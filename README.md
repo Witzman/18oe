@@ -1,7 +1,8 @@
 # 18oe
 
 Turn-based 18xx-style train game. Private project; process and design docs
-live in the sibling `18oe-workshop` repo, not here.
+live in the sibling `18oe-workshop` repo, not here — see `CLAUDE.md` for
+the short version and the pointer.
 
 ## Running locally
 
@@ -10,4 +11,13 @@ docker compose up --build
 curl http://localhost/healthz
 ```
 
-Currently a walking skeleton (`app.rb`) — no game logic yet.
+## Deployment
+
+Runs on Dokploy (`orient18oe`), building this repo's `Dockerfile`/
+`docker-compose.yml` directly. DNS/vhost routing (the server also runs
+Apache for other domains) is being finished separately.
+
+## Status
+
+Walking skeleton only — `app.rb` answers `/healthz`, no game logic yet.
+Ruby, Sinatra, Puma.
