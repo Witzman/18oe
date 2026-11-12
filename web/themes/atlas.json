@@ -1,0 +1,59 @@
+{
+  "id": "atlas",
+  "name": "Atlas",
+  "colorScheme": "light",
+  "map": {
+    "seaDeep": "#7fa0b6",
+    "seaShallow": "#93bab2",
+    "landLow": "#b4bf8a",
+    "land": "#aab67e",
+    "landHigh": "#a58f66",
+    "hexLine": "#282319",
+    "tile": "#eedd7a",
+    "tileEdge": "#a8902f",
+    "track": "#6b2f26",
+    "city": "#f8f2e0",
+    "cityEdge": "#3a2f1f",
+    "edgeDot": "#8b3a2f"
+  },
+  "ui": {
+    "bg": "#d9cdb0",
+    "panel": "#efe5cc",
+    "ink": "#3a2f1f",
+    "faint": "#63563f",
+    "rule": "#b9a77f",
+    "accent": "#b8923f",
+    "accentInk": "#1d1a12",
+    "bar": "#2c2a3a",
+    "barInk": "#f1e7cc",
+    "error": "#8b2f25"
+  },
+  "company": {
+    "c1": "#3f6f9a",
+    "c2": "#a8443a",
+    "c3": "#4f7f4f",
+    "c4": "#33302b",
+    "c5": "#5f4a82",
+    "c6": "#c27a3a"
+  },
+  "player": {
+    "p1": "#1f5f8b",
+    "p2": "#b0440f",
+    "p3": "#e0a81c",
+    "p4": "#7cc0e8",
+    "p5": "#2b2b2b",
+    "p6": "#fbf6ea",
+    "p7": "#8a8a86"
+  },
+  "font": {
+    "head": "'Old Standard TT', Georgia, serif",
+    "body": "'Source Serif 4', Georgia, serif"
+  },
+  "shape": {
+    "tilt": 1,
+    "tileStyle": "full",
+    "hexLineAlpha": 0.32,
+    "paper": 0.05,
+    "radius": 1
+  }
+}
