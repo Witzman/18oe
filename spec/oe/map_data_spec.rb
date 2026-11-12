@@ -217,6 +217,95 @@ RSpec.describe Oe::MapData do
     end
   end
 
+  describe "upgrade paths (#201)" do
+    let(:tiles) { data[:tiles] }
+    let(:game) { described_class.fresh_game }
+    let(:labelled) { game.hexes.select { |h| h.tile.label } }
+    let(:neutral) { game.hexes.find { |h| h.tile.color == :white && !h.tile.label } }
+
+    it "gives every one of the 76 catalog tiles an upgrades_to list of catalog names" do
+      expect(tiles.size).to eq(76)
+      tiles.each do |name, t|
+        expect(t[:upgrades_to]).to be_an(Array), name
+        expect(t[:upgrades_to]).to eq(t[:upgrades_to].sort)
+        expect(tiles.keys).to include(*t[:upgrades_to]) unless t[:upgrades_to].empty?
+        expect(tiles.keys).to include(*t[:upgrades_to_at].keys) if t[:upgrades_to_at]
+        expect(t[:upgrades_to] & (t[:upgrades_to_at] || {}).keys).to be_empty
+      end
+    end
+
+    it "matches the engine (all_potential_upgrades) for every tile on every hex it can lie on" do
+      checked = 0
+      game.tiles.group_by(&:name).each do |name, copies|
+        tile = copies.first
+        contexts = tile.label ? [neutral] + labelled : [neutral]
+        entry = tiles.fetch(name)
+        contexts.each do |hex|
+          tile.hex = hex
+          engine = game.send(:all_potential_upgrades, tile).map(&:name)
+          mine = entry[:upgrades_to] + (entry[:upgrades_to_at] || {}).select { |_, ids| ids.include?(hex.id) }.keys
+          expect(mine).to match_array(engine), "#{name} on #{hex.id}"
+          checked += 1
+        end
+        tile.hex = nil
+      end
+      expect(checked).to be > 76
+    end
+
+    it "only goes up one colour, keeps the pre-printed track and the city/town counts" do
+      colors = Engine::Tile::COLORS.map(&:to_s)
+      by_name = game.tiles.group_by(&:name).transform_values(&:first)
+      tiles.each do |name, t|
+        from = by_name.fetch(name)
+        (t[:upgrades_to] + (t[:upgrades_to_at] || {}).keys).each do |to_name|
+          to = by_name.fetch(to_name)
+          expect(colors.index(to.color.to_s)).to eq(colors.index(t[:color]) + 1), "#{name} -> #{to_name}"
+          expect(from.paths_are_subset_of?(to.paths)).to be(true)
+          expect(from.towns.size).to eq(to.towns.size)
+          expect(from.double_towns.size).to eq(to.double_towns.size)
+        end
+      end
+    end
+
+    it "marks the hex-dependent label upgrades with the hexes they apply to" do
+      at = tiles["201"][:upgrades_to_at]
+      expect(at["OE12"]).to eq(%w[K26 R55 Y14])
+      expect(at["OE13"]).to eq(%w[M50])
+      expect(at["OE14"]).to eq(%w[AA82])
+      expect(at["OE18"]).to eq(%w[C74])
+      expect(at["OE16"]).to eq(%w[AB51])
+      expect(tiles["201"][:upgrades_to]).to eq(%w[207 208 622])
+      expect(tiles["OE4"][:upgrades_to_at]["OE17"]).to eq(%w[Q30])
+      expect(tiles["3"][:upgrades_to_at]).to be_nil
+      expect(labelled.map { |h| h.id }).to include(*at.values.flatten)
+    end
+
+    it "carries the first phase in which the colour may be laid" do
+      expect(tiles["3"][:phase]).to eq("2")
+      expect(tiles["141"][:phase]).to eq("3")
+      expect(tiles["145"][:phase]).to eq("5")
+      expect(tiles["OE34"][:phase]).to eq("7")
+      expect(tiles.values.map { |t| t[:phase] }.compact.size).to eq(76)
+    end
+
+    it "gives bare white hexes one shared list and printed cities/towns their own" do
+      blank = data[:blank_upgrades_to]
+      expect(blank).to eq(%w[7 8 9])
+      own = hexes.select { |h| h[:upgrades_to] }
+      expect(own.size).to eq(272)
+      expect(own.map { |h| h[:upgrades_to] }.flatten - tiles.keys).to be_empty
+      bare = hexes.select { |h| h[:color] == "white" && !h[:upgrades_to] && !h[:cities] && !h[:towns] && !h[:paths] }
+      expect(bare).not_to be_empty
+      game.hexes.select { |h| h.tile.color == :white && described_class.blank_tile?(h.tile) }.each do |eh|
+        expect(game.send(:all_potential_upgrades, eh.tile).map(&:name)).to match_array(blank), eh.id
+      end
+      own.each do |h|
+        eh = game.hex_by_id(h[:id])
+        expect(h[:upgrades_to]).to match_array(game.send(:all_potential_upgrades, eh.tile).map(&:name)), h[:id]
+      end
+    end
+  end
+
   describe ".json" do
     it "is memoised per engine_rev" do
       a = described_class.json("rev-a")
