@@ -47,7 +47,7 @@ RSpec.describe Oe::GameSession do
         path = File.join(dir, "x.sqlite3")
         Oe::Store.new(path).close
         reopened = Oe::Store.new(path)
-        expect(reopened.schema_version).to eq(1)
+        expect(reopened.schema_version).to eq(Oe::Store::SCHEMA_VERSION)
         reopened.close
       end
     end

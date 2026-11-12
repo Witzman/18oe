@@ -14,11 +14,11 @@ module Oe
   # transactions are BEGIN IMMEDIATE so a second process also queues behind
   # the writer (busy_timeout) instead of failing half way.
   class Store
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
     DEFAULT_PATH = "/data/18oe.sqlite3"
 
     MIGRATIONS = {
-      1 => <<~SQL
+      1 => <<~SQL,
         CREATE TABLE games (
           id         INTEGER PRIMARY KEY,
           created_at TEXT NOT NULL,
@@ -36,6 +36,16 @@ module Oe
           payload     TEXT NOT NULL,       -- JSON, exactly the engine's action.to_h
           created_at  TEXT NOT NULL,
           UNIQUE (game_id, seq)
+        );
+      SQL
+      2 => <<~SQL
+        CREATE TABLE incidents (
+          id         INTEGER PRIMARY KEY,
+          game_id    INTEGER NOT NULL REFERENCES games(id),
+          seq        INTEGER NOT NULL,     -- log position when it happened
+          kind       TEXT NOT NULL,        -- bot_error | bot_rejected | fallback | stuck
+          message    TEXT NOT NULL,
+          created_at TEXT NOT NULL
         );
       SQL
     }.freeze
@@ -109,6 +119,18 @@ module Oe
         @db.execute("SELECT seq, actor, action_type, payload, created_at FROM actions WHERE game_id = ? ORDER BY seq", [game_id])
       end
       rows.map { |r| r.merge("payload" => JSON.parse(r["payload"])) }
+    end
+
+    # Things that went wrong around a game without stopping it (bot failures).
+    def add_incident(game_id:, seq:, kind:, message:)
+      @mutex.synchronize do
+        @db.execute("INSERT INTO incidents (game_id, seq, kind, message, created_at) VALUES (?, ?, ?, ?, ?)",
+                    [game_id, seq, kind, message.to_s[0, 500], now])
+      end
+    end
+
+    def incidents(game_id)
+      @mutex.synchronize { @db.execute("SELECT seq, kind, message, created_at FROM incidents WHERE game_id = ? ORDER BY id", [game_id]) }
     end
 
     def set_status(id, status)
