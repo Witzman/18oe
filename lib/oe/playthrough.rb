@@ -3,6 +3,7 @@
 require 'fileutils'
 require 'json'
 require_relative 'legal_actions'
+require_relative 'strategy_player'
 
 module Oe
   # Plays one game with random legal actions (Oe::LegalActions) until it ends
@@ -36,7 +37,8 @@ module Oe
       new(**opts).run
     end
 
-    def initialize(players:, seed:, max_actions: 20_000, limit: 12)
+    def initialize(players:, seed:, max_actions: 20_000, limit: 12, player: :random)
+      @player = player
       @players = players
       @seed = seed
       @max_actions = max_actions
@@ -46,6 +48,7 @@ module Oe
     def run
       game = Engine::Game::G18OE::Game.new(("A".."Z").first(@players), id: @seed, seed: @seed)
       rng = Random.new(@seed)
+      strategist = StrategyPlayer.new(game, rng: rng) if @player == :strategy
       started = clock
       spent = 0.0
       slowest = 0.0
@@ -72,7 +75,8 @@ module Oe
           break
         end
 
-        action = actions.group_by(&:class).values.sample(random: rng).sample(random: rng)
+        action = strategist ? strategist.choose(actions) : actions.group_by(&:class).values.sample(random: rng).sample(random: rng)
+        action ||= actions.sample(random: rng)
         game.process_action(action)
         count += 1
         next unless (error = game.exception)

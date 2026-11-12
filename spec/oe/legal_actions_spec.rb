@@ -174,11 +174,8 @@ RSpec.describe Oe::LegalActions do
       end
     end
 
-    # Known engine dead ends (#32): a minor or regional cannot pay for a
-    # forced 2+2 or home token. The enumerator reports them honestly (no
-    # action), and this example turns green once #32 fixes them.
+    # Used to be the known engine dead ends (#85 first-round insolvency, #86 token re-placement).
     it "never leaves an active step without an action" do
-      pending "#32: undercapitalised minors/regionals hit a dead end in the first operating round"
       build = -> { Engine::Game::G18OE::Game.new(%w[A B C D], id: 1, seed: 1) }
       played = play(build, seed: 1, steps: 3000, every: 10_000)
 

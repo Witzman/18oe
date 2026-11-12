@@ -355,8 +355,18 @@ module Oe
         min, max = step.spend_minmax(entity, train)
         max = [max, budget].min
         prices = train.from_depot? ? [train.price] : amounts(min, [train.price, max].min, 10)
-        prices.select { |price| price <= max && price.positive? }.map { |price| A::BuyTrain.new(entity, train: train, price: price) }
+        prices.select { |price| price <= max && price.positive? && cheapest_if_contributing?(step, train, price, entity) }.map { |price| A::BuyTrain.new(entity, train: train, price: price) }
       end
+    end
+
+    # When the president has to chip in, the engine only allows the cheapest depot train.
+    def cheapest_if_contributing?(step, train, price, entity)
+      return true if price <= entity.cash
+
+      step.send(:check_for_cheapest_train, train)
+      true
+    rescue Engine::GameError
+      false
     end
 
     # Own cash, plus the president's when the step lets them contribute.
