@@ -7,11 +7,10 @@ if RUBY_ENGINE == 'opal'
   require_tree '../round'
   require_tree '../step'
 else
-  require 'require_all'
   require 'json'
-  require_rel '../action'
-  require_rel '../round'
-  require_rel '../step'
+  Dir[File.join(__dir__, '../action', '**', '*.rb')].sort.each { |f| require f }
+  Dir[File.join(__dir__, '../round', '**', '*.rb')].sort.each { |f| require f }
+  Dir[File.join(__dir__, '../step', '**', '*.rb')].sort.each { |f| require f }
 end
 
 require_relative '../bank'

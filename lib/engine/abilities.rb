@@ -3,8 +3,7 @@
 if RUBY_ENGINE == 'opal'
   require_tree 'ability'
 else
-  require 'require_all'
-  require_rel 'ability'
+  Dir[File.join(__dir__, 'ability', '**', '*.rb')].sort.each { |f| require f }
 end
 
 module Engine

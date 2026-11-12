@@ -8,8 +8,8 @@ require_relative 'engine/logger'
 if RUBY_ENGINE == 'opal'
   require_tree 'engine/game'
 else
-  require 'require_all'
-  require_rel 'engine/game'
+  Dir[File.join(__dir__, 'engine', 'game', '*.rb')].sort.each { |f| require f }
+  Dir[File.join(__dir__, 'engine', 'game', 'g_18_oe', '**', '*.rb')].sort.each { |f| require f }
 end
 
 module Engine

@@ -3,8 +3,7 @@
 if RUBY_ENGINE == 'opal'
   require_tree '../step'
 else
-  require 'require_all'
-  require_rel '../step'
+  Dir[File.join(__dir__, '../step', '**', '*.rb')].sort.each { |f| require f }
 end
 
 module Engine

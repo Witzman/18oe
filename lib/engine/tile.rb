@@ -3,8 +3,7 @@
 if RUBY_ENGINE == 'opal'
   require_tree 'part'
 else
-  require 'require_all'
-  require_rel 'part'
+  Dir[File.join(__dir__, 'part', '**', '*.rb')].sort.each { |f| require f }
 end
 
 require_relative 'game_error'
