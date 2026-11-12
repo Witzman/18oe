@@ -145,6 +145,16 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "dividend.half": e("Hälfte ausschütten", "Pay half-revenue as dividends", "§11.4"),
   "dividend.payout": e("Alles ausschütten", "Pay all revenue as dividends", "§11.4"),
 
+  // --- Gründe für Ungültiges (ui-spec §3.5: nur diese Fälle, sonst Standardtext) --
+  "invalid.cash": e("Zu wenig Bargeld", "Not enough cash", "—"),
+  "invalid.certificate_limit": e("Zertifikatslimit erreicht", "Certificate limit reached", "§2.2.7"),
+  "invalid.no_build_points": e("Keine Baupunkte mehr", "No tile placements left", "§11.1"),
+  "invalid.no_token": e("Kein freier Token", "No token available", "§11.2"),
+  "invalid.no_train": e("Kein Zug dieser Art im Depot", "No train of this type in the depot", "§11.6"),
+  "invalid.tile_unavailable": e("Kachel nicht vorrätig", "Tile not available", "§11.1.2"),
+  "invalid.phase": e("Nicht in dieser Phase (Kachelfarbe)", "Not allowed in this phase (tile colour)", "§5"),
+  "invalid.default": e("Jetzt nicht möglich", "Not possible now", "—"),
+
   // --- Fehlercodes (lib/oe/games_api.rb, app.rb; "network" in web/api.ts) ----
   "error.bad_request": e("Ungültige Anfrage", "Bad request", "—"),
   "error.login_required": e("Bitte anmelden", "Login required", "—"),

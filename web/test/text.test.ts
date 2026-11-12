@@ -102,6 +102,14 @@ test("round types, tiers, dividend kinds, error codes and rule references have e
   assert.deepEqual(keys.filter((k) => !TEXT[k]), []);
 });
 
+test("every reason for an invalid action (ui-spec §3.5) has an entry", () => {
+  const reasons = [
+    "cash", "certificate_limit", "no_build_points", "no_token", "no_train",
+    "tile_unavailable", "phase", "default",
+  ];
+  assert.deepEqual(reasons.filter((r) => !TEXT[`invalid.${r}`]), []);
+});
+
 test("no entry has an empty German, English or rule text", () => {
   for (const [key, entry] of Object.entries(TEXT)) {
     for (const field of ["de", "en", "regel"] as const) {
