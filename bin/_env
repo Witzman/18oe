@@ -1,0 +1,16 @@
+# Sourced by bin/setup and bin/test. Keeps every tool inside the repo so
+# nothing depends on (or writes to) $HOME, and does not assume bundle/node in PATH.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export XDG_CACHE_HOME="$ROOT/.tools/cache"      # gem/bundler caches (~/.cache may be read-only)
+export BUNDLE_USER_HOME="$ROOT/.tools/bundle-home"
+export BUNDLE_APP_CONFIG="$ROOT/.bundle"
+export BUNDLE_PATH="$ROOT/vendor/bundle"
+export BUNDLE_GEMFILE="$ROOT/Gemfile"
+mkdir -p "$XDG_CACHE_HOME" "$BUNDLE_USER_HOME"
+export PATH="$ROOT/.tools/node/bin:$PATH"
+
+# Bundler: use `bundle` if present, else the default gem shipped with Ruby.
+bundler() {
+  if command -v bundle >/dev/null 2>&1; then bundle "$@"
+  else ruby -e 'load Gem.bin_path("bundler", "bundle")' -- "$@"; fi
+}
