@@ -33,19 +33,28 @@ module Oe
       new(game, **opts).call
     end
 
-    def initialize(game, limit: nil, rng: Random.new(0))
+    def initialize(game, limit: nil, rng: Random.new(0), compact: false)
       @game = game
       @limit = limit
       @rng = rng
       @unsupported = []
+      @compact = compact
+      @ranges = []
     end
 
     # Action types a step offered that have no generator, as "Step: type"
     # strings, in the order met (set by #call).
     attr_reader :unsupported
 
+    # With `compact: true` the bid family (thousands of actions: one per amount)
+    # is not expanded; it is described here instead (#91), one entry per
+    # entity and company: {type: 'bid', entity:, company:, min:, max:, step:}.
+    # Every amount min, min+step, ... max is a legal bid.
+    attr_reader :ranges
+
     def call
       @unsupported = []
+      @ranges = []
       return [] if @game.finished
 
       step = @game.round.active_step
@@ -98,11 +107,11 @@ module Oe
     end
 
     # Spread of amounts between min and max, always including both ends.
-    def amounts(min, max, step_size = 1)
+    def amounts(min, max, step_size = 1, exhaustive: false)
       return [] if max < min
 
       values = [min, max]
-      if @limit.nil?
+      if @limit.nil? || exhaustive
         values = (min..max).step(step_size).to_a
       else
         values.concat(Array.new([@limit - 2, 0].max) { min + (@rng.rand(((max - min) / step_size) + 1) * step_size) })
@@ -141,6 +150,13 @@ module Oe
 
         max = step.max_bid(entity, company)
         prices = bid_prices(step, company, min, max)
+        if @compact
+          unless prices.empty?
+            @ranges << { type: 'bid', entity: entity.id, company: company.id, min: prices.first, max: prices.last,
+                         step: prices.size > 1 ? step.min_increment : 1 }
+          end
+          next []
+        end
         prices.map { |price| A::Bid.new(entity, company: company, price: price) }
       end
     end
@@ -151,7 +167,7 @@ module Oe
       return [min] if step.respond_to?(:top_row?, true) && step.send(:top_row?, company) &&
                       !@game.company_becomes_minor?(company) && !step.auctioning
 
-      amounts(min, max, step.min_increment)
+      amounts(min, max, step.min_increment, exhaustive: @compact)
     end
 
     # ---- stock round ------------------------------------------------------

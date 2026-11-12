@@ -70,6 +70,7 @@ export interface HexChange {
 export interface Prompt {
   step: string | null; types: string[]; viewer_to_act: boolean;
   unsupported: string[];
+  ranges: { type: string; entity: string; company: string; min: number; max: number; step: number }[];
   actions: Record<string, unknown>[];
 }
 
