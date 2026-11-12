@@ -66,6 +66,16 @@ export interface Prompt {
   actions: Record<string, unknown>[];
 }
 
+export interface AuctionCard {
+  id: string; name: string; kind: "private" | "minor" | "concession";
+  row: number; value: number; revenue: number; discount: number; min_bid: number;
+  bid: { player: string; price: number } | null;
+}
+export interface Auction {
+  top_row: number | null; increment: number; cards: AuctionCard[];
+  current: string | null; to_act: string[]; passed: string[]; open_bidders: string[];
+}
+
 export interface GameState {
   meta: Meta;
   players: Player[];
@@ -73,6 +83,7 @@ export interface GameState {
   market: { rows: (MarketCell | null)[][] };
   depot: { available: (Train & { owner: string | null })[]; upcoming: number; next: string | null; discarded: string[] };
   bank: { cash: number };
+  auction: Auction | null;
   map: HexChange[];
   log: { action: number; text: string }[];
   prompt: Prompt;

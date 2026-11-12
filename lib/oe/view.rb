@@ -34,6 +34,7 @@ module Oe
         market: market(game),
         depot: depot(game),
         bank: { cash: game.bank.cash },
+        auction: auction(game),
         map: map(game),
         log: log_lines(game, log),
         prompt: prompt(game, viewer, actions, actions_limit),
@@ -192,6 +193,48 @@ module Oe
         upcoming: depot.upcoming.size,
         next: depot.upcoming.first&.name,
         discarded: depot.discarded.map(&:name),
+      }
+    end
+
+    # The opening auction (#120): the unsold cards in row order, nil when no
+    # auction is running. A card is a private, a minor or a concession; `min_bid`
+    # is the step's own minimum (face value less the all-pass discount for the
+    # top row, else the highest bid plus the increment); `bid` the highest bid.
+    # `current` is the card in the open auction among all players (once someone
+    # bid above face value on a minor), `open_bidders` who is still in it.
+    def auction(game)
+      return if game.finished
+
+      step = game.round.active_step
+      return unless step.respond_to?(:tiered_auction_companies) && step.respond_to?(:open_bidders)
+
+      cards = step.companies
+      {
+        top_row: cards.first&.auction_row,
+        increment: step.min_increment,
+        cards: cards.map { |c| auction_card(game, step, c) },
+        current: step.auctioning&.id,
+        to_act: step.active_entities.map(&:id),
+        passed: game.players.select(&:passed?).map(&:id),
+        open_bidders: step.open_bidders.map(&:id),
+      }
+    end
+
+    def auction_card(game, step, company)
+      high = step.bids.fetch(company, []).max_by(&:price)
+      {
+        id: company.id,
+        name: company.name,
+        kind: if company.type == :concession then "concession"
+              elsif game.company_becomes_minor?(company) then "minor"
+              else "private"
+              end,
+        row: company.auction_row,
+        value: company.value,
+        revenue: company.revenue,
+        discount: company.discount,
+        min_bid: step.min_bid(company),
+        bid: high && { player: high.entity.id, price: high.price },
       }
     end
 

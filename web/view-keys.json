@@ -1,5 +1,6 @@
 {
   "state": [
+    "auction",
     "bank",
     "corporations",
     "depot",
@@ -79,5 +80,25 @@
   ],
   "market": [
     "rows"
+  ],
+  "auction": [
+    "cards",
+    "current",
+    "increment",
+    "open_bidders",
+    "passed",
+    "to_act",
+    "top_row"
+  ],
+  "auction_card": [
+    "bid",
+    "discount",
+    "id",
+    "kind",
+    "min_bid",
+    "name",
+    "revenue",
+    "row",
+    "value"
   ]
 }
