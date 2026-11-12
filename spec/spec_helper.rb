@@ -28,5 +28,4 @@ end
 
 RSpec.configure do |config|
   config.include AppHelper
-  config.disable_monkey_patching!
 end

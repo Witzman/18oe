@@ -12,9 +12,10 @@ engine.
 ## Removed
 
 - All other game titles: every `lib/engine/game/g_*` directory and its
-  `g_*.rb` stub except `g_18_oe/` and `g_18_oe.rb`, including the
-  `g_18_oe_uk_fr` variant. Nothing in `g_18_oe/` or the kept core files
-  references another title.
+  `g_*.rb` stub except `g_18_oe/`, `g_18_oe.rb`, `g_18_oe_uk_fr/` and
+  `g_18_oe_uk_fr.rb` (the UK-France scenario variant, kept unmodified because
+  the upstream 18OE specs exercise it). Nothing in `g_18_oe/` or the kept core
+  files references another title.
 - Kept unchanged: the whole core (`round/`, `step/`, `ability/`, `part/`,
   `action/`, `config/`, `helper/`, ...) and the shared top-level files of
   `lib/engine/game/` (`base.rb`, `meta.rb`, shared mixins).
@@ -26,7 +27,7 @@ left as they were.
 
 - `lib/engine.rb`: `require 'require_all'` / `require_rel 'engine/game'`
   replaced by explicit `Dir[...].sort` requires of `engine/game/*.rb` and the
-  `engine/game/g_18_oe/**` tree (title registry code is unchanged).
+  `engine/game/g_18_oe/**` and `engine/game/g_18_oe_uk_fr/**` trees (title registry code is unchanged).
 - `lib/engine/abilities.rb`: `require_rel 'ability'` replaced by sorted Dir require.
 - `lib/engine/tile.rb`: `require_rel 'part'` replaced by sorted Dir require.
 - `lib/engine/round/base.rb`: `require_rel '../step'` replaced by sorted Dir require.

@@ -10,6 +10,7 @@ if RUBY_ENGINE == 'opal'
 else
   Dir[File.join(__dir__, 'engine', 'game', '*.rb')].sort.each { |f| require f }
   Dir[File.join(__dir__, 'engine', 'game', 'g_18_oe', '**', '*.rb')].sort.each { |f| require f }
+  Dir[File.join(__dir__, 'engine', 'game', 'g_18_oe_uk_fr', '**', '*.rb')].sort.each { |f| require f }
 end
 
 module Engine
