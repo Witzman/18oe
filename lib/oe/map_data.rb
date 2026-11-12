@@ -73,6 +73,7 @@ module Oe
       sea_by_hex = sea_zones.each_with_object({}) { |(name, z), h| z[:hexes].each { |id| h[id] = name } }
       zone_hexes = klass::NATIONAL_REGION_HEXES
       hexes = game.hexes.sort_by { |h| [row_index(h.id), col_number(h.id)] }
+      tile_names = game.tiles.group_by(&:name).transform_values(&:first)
 
       {
         schema: SCHEMA,
@@ -85,8 +86,9 @@ module Oe
           edge_vectors: edge_vectors,
           note: "x = col * sqrt(3)/2, y = row * 1.5 (side length 1, y down); edge i points to neighbors[i]",
         },
-        hexes: hexes.map { |h| hex(game, h, sea_by_hex, zone_hexes) },
-        tiles: tile_catalog(game),
+        hexes: hexes.map { |h| hex(game, h, sea_by_hex, zone_hexes, tile_names) },
+        tiles: tile_catalog(game, tile_names),
+        blank_upgrades_to: blank_upgrades(game, tile_names),
         ports: ports(klass::PORTS),
         sea_zones: sea_zones.map { |name, z| { name: name, sea: z[:sea].to_s, hexes: z[:hexes] } },
         channel_passages: klass::CHANNEL_PASSAGES.map(&:dup),
@@ -105,7 +107,7 @@ module Oe
     # -> hex or nil). The engine's `neighbors` is only the passable subset
     # (edges towards blue/gray/red tiles are dropped, #43 measured): not
     # symmetric, so useless for geometry.
-    def hex(game, hex, sea_by_hex, zone_hexes)
+    def hex(game, hex, sea_by_hex, zone_hexes, tile_names)
       tile = hex.tile
       id = hex.id
       row = row_index(id)
@@ -123,7 +125,70 @@ module Oe
       out[:zone] = zone if zone
       out[:zones] = zones if zones.size > 1
       out[:sea_zone] = sea_by_hex[id] if sea_by_hex[id]
-      out.merge(tile_parts(tile))
+      out = out.merge(tile_parts(tile))
+      ups = hex_upgrades(game, hex, tile_names) if printed_tile_upgradable?(hex.tile)
+      out[:upgrades_to] = ups if ups && !ups.empty?
+      out
+    end
+
+    UPGRADABLE_COLORS = %i[white yellow green brown].freeze
+
+    # A printed tile that is more than bare terrain (cities, towns, paths,
+    # labels, ...) has its own upgrade list; bare white hexes share
+    # `blank_upgrades_to` (checked in the spec: identical for all of them).
+    def printed_tile_upgradable?(tile)
+      UPGRADABLE_COLORS.include?(tile.color) && !blank_tile?(tile)
+    end
+
+    def blank_tile?(tile)
+      tile.parts.all? { |p| p.is_a?(Engine::Part::Upgrade) || p.is_a?(Engine::Part::Border) }
+    end
+
+    # Upgrade targets of the tile actually lying on `hex` (the engine's own
+    # `upgrades_to?`, so labels that depend on the hex are decided exactly as
+    # in play). Names only, sorted; the colour/phase gate is `tile_phase`.
+    def hex_upgrades(game, hex, tile_names)
+      tile_names.select { |_, t| game.upgrades_to?(hex.tile, t) }.keys.sort
+    end
+
+    def blank_upgrades(game, tile_names)
+      blank = game.hexes.find { |h| h.tile.color == :white && blank_tile?(h.tile) }
+      hex_upgrades(game, blank, tile_names)
+    end
+
+    # Name of the first phase in which tiles of this colour may be laid
+    # (engine phase table), nil if never.
+    def tile_phase(game, color)
+      game.phase.phases.find { |ph| Array(ph[:tiles]).include?(color) }&.fetch(:name)
+    end
+
+    # Upgrade paths of catalog tiles (#201). `upgrades_to` are the catalog
+    # names the tile may be upgraded to wherever it lies; `upgrades_to_at`
+    # {name => [hex ids]} those that depend on the hex (the engine's label
+    # rule `upgrades_to_correct_label?` looks at `from.hex.coordinates`, e.g.
+    # a plain city on K26/Y14/R55 only goes to an "A" tile). Decided by the
+    # engine's `upgrades_to?` itself: a labelled tile is tried on every hex whose
+    # printed tile carries a label plus one hex without (the neutral case).
+    # Not decided here: costs, tile counts, whether a company may lay (that
+    # is the track step, `Tracker#potential_tiles`).
+    def catalog_upgrades(game, tile, tile_names)
+      labelled = game.hexes.select { |h| h.tile.label }
+      neutral = game.hexes.find { |h| h.tile.color == :white && !h.tile.label }
+      # A tile without a label is never on a labelled hex (labelled printed
+      # tiles only go to tiles carrying a label), so it is judged neutral only.
+      contexts = tile.label ? [neutral] + labelled : [neutral]
+      saved = tile.hex
+      tile_names.each_with_object({ all: [], at: {} }) do |(name, target), acc|
+        ok = contexts.select do |h|
+          tile.hex = h
+          game.upgrades_to?(tile, target)
+        end
+        if ok.size == contexts.size then acc[:all] << name
+        elsif ok.any? then acc[:at][name] = (ok - [neutral]).map(&:id).sort
+        end
+      end
+    ensure
+      tile.hex = saved
     end
 
     def kind(tile, sea_zone)
@@ -133,10 +198,17 @@ module Oe
       "land"
     end
 
-    def tile_catalog(game)
-      game.tiles.group_by(&:name).sort_by { |name, _| name }.to_h do |name, copies|
-        tile = copies.first
-        [name, { color: tile.color.to_s, count: copies.size }.merge(tile_parts(tile))]
+    def tile_catalog(game, tile_names)
+      counts = game.tiles.group_by(&:name).transform_values(&:size)
+      tile_names.sort_by { |name, _| name }.to_h do |name, tile|
+        ups = catalog_upgrades(game, tile, tile_names)
+        entry = { color: tile.color.to_s, count: counts[name] }
+        phase = tile_phase(game, tile.color)
+        entry[:phase] = phase if phase
+        entry = entry.merge(tile_parts(tile))
+        entry[:upgrades_to] = ups[:all].sort
+        entry[:upgrades_to_at] = ups[:at].sort.to_h unless ups[:at].empty?
+        [name, entry]
       end
     end
 
@@ -178,6 +250,17 @@ module Oe
         h[:loc] = t.loc if t.loc
         h
       end)
+      # Double town: `axis` and `revenue_loc` are layout hints of the old
+      # renderer, only stored by the engine (`Part::DoubleTown`). Reading
+      # (#201, from all 9 catalog tiles + the printed ones): positions are edge
+      # positions as `loc` (0 = edge 0, +1 = next edge, .5 = the corner between;
+      # period 6). `axis` (0..2 in steps of .5, period 3 = 180 degrees) is the
+      # line through the hex centre on which the two town dots sit, i.e. towards
+      # edge position `axis` and its opposite `axis + 3`; it points along the
+      # through track (OE1: edges 0 and 3, axis 0) or into the free gap
+      # (OE9: edges 0,1,3,4 used, axis 2). `revenue_loc` are the two edge
+      # positions of the two revenue labels, always where no track leaves
+      # (OE1: 1.5 and 4.5 between the edges; OE11: 4 and 5, the free edges).
       add.call(:double_towns, parts.grep(Engine::Part::DoubleTown).map do |d|
         { node: index.fetch(d), axis: d.axis, revenue_loc: d.revenue_locs, revenue: revenue(d.towns.first) }
       end)
