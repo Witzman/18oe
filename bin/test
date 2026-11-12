@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Single entry point for all test suites. Later issues add more below.
+set -euo pipefail
+source "$(dirname "$0")/_env"
+cd "$ROOT"
+bundler exec rspec "$@"

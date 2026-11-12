@@ -8,6 +8,8 @@ WORKDIR /app
 RUN apk add --no-cache build-base
 
 COPY Gemfile Gemfile.lock ./
+# Test gems (rspec, rack-test) are not needed in the image.
+ENV BUNDLE_WITHOUT=test
 RUN bundle install
 
 COPY app.rb ./

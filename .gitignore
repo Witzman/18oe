@@ -1,0 +1,5 @@
+vendor/bundle
+.bundle
+.tools
+node_modules
+tmp
