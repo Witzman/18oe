@@ -15,6 +15,25 @@ Docker is not required for tests. Everything stays inside the repo
 (`vendor/bundle`, `.tools`, both gitignored); `bundle` and `node` need not
 be in `PATH`.
 
+## Screenshots (visual self-check)
+
+```sh
+cd web && npm run build && cd ..
+bin/shot web/dist/index.html#/kit out.png --theme atlas --width 1280 --height 900 --full-page
+bin/shot http://127.0.0.1:4567/#/kit out.png --wait-for ".kit" --eval 'document.body.classList.add("x")'
+```
+
+`bin/shot <url|file> <out.png>` renders with a headless Chromium and writes a PNG
+(options: `--width --height --theme brett|atlas --tile-style full|inner --wait-for <selector>
+--delay <ms> --eval <js> --full-page`; `bin/shot --help`). A local file is served from its
+own directory as site root, so `web/dist/index.html#/kit` works without the Ruby server.
+Camera values and the like go into the URL (query/hash) once the page reads them.
+No dependencies: it talks the DevTools protocol itself. Needs the Debian packages
+`chromium-headless-shell`, `fonts-liberation`, `fonts-dejavu-core` (or `OE_BROWSER=<binary>`).
+Note: in the agent sandbox only the headless *shell* starts (`AF_UNIX` sockets are denied,
+the full `chromium` needs one); WebGL runs in software (SwiftShader). The smoke test in
+`web/test/shot.test.ts` is skipped when no browser is installed.
+
 ## Rules engine
 
 `lib/engine/` is the rules engine, extracted from the open-source
