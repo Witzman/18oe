@@ -285,6 +285,84 @@ RSpec.describe "games API (#36)" do
   end
 end
 
+RSpec.describe "games API with bot seats (#39)" do
+  class BotApiClient
+    include Rack::Test::Methods
+
+    def app = Sinatra::Application
+
+    def api(verb, path, body = nil)
+      env = { "HTTP_HOST" => "127.0.0.1" }
+      env["CONTENT_TYPE"] = "application/json" if body
+      send(verb, path, body ? JSON.generate(body) : {}, env)
+      [last_response.status, JSON.parse(last_response.body)]
+    end
+  end
+
+  let(:alice) do
+    c = BotApiClient.new
+    c.post "/login", { account: "alice", code: "sesame" }, { "HTTP_HOST" => "127.0.0.1" }
+    c
+  end
+  let(:seats) { [{ kind: "human", account_id: "alice" }, { kind: "bot" }, { kind: "bot" }] }
+
+  before do
+    ENV["OE_ACCESS_CODE"] = "sesame"
+    Sinatra::Application.set :store, Oe::Store.new(":memory:")
+  end
+
+  after do
+    ENV.delete("OE_ACCESS_CODE")
+    Sinatra::Application.set :bot_mode, :off
+  end
+
+  def play_one(client, id)
+    state = client.api(:get, "/games/#{id}")[1]
+    action = state["state"]["prompt"]["actions"].first
+    client.api(:post, "/games/#{id}/actions", { action: action, seq: state["seq"] })
+  end
+
+  it "lets the bots answer inside the request (inline): the response is back at the human" do
+    Sinatra::Application.set :bot_mode, :inline
+    status, game = alice.api(:post, "/games", { seats: seats, seed: 2 })
+    expect(status).to eq(201)
+    expect(game["state"]["meta"]["active_players"]).to eq([game["viewer"]])
+    expect(game["state"]["prompt"]["viewer_to_act"]).to be(true)
+
+    before_seq = game["seq"]
+    status, after = play_one(alice, game["id"])
+    expect(status).to eq(200)
+    expect(after["seq"]).to be >= before_seq + 3 # the human's move and both bots' replies
+    expect(after["state"]["prompt"]["viewer_to_act"]).to be(true)
+
+    _, log = alice.api(:get, "/games/#{game['id']}/actions")
+    expect(log["actions"].map { |a| a["actor"] }.uniq.sort).to eq(%w[alice bot:1 bot:2])
+    expect(log["incidents"]).to eq([])
+  end
+
+  it "lets the bots answer in the background (async): the human sees their moves via polling" do
+    Sinatra::Application.set :bot_mode, :async
+    runner = Oe::GamesApi.runner_for(Sinatra::Application.settings.store)
+    _, game = alice.api(:post, "/games", { seats: seats, seed: 2 })
+    id = game["id"]
+    expect(runner.wait_idle(id, timeout: 60)).to be(true)
+
+    status, = play_one(alice, id)
+    expect(status).to eq(200)
+    expect(runner.wait_idle(id, timeout: 60)).to be(true)
+    _, now = alice.api(:get, "/games/#{id}")
+    expect(now["state"]["prompt"]["viewer_to_act"]).to be(true)
+    expect(now["seq"]).to be >= 3
+    expect(alice.api(:get, "/games/#{id}/version")[1]["seq"]).to eq(now["seq"])
+  end
+
+  it "leaves bot seats alone when the runner is off" do
+    Sinatra::Application.set :bot_mode, :off
+    _, game = alice.api(:post, "/games", { seats: [{ kind: "human", account_id: "alice" }, { kind: "bot" }], seed: 2 })
+    expect(game["seq"]).to eq(0)
+  end
+end
+
 # The authorizer decides who may act for which entity. The HTTP specs above stay in
 # the auction (players as entities); this checks a corporation in an operating round,
 # on a real state reached by playing a strategy game directly.

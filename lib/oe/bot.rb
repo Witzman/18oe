@@ -27,6 +27,23 @@ module Oe
   # operated (withhold in the first run). After a restart that memory is empty,
   # which only costs the "withhold first" habit once.
   class Bot
+    # A stand-in for Random whose seed can be replaced: the bot components keep
+    # one rng object, the bot runner reseeds it per move (game seed + seq), so a
+    # replay can explain the same choices. Responds to what Array#sample needs.
+    class Rng
+      def initialize(random)
+        @random = random
+      end
+
+      def reseed(seed)
+        @random = Random.new(seed)
+      end
+
+      def rand(*args)
+        @random.rand(*args)
+      end
+    end
+
     # Families handled here. Anything not listed goes to the fallback.
     SPECIAL = %w[Bid Par BuyShares SellShares LayTile].freeze
     # If one of these is on offer, the fallback decides (same order of
@@ -41,12 +58,17 @@ module Oe
 
     def initialize(game, rng: Random.new(0), limit: 12)
       @game = game
-      @rng = rng
+      @rng = Rng.new(rng)
       @limit = limit
-      @fallback = StrategyPlayer.new(game, rng: rng)
-      @auction = Auction.new(game, rng)
-      @stock = Stock.new(game, rng, @fallback)
-      @track = Track.new(game, rng)
+      @fallback = StrategyPlayer.new(game, rng: @rng)
+      @auction = Auction.new(game, @rng)
+      @stock = Stock.new(game, @rng, @fallback)
+      @track = Track.new(game, @rng)
+    end
+
+    # Replace the random stream (see Rng); the same seed gives the same choice for the same state.
+    def reseed(seed)
+      @rng.reseed(seed)
     end
 
     # Returns nil when the player has nothing to do right now.

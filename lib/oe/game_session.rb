@@ -84,6 +84,10 @@ module Oe
       @row["seats"]
     end
 
+    def seed
+      @row["seed"]
+    end
+
     def status
       @store.game(@id)["status"]
     end

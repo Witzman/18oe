@@ -3,6 +3,7 @@
 require "json"
 require "securerandom"
 require_relative "accounts"
+require_relative "bot_runner"
 require_relative "game_session"
 require_relative "store"
 require_relative "view"
@@ -17,10 +18,29 @@ module Oe
   #   404 not_found     409 conflict (stale seq)   422 rejected / invalid_seats / game_limit
   module GamesApi
     MAX_ACTIVE_DEFAULT = 10
+    RUNNER_LOCK = Mutex.new
+
+    # One BotRunner per store (tests swap the store).
+    def self.runner_for(store)
+      RUNNER_LOCK.synchronize do
+        @runners ||= {}.compare_by_identity
+        @runners[store] ||= BotRunner.new(store)
+      end
+    end
 
     module Helpers
       def store
         settings.store
+      end
+
+      # Let bots play after a game was created or a human moved. Mode (settings.bot_mode):
+      # :async = background thread (production), :inline = synchronous (tests), :off.
+      def kick_bots(game_id)
+        runner = GamesApi.runner_for(store)
+        case settings.bot_mode
+        when :async then runner.kick(game_id)
+        when :inline then runner.drain(game_id)
+        end
       end
 
       def player_range
@@ -124,7 +144,8 @@ module Oe
 
         seed = data["seed"].is_a?(Integer) ? data["seed"] : SecureRandom.random_number(2**31)
         session = GameSession.create(store, seats: seats, seed: seed)
-        json 201, envelope(session)
+        kick_bots(session.id)
+        json 201, envelope(GameSession.load(store, session.id))
       end
 
       app.get "/games/:id" do
@@ -142,7 +163,7 @@ module Oe
 
       app.get "/games/:id/actions" do
         session = load_session(params[:id])
-        json 200, actions: store.action_rows(session.id)
+        json 200, actions: store.action_rows(session.id), incidents: store.incidents(session.id)
       end
 
       app.post "/games/:id/actions" do
@@ -164,6 +185,7 @@ module Oe
         rescue GameSession::Rejected => e
           halt api_error(422, "rejected", e.message)
         end
+        kick_bots(session.id)
         json 200, envelope(GameSession.load(store, session.id))
       end
     end

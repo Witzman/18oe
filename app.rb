@@ -39,6 +39,10 @@ use Rack::Session::Cookie,
 # use an in-memory database; DATABASE_PATH overrides the default /data volume.
 set :store, Oe::Store.new(dev_mode && !ENV["DATABASE_PATH"] ? ":memory:" : (ENV["DATABASE_PATH"] || Oe::Store::DEFAULT_PATH))
 
+# Bots: :async (background threads) in production, :off in tests unless a spec
+# switches to :inline. OE_BOTS=off|async|inline overrides.
+set :bot_mode, (ENV["OE_BOTS"] || (ENV["APP_ENV"] == "test" ? "off" : "async")).to_sym
+
 helpers do
   def json(status_code, payload)
     status status_code
@@ -100,6 +104,9 @@ post "/accounts" do
 end
 
 register Oe::GamesApi
+
+# A restart in the middle of a bot chain: pick it up again.
+Oe::GamesApi.runner_for(settings.store).resume_all if settings.bot_mode == :async
 
 not_found do
   api_error 404, "not_found", "no such endpoint"
