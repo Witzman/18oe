@@ -18,6 +18,11 @@ export interface RenderTheme {
   tileStyle: TileStyle;
   hexLineAlpha: number;
   paper: number;
+  /** Map strokes in hex side lengths and the fill alpha of valid targets (#44). */
+  zoneLine: number;
+  focusLine: number;
+  targetAlpha: number;
+  font: Theme["font"];
   /** Panel metrics in px (CSS reads them as --shape-*). */
   barHeight: number;
   sideWidth: number;
@@ -43,6 +48,10 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     tileStyle: choice.tileStyle,
     hexLineAlpha: t.shape.hexLineAlpha,
     paper: t.shape.paper,
+    zoneLine: t.shape.zoneLine,
+    focusLine: t.shape.focusLine,
+    targetAlpha: t.shape.targetAlpha,
+    font: { ...t.font },
     barHeight: t.shape.barHeight,
     sideWidth: t.shape.sideWidth,
     gap: t.shape.gap,
