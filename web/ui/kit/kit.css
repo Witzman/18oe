@@ -1,8 +1,9 @@
 /* UI kit (#160). Only theme variables (themes.css); no colour literals. States follow ui-spec 3.5. */
+:root { --kit-invalid-mark: "\00D7\00A0"; --kit-table-max: 16rem; }
 .kit-s { --k: 20px; } .kit-m { --k: 28px; } .kit-l { --k: 40px; }
 
 /* Siegel */
-.kit-seal { display: inline-grid; place-items: center; width: var(--k, 28px); height: var(--k, 28px); border-radius: 50%; background: var(--seal-bg); color: var(--seal-ink); font: 700 calc(var(--k, 28px) * .38)/1 var(--font-head); letter-spacing: .02em; text-decoration: none; box-shadow: var(--shape-shadow); border: 2px solid var(--ui-panel); box-sizing: border-box; vertical-align: middle; }
+.kit-seal { display: inline-grid; place-items: center; width: var(--k, 28px); height: var(--k, 28px); border-radius: 50%; background: var(--seal-bg); color: var(--seal-ink); font: 700 calc(var(--k, 28px) * var(--seal-fs, .38))/1 var(--font-head); letter-spacing: .02em; overflow: hidden; white-space: nowrap; text-decoration: none; box-shadow: var(--shape-shadow); border: 2px solid var(--ui-panel); box-sizing: border-box; vertical-align: middle; }
 a.kit-seal:hover, .kit-seal[data-state="hover"] { outline: 2px solid var(--ui-faint); outline-offset: 1px; }
 .kit-seal[data-state="valid"] { outline: 2px solid var(--map-valid); outline-offset: 2px; }
 .kit-seal[data-state="selected"] { outline: 3px double var(--map-selected); outline-offset: 2px; }
@@ -26,7 +27,7 @@ a.kit-pennant:hover, .kit-pennant[data-state="hover"] { background: var(--ui-pan
 .kit-money.kit-pos { color: var(--ui-ok); }
 
 /* Tabelle */
-.kit-table-wrap { max-height: 16rem; overflow: auto; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); }
+.kit-table-wrap { max-height: var(--kit-table-max); overflow: auto; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); }
 .kit-table { border-collapse: collapse; width: 100%; }
 .kit-table caption { text-align: left; padding: 4px 8px; font: 700 1rem var(--font-head); letter-spacing: .04em; }
 .kit-table th { position: sticky; top: 0; background: var(--ui-panel-alt); text-align: left; border-bottom: 1px solid var(--ui-rule); padding: 4px 8px; z-index: 1; }
@@ -39,7 +40,7 @@ a.kit-pennant:hover, .kit-pennant[data-state="hover"] { background: var(--ui-pan
 .kit-table tr[data-state="valid"] td:first-child::after { content: " \25C2"; color: var(--map-valid); }
 .kit-table tr[data-state="selected"] { box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel-alt); }
 .kit-table tr[data-state="invalid"] { opacity: .6; }
-.kit-table tr[data-state="invalid"] td:first-child::before { content: "\1F512  "; }
+.kit-table tr[data-state="invalid"] td:first-child::before { content: var(--kit-invalid-mark); color: var(--map-invalid); font-weight: 700; }
 .kit-table tr[data-state="preview"] { font-style: italic; }
 .kit-table tr[data-state="waiting"] { cursor: progress; opacity: .85; }
 
@@ -84,7 +85,7 @@ a.kit-pennant:hover, .kit-pennant[data-state="hover"] { background: var(--ui-pan
 .kit-order[data-state="valid"] { border-left-color: var(--map-valid); }
 .kit-order[data-state="invalid"] { border-left-color: var(--map-invalid); }
 .kit-order[data-state="invalid"] .kit-order-sentence { opacity: .6; }
-.kit-order[data-state="invalid"] .kit-order-sentence::before { content: "\1F512  "; }
+.kit-order[data-state="invalid"] .kit-order-sentence::before { content: var(--kit-invalid-mark); color: var(--map-invalid); font-weight: 700; }
 .kit-order[data-state="selected"] { box-shadow: inset 4px 0 0 var(--ui-accent); }
 .kit-order[data-state="hover"] { background: var(--ui-panel-alt); }
 .kit-order[data-state="waiting"] { cursor: progress; }
@@ -96,4 +97,7 @@ a.kit-pennant:hover, .kit-pennant[data-state="hover"] { background: var(--ui-pan
 .kit-page .kit-grid { display: grid; grid-template-columns: 7rem 1fr; gap: 8px 12px; align-items: center; margin: 8px 0 20px; }
 .kit-page .kit-grid > dt { color: var(--ui-faint); font-size: .85rem; }
 .kit-page .kit-grid > dd { margin: 0; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-.kit-page .kit-tip-demo { min-height: 9rem; }
+/* The tooltip is shown open and in flow: no reserved empty space, and the sample is visible without hover. */
+.kit-page .kit-tip-demo .kit-tip { display: flex; position: static; }
+.kit-page .kit-tip-demo .kit-has-tip { display: inline-flex; flex-direction: column; align-items: flex-start; }
+.kit-page .kit-table-all { --kit-table-max: none; }

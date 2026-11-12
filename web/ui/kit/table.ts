@@ -16,6 +16,8 @@ export interface TableOptions<R> {
   onSort?: (key: string) => void;
   rowState?: (row: R, index: number) => State;
   /** Reason shown as title on an invalid row. */
+  /** Extra class on the wrapper, e.g. to lift the height limit. */
+  wrapClass?: string;
   rowReason?: (row: R) => string | undefined;
 }
 
@@ -52,6 +54,6 @@ export function Tabelle<R>(columns: readonly Column<R>[], rows: readonly R[], o:
     return v("tr", { "data-state": state, title: state === "invalid" ? o.rowReason?.(row) : undefined, "aria-selected": state === "selected" ? "true" : undefined },
       ...columns.map((c) => v("td", { class: c.align === "right" ? "kit-right" : "" }, c.cell(row))));
   });
-  return v("div", { class: "kit-table-wrap" },
+  return v("div", { class: o.wrapClass ? `kit-table-wrap ${o.wrapClass}` : "kit-table-wrap" },
     v("table", { class: "kit-table" }, v("caption", {}, o.caption), v("thead", {}, v("tr", {}, ...head)), v("tbody", {}, ...body)));
 }

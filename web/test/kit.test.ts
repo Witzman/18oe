@@ -196,7 +196,7 @@ test("every var(--x) in kit.css exists in the generated theme CSS or is kit-loca
   const { themesCss } = await import("../themes/css.ts");
   const generated = themesCss(themes, "brett");
   const css = readFileSync(join(kitDir, "kit.css"), "utf8");
-  const local = new Set(["--k", "--seal-bg", "--seal-ink", "--flag-bg", "--flag-ink"]);
+  const local = new Set(["--k", "--seal-bg", "--seal-ink", "--flag-bg", "--flag-ink", "--seal-fs", "--kit-invalid-mark", "--kit-table-max"]);
   const missing = [...new Set([...css.matchAll(/var\((--[a-z0-9-]+)/g)].map((m) => m[1]!))].filter((n) => !local.has(n) && !generated.includes(`${n}:`));
   assert.deepEqual(missing, []);
 });
