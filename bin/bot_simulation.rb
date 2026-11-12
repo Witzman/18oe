@@ -35,13 +35,17 @@ run_one = lambda do |players, seed|
   reader, writer = IO.pipe
   pid = fork do
     reader.close
-    result = Oe::BotSimulation.run(players: players, seed: seed, mix: opts[:mix], opponent: opts[:opponent], max_actions: opts[:max_actions])
-    writer.write(JSON.generate(result.to_h.merge("kinds" => result.kinds.transform_values(&:to_s))))
+    begin
+      result = Oe::BotSimulation.run(players: players, seed: seed, mix: opts[:mix], opponent: opts[:opponent], max_actions: opts[:max_actions])
+      writer.write(JSON.generate(result.to_h.merge("kinds" => result.kinds.transform_values(&:to_s))))
+    rescue StandardError => e
+      writer.write(JSON.generate("crash" => "#{e.class}: #{e.message}"[0, 200]))
+    end
     writer.close
     exit!(0)
   end
   writer.close
-  [pid, reader]
+  [pid, reader, players, seed]
 end
 
 results = []
@@ -51,10 +55,22 @@ until queue.empty? && running.empty?
   while running.size < opts[:jobs] && !queue.empty?
     running << run_one.call(*queue.shift)
   end
-  pid, reader = running.shift
+  pid, reader, players, seed = running.shift
   data = reader.read
   Process.wait(pid)
-  r = JSON.parse(data)
+  # A game that crashes (or a child that dies) becomes one "crash" result; the run goes on.
+  r = begin
+    parsed = JSON.parse(data)
+    parsed.key?("crash") ? nil : parsed
+  rescue JSON::ParserError
+    nil
+  end
+  r ||= {
+    "players" => players, "seed" => seed, "status" => "crash", "actions" => 0, "turn" => 0, "phase" => "?",
+    "kinds" => {}, "values" => {}, "floated" => { "minor" => 0, "regional" => 0, "major" => 0, "national" => 0 },
+    "closed" => 0, "passes" => {}, "moves" => {}, "seconds" => 0.0,
+    "detail" => (JSON.parse(data)["crash"] rescue "child died without a result"),
+  }
   results << r
   w = r["values"].max_by { |_, v| v }
   puts format("%dp seed %-3d %-8s %5d actions turn %-3s phase %-3s winner %s(%s) %5.1fs %s",
@@ -73,6 +89,13 @@ end
 puts
 finished = results.select { |r| r["status"] == "finished" }
 puts "games: #{results.size}, finished: #{finished.size}, stops: #{results.group_by { |r| r['status'] }.map { |s, rs| "#{s}=#{rs.size}" }.join(', ')}"
+crashed = results.select { |r| r["status"] == "crash" }
+crashed.each { |r| puts "CRASH #{r['players']}p seed #{r['seed']}: #{r['detail']}" }
+results = results.reject { |r| r["status"] == "crash" } # the figures below only use games that ran
+if results.empty?
+  puts "no game ran to a result"
+  exit(crashed.empty? ? 0 : 1)
+end
 puts "actions: median #{median(results.map { |r| r['actions'] })}, turns: median #{median(results.map { |r| r['turn'] })}"
 puts "final phase: #{results.group_by { |r| r['phase'] }.sort_by { |k, _| k.to_s }.map { |p, rs| "#{p}=#{rs.size}" }.join(', ')}"
 puts "floated per game (mean): #{%w[minor regional major national].map { |t| "#{t}=#{(results.sum { |r| r['floated'][t] }.to_f / results.size).round(1)}" }.join(', ')}; closed (mean): #{(results.sum { |r| r['closed'] }.to_f / results.size).round(1)}"
