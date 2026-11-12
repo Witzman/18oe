@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "engine"
+require_relative "engine_helper"
 
 RSpec.describe "18OE engine smoke" do
   # Starting cash per player as computed by the engine (STARTING_CASH).
