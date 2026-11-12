@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Screenshot of a page for visual self-checks (#42). See `bin/shot --help` and README.
+set -euo pipefail
+source "$(dirname "$0")/_env"
+exec node "$ROOT/bin/shot.mjs" "$@"
