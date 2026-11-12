@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Timing of Oe::LegalActions per step class (#87): bin/enumeration-timing --help
+set -euo pipefail
+source "$(dirname "$0")/_env"
+cd "$ROOT"
+bundler exec ruby -I lib bin/enumeration_timing.rb "$@"
