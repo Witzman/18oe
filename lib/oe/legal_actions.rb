@@ -22,7 +22,9 @@ module Oe
   # (tile lays, bid amounts, share bundles, ...), sampled with `rng`. A
   # `limit` of nil enumerates everything.
   class LegalActions
-    # A step offers an action type this class does not know how to build.
+    # Kept for callers that rescue it. Since #125 an action type without a
+    # generator is no longer raised: it is skipped and listed in #unsupported,
+    # so one unbuildable type cannot make the whole game unplayable.
     class Unsupported < StandardError; end
 
     A = Engine::Action
@@ -35,9 +37,15 @@ module Oe
       @game = game
       @limit = limit
       @rng = rng
+      @unsupported = []
     end
 
+    # Action types a step offered that have no generator, as "Step: type"
+    # strings, in the order met (set by #call).
+    attr_reader :unsupported
+
     def call
+      @unsupported = []
       return [] if @game.finished
 
       step = @game.round.active_step
@@ -74,7 +82,11 @@ module Oe
 
     def generate(type, step, entity)
       method = "generate_#{type}"
-      raise Unsupported, "#{step.class.name}: no generator for action '#{type}'" unless respond_to?(method, true)
+      unless respond_to?(method, true)
+        note = "#{step.class.name.split('::').last}: #{type}"
+        @unsupported << note unless @unsupported.include?(note)
+        return []
+      end
 
       send(method, step, entity)
     end

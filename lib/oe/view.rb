@@ -223,14 +223,20 @@ module Oe
       step = game.finished ? nil : game.round.active_step
       mine = viewer && !game.finished && game.active_players.any? { |p| p.id == viewer }
       list = []
+      unsupported = []
       if mine && with_actions
-        list = Oe::LegalActions.new(game, limit: limit, rng: Random.new(0)).call.map { |a| a.to_h.reject { |k, _| %w[id created_at user].include?(k) } }
+        legal = Oe::LegalActions.new(game, limit: limit, rng: Random.new(0))
+        list = legal.call.map { |a| a.to_h.reject { |k, _| %w[id created_at user].include?(k) } }
+        unsupported = legal.unsupported
       end
       {
         step: step && step.class.name.split("::").last,
         types: step ? Array(step.current_actions).map(&:to_s) : [],
         viewer_to_act: mine ? true : false,
         actions: list,
+        # Action types the step offers that the server cannot enumerate (#125).
+        # The game stays playable; the client may offer a generic fallback.
+        unsupported: unsupported,
       }
     end
 
