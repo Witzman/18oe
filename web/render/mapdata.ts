@@ -15,6 +15,18 @@ export interface MapHex {
   terrain?: { types: string[]; cost: number }[];
   /** Geometric neighbour per edge 0..5 (null at the map border). */
   neighbors: (string | null)[];
+  /** Zero-based row (A = 0) and column number; used to group hexes into blocks (#44). */
+  row?: number;
+  col?: number;
+  /** Colour of the printed tile (white, yellow, gray, red, blue). */
+  color?: string;
+  /** Track-rights zone (Oe::MapData, game.region_for_hex). */
+  zone?: string;
+  name?: string;
+  /** Edge borders; type "province" separates track-rights zones. */
+  borders?: { edge: number; type: string; cost?: number }[];
+  /** Line inside the hex between two vertices a, b (engine: 0 = bottom vertex, clockwise). */
+  partitions?: { a: number; b: number; type: string; length?: number | null }[];
 }
 
 export interface MapLayout {
@@ -26,6 +38,8 @@ export interface MapLayout {
 export interface MapGeometry {
   layout: MapLayout;
   hexes: MapHex[];
+  /** Home hex per corporation (used by flyTo(corpId) before a company has tokens). */
+  homes?: { corporation: string; type: string; hex: string }[];
 }
 
 type Heights = Pick<Theme["camera"], "heightLand" | "heightHill" | "heightMountain" | "heightTile">;

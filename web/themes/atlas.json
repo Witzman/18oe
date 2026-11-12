@@ -21,7 +21,7 @@
     "edgeDot": "#8b3a2f",
     "hill": "#b09a6e",
     "mountain": "#9c8f80",
-    "water": "#6f9fb8",
+    "water": "#9fb89a",
     "rail": "#2a1c14",
     "sleeper": "#7a6244",
     "bed": "#e4d9b8",
@@ -103,6 +103,7 @@
     "runMaxMs": 6000,
     "queueMaxMs": 9000,
     "flashMs": 600,
+    "flyMs": 500,
     "enabled": true
   },
   "shape": {
@@ -113,6 +114,9 @@
     "radius": 1,
     "barHeight": 56,
     "sideWidth": 340,
-    "gap": 12
+    "gap": 12,
+    "zoneLine": 0.07,
+    "focusLine": 0.08,
+    "targetAlpha": 0.3
   }
 }
