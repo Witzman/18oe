@@ -517,6 +517,12 @@ module Engine
           !company_becomes_minor?(company) && !concession?(company)
         end
 
+        # §10.4 needs a mutually agreed price. Until the seller can consent (#148 part 2),
+        # buying a private/minor from another player is switched off; the bank stays open.
+        def player_trade_enabled?
+          false
+        end
+
         def face_down_private?(company)
           @face_down_privates.include?(company)
         end

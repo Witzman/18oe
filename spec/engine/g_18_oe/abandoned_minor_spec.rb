@@ -76,6 +76,7 @@ describe 'G18OE abandoning a minor (§9.5)' do
 
     it 'cannot be bought, traded or merged by a player' do
       allow(game).to receive(:major_phase?).and_return(true)
+      allow(game).to receive(:player_trade_enabled?).and_return(true)
       step = stock_round!(game, turn: 1).active_step
       expect(step.can_buy_corporation?(game.players.last, minor)).to be(true)
       game.abandon_minor!(minor)
