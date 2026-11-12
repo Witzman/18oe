@@ -8,6 +8,9 @@ import { v, type State, type VNode } from "./vnode.ts";
 export interface Corp { sym: string; name?: string; color: string }
 export interface SealOptions { theme: Theme; state?: State; size?: "s" | "m" | "l"; link?: string }
 
+// Longer abbreviations get a smaller font so the text stays inside the seal (#198).
+const sealScale = (sym: string) => sym.length <= 2 ? "" : `;--seal-fs:${sym.length === 3 ? .32 : .25}`;
+
 export function Siegel(corp: Corp, o: SealOptions): VNode {
   const state = o.state ?? "normal";
   const ink = inkFor(corp.color, o.theme);
@@ -15,7 +18,7 @@ export function Siegel(corp: Corp, o: SealOptions): VNode {
   const attrs = {
     class: `kit-seal kit-${o.size ?? "m"}`,
     "data-state": state,
-    style: `--seal-bg:${corp.color};--seal-ink:${ink}`,
+    style: `--seal-bg:${corp.color};--seal-ink:${ink}${sealScale(corp.sym)}`,
     title: label,
     "aria-label": label,
     "aria-disabled": state === "invalid" ? "true" : undefined,

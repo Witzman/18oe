@@ -43,7 +43,7 @@ export function kitSections(theme: Theme, state: { sort?: Sort; dialog: boolean 
       ["alle 7 Farben", ...PLAYERS.map((p) => Wimpel(p, { theme }))]),
     section("Geld", ["Beträge", Geld(0), Geld(5), Geld(1250), Geld(-40)], ["Änderung", Geld(5, { delta: true }), Geld(-5, { delta: true })]),
     section("Tabelle", ["sortierbar", Tabelle(columns, ROWS, { caption: "Firmen", sort: state.sort, onSort: act.sort })],
-      ["Zeilenzustände", Tabelle(columns.slice(0, 2), ROWS.slice(0, 1).flatMap((r) => STATES.map(() => r)), { caption: "Je Zustand eine Zeile", rowState: (_, i) => STATES[i]!, rowReason: () => "Jetzt nicht möglich" })]),
+      ["Zeilenzustände", Tabelle(columns.slice(0, 2), ROWS.slice(0, 1).flatMap((r) => STATES.map(() => r)), { caption: "Je Zustand eine Zeile", wrapClass: "kit-table-all", rowState: (_, i) => STATES[i]!, rowReason: () => "Jetzt nicht möglich" })]),
     section("Tooltip", ["Aufschlüsselung", v("div", { class: "kit-tip-demo" }, mitTooltip(v("button", { type: "button" }, "Legen £30"), tip), " ", v("span", {}, "(Hover oder Tab)"))],
       ["ungültig, Grund", v("div", { class: "kit-tip-demo" }, mitTooltip(v("button", { type: "button", disabled: true }, "Token setzen"), { title: "Jetzt nicht möglich", term: "No free token", reason: "Kein freier Token mehr." }))]),
     section("Dialog", ["Öffnen", v("button", { type: "button", onclick: () => act.dialog(true) }, "Dialog zeigen"), v("span", { class: "muted" }, "liegt nur über dem Hauptbereich, die Rundenleiste bleibt frei")]),
