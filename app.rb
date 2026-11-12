@@ -14,6 +14,7 @@ require "securerandom"
 require_relative "lib/oe/build_id"
 require_relative "lib/oe/accounts"
 require_relative "lib/oe/games_api"
+require_relative "lib/oe/map_data"
 
 set :bind, "0.0.0.0"
 set :port, (ENV["PORT"] || 80).to_i
@@ -77,6 +78,10 @@ before "/games*" do
   halt api_error(401, "login_required", "login required") unless current_account
 end
 
+before "/map" do
+  halt api_error(401, "login_required", "login required") unless current_account
+end
+
 post "/login" do
   data = request_params
   account = Oe::Accounts.find(data["account"])
@@ -108,6 +113,17 @@ post "/accounts" do
 end
 
 register Oe::GamesApi
+
+# The fixed map (#43): changes only with the engine revision, so the ETag is
+# derived from it and the browser revalidates cheaply (304). private: it sits
+# behind the login.
+get "/map" do
+  rev = Oe::GameSession.engine_rev
+  etag "map-#{Oe::MapData::SCHEMA}-#{rev}"
+  cache_control :private, :no_cache
+  content_type :json
+  Oe::MapData.json(rev)
+end
 
 # A restart in the middle of a bot chain: pick it up again.
 Oe::GamesApi.runner_for(settings.store).resume_all if settings.bot_mode == :async
