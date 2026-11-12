@@ -5,11 +5,15 @@
 # deploy can be verified from outside). See 18oe-workshop#2/#3 and
 # notes/reference/infrastructure-plan.md for what comes next.
 
+# The container starts `ruby app.rb` without -Ilib; the engine is required as "engine".
+$LOAD_PATH.unshift(File.join(__dir__, "lib")) unless $LOAD_PATH.include?(File.join(__dir__, "lib"))
+
 require "sinatra"
 require "json"
 require "securerandom"
 require_relative "lib/oe/build_id"
 require_relative "lib/oe/accounts"
+require_relative "lib/oe/games_api"
 
 set :bind, "0.0.0.0"
 set :port, (ENV["PORT"] || 80).to_i
@@ -31,11 +35,20 @@ use Rack::Session::Cookie,
     httponly: true,
     secure: !dev_mode
 
+# One SQLite store per process (Puma runs a single process; see #34). Tests
+# use an in-memory database; DATABASE_PATH overrides the default /data volume.
+set :store, Oe::Store.new(dev_mode && !ENV["DATABASE_PATH"] ? ":memory:" : (ENV["DATABASE_PATH"] || Oe::Store::DEFAULT_PATH))
+
 helpers do
   def json(status_code, payload)
     status status_code
     content_type :json
     JSON.generate(payload)
+  end
+
+  # {error: <machine code>, message: <human text>} — the one error format.
+  def api_error(status_code, code, message)
+    json status_code, error: code, message: message
   end
 
   def current_account
@@ -53,7 +66,7 @@ helpers do
 end
 
 before "/games*" do
-  halt json(401, error: "login required") unless current_account
+  halt api_error(401, "login_required", "login required") unless current_account
 end
 
 post "/login" do
@@ -61,7 +74,7 @@ post "/login" do
   account = Oe::Accounts.find(data["account"])
   unless account && Oe::Accounts.access_ok?(data["code"])
     session.clear
-    halt json(401, error: "invalid account or access code")
+    halt api_error(401, "invalid_login", "invalid account or access code")
   end
   session.clear
   session[:account] = account["id"]
@@ -75,11 +88,21 @@ end
 
 get "/me" do
   account = current_account
-  account ? json(200, account) : json(401, error: "login required")
+  account ? json(200, account) : api_error(401, "login_required", "login required")
 end
 
 get "/accounts" do
   json 200, accounts: Oe::Accounts.all.map { |id, name| { id: id, name: name } }
+end
+
+register Oe::GamesApi
+
+not_found do
+  api_error 404, "not_found", "no such endpoint"
+end
+
+error do
+  api_error 500, "internal_error", "internal error"
 end
 
 get "/healthz" do

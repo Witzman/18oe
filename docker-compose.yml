@@ -7,7 +7,15 @@ services:
     # Dokploy keeps these in the compose project's .env; compose only hands
     # them to the container if they are named here. The app refuses to start
     # without them (see app.rb), so a missing one fails the deploy loudly.
+    volumes:
+      - oe-data:/data
     environment:
+      DATABASE_PATH: /data/18oe.sqlite3
       SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set in Dokploy}
       OE_ACCESS_CODE: ${OE_ACCESS_CODE:?OE_ACCESS_CODE must be set in Dokploy}
       OE_ACCOUNTS: ${OE_ACCOUNTS:?OE_ACCOUNTS must be set in Dokploy}
+
+# SQLite lives here (action log of every game). Without it every deploy would
+# delete all games.
+volumes:
+  oe-data:

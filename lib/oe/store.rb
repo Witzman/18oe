@@ -93,6 +93,24 @@ module Oe
       row && row.merge("seats" => JSON.parse(row["seats"]))
     end
 
+    # All games, oldest first (PoC: a handful, so no paging).
+    def games
+      rows = @mutex.synchronize { @db.execute("SELECT * FROM games ORDER BY id") }
+      rows.map { |row| row.merge("seats" => JSON.parse(row["seats"])) }
+    end
+
+    def active_game_count
+      @mutex.synchronize { @db.get_first_value("SELECT COUNT(*) FROM games WHERE status = 'active'") }
+    end
+
+    # The log with metadata (debugging / transparency), ascending seq.
+    def action_rows(game_id)
+      rows = @mutex.synchronize do
+        @db.execute("SELECT seq, actor, action_type, payload, created_at FROM actions WHERE game_id = ? ORDER BY seq", [game_id])
+      end
+      rows.map { |r| r.merge("payload" => JSON.parse(r["payload"])) }
+    end
+
     def set_status(id, status)
       @mutex.synchronize { @db.execute("UPDATE games SET status = ? WHERE id = ?", [status, id]) }
     end
