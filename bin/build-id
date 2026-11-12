@@ -1,0 +1,6 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Prints the build id of this working tree; compare with /healthz on the server.
+require_relative "../lib/oe/build_id"
+puts Oe::BuildId.compute
