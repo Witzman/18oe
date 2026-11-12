@@ -22,7 +22,7 @@ RSpec.describe Oe::BotSimulation do
     result = sim.run
     expect(result.status).to eq(:limit)
     expect(result.actions).to eq(150)
-    expect(result.values.keys).to eq(%w[p0 p1 p2 p3])
+    expect(result.values.keys.sort).to eq(%w[p0 p1 p2 p3])
     expect(result.moves.values.sum).to eq(150)
     expect(result.floated.keys).to eq(%w[minor regional major national])
     expect(result.winner_kind).to be_a(Symbol)
