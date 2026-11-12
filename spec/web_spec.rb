@@ -70,6 +70,9 @@ RSpec.describe "web frontend (#40)" do
       expect(state["prompt"].keys.sort).to eq(keys["prompt"])
       expect(state["depot"].keys.sort).to eq(keys["depot"])
       expect(state["market"].keys.sort).to eq(keys["market"])
+      # A new game starts in the auction (#120).
+      expect(state["auction"].keys.sort).to eq(keys["auction"])
+      expect(state["auction"]["cards"].first.keys.sort).to eq(keys["auction_card"])
     end
   end
 end

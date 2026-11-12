@@ -7,6 +7,11 @@ module Engine
     module G18OE
       module Step
         class WaterfallAuction < Engine::Step::WaterfallAuction
+          # Players still in the open auction (empty unless one is running); read by Oe::View (#120).
+          def open_bidders
+            @open_bidders.dup
+          end
+
           def setup
             super
             @companies = @companies.sort_by { |c| [c.auction_row, c.value, c.sym[/\d+/].to_i, c.sym] }

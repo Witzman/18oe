@@ -59,9 +59,20 @@ RSpec.describe Oe::View do
 
   it "has the documented top-level shape in every state" do
     @samples.each do |label, view, _|
-      expect(view.keys).to eq(%i[meta players corporations market depot bank map log prompt]), label
+      expect(view.keys).to eq(%i[meta players corporations market depot bank auction map log prompt]), label
       expect(view[:meta].keys).to include(:seq, :finished, :round, :phase, :current, :active_players, :standings), label
       expect(view[:players].size).to eq(4), label
+    end
+  end
+
+  it "has an auction section exactly while an auction round runs (#120)" do
+    @samples.each do |label, view, _|
+      if view[:meta][:round][:type] == "auction"
+        expect(view[:auction][:cards]).not_to be_empty, label
+        expect(view[:auction][:cards].size).to be <= 32, label
+      else
+        expect(view[:auction]).to be_nil, label
+      end
     end
   end
 
