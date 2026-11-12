@@ -1,0 +1,45 @@
+# frozen_string_literal: true
+
+require_relative 'base'
+
+module Engine
+  module Part
+    class Partition < Base
+      attr_reader :a, :a_sign, :b, :b_sign, :length, :type, :restrict, :blockers, :inner, :outer
+
+      SIGN = {
+        '-' => -1,
+        nil => 0,
+        '+' => 1,
+      }.freeze
+
+      def initialize(a, b, type, restrict, length: nil)
+        # a and b are vertices of the hex. 0 represents the bottom one and then you go clockwise
+        # The sign tells if the partition should be drawn a little bit before or after the vertex,
+        # but doesn't have any impact on the game.
+        @a = a[0].to_i
+        @a_sign = SIGN[a[1]]
+        @b = b[0].to_i
+        @b_sign = SIGN[b[1]]
+
+        @type = type&.to_sym
+        # If restrict==inner, only allow paths between a and b. If outer, only between b and a
+        @restrict = restrict
+        @length = length&.to_f
+        @blockers = []
+
+        a_lo, b_hi = [@a, @b].minmax
+        @inner = (restrict == 'outer' ? [] : (a_lo..(b_hi - 1)).to_a)
+        @outer = (restrict == 'inner' ? [] : (0..5).to_a - (a_lo..(b_hi - 1)).to_a)
+      end
+
+      def add_blocker!(private_company)
+        @blockers << private_company
+      end
+
+      def partition?
+        true
+      end
+    end
+  end
+end
