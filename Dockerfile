@@ -7,7 +7,7 @@ WORKDIR /app
 
 RUN apk add --no-cache build-base
 
-COPY Gemfile ./
+COPY Gemfile Gemfile.lock ./
 RUN bundle install
 
 COPY app.rb ./
