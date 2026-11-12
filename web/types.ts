@@ -47,7 +47,14 @@ export interface Corporation {
   reserved: { percent: number; player: string | null } | null;
   trains: Train[];
   tokens: { used: boolean; hex: string | null }[];
-  last_run: { revenue: number; dividend: string | null } | null;
+  last_run: {
+    revenue: number; dividend: string | null;
+    routes: {
+      train: string; name: string; revenue: number; hexes: string[];
+      segments: { hex: string; exits: number[]; nodes: number[] }[];
+      stops: { hex: string; index: number; revenue: number }[];
+    }[];
+  } | null;
   track_rights: string[];
   orient_express_marker: boolean;
   status: string[];
