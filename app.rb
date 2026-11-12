@@ -8,7 +8,7 @@ require "sinatra"
 
 set :bind, "0.0.0.0"
 set :port, (ENV["PORT"] || 80).to_i
-set :host_authorization, { permitted_hosts: ["oe.witzman.de"] }
+set :host_authorization, { permitted_hosts: ["oe.witzman.de", "127.0.0.1", "localhost"] }
 
 get "/healthz" do
   content_type :json
