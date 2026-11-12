@@ -175,7 +175,25 @@ module Oe
       info = corp.operating_history.to_a.last&.last
       return unless info
 
-      { revenue: info.revenue, dividend: info.dividend_kind&.to_s }
+      {
+        revenue: info.revenue,
+        dividend: info.dividend_kind&.to_s,
+        # Per train (#119): the run as driven. `segments` are the paths in order
+        # (hex id, exit edges, node indexes); `stops` the places visited with
+        # their revenue for that train. Captured when the run was paid out.
+        routes: info.routes.keys.map { |t| run_detail(info, t) },
+      }
+    end
+
+    def run_detail(info, train)
+      {
+        train: train.id,
+        name: train.name,
+        revenue: info.revenues[train],
+        hexes: info.routes[train].flatten.map(&:to_s),
+        segments: info.segments[train],
+        stops: info.stops[train],
+      }
     end
 
     def market(game)
