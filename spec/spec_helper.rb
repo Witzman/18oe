@@ -2,6 +2,8 @@
 
 ENV["APP_ENV"] = "test"
 ENV["RACK_ENV"] = "test"
+# The engine logs every action at DEBUG unless told otherwise (3 = ERROR).
+ENV["ENGINE_LOG_LEVEL"] ||= "3"
 
 require "rack/test"
 require "rspec"
