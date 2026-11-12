@@ -19,3 +19,4 @@ if [ ! -x "$ROOT/.tools/node/bin/node" ]; then
   tar -xJf "$tmp/$name.tar.xz" -C "$ROOT/.tools/node" --strip-components=1
 fi
 echo "node $(node --version)"
+(cd "$ROOT/web" && npm ci --no-progress)

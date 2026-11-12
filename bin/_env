@@ -8,6 +8,7 @@ export BUNDLE_PATH="$ROOT/vendor/bundle"
 export BUNDLE_GEMFILE="$ROOT/Gemfile"
 mkdir -p "$XDG_CACHE_HOME" "$BUNDLE_USER_HOME"
 export PATH="$ROOT/.tools/node/bin:$PATH"
+export npm_config_cache="$ROOT/.tools/cache/npm" npm_config_update_notifier=false npm_config_fund=false npm_config_audit=false
 
 # Bundler: use `bundle` if present, else the default gem shipped with Ruby.
 bundler() {
