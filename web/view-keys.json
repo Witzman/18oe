@@ -68,6 +68,7 @@
     "actions",
     "step",
     "types",
+    "unsupported",
     "viewer_to_act"
   ],
   "depot": [

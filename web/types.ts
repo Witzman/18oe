@@ -62,6 +62,7 @@ export interface HexChange {
 }
 export interface Prompt {
   step: string | null; types: string[]; viewer_to_act: boolean;
+  unsupported: string[];
   actions: Record<string, unknown>[];
 }
 
