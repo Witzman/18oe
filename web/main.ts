@@ -3,8 +3,11 @@ import { createPoller } from "./poller.ts";
 import type { Account } from "./types.ts";
 import { h, mount } from "./ui/dom.ts";
 import { gameFrame, gamesPage, loginPage, type Ctx } from "./ui/pages.ts";
+import { initTheme, themeSwitch } from "./ui/theme-switch.ts";
 
+initTheme();
 const root = document.getElementById("app")!;
+document.body.append(themeSwitch());
 const api = createApi();
 const ctx: Ctx = { api, me: null, accounts: [], go: (hash) => { location.hash = hash; } };
 let poller: ReturnType<typeof createPoller> | null = null;

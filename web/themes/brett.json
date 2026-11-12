@@ -1,0 +1,59 @@
+{
+  "id": "brett",
+  "name": "Brett",
+  "colorScheme": "light",
+  "map": {
+    "seaDeep": "#2f5f8c",
+    "seaShallow": "#2f8f88",
+    "landLow": "#8c9a4e",
+    "land": "#7f8a4f",
+    "landHigh": "#7a6a42",
+    "hexLine": "#1e1e14",
+    "tile": "#d3e03a",
+    "tileEdge": "#a9b52a",
+    "track": "#143d1e",
+    "city": "#ffffff",
+    "cityEdge": "#2a2a2a",
+    "edgeDot": "#c8372d"
+  },
+  "ui": {
+    "bg": "#26302c",
+    "panel": "#f1ead6",
+    "ink": "#2b2a22",
+    "faint": "#5f5c4c",
+    "rule": "#c9bf9f",
+    "accent": "#b8923f",
+    "accentInk": "#1d1a12",
+    "bar": "#1d2522",
+    "barInk": "#efe7cf",
+    "error": "#a3271f"
+  },
+  "company": {
+    "c1": "#2f6fb0",
+    "c2": "#c0392b",
+    "c3": "#3a8a4a",
+    "c4": "#2a2a2a",
+    "c5": "#5b3f8c",
+    "c6": "#d9772b"
+  },
+  "player": {
+    "p1": "#1f5f8b",
+    "p2": "#b0440f",
+    "p3": "#e0a81c",
+    "p4": "#7cc0e8",
+    "p5": "#2b2b2b",
+    "p6": "#fbf6ea",
+    "p7": "#8a8a86"
+  },
+  "font": {
+    "head": "'Barlow Condensed', 'Arial Narrow', sans-serif",
+    "body": "Barlow, 'Helvetica Neue', Arial, sans-serif"
+  },
+  "shape": {
+    "tilt": 1,
+    "tileStyle": "full",
+    "hexLineAlpha": 0.28,
+    "paper": 0,
+    "radius": 3
+  }
+}

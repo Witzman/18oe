@@ -1,22 +1,30 @@
-/* Colour tokens from notes/reference/frontend-plan.md. Keep in sync with render/theme.ts. */
-:root {
-  --parchment: #e8dcc3;
-  --parchment-dark: #d4c4a0;
-  --ink: #3a2f1f;
-  --ink-faint: #6b5d47;
-  --accent-rail: #8b3a2f;
-  --accent-sea: #5b7a8c;
-  --accent-gold: #b8923f;
-}
+/* Layout and component styles. Every colour, font and radius comes from the theme tokens in
+   themes.css (generated from web/themes/*.json, #95); nothing visual is fixed here. */
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--parchment); color: var(--ink); font: 16px/1.4 Georgia, serif; }
-#app { max-width: 960px; margin: 0 auto; padding: 16px; }
-h1, h2 { font-weight: normal; border-bottom: 1px solid var(--parchment-dark); padding-bottom: 4px; }
-button, select, input { font: inherit; color: inherit; background: var(--parchment); border: 1px solid var(--ink-faint); padding: 4px 10px; }
-button { cursor: pointer; background: var(--parchment-dark); }
-button:hover { border-color: var(--accent-gold); }
-.panel { background: var(--parchment-dark); border: 1px solid var(--ink-faint); padding: 12px; margin: 12px 0; }
-.error { color: var(--accent-rail); }
-.muted { color: var(--ink-faint); }
+body { margin: 0; min-height: 100vh; background: var(--ui-bg); color: var(--ui-ink); font: 16px/1.4 var(--font-body); }
+#app { max-width: 960px; margin: 16px auto; padding: 16px; background: var(--ui-panel); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); }
+h1, h2 { font-family: var(--font-head); font-weight: 700; letter-spacing: .04em; border-bottom: 1px solid var(--ui-rule); padding-bottom: 4px; }
+a { color: inherit; }
+button, select, input { font: inherit; color: var(--ui-ink); background: var(--ui-panel); border: 1px solid var(--ui-faint); border-radius: var(--shape-radius); padding: 4px 10px; }
+button { cursor: pointer; }
+button:hover { border-color: var(--ui-accent); background: color-mix(in srgb, var(--ui-accent) 25%, var(--ui-panel)); }
+button[aria-pressed="true"] { background: var(--ui-ink); color: var(--ui-panel); border-color: var(--ui-ink); }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.panel { background: var(--ui-panel); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 12px; margin: 12px 0; }
+.error { color: var(--ui-error); }
+.muted { color: var(--ui-faint); }
 .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
-.turn { color: var(--accent-gold); font-weight: bold; }
+.turn { display: inline-block; background: var(--ui-accent); color: var(--ui-accent-ink); font-weight: bold; padding: 2px 12px; border-radius: 99px; }
+
+/* Dev menu: theme and tile style */
+.dev-menu { position: fixed; right: 12px; bottom: 12px; max-width: calc(100vw - 24px); background: var(--ui-bar); color: var(--ui-bar-ink); border-radius: var(--shape-radius); padding: 6px 10px; font: 14px/1.3 var(--font-head); letter-spacing: .04em; }
+.dev-menu summary { cursor: pointer; text-transform: uppercase; }
+.dev-menu button { padding: 2px 8px; }
+.swatch { display: flex; height: 22px; margin-top: 6px; border: 1px solid var(--ui-bar-ink); }
+.swatch span { flex: 1; }
+.sw-sea { background: linear-gradient(90deg, var(--map-sea-deep), var(--map-sea-shallow)); }
+.sw-land { background: var(--map-land); }
+.sw-high { background: var(--map-land-high); }
+.sw-tile { background: var(--map-tile); display: grid; place-items: center; }
+.sw-tile i { width: 70%; height: 3px; background: var(--map-track); }
+:root[data-tile-style="inner"] .sw-tile { background: linear-gradient(var(--map-tile), var(--map-tile)) center / calc(100% - 8px) calc(100% - 8px) no-repeat var(--map-land); }

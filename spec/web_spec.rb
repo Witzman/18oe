@@ -18,10 +18,15 @@ RSpec.describe "web frontend (#40)" do
       expect(last_response.status).to eq(200)
       get "/theme.css"
       expect(last_response.status).to eq(200)
+      # Theme tokens (#95): generated from web/themes/*.json, one rule per theme.
+      get "/themes.css"
+      expect(last_response.status).to eq(200)
+      expect(last_response.body).to include(':root[data-theme="brett"]', ':root[data-theme="atlas"]')
     end
 
     it "never serves sources, package files or node_modules" do
       %w[/main.ts /package.json /package-lock.json /build.mjs /api.ts /node_modules/esbuild/package.json /view-keys.json
+         /themes/brett.json /themes/schema.ts
          /../web/package.json /%2e%2e/web/package.json].each do |path|
         get path
         expect(last_response.status).to eq(404), "#{path} answered #{last_response.status}"
