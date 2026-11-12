@@ -48,6 +48,7 @@ module Engine
 
           def purchasable_companies(player)
             return [] unless can_trade?(player)
+            return [] unless @game.player_trade_enabled?
 
             @game.purchasable_companies(player).reject { |company| @game.face_down_private?(company) }
           end
@@ -58,14 +59,14 @@ module Engine
           end
 
           def can_buy_any_corporation?(player)
-            return false unless can_trade?(player)
+            return false unless can_trade?(player) && @game.player_trade_enabled?
 
             merged = @game.merged_minors.values.flatten
             @game.corporations.any? { |corporation| tradable_minor?(player, corporation, merged) }
           end
 
           def can_buy_corporation?(player, corporation)
-            can_trade?(player) && tradable_minor?(player, corporation, @game.merged_minors.values.flatten)
+            can_trade?(player) && @game.player_trade_enabled? && tradable_minor?(player, corporation, @game.merged_minors.values.flatten)
           end
 
           def price_range(player, _target)
@@ -94,6 +95,7 @@ module Engine
               return super
             end
 
+            raise GameError, "#{seller.name} has not agreed to sell #{company.name} (§10.4)" unless @game.player_trade_enabled?
             raise GameError, "Cannot buy #{company.name}" unless purchasable_companies(player).include?(company)
 
             price = action.price
@@ -112,6 +114,7 @@ module Engine
           def process_buy_corporation(action)
             player = action.entity
             corporation = action.corporation
+            raise GameError, "The seller has not agreed to the sale (§10.4)" unless @game.player_trade_enabled?
             raise GameError, "Cannot buy #{corporation&.name || 'that corporation'}" unless
               can_buy_corporation?(player, corporation)
 

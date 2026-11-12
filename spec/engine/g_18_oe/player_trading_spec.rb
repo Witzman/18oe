@@ -15,6 +15,10 @@ describe 'G18OE trading with another player (§10.4, errata 8 and 10)' do
   let(:unfloated) { give_company!(seller, game.company_by_id('A')) }
   let(:minor) { start_minor!(game, 'B', seller, 'SP') }
 
+  # The mechanics below are exercised with the consent switch on; the default (off) is
+  # covered in player_trade_protection_spec.rb (#148 part 1).
+  before { allow(game).to receive(:player_trade_enabled?).and_return(true) }
+
   def buy_company!(target, price, buyer = player)
     act!(round, Engine::Action::BuyCompany.new(buyer, company: target, price: price))
   end
