@@ -13,6 +13,7 @@ ENV BUNDLE_WITHOUT=test
 RUN bundle install
 
 COPY app.rb ./
+COPY lib/ ./lib/
 
 ENV PORT=80
 EXPOSE 80

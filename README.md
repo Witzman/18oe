@@ -15,6 +15,15 @@ Docker is not required for tests. Everything stays inside the repo
 (`vendor/bundle`, `.tools`, both gitignored); `bundle` and `node` need not
 be in `PATH`.
 
+## Rules engine
+
+`lib/engine/` is the rules engine, extracted from the open-source
+tobymao/18xx Ruby engine (MIT) and trimmed to the core plus the 18OE title,
+loaded with plain `require 'engine'` (no `require_all` gem, no Opal). Source
+commit, removals, the list of modified files and the license are in
+`lib/engine/UPSTREAM.md`. Do not reformat or refactor it; keep the diff
+against upstream explainable.
+
 ## Running with Docker
 
 ```sh
