@@ -102,6 +102,8 @@ function reducedMotion(theme: RenderTheme): boolean {
 }
 
 const DRAG_PX = 4;
+/** Below this element size in px the map keeps its last size (hidden or collapsed element). */
+const MIN_SIZE = 64;
 
 export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: MapOptions = {}): Promise<MapView> {
   const t0 = performance.now();
@@ -114,12 +116,14 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   const dpr = Math.max(1, window.devicePixelRatio || 1);
   await app.init({
     background: theme.ui.bg, antialias: true, autoStart: false, sharedTicker: false,
-    resolution: dpr, autoDensity: true, width: el.clientWidth || 800, height: el.clientHeight || 600, preference: "webgl",
+    resolution: dpr, autoDensity: true, width: el.clientWidth >= MIN_SIZE ? el.clientWidth : 800, height: el.clientHeight >= MIN_SIZE ? el.clientHeight : 600, preference: "webgl",
   });
   app.ticker.stop();
   const canvas = app.canvas;
-  canvas.style.display = "block";
-  canvas.style.touchAction = "none";
+  // The canvas follows the element's size and never sets it (no feedback through layout).
+  canvas.style.cssText = "position:absolute;left:0;top:0;display:block;touch-action:none";
+  if (getComputedStyle(el).position === "static") el.style.position = "relative";
+  el.style.overflow = "hidden";
   el.append(canvas);
   if (el.tabIndex < 0) el.tabIndex = 0;
 
@@ -377,7 +381,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
 
   const onDown = (e: PointerEvent) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    canvas.setPointerCapture?.(e.pointerId);
+    try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or already released pointer */ }
     const p = pos(e);
     pointers.set(e.pointerId, p);
     drag = pointers.size === 1 ? { start: p, moved: false } : drag && { ...drag, moved: true };
@@ -451,7 +455,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let size = vp();
   const resize = new ResizeObserver(() => {
     const w = el.clientWidth, h = el.clientHeight;
-    if (!w || !h || (w === size.width && h === size.height)) return;
+    if (w < MIN_SIZE || h < MIN_SIZE || (w === size.width && h === size.height)) return;
     app.renderer.resize(w, h);
     view = panBy(view, (w - size.width) / 2, (h - size.height) / 2);
     size = vp();
