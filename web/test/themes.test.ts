@@ -8,7 +8,7 @@ import { applyChoice, choiceFromRoot, loadChoice, saveTheme, saveTileStyle, THEM
 import { contrast, hexToNumber } from "../themes/color.ts";
 import { cssVar, themesCss, themeVars } from "../themes/css.ts";
 import { DEFAULT_THEME_ID, themeById, themes } from "../themes/index.ts";
-import { COLOR_KEYS, FONT_KEYS, SHAPE_KEYS, themeProblems, TOP_KEYS, type ColorGroup } from "../themes/schema.ts";
+import { CAMERA_KEYS, COLOR_KEYS, FONT_KEYS, migrateTheme, MOTION_KEYS, NUMBER_RANGES, parseTheme, SHAPE_KEYS, themeProblems, TILE_COLOR_KEYS, TOP_KEYS, TRACK_KEYS, type ColorGroup } from "../themes/schema.ts";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "themes");
 const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
@@ -46,6 +46,9 @@ for (const file of files) {
     }
     assert.deepEqual(Object.keys(t.font!).sort(), [...FONT_KEYS].sort());
     assert.deepEqual(Object.keys(t.shape!).sort(), [...SHAPE_KEYS].sort());
+    assert.deepEqual(Object.keys(t.camera!).sort(), [...CAMERA_KEYS].sort());
+    assert.deepEqual(Object.keys(t.track!).sort(), [...TRACK_KEYS].sort());
+    assert.deepEqual(Object.keys(t.motion!).sort(), [...MOTION_KEYS].sort());
   });
 }
 
@@ -62,11 +65,20 @@ test("a theme with a missing, an unknown or a malformed token is rejected", () =
   assert.ok(themeProblems(null).length > 0);
 });
 
-// Owner decisions (#11, G3/G4): top-down view and full-hex tiles for the first board.
+// Owner decisions (#11): half-3D camera, full-hex tiles, track neutral (company colour only on
+// tokens, trains, runs and seals).
 for (const t of themes) {
-  test(`${t.id}: top-down view and full-hex tiles by default`, () => {
-    assert.equal(t.shape.tilt, 1);
+  test(`${t.id}: half-3D camera, neutral track and full-hex tiles by default`, () => {
+    assert.ok(t.camera.pitch > 0 && t.camera.pitch <= 65);
+    assert.equal(t.track.colorMode, "neutral");
     assert.equal(t.shape.tileStyle, "full");
+  });
+
+  test(`${t.id}: every number is inside its range`, () => {
+    for (const [group, ranges] of Object.entries(NUMBER_RANGES)) {
+      const values = t[group as keyof typeof NUMBER_RANGES] as unknown as Record<string, number>;
+      for (const [k, [min, max]] of Object.entries(ranges)) assert.ok(values[k]! >= min && values[k]! <= max, `${group}.${k}`);
+    }
   });
 
   test(`${t.id}: text and marks reach their contrast on the surface they sit on`, () => {
@@ -78,10 +90,16 @@ for (const t of themes) {
       ["text on accent", t.ui.accentInk, t.ui.accent, 4.5],
       ["pressed button (panel on ink)", t.ui.panel, t.ui.ink, 7],
       // Graphics need 3:1 (WCAG 1.4.11).
-      ["track on tile", t.map.track, t.map.tile, 3],
+      ["track on yellow tile", t.map.track, t.map.tileYellow, 3],
+      ["label on its halo", t.map.label, t.map.labelHalo, 7],
+      ["warn text on panel", t.ui.warn, t.ui.panel, 4.5],
+      ["ok text on panel", t.ui.ok, t.ui.panel, 4.5],
+      ["info text on panel", t.ui.info, t.ui.panel, 4.5],
+      ["text on zebra row", t.ui.ink, t.ui.panelAlt, 7],
       ["track on land", t.map.track, t.map.land, 3],
       ["city outline on city", t.map.cityEdge, t.map.city, 3],
       ["city outline on land", t.map.cityEdge, t.map.land, 3],
+      ...TILE_COLOR_KEYS.map((k) => [`rail on ${k}`, t.map.rail, t.map[k], 3] as [string, string, string, number]),
       ["panel edge against page", t.ui.panel, t.ui.bg, 1.1],
     ];
     for (const [what, fg, bg, min] of pairs) {
@@ -91,7 +109,7 @@ for (const t of themes) {
   });
 
   test(`${t.id}: sea, land and laid tile are distinct areas`, () => {
-    assert.ok(contrast(t.map.tile, t.map.land) >= 1.5);
+    assert.ok(contrast(t.map.tileYellow, t.map.land) >= 1.5);
     assert.notEqual(t.map.seaDeep, t.map.land);
     assert.notEqual(t.map.landHigh, t.map.land);
   });
@@ -112,7 +130,8 @@ test("the generated CSS carries every token of every theme", () => {
   for (const t of themes) {
     const vars = themeVars(t);
     const colours = Object.values(COLOR_KEYS).reduce((n, keys) => n + keys.length, 0);
-    assert.equal(vars.length, colours + FONT_KEYS.length + SHAPE_KEYS.length - 1); // tileStyle is a data attribute
+    const numbers = CAMERA_KEYS.length + TRACK_KEYS.length + MOTION_KEYS.length + SHAPE_KEYS.length - 1; // tileStyle is a data attribute
+    assert.equal(vars.length, colours + FONT_KEYS.length + numbers);
     for (const [name, value] of vars) assert.ok(css.includes(`  ${name}: ${value};`), `${t.id} ${name}`);
   }
 });
@@ -134,7 +153,8 @@ test("the renderer palette is the same values as the theme file", () => {
       const numbers: Record<string, number> = r[group];
       for (const key of COLOR_KEYS[group]) assert.equal(numbers[key], hexToNumber(colors[key]!), `${t.id} ${group}.${key}`);
     }
-    assert.equal(r.tilt, t.shape.tilt);
+    assert.deepEqual([r.camera, r.track, r.motion], [t.camera, t.track, t.motion]);
+    assert.deepEqual([r.barHeight, r.sideWidth, r.gap], [t.shape.barHeight, t.shape.sideWidth, t.shape.gap]);
     assert.equal(r.hexLineAlpha, t.shape.hexLineAlpha);
   }
 });
@@ -176,4 +196,48 @@ test("the choice goes onto the root element and the renderer reads it back from 
   assert.equal(choiceFromRoot(root).tileStyleOverridden, true);
   const r = currentRenderTheme(root);
   assert.deepEqual([r.id, r.tileStyle, r.map.track], ["atlas", "inner", 0x6b2f26]);
+});
+
+test("the CSS carries camera, track, motion and panel metrics with their units", () => {
+  const vars = Object.fromEntries(themeVars(themeById("brett")));
+  assert.equal(vars["--camera-pitch"], "38");
+  assert.equal(vars["--camera-light-azimuth"], "315");
+  assert.equal(vars["--track-color-mode"], "neutral");
+  assert.equal(vars["--motion-enabled"], "1");
+  assert.equal(vars["--motion-run-ms-per-hex"], "220");
+  assert.equal(vars["--shape-side-width"], "340px");
+  assert.equal(vars["--map-tile-yellow"], themeById("brett").map.tileYellow);
+  assert.ok(!("--shape-tilt" in vars) && !("--map-tile" in vars));
+});
+
+test("out-of-range and inconsistent v2 values are rejected", () => {
+  const t = JSON.parse(readFileSync(join(dir, "brett.json"), "utf8")) as Record<string, Record<string, unknown>>;
+  t.camera!.pitch = 70;
+  t.camera!.yaw = -46;
+  t.track!.colorMode = "byBuilder";
+  t.track!.sleeperLength = 0.1;
+  t.motion!.enabled = "yes";
+  t.motion!.queueMaxMs = 1000;
+  t.shape!.gap = 40;
+  t.shape!.shadow = "";
+  assert.deepEqual(themeProblems(t).sort(), [
+    "camera.pitch: expected a number from 0 to 65", "camera.yaw: expected a number from -45 to 45",
+    "motion.enabled: expected true or false", "motion.queueMaxMs: shorter than runMaxMs",
+    "shape.gap: expected a number from 4 to 24", "shape.shadow: expected a CSS box-shadow",
+    "track.colorMode: expected builder, neutral or lastRun",
+    "track.sleeperLength: shorter than gauge + railWidth",
+  ].sort());
+});
+
+test("a v1 theme migrates: tilt becomes camera.pitch via acos, tile becomes the five tile colours", () => {
+  const v1 = { map: { tile: "#d3e03a", track: "#143d1e" }, shape: { tilt: 0.55, tileStyle: "full" } };
+  const m = migrateTheme(v1) as { map: Record<string, string>; shape: Record<string, unknown>; camera: { pitch: number } };
+  assert.ok(Math.abs(m.camera.pitch - 56.6) < 0.05);
+  assert.ok(!("tilt" in m.shape) && !("tile" in m.map));
+  for (const k of TILE_COLOR_KEYS) assert.equal(m.map[k], "#d3e03a");
+  assert.equal((migrateTheme({ shape: { tilt: 1 } }) as { camera: { pitch: number } }).camera.pitch, 0);
+  assert.ok("tilt" in v1.shape, "input is not modified");
+  // A migrated v1 file is still incomplete: the new tokens must come from the author.
+  assert.ok(themeProblems(migrateTheme(v1)).includes("camera.yaw: missing"));
+  assert.throws(() => parseTheme(v1));
 });

@@ -25,6 +25,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .sw-sea { background: linear-gradient(90deg, var(--map-sea-deep), var(--map-sea-shallow)); }
 .sw-land { background: var(--map-land); }
 .sw-high { background: var(--map-land-high); }
-.sw-tile { background: var(--map-tile); display: grid; place-items: center; }
+.sw-tile { background: var(--map-tile-yellow); display: grid; place-items: center; }
 .sw-tile i { width: 70%; height: 3px; background: var(--map-track); }
-:root[data-tile-style="inner"] .sw-tile { background: linear-gradient(var(--map-tile), var(--map-tile)) center / calc(100% - 8px) calc(100% - 8px) no-repeat var(--map-land); }
+:root[data-tile-style="inner"] .sw-tile { background: linear-gradient(var(--map-tile-yellow), var(--map-tile-yellow)) center / calc(100% - 8px) calc(100% - 8px) no-repeat var(--map-land); }
