@@ -28,6 +28,15 @@ module Engine
             "#{tile_lay} track points"
           end
 
+          # A tile that settles a multi-city hex makes the corporations choose a city for the
+          # tokens already standing there. Those tokens were paid for when first placed
+          # (home tokens cost the track-rights price), so re-placing them is free.
+          def update_token!(action, entity, tile, old_tile)
+            pending = @round.pending_tokens.size
+            super
+            @round.pending_tokens[pending..].each { |entry| entry[:token].price = 0 }
+          end
+
           def lay_tile_action(action)
             tile = action.tile
             old_tile = action.hex.tile

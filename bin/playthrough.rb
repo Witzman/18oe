@@ -8,7 +8,7 @@ require 'optparse'
 ENV['ENGINE_LOG_LEVEL'] ||= '3'
 require 'oe/playthrough'
 
-opts = { players: [4], seeds: [1], max_actions: 20_000, out: 'tmp/playthrough' }
+opts = { players: [4], seeds: [1], max_actions: 20_000, player: :random, out: 'tmp/playthrough' }
 parse_range = lambda do |text|
   first, last = text.split('-', 2).map(&:to_i)
   (first..(last || first)).to_a
@@ -17,11 +17,12 @@ OptionParser.new do |o|
   o.on('--players N|A-B') { |v| opts[:players] = parse_range.call(v) }
   o.on('--seeds N|A-B') { |v| opts[:seeds] = parse_range.call(v) }
   o.on('--max-actions M', Integer) { |v| opts[:max_actions] = v }
+  o.on('--player random|strategy') { |v| opts[:player] = v.to_sym }
   o.on('--out DIR') { |v| opts[:out] = v }
 end.parse!
 
 results = opts[:players].product(opts[:seeds]).map do |players, seed|
-  result = Oe::Playthrough.run(players: players, seed: seed, max_actions: opts[:max_actions])
+  result = Oe::Playthrough.run(players: players, seed: seed, max_actions: opts[:max_actions], player: opts[:player])
   path = Oe::Playthrough.write_log(result, opts[:out])
   puts format('%dp seed %-3d %-9s %6d actions  %-14s turn %-2s %6.1fs (enumerate %5.1fs, max %.2fs)  %s',
               players, seed, result.status, result.actions, result.round, result.turn, result.seconds,

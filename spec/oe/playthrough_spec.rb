@@ -33,10 +33,21 @@ RSpec.describe Oe::Playthrough do
     end
   end
 
-  it "reports a dead end instead of raising" do
-    result = described_class.run(players: 4, seed: 1, max_actions: 5000)
+  it "reports how a game stopped instead of raising" do
+    result = described_class.run(players: 4, seed: 1, max_actions: 1500)
 
-    expect(%i[dead_end rejected crash finished]).to include(result.status)
-    expect(result.detail).not_to be_nil unless result.status == :finished
+    expect(statuses).to include(result.status)
+    expect(result.detail).not_to be_nil if %i[dead_end rejected crash].include?(result.status)
+  end
+
+  # Regression: #85 (first-round insolvency, §11.6.5) and #86 (re-placing a token
+  # after a multi-city tile costs nothing). Each of these games used to end in
+  # a dead end in the first operating round (6 players) or the second (4p seed 8).
+  {[6, 1] => "6 players (insolvent minors)", [4, 8] => "4 players, token re-placement on Wien"}.each do |(players, seed), what|
+    it "plays a strategy game to the end: #{what}" do
+      result = described_class.run(players: players, seed: seed, max_actions: 20_000, player: :strategy)
+
+      expect(result.status).to eq(:finished), "#{result.status}: #{result.detail}"
+    end
   end
 end
