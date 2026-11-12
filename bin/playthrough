@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Random-playthrough harness (#31): bin/playthrough --help
+set -euo pipefail
+source "$(dirname "$0")/_env"
+cd "$ROOT"
+bundler exec ruby -I lib bin/playthrough.rb "$@"
