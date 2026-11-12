@@ -53,10 +53,16 @@ RSpec.describe "accounts and session (#33)" do
     expect(JSON.parse(last_response.body)).to eq("id" => "alice", "name" => "Alice")
   end
 
-  it "lets a logged-in session pass the /games* guard (404, not 401)" do
+  it "lets a logged-in session pass the /games* guard" do
     login("bob", "sesame")
     get "/games"
-    expect(last_response.status).to eq(404)
+    expect(last_response.status).to eq(200)
+    expect(JSON.parse(last_response.body)).to eq("games" => [])
+  end
+
+  it "answers errors in the one JSON error format" do
+    get "/games"
+    expect(JSON.parse(last_response.body)).to include("error" => "login_required", "message" => a_kind_of(String))
   end
 
   it "logs out" do

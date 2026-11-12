@@ -15,7 +15,8 @@ RUN bundle install
 COPY app.rb ./
 COPY lib/ ./lib/
 
-ENV PORT=80
+ENV PORT=80 DATABASE_PATH=/data/18oe.sqlite3
+VOLUME /data
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \

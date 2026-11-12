@@ -1,0 +1,171 @@
+# frozen_string_literal: true
+
+require "json"
+require "securerandom"
+require_relative "accounts"
+require_relative "game_session"
+require_relative "store"
+require_relative "view"
+
+module Oe
+  # The game endpoints (#36). Sinatra extension: `register Oe::GamesApi`.
+  # Expects the host app to provide `settings.store` and the helpers
+  # `json(status, payload)`, `current_account`, `api_error(status, code, message)`.
+  #
+  # Errors are always JSON `{error: <code>, message: <text>}`:
+  #   400 bad_request   401 login_required   403 forbidden / not_your_turn
+  #   404 not_found     409 conflict (stale seq)   422 rejected / invalid_seats / game_limit
+  module GamesApi
+    MAX_ACTIVE_DEFAULT = 10
+
+    module Helpers
+      def store
+        settings.store
+      end
+
+      def player_range
+        Engine::Game::G18OE::Game::PLAYER_RANGE
+      end
+
+      # "p<n>" for the seat the logged-in account holds in this game, else nil.
+      def viewer_player_id(seats)
+        seat = seats.find { |s| s["account_id"] == current_account["id"] }
+        seat && GameSession.player_id(seat)
+      end
+
+      def load_session(id)
+        GameSession.load(store, Integer(id))
+      rescue ArgumentError, GameSession::NotFound
+        halt api_error(404, "not_found", "no such game")
+      end
+
+      def envelope(session)
+        viewer = viewer_player_id(session.seats)
+        {
+          id: session.id,
+          status: session.status,
+          seats: session.seats,
+          viewer: viewer,
+          seq: session.seq,
+          state: Oe::View.render(session.game, viewer: viewer, seq: session.seq,
+                                               log: (params["log"] || 40).to_i),
+        }
+      end
+
+      def json_body
+        data = JSON.parse(request.body.read)
+        data.is_a?(Hash) ? data : halt(api_error(400, "bad_request", "JSON object expected"))
+      rescue JSON::ParserError
+        halt api_error(400, "bad_request", "invalid JSON")
+      end
+
+      def build_seats(data)
+        raw = data["seats"]
+        return halt(api_error(422, "invalid_seats", "seats must be a list")) unless raw.is_a?(Array)
+
+        min, max = player_range
+        unless (min..max).cover?(raw.size)
+          return halt(api_error(422, "invalid_seats", "#{min} to #{max} seats required, got #{raw.size}"))
+        end
+
+        humans = []
+        seats = raw.each_with_index.map do |entry, i|
+          kind = entry.is_a?(Hash) ? entry["kind"] : nil
+          case kind
+          when "human"
+            account = Accounts.find(entry["account_id"])
+            halt api_error(422, "invalid_seats", "unknown account at seat #{i}") unless account
+            humans << account["id"]
+            { "seat" => i, "kind" => "human", "account_id" => account["id"], "name" => account["name"] }
+          when "bot"
+            { "seat" => i, "kind" => "bot", "name" => "Bot #{i + 1}" }
+          else
+            halt api_error(422, "invalid_seats", "seat #{i}: kind must be human or bot")
+          end
+        end
+        halt api_error(422, "invalid_seats", "an account may hold only one seat") if humans.uniq.size != humans.size
+        halt api_error(422, "invalid_seats", "you must hold a seat yourself") unless humans.include?(current_account["id"])
+        seats
+      end
+
+      # Authorization as a block for GameSession#append: runs inside the
+      # transaction on the current state. The viewer must hold a seat and be
+      # the acting player of the entity named in the action.
+      def authorizer(viewer, action)
+        lambda do |game|
+          raise GameSession::Forbidden.new("forbidden", "you hold no seat in this game") unless viewer
+
+          entity = game.round.active_entities.find { |e| e.id == action["entity"] }
+          owner = entity && (entity.player? ? entity : entity.player)
+          next if owner && owner.id == viewer
+
+          raise GameSession::Forbidden.new("not_your_turn", "it is not your turn, or the entity is not yours to act for")
+        end
+      end
+    end
+
+    def self.registered(app)
+      app.helpers Helpers
+
+      app.get "/games" do
+        mine = store.games.select { |g| g["seats"].any? { |s| s["account_id"] == current_account["id"] } }
+        json 200, games: mine.map { |g|
+          { id: g["id"], status: g["status"], seats: g["seats"], seq: store.last_seq(g["id"]), created_at: g["created_at"] }
+        }
+      end
+
+      app.post "/games" do
+        data = json_body
+        seats = build_seats(data)
+        limit = (ENV["OE_MAX_GAMES"] || MAX_ACTIVE_DEFAULT).to_i
+        if store.active_game_count >= limit
+          halt api_error(422, "game_limit", "at most #{limit} active games")
+        end
+
+        seed = data["seed"].is_a?(Integer) ? data["seed"] : SecureRandom.random_number(2**31)
+        session = GameSession.create(store, seats: seats, seed: seed)
+        json 201, envelope(session)
+      end
+
+      app.get "/games/:id" do
+        json 200, envelope(load_session(params[:id]))
+      end
+
+      # Cheap: no replay, just the log position (polling, #8).
+      app.get "/games/:id/version" do
+        id = Integer(params[:id], exception: false)
+        row = id && store.game(id)
+        halt api_error(404, "not_found", "no such game") unless row
+
+        json 200, seq: store.last_seq(id), status: row["status"]
+      end
+
+      app.get "/games/:id/actions" do
+        session = load_session(params[:id])
+        json 200, actions: store.action_rows(session.id)
+      end
+
+      app.post "/games/:id/actions" do
+        data = json_body
+        action = data["action"]
+        seq = data["seq"]
+        halt api_error(400, "bad_request", "action (object) and seq (integer) required") unless action.is_a?(Hash) && seq.is_a?(Integer)
+
+        session = load_session(params[:id])
+        viewer = viewer_player_id(session.seats)
+        check = authorizer(viewer, action)
+
+        begin
+          session.append(action.merge("user" => viewer), actor: current_account["id"], expected_seq: seq, &check)
+        rescue GameSession::Forbidden => e
+          halt api_error(403, e.code, e.message)
+        rescue GameSession::Conflict => e
+          halt api_error(409, "conflict", e.message)
+        rescue GameSession::Rejected => e
+          halt api_error(422, "rejected", e.message)
+        end
+        json 200, envelope(GameSession.load(store, session.id))
+      end
+    end
+  end
+end

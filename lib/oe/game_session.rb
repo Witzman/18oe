@@ -16,6 +16,15 @@ module Oe
     class Conflict < Error; end
     # The engine refused the action (or it is not appendable). Nothing written.
     class Rejected < Error; end
+    # The caller's authorize block said no (not seated / not your turn). Nothing written.
+    class Forbidden < Error
+      attr_reader :code
+
+      def initialize(code, message)
+        super(message)
+        @code = code
+      end
+    end
 
     UPSTREAM_COMMIT = "06b3f0b37" # lib/engine/UPSTREAM.md
     GAME_CLASS = -> { Engine::Game::G18OE::Game }
@@ -83,6 +92,10 @@ module Oe
     # expected_seq: the seq the caller based its decision on (nil = "latest").
     # Returns the new seq. Raises Conflict / Rejected; on any error the log is
     # unchanged.
+    #
+    # A block, if given, is called with the up-to-date game inside the
+    # transaction, before the action is applied; it authorizes by raising
+    # Forbidden (so it never races with another thread mutating the game).
     def append(action, actor:, expected_seq: nil)
       # Always go through the hash form: it is what the API sends and what the
       # replay reads, and it rebuilds the action against the *current* game.
@@ -99,6 +112,8 @@ module Oe
         refresh!(db_seq)
         raise Rejected, "game #{@id} is finished" if @game.finished
 
+        yield @game if block_given?
+
         apply(action, db_seq)
         payload = @game.raw_actions.last
         @store.insert_action(game_id: @id, seq: db_seq + 1, actor: actor.to_s, payload: payload)
@@ -107,6 +122,8 @@ module Oe
         @store.sessions[@id] = { seq: @seq, game: @game }
         @seq
       end
+    rescue Conflict, Forbidden
+      raise # raised before the game was touched: the cache is still good
     rescue StandardError
       @store.sessions.delete(@id) # game object may be half-mutated or ahead of the log
       raise
