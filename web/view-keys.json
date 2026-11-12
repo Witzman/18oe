@@ -1,0 +1,82 @@
+{
+  "state": [
+    "bank",
+    "corporations",
+    "depot",
+    "log",
+    "map",
+    "market",
+    "meta",
+    "players",
+    "prompt"
+  ],
+  "meta": [
+    "active_players",
+    "current",
+    "finished",
+    "game_id",
+    "phase",
+    "round",
+    "seq",
+    "standings",
+    "winner"
+  ],
+  "round": [
+    "description",
+    "number",
+    "turn",
+    "type"
+  ],
+  "phase": [
+    "name",
+    "operating_rounds",
+    "status",
+    "tiles"
+  ],
+  "player": [
+    "cash",
+    "cert_limit",
+    "certs",
+    "companies",
+    "id",
+    "name",
+    "order",
+    "shares",
+    "value"
+  ],
+  "corporation": [
+    "cash",
+    "closed",
+    "floated",
+    "id",
+    "ipoed",
+    "last_run",
+    "name",
+    "orient_express_marker",
+    "par_price",
+    "president",
+    "reserved",
+    "share_price",
+    "shares",
+    "status",
+    "tokens",
+    "track_rights",
+    "trains",
+    "type"
+  ],
+  "prompt": [
+    "actions",
+    "step",
+    "types",
+    "viewer_to_act"
+  ],
+  "depot": [
+    "available",
+    "discarded",
+    "next",
+    "upcoming"
+  ],
+  "market": [
+    "rows"
+  ]
+}

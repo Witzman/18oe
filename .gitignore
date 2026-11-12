@@ -3,3 +3,4 @@ vendor/bundle
 .tools
 node_modules
 tmp
+web/dist

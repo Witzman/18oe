@@ -17,6 +17,10 @@ require_relative "lib/oe/games_api"
 
 set :bind, "0.0.0.0"
 set :port, (ENV["PORT"] || 80).to_i
+# The browser app: only web/dist is ever served (sources, node_modules and
+# package files stay out of reach). Build it with `cd web && npm run build`.
+set :public_folder, File.join(__dir__, "web", "dist")
+set :static, true
 set :host_authorization, { permitted_hosts: ["oe.witzman.de", "127.0.0.1", "localhost"] }
 
 # Session cookie. SESSION_SECRET comes from the environment (Dokploy), never
@@ -114,6 +118,13 @@ end
 
 error do
   api_error 500, "internal_error", "internal error"
+end
+
+get "/" do
+  index = File.join(settings.public_folder, "index.html")
+  halt api_error(404, "not_found", "frontend not built") unless File.file?(index)
+
+  send_file index
 end
 
 get "/healthz" do

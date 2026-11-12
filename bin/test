@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
-# Single entry point for all test suites. Later issues add more below.
+# Single entry point for all test suites.
+#   bin/test            rspec (engine, backend) + frontend typecheck and unit tests
+#   bin/test web        frontend only (typecheck + node tests)
+#   bin/test <args>     rspec with the given arguments (files, -e, --tag ...)
 set -euo pipefail
 source "$(dirname "$0")/_env"
 cd "$ROOT"
-bundler exec rspec "$@"
+
+web() { (cd "$ROOT/web" && npm run --silent typecheck && npm test --silent); }
+
+case "${1:-}" in
+  web) web ;;
+  "") bundler exec rspec; web ;;
+  *) bundler exec rspec "$@" ;;
+esac

@@ -1,0 +1,22 @@
+/* Colour tokens from notes/reference/frontend-plan.md. Keep in sync with render/theme.ts. */
+:root {
+  --parchment: #e8dcc3;
+  --parchment-dark: #d4c4a0;
+  --ink: #3a2f1f;
+  --ink-faint: #6b5d47;
+  --accent-rail: #8b3a2f;
+  --accent-sea: #5b7a8c;
+  --accent-gold: #b8923f;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--parchment); color: var(--ink); font: 16px/1.4 Georgia, serif; }
+#app { max-width: 960px; margin: 0 auto; padding: 16px; }
+h1, h2 { font-weight: normal; border-bottom: 1px solid var(--parchment-dark); padding-bottom: 4px; }
+button, select, input { font: inherit; color: inherit; background: var(--parchment); border: 1px solid var(--ink-faint); padding: 4px 10px; }
+button { cursor: pointer; background: var(--parchment-dark); }
+button:hover { border-color: var(--accent-gold); }
+.panel { background: var(--parchment-dark); border: 1px solid var(--ink-faint); padding: 12px; margin: 12px 0; }
+.error { color: var(--accent-rail); }
+.muted { color: var(--ink-faint); }
+.row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+.turn { color: var(--accent-gold); font-weight: bold; }
