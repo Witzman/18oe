@@ -285,10 +285,12 @@ module Oe
       mine = viewer && !game.finished && game.active_players.any? { |p| p.id == viewer }
       list = []
       unsupported = []
+      ranges = []
       if mine && with_actions
-        legal = Oe::LegalActions.new(game, limit: limit, rng: Random.new(0))
+        legal = Oe::LegalActions.new(game, limit: limit, rng: Random.new(0), compact: true)
         list = legal.call.map { |a| a.to_h.reject { |k, _| %w[id created_at user].include?(k) } }
         unsupported = legal.unsupported
+        ranges = legal.ranges
       end
       {
         step: step && step.class.name.split("::").last,
@@ -298,6 +300,9 @@ module Oe
         # Action types the step offers that the server cannot enumerate (#125).
         # The game stays playable; the client may offer a generic fallback.
         unsupported: unsupported,
+        # Families with too many members to list (#91): bids as ranges. Every
+        # amount min, min+step .. max is legal; send a normal bid action.
+        ranges: ranges,
       }
     end
 

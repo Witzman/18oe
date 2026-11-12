@@ -67,6 +67,7 @@
   ],
   "prompt": [
     "actions",
+    "ranges",
     "step",
     "types",
     "unsupported",
