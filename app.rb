@@ -91,7 +91,11 @@ get "/me" do
   account ? json(200, account) : api_error(401, "login_required", "login required")
 end
 
-get "/accounts" do
+# The account list holds real names, so it is only given to someone who knows the
+# shared access code (the login picker asks for the code first).
+post "/accounts" do
+  halt api_error(401, "invalid_login", "invalid access code") unless Oe::Accounts.access_ok?(request_params["code"])
+
   json 200, accounts: Oe::Accounts.all.map { |id, name| { id: id, name: name } }
 end
 

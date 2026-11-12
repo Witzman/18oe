@@ -80,6 +80,25 @@ RSpec.describe "accounts and session (#33)" do
     expect(last_response.status).to eq(401)
   end
 
+  it "does not hand out the account list to anonymous GET requests" do
+    get "/accounts"
+    expect(last_response.status).to eq(404)
+    expect(last_response.body).not_to include("Alice")
+  end
+
+  it "gives the account list only with the access code" do
+    post "/accounts", { code: "nope" }, { "HTTP_HOST" => "127.0.0.1" }
+    expect(last_response.status).to eq(401)
+    expect(last_response.body).not_to include("Alice")
+
+    post "/accounts", {}, { "HTTP_HOST" => "127.0.0.1" }
+    expect(last_response.status).to eq(401)
+
+    post "/accounts", { code: "sesame" }, { "HTTP_HOST" => "127.0.0.1" }
+    expect(last_response.status).to eq(200)
+    expect(JSON.parse(last_response.body)["accounts"]).to include("id" => "alice", "name" => "Alice")
+  end
+
   it "accepts a JSON login body" do
     post "/login", JSON.generate(account: "alice", code: "sesame"),
          { "CONTENT_TYPE" => "application/json", "HTTP_HOST" => "127.0.0.1" }
