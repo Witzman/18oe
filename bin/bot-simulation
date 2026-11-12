@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Bot-vs-random simulation (#38): bin/bot-simulation --help
+set -euo pipefail
+source "$(dirname "$0")/_env"
+cd "$ROOT"
+bundler exec ruby -I lib bin/bot_simulation.rb "$@"
