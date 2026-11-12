@@ -4,3 +4,10 @@ services:
     expose:
       - "80"
     restart: unless-stopped
+    # Dokploy keeps these in the compose project's .env; compose only hands
+    # them to the container if they are named here. The app refuses to start
+    # without them (see app.rb), so a missing one fails the deploy loudly.
+    environment:
+      SESSION_SECRET: ${SESSION_SECRET:?SESSION_SECRET must be set in Dokploy}
+      OE_ACCESS_CODE: ${OE_ACCESS_CODE:?OE_ACCESS_CODE must be set in Dokploy}
+      OE_ACCOUNTS: ${OE_ACCOUNTS:?OE_ACCOUNTS must be set in Dokploy}

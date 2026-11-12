@@ -21,7 +21,7 @@ module Oe
     end
 
     def self.all(env = ENV)
-      parse(env["OE_ACCOUNTS"] || DEFAULT)
+      parse(env["OE_ACCOUNTS"].to_s.empty? ? DEFAULT : env["OE_ACCOUNTS"])
     end
 
     def self.find(id, env = ENV)
