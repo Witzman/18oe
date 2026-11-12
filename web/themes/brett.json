@@ -9,16 +9,39 @@
     "land": "#7f8a4f",
     "landHigh": "#7a6a42",
     "hexLine": "#1e1e14",
-    "tile": "#d3e03a",
+    "tileYellow": "#d3e03a",
+    "tileGreen": "#5aa845",
+    "tileBrown": "#b07a46",
+    "tileGray": "#b8b8b2",
+    "tileRed": "#d4513f",
     "tileEdge": "#a9b52a",
     "track": "#143d1e",
     "city": "#ffffff",
     "cityEdge": "#2a2a2a",
-    "edgeDot": "#c8372d"
+    "edgeDot": "#c8372d",
+    "hill": "#9a8a55",
+    "mountain": "#8a7d70",
+    "water": "#4a86a8",
+    "rail": "#0f1a12",
+    "sleeper": "#5a4630",
+    "bed": "#c8bfa4",
+    "zoneBorder": "#5b3f8c",
+    "seaZoneLine": "#cfe6f0",
+    "ferry": "#1f4f7a",
+    "port": "#8a5a1c",
+    "oeRoute": "#8b1e3f",
+    "label": "#1e1e14",
+    "labelHalo": "#f4efd8",
+    "valid": "#3aa655",
+    "selected": "#e0a81c",
+    "invalid": "#c0392b",
+    "preview": "#f4efd8",
+    "shadow": "#101810"
   },
   "ui": {
     "bg": "#26302c",
     "panel": "#f1ead6",
+    "panelAlt": "#e6dcc0",
     "ink": "#2b2a22",
     "faint": "#5f5c4c",
     "rule": "#c9bf9f",
@@ -26,7 +49,11 @@
     "accentInk": "#1d1a12",
     "bar": "#1d2522",
     "barInk": "#efe7cf",
-    "error": "#a3271f"
+    "error": "#a3271f",
+    "ok": "#2a6f38",
+    "warn": "#8a5a0c",
+    "info": "#2f6f9a",
+    "overlay": "#10150f"
   },
   "company": {
     "c1": "#2f6fb0",
@@ -49,11 +76,43 @@
     "head": "'Barlow Condensed', 'Arial Narrow', sans-serif",
     "body": "Barlow, 'Helvetica Neue', Arial, sans-serif"
   },
+  "camera": {
+    "pitch": 38,
+    "yaw": -12,
+    "heightLand": 0.1,
+    "heightHill": 0.18,
+    "heightMountain": 0.32,
+    "heightTile": 0.04,
+    "heightToken": 0.16,
+    "wallShade": 0.45,
+    "lightAzimuth": 315,
+    "shadowAlpha": 0.25
+  },
+  "track": {
+    "gauge": 0.11,
+    "railWidth": 0.022,
+    "sleeperSpacing": 0.075,
+    "sleeperLength": 0.19,
+    "sleeperWidth": 0.03,
+    "bedWidth": 0.26,
+    "colorMode": "neutral",
+    "colorPart": "bed"
+  },
+  "motion": {
+    "runMsPerHex": 220,
+    "runMaxMs": 6000,
+    "queueMaxMs": 9000,
+    "flashMs": 600,
+    "enabled": true
+  },
   "shape": {
-    "tilt": 1,
     "tileStyle": "full",
+    "shadow": "0 2px 8px rgba(16, 24, 16, 0.35)",
     "hexLineAlpha": 0.28,
     "paper": 0,
-    "radius": 3
+    "radius": 3,
+    "barHeight": 56,
+    "sideWidth": 340,
+    "gap": 12
   }
 }

@@ -9,16 +9,39 @@
     "land": "#aab67e",
     "landHigh": "#a58f66",
     "hexLine": "#282319",
-    "tile": "#eedd7a",
+    "tileYellow": "#eedd7a",
+    "tileGreen": "#8fc27a",
+    "tileBrown": "#c9955f",
+    "tileGray": "#cfcdc4",
+    "tileRed": "#e08a73",
     "tileEdge": "#a8902f",
     "track": "#6b2f26",
     "city": "#f8f2e0",
     "cityEdge": "#3a2f1f",
-    "edgeDot": "#8b3a2f"
+    "edgeDot": "#8b3a2f",
+    "hill": "#b09a6e",
+    "mountain": "#9c8f80",
+    "water": "#6f9fb8",
+    "rail": "#2a1c14",
+    "sleeper": "#7a6244",
+    "bed": "#e4d9b8",
+    "zoneBorder": "#6f4f8c",
+    "seaZoneLine": "#f1f6f2",
+    "ferry": "#35587a",
+    "port": "#8a5a1c",
+    "oeRoute": "#8b2f4a",
+    "label": "#2a2116",
+    "labelHalo": "#f3ead0",
+    "valid": "#4a9a5a",
+    "selected": "#c98f1c",
+    "invalid": "#a8443a",
+    "preview": "#f3ead0",
+    "shadow": "#3a2f1f"
   },
   "ui": {
     "bg": "#d9cdb0",
     "panel": "#efe5cc",
+    "panelAlt": "#e3d6b6",
     "ink": "#3a2f1f",
     "faint": "#63563f",
     "rule": "#b9a77f",
@@ -26,7 +49,11 @@
     "accentInk": "#1d1a12",
     "bar": "#2c2a3a",
     "barInk": "#f1e7cc",
-    "error": "#8b2f25"
+    "error": "#8b2f25",
+    "ok": "#3a6f42",
+    "warn": "#7a520c",
+    "info": "#376590",
+    "overlay": "#2a2418"
   },
   "company": {
     "c1": "#3f6f9a",
@@ -49,11 +76,43 @@
     "head": "'Old Standard TT', Georgia, serif",
     "body": "'Source Serif 4', Georgia, serif"
   },
+  "camera": {
+    "pitch": 30,
+    "yaw": -6,
+    "heightLand": 0.06,
+    "heightHill": 0.12,
+    "heightMountain": 0.22,
+    "heightTile": 0.03,
+    "heightToken": 0.14,
+    "wallShade": 0.3,
+    "lightAzimuth": 315,
+    "shadowAlpha": 0.15
+  },
+  "track": {
+    "gauge": 0.11,
+    "railWidth": 0.02,
+    "sleeperSpacing": 0.08,
+    "sleeperLength": 0.19,
+    "sleeperWidth": 0.028,
+    "bedWidth": 0.25,
+    "colorMode": "neutral",
+    "colorPart": "bed"
+  },
+  "motion": {
+    "runMsPerHex": 220,
+    "runMaxMs": 6000,
+    "queueMaxMs": 9000,
+    "flashMs": 600,
+    "enabled": true
+  },
   "shape": {
-    "tilt": 1,
     "tileStyle": "full",
+    "shadow": "0 1px 4px rgba(58, 47, 31, 0.30)",
     "hexLineAlpha": 0.32,
     "paper": 0.05,
-    "radius": 1
+    "radius": 1,
+    "barHeight": 56,
+    "sideWidth": 340,
+    "gap": 12
   }
 }

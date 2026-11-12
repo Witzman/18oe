@@ -15,10 +15,16 @@ export function themeVars(theme: Theme): [name: string, value: string][] {
     for (const key of COLOR_KEYS[group]) vars.push([cssVar(group, key), colors[key]!]);
   }
   vars.push(["--font-head", theme.font.head], ["--font-body", theme.font.body]);
-  vars.push(["--shape-tilt", String(theme.shape.tilt)]);
-  vars.push(["--shape-hex-line-alpha", String(theme.shape.hexLineAlpha)]);
-  vars.push(["--shape-paper", String(theme.shape.paper)]);
-  vars.push(["--shape-radius", `${theme.shape.radius}px`]);
+  // Numbers keep their unit-free value (angles in degrees, lengths in hex side lengths,
+  // times in ms) except the panel metrics, which are pixels.
+  const px = new Set(["radius", "barHeight", "sideWidth", "gap"]);
+  for (const [group, values] of [["camera", theme.camera], ["track", theme.track], ["motion", theme.motion], ["shape", theme.shape]] as const) {
+    for (const [key, value] of Object.entries(values)) {
+      if (key === "tileStyle") continue; // a data attribute (themes/choice.ts)
+      const text = typeof value === "boolean" ? (value ? "1" : "0") : px.has(key) ? `${value}px` : String(value);
+      vars.push([`--${group}-${kebab(key)}`, text]);
+    }
+  }
   return vars;
 }
 

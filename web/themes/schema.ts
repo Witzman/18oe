@@ -3,8 +3,17 @@
 // derived from it, nothing is hard-coded elsewhere.
 
 export const COLOR_KEYS = {
-  map: ["seaDeep", "seaShallow", "landLow", "land", "landHigh", "hexLine", "tile", "tileEdge", "track", "city", "cityEdge", "edgeDot"],
-  ui: ["bg", "panel", "ink", "faint", "rule", "accent", "accentInk", "bar", "barInk", "error"],
+  map: [
+    "seaDeep", "seaShallow", "landLow", "land", "landHigh", "hexLine",
+    // Laid-tile colour by the engine's tile.color (replaces the single `tile` of schema v1).
+    "tileYellow", "tileGreen", "tileBrown", "tileGray", "tileRed", "tileEdge",
+    "track", "city", "cityEdge", "edgeDot",
+    "hill", "mountain", "water",
+    "rail", "sleeper", "bed",
+    "zoneBorder", "seaZoneLine", "ferry", "port", "oeRoute",
+    "label", "labelHalo", "valid", "selected", "invalid", "preview", "shadow",
+  ],
+  ui: ["bg", "panel", "panelAlt", "ink", "faint", "rule", "accent", "accentInk", "bar", "barInk", "error", "ok", "warn", "info", "overlay"],
   // Placeholders until the real company colours come from the engine.
   company: ["c1", "c2", "c3", "c4", "c5", "c6"],
   player: ["p1", "p2", "p3", "p4", "p5", "p6", "p7"],
@@ -15,10 +24,35 @@ export type Colors<G extends ColorGroup> = Record<(typeof COLOR_KEYS)[G][number]
 
 export const TILE_STYLES = ["full", "inner"] as const;
 export type TileStyle = (typeof TILE_STYLES)[number];
+export type TrackColorMode = (typeof TRACK_COLOR_MODES)[number];
+export type TrackColorPart = (typeof TRACK_COLOR_PARTS)[number];
 
 export const FONT_KEYS = ["head", "body"] as const;
-export const SHAPE_KEYS = ["tilt", "tileStyle", "hexLineAlpha", "paper", "radius"] as const;
-export const TOP_KEYS = ["id", "name", "colorScheme", "map", "ui", "company", "player", "font", "shape"] as const;
+export const TILE_COLOR_KEYS = ["tileYellow", "tileGreen", "tileBrown", "tileGray", "tileRed"] as const;
+
+/** Where the company colour sits on track (#11: not by builder; neutral is the owner's choice). */
+export const TRACK_COLOR_MODES = ["builder", "neutral", "lastRun"] as const;
+export const TRACK_COLOR_PARTS = ["bed", "sleepers", "rails"] as const;
+
+/** Numeric tokens with their allowed range (ui-spec 1.3). Lengths are in hex side lengths. */
+export const NUMBER_RANGES = {
+  camera: {
+    pitch: [0, 65], yaw: [-45, 45], heightLand: [0, 0.6], heightHill: [0, 1], heightMountain: [0, 1.5],
+    heightTile: [0, 0.3], heightToken: [0, 0.6], wallShade: [0, 1], lightAzimuth: [0, 360], shadowAlpha: [0, 1],
+  },
+  track: {
+    gauge: [0.02, 0.3], railWidth: [0.005, 0.08], sleeperSpacing: [0.03, 0.3],
+    sleeperLength: [0.05, 0.5], sleeperWidth: [0.01, 0.1], bedWidth: [0.05, 0.6],
+  },
+  motion: { runMsPerHex: [50, 1000], runMaxMs: [500, 20000], queueMaxMs: [500, 30000], flashMs: [100, 2000] },
+  shape: { hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24] },
+} as const satisfies Record<string, Record<string, readonly [number, number]>>;
+
+export const CAMERA_KEYS = Object.keys(NUMBER_RANGES.camera) as (keyof typeof NUMBER_RANGES.camera)[];
+export const TRACK_KEYS = [...Object.keys(NUMBER_RANGES.track), "colorMode", "colorPart"] as const;
+export const MOTION_KEYS = [...Object.keys(NUMBER_RANGES.motion), "enabled"] as const;
+export const SHAPE_KEYS = ["tileStyle", "shadow", ...Object.keys(NUMBER_RANGES.shape)] as const;
+export const TOP_KEYS = ["id", "name", "colorScheme", "map", "ui", "company", "player", "font", "camera", "track", "motion", "shape"] as const;
 
 export interface Theme {
   id: string;
@@ -29,16 +63,17 @@ export interface Theme {
   company: Colors<"company">;
   player: Colors<"player">;
   font: Record<(typeof FONT_KEYS)[number], string>;
-  shape: {
-    /** Vertical squash of the map: 1 = straight top-down view, 0.55 = tilted. */
-    tilt: number;
+  camera: Record<keyof typeof NUMBER_RANGES.camera, number>;
+  track: Record<keyof typeof NUMBER_RANGES.track, number> & { colorMode: TrackColorMode; colorPart: TrackColorPart };
+  motion: Record<keyof typeof NUMBER_RANGES.motion, number> & {
+    /** Overridden by prefers-reduced-motion and the player's setting. */
+    enabled: boolean;
+  };
+  shape: Record<keyof typeof NUMBER_RANGES.shape, number> & {
     /** Laid tiles fill the whole hex ("full", like the physical board) or leave a rim ("inner"). */
     tileStyle: TileStyle;
-    hexLineAlpha: number;
-    /** Paper grain strength, 0 = none. */
-    paper: number;
-    /** Corner radius of panels in px. */
-    radius: number;
+    /** CSS box-shadow of the panels. */
+    shadow: string;
   };
 }
 
@@ -80,16 +115,57 @@ export function themeProblems(raw: unknown): string[] {
   if (isRecord(raw.font)) {
     for (const k of FONT_KEYS) if (typeof raw.font[k] !== "string" || raw.font[k] === "") problems.push(`font.${k}: expected a font stack`);
   }
-  problems.push(...keyProblems("shape", raw.shape, SHAPE_KEYS));
+  for (const [group, keys] of [["camera", CAMERA_KEYS], ["track", TRACK_KEYS], ["motion", MOTION_KEYS], ["shape", SHAPE_KEYS]] as const) {
+    problems.push(...keyProblems(group, raw[group], keys));
+    const values = raw[group];
+    if (!isRecord(values)) continue;
+    const ranges: Record<string, readonly [number, number]> = NUMBER_RANGES[group];
+    for (const [k, [min, max]] of Object.entries(ranges)) if (k in values) problems.push(...inRange(`${group}.${k}`, values[k], min, max));
+  }
+  if (isRecord(raw.track)) {
+    const t = raw.track;
+    if (!TRACK_COLOR_MODES.includes(t.colorMode as TrackColorMode)) problems.push("track.colorMode: expected builder, neutral or lastRun");
+    if (!TRACK_COLOR_PARTS.includes(t.colorPart as TrackColorPart)) problems.push("track.colorPart: expected bed, sleepers or rails");
+    const [g, rw, sl, bw] = [t.gauge, t.railWidth, t.sleeperLength, t.bedWidth];
+    if ([g, rw, sl, bw].every((v) => typeof v === "number")) {
+      // Geometry must hold together: sleepers reach past both rails, the bed past the sleepers.
+      if ((sl as number) < (g as number) + (rw as number)) problems.push("track.sleeperLength: shorter than gauge + railWidth");
+      if ((bw as number) < (sl as number)) problems.push("track.bedWidth: narrower than sleeperLength");
+    }
+  }
+  if (isRecord(raw.motion)) {
+    const m = raw.motion;
+    if (typeof m.enabled !== "boolean") problems.push("motion.enabled: expected true or false");
+    if (typeof m.runMaxMs === "number" && typeof m.queueMaxMs === "number" && m.queueMaxMs < m.runMaxMs) problems.push("motion.queueMaxMs: shorter than runMaxMs");
+  }
   if (isRecord(raw.shape)) {
-    const s = raw.shape;
-    problems.push(...inRange("shape.tilt", s.tilt, 0.4, 1));
-    problems.push(...inRange("shape.hexLineAlpha", s.hexLineAlpha, 0, 1));
-    problems.push(...inRange("shape.paper", s.paper, 0, 1));
-    problems.push(...inRange("shape.radius", s.radius, 0, 24));
-    if (!TILE_STYLES.includes(s.tileStyle as TileStyle)) problems.push("shape.tileStyle: expected full or inner");
+    if (!TILE_STYLES.includes(raw.shape.tileStyle as TileStyle)) problems.push("shape.tileStyle: expected full or inner");
+    if (typeof raw.shape.shadow !== "string" || raw.shape.shadow === "") problems.push("shape.shadow: expected a CSS box-shadow");
   }
   return problems;
+}
+
+/**
+ * Brings a schema-v1 theme (#95) to v2 where the old values map onto new ones:
+ * `shape.tilt` becomes `camera.pitch = acos(tilt)` in degrees and is removed,
+ * `map.tile` becomes the five `map.tile*` colours. Anything else new stays missing
+ * and is reported by `themeProblems`. Does not modify its argument.
+ */
+export function migrateTheme(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  const out: Record<string, unknown> = { ...raw };
+  if (isRecord(raw.shape) && "tilt" in raw.shape) {
+    const { tilt, ...shape } = raw.shape;
+    out.shape = shape;
+    if (typeof tilt === "number" && tilt >= 0 && tilt <= 1 && !("camera" in raw)) {
+      out.camera = { pitch: Math.round((Math.acos(tilt) * 180) / Math.PI * 10) / 10 };
+    }
+  }
+  if (isRecord(raw.map) && "tile" in raw.map) {
+    const { tile, ...map } = raw.map;
+    out.map = { ...Object.fromEntries(TILE_COLOR_KEYS.map((k) => [k, tile])), ...map };
+  }
+  return out;
 }
 
 export function parseTheme(raw: unknown): Theme {

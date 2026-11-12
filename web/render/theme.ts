@@ -12,10 +12,16 @@ export interface RenderTheme {
   ui: Numeric<"ui">;
   company: Numeric<"company">;
   player: Numeric<"player">;
-  tilt: number;
+  camera: Theme["camera"];
+  track: Theme["track"];
+  motion: Theme["motion"];
   tileStyle: TileStyle;
   hexLineAlpha: number;
   paper: number;
+  /** Panel metrics in px (CSS reads them as --shape-*). */
+  barHeight: number;
+  sideWidth: number;
+  gap: number;
 }
 
 function numeric<G extends ColorGroup>(theme: Theme, group: G): Numeric<G> {
@@ -31,10 +37,15 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     ui: numeric(t, "ui"),
     company: numeric(t, "company"),
     player: numeric(t, "player"),
-    tilt: t.shape.tilt,
+    camera: { ...t.camera },
+    track: { ...t.track },
+    motion: { ...t.motion },
     tileStyle: choice.tileStyle,
     hexLineAlpha: t.shape.hexLineAlpha,
     paper: t.shape.paper,
+    barHeight: t.shape.barHeight,
+    sideWidth: t.shape.sideWidth,
+    gap: t.shape.gap,
   };
 }
 
