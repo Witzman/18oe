@@ -24,6 +24,28 @@ RSpec.describe "web frontend (#40)" do
       expect(last_response.body).to include(':root[data-theme="brett"]', ':root[data-theme="atlas"]')
     end
 
+    it "serves theme fonts locally and references no foreign host (#98)" do
+      skip "web/dist not built (cd web && npm run build)" unless File.file?(File.join(dist, "index.html"))
+
+      get "/fonts.css"
+      expect(last_response.status).to eq(200)
+      files = last_response.body.scan(%r{url\((/fonts/[^)]+\.woff2)\)}).flatten
+      expect(files.size).to eq(16)
+      files.each do |path|
+        get path
+        expect(last_response.status).to eq(200), "#{path} answered #{last_response.status}"
+        expect(last_response.body.bytesize).to be > 1000
+      end
+      %w[/ /theme.css /themes.css /fonts.css].each do |path|
+        get path
+        expect(last_response.body).not_to match(%r{(https?:)?//[a-z0-9.-]+\.[a-z]{2,}}i), "#{path} references a foreign host"
+      end
+      %w[/fonts/SOURCES.md /fonts/LICENSES/barlow-OFL.txt].each do |path|
+        get path
+        expect(last_response.status).to eq(200)
+      end
+    end
+
     it "never serves sources, package files or node_modules" do
       %w[/main.ts /package.json /package-lock.json /build.mjs /api.ts /node_modules/esbuild/package.json /view-keys.json
          /themes/brett.json /themes/schema.ts

@@ -1,7 +1,7 @@
 // Bundles web/main.ts into web/dist/ and copies the static files next to it.
 // Only web/dist is ever served by the app (see app.rb), never the sources.
 import { build } from "esbuild";
-import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { themesCss } from "./themes/css.ts";
@@ -23,5 +23,8 @@ await build({
   logLevel: "info",
 });
 for (const file of ["index.html", "theme.css"]) copyFileSync(join(root, file), join(dist, file));
+// Theme fonts: @font-face (fonts.css) and the woff2 files, served from our own origin (#98).
+cpSync(join(root, "fonts"), join(dist, "fonts"), { recursive: true });
+copyFileSync(join(root, "fonts", "fonts.css"), join(dist, "fonts.css"));
 // Theme tokens as CSS variables, one rule per theme (#95).
 writeFileSync(join(dist, "themes.css"), themesCss(themes, DEFAULT_THEME_ID));
