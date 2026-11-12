@@ -8,6 +8,7 @@ services:
       - dokploy-network
     labels:
       - traefik.enable=true
+      - traefik.docker.network=dokploy-network
       - traefik.http.routers.orient18oe.rule=Host(`oe.witzman.de`)
       - traefik.http.routers.orient18oe.entrypoints=websecure
       - traefik.http.routers.orient18oe.tls.certResolver=letsencrypt
