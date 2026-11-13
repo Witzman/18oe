@@ -34,5 +34,6 @@ copyFileSync(join(root, "ui", "frame", "frame.css"), join(dist, "frame.css"));
 copyFileSync(join(root, "ui", "panels", "auction.css"), join(dist, "auction.css"));
 copyFileSync(join(root, "ui", "panels", "concession.css"), join(dist, "concession.css"));
 copyFileSync(join(root, "ui", "panels", "stock.css"), join(dist, "stock.css"));
+copyFileSync(join(root, "ui", "panels", "train.css"), join(dist, "train.css"));
 // Theme tokens as CSS variables, one rule per theme (#95).
 writeFileSync(join(dist, "themes.css"), themesCss(themes, DEFAULT_THEME_ID));

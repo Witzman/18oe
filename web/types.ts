@@ -232,3 +232,13 @@ export interface GameSummary extends TurnInfo { id: number; status: string; seat
 export interface Version extends TurnInfo { seq: number; status: string }
 // GET /games/:id/log?from=&limit= (#152)
 export interface LogPage { lines: { action: number; text: string }[]; next: number | null; seq: number }
+// GET /games/:id/history (#115): time series, derived by replay, on request only
+export interface SharePricePoint { action: number; turn: number; round: string; number: number | null; price: number | null }
+export interface PlayerValuePoint { round: string; turn: number; number: number; value: number }
+export interface RevenuePoint { turn: number; number: number; revenue: number; dividend: "payout" | "half" | "withhold" }
+export interface History {
+  seq: number;
+  share_prices: Record<string, SharePricePoint[]>;
+  player_values: Record<string, PlayerValuePoint[]>;
+  revenue: Record<string, RevenuePoint[]>;
+}
