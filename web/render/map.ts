@@ -726,7 +726,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     }
     if (pointers.size === 0) drag = null;
   };
-  const onLeave = (e: PointerEvent) => { if (pointers.size === 0 && e.pointerType === "mouse") setHover(null); };
+  const onLeave = (e: PointerEvent) => { if (pointers.size === 0 && e.pointerType !== "touch" && e.pointerType !== "pen") setHover(null); };
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     const step = e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 1 : 0.0015;

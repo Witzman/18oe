@@ -142,7 +142,7 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
 })()`;
 
 for (const orientation of ["landscape", "portrait"] as const) {
-  test(`touch on the map under the iPad profile, ${orientation}: tap selects, list for ambiguous taps, pan, inertia, pinch, double tap`, { skip: browser ? false : "no headless browser installed", timeout: 240000 }, async () => {
+  test(`touch on the map under the iPad profile, ${orientation}: tap selects, list for ambiguous taps, pan, inertia, pinch, double tap`, { skip: browser ? false : "no headless browser installed", timeout: 60000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), "oe-touch-test-"));
     try {
       await build({ entryPoints: [join(web, "main.ts")], bundle: true, format: "esm", target: "es2022", outfile: join(dir, "main.js"), logLevel: "silent" });
@@ -153,7 +153,7 @@ for (const orientation of ["landscape", "portrait"] as const) {
       const [w, h] = orientation === "landscape" ? [ph, pw] : [pw, ph];
       const out = join(dir, "out.png");
       const r = spawnSync(process.execPath, [shot, `${join(dir, "index.html")}#/map?src=/map.json&pitch=0&yaw=0`, out,
-        "--device", "ipad", "--orientation", orientation, "--wait-for", ".map-dev[data-ready]", "--eval", CHECKS(w, h), "--delay", "0"], { encoding: "utf8", timeout: 230000 });
+        "--device", "ipad", "--orientation", orientation, "--wait-for", ".map-dev[data-ready]", "--eval", CHECKS(w, h), "--delay", "0"], { encoding: "utf8", timeout: 55000 });
       assert.equal(r.status, 0, r.stderr + r.stdout);
       assert.doesNotMatch(r.stderr, /page error/);
       console.log(r.stdout.trim().split("\n").pop());

@@ -62,7 +62,7 @@ const CHECKS = String.raw`(async () => {
   const seen = [];
   window.oeFrameMap.on("hex", (d) => seen.push(d.hex));
   const p = m.hexOnScreen("A2") || fail("no hex on screen");
-  const ev = (type) => c.dispatchEvent(new PointerEvent(type, { clientX: cb.left + p.x, clientY: cb.top + p.y, pointerId: 1, pointerType: "touch", button: 0, bubbles: true }));
+  const ev = (type) => c.dispatchEvent(new PointerEvent(type, { clientX: cb.left + p.x, clientY: cb.top + p.y, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true }));
   ev("pointerdown"); ev("pointerup");
   await sleep(100);
   if (seen.length === 0) fail("click did not reach frame.hooks.map");
