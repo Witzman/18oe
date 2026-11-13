@@ -15,6 +15,7 @@ import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./or
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
 import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stepLabel, type PlayerRow } from "./model.ts";
 import { createViews } from "./views.ts";
+import { versionButton } from "../version.ts";
 import { endgameModel, Endstand } from "../panels/endgame.ts";
 
 export interface GameFrame {
@@ -86,7 +87,7 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   const barTools = h("div", { class: "frame-bar-tools" });
   barEl.append(barMain, message.el, barTools);
   const body = h("div", { class: "frame-body" }, contextEl, mainEl, outlinerEl);
-  const root = h("div", { class: "frame" }, roundEl, band.el, playersEl, body, drawerEl, barEl);
+  const root = h("div", { class: "frame" }, roundEl, band.el, playersEl, body, drawerEl, barEl, versionButton());
 
   const model = () => (game ? genericModel(game, claims) : null);
 

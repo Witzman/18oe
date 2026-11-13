@@ -192,6 +192,18 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "access.hint_name": e("2 bis 30 Zeichen, ohne @", "2 to 30 characters, no @", "—"),
   "access.hint_password": e("Mindestens 8 Zeichen", "At least 8 characters", "—"),
   "access.hint_code": e("Den Code hast du vom Spielleiter erhalten.", "The code comes from the host", "—"),
+  // Versionsangabe (#271)
+  "version.label": e("Version", "Version", "—"),
+  "version.line": e("Version {version} · Build {build} · Engine {engine}", "Version {version} · build {build} · engine {engine}", "—"),
+  "version.title": e("Versionsangabe", "Version information", "—"),
+  "version.page": e("Seite (Frontend)", "Page (frontend)", "—"),
+  "version.server": e("Server", "Server", "—"),
+  "version.build": e("Build", "Build", "—"),
+  "version.engine": e("Regelwerk-Stand (Engine)", "Engine revision", "—"),
+  "version.unknown": e("unbekannt", "unknown", "—"),
+  "version.stale": e("Seite und Server haben verschiedene Versionen: bitte neu laden (Strg+F5).", "Page and server versions differ", "—"),
+  "version.report": e("Bei Rückmeldungen bitte diese Zeile mitschicken.", "Include this line in feedback", "—"),
+  "version.close": e("Schließen", "Close", "—"),
   "access.busy": e("Einen Moment …", "Please wait", "—"),
   // Fehlermeldungen je Server-Code oder Client-Prüfung
   "access.err_required": e("Bitte alle Felder ausfüllen.", "All fields are required", "—"),

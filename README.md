@@ -108,6 +108,41 @@ salted scrypt hashes. Set `SESSION_SECRET` and `OE_INVITE_CODE` in Dokploy
 them). Until someone has registered with the code, nobody can log in. No
 confirmation mail and no password reset yet.
 
+## Versions, tags and changelog (#271)
+
+The roadmap version (v0.1 to v0.9, see 18oe-workshop#20) lives in ONE file, `VERSION` in the repo
+root (`0.1.0-dev` while a version is being built). `lib/oe/version.rb` and `web/build.mjs` read it;
+nothing else repeats it. Where it shows:
+
+- `GET /healthz` returns `status`, `build` (content hash, `bin/build-id` for the local tree),
+  `version` (from `VERSION`) and `engine` (engine revision: upstream commit + build id, the stamp new
+  games get). Fields are only ever added.
+- The UI: a footer line on the login/registration pages and a version button (top right, opens an info
+  dialog) in the game frame. Page version is baked in at build time, build id and engine stand come from
+  `/healthz` (the only runtime call). If page and server versions differ (old frontend in the browser
+  cache) the display says so. Texts: `web/ui/text.ts` (`version.*`).
+- Feedback and bug reports name the line "Version x · Build y · Engine z".
+
+**Releasing a version** (done by the main session when a roadmap version is finished and accepted):
+
+1. In a PR set `VERSION` to the final number (`0.1.0`, `0.2.0`, ...; sub-stages `0.2.1`), merge it.
+2. Tag the merge commit on `main`, annotated, with `v<VERSION>`: `git tag -a v0.1.0 <merge-commit> -m "v0.1.0"`,
+   `git push origin v0.1.0`. Tags go only on merge commits of `main`; never a `Co-Authored-By` or
+   "Generated with" line in tag, release text or commit (workshop rule 5).
+3. Create a GitHub Release for the tag; its text is the changelog. Put a short copy into #20.
+4. Set `VERSION` to the next `-dev` value (`0.2.0-dev`) in the next PR.
+
+Changelog template (German, as the project):
+
+```
+## v0.X.0 - <Kurztitel>
+**Neu:** <was Spielerinnen und Spieler jetzt können; je Punkt ein Satz, mit Issue-Nummer>
+**Bekannt fehlt:** <was erwartet wird und noch nicht geht; offene Issues der Version>
+**Migration / Replay:** <Änderungen an der Datenbank; ändert sich die Engine, sind laufende Partien
+noch abspielbar (#131)? sonst: laufende Partien vor dem Deploy beenden>
+**Stand:** Build <build-id> - Engine <engine-stand> (aus /healthz nach dem Deploy)
+```
+
 ## Status
 
 Walking skeleton only — `app.rb` answers `/healthz`, no game logic yet.
