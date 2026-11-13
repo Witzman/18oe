@@ -55,7 +55,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .lobby .seat input { flex: 1; min-width: 12rem; }
 .lobby .seat input[hidden] { display: none; }
 
-/* Version display (#271): colours from theme tokens only. */
+/* Version display (issue 271): colours from theme tokens only. */
 .version-note { margin: 16px 0 0; font-size: 0.8em; text-align: center; }
 .version-note[data-stale] { color: var(--ui-warn); }
 .version-open { position: absolute; top: 0; right: var(--shape-gap); height: var(--shape-bar-height); z-index: 2; background: transparent; color: var(--ui-bar-ink); border-color: transparent; font: 0.75rem var(--font-head); opacity: .75; }
