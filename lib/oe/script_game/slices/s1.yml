@@ -39,7 +39,7 @@ games:
       - operating/Dividend/dividend
       - operating/BuyTrain/buy_train
       - operating/BuyTrain/pass
-  - name: initial stock round up to the major phase
+  - name: initial stock round, major phase, issue step
     seed: 1
     finish: false
     rush: true
@@ -48,3 +48,8 @@ games:
       - stock/BuySellParShares/buy_shares:regional
       - stock/ReserveShare/choose:reserve
       - stock/ReserveShare/pass
+      # then on, with majors operating: Issue step (§11.7) and the president
+      # selling shares to buy a train
+      - operating/IssueShares/pass
+      - operating/IssueShares/sell_shares:major
+      - operating/BuyTrain/sell_shares:major
