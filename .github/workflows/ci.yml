@@ -69,6 +69,7 @@ jobs:
         run: |
           files=$(ls test/*.test.ts | grep -E '(-browser|^test/shot|^test/ipad)')
           echo "$files"
+          set +e +o pipefail  # the runner shell is -e -o pipefail: keep going to report the result
           node --test --test-reporter=tap $files | tee "$RUNNER_TEMP/browser.tap"
           status=${PIPESTATUS[0]}
           grep -E '^# (tests|pass|fail|skipped) ' "$RUNNER_TEMP/browser.tap"
