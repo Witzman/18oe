@@ -4,6 +4,7 @@ require "json"
 require "securerandom"
 require_relative "accounts"
 require_relative "bot_runner"
+require_relative "catalog"
 require_relative "game_session"
 require_relative "store"
 require_relative "view"
@@ -162,6 +163,19 @@ module Oe
 
     def self.registered(app)
       app.helpers Helpers
+
+      # The static card catalog (#124): never changes within a build, so the
+      # engine revision is its ETag and the browser revalidates cheaply.
+      app.before "/catalog" do
+        halt api_error(401, "login_required", "login required") unless current_account
+      end
+
+      app.get "/catalog" do
+        etag "catalog-#{Oe::Catalog::SCHEMA}-#{GameSession.engine_rev}"
+        cache_control :private, :no_cache
+        content_type :json
+        Oe::Catalog.json
+      end
 
       app.get "/games" do
         mine = store.games.select { |g| g["seats"].any? { |s| s["account_id"] == current_account["id"] } }

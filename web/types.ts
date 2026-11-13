@@ -104,6 +104,10 @@ export interface Prompt {
   unsupported: string[];
   ranges: { type: string; entity: string; company: string; min: number; max: number; step: number }[];
   actions: Record<string, unknown>[];
+  // The active step's own texts (#124), English as in the engine; help is null when empty.
+  description: string | null; help: string | null; pass_description: string | null;
+  choice_name: string | null;
+  choices: { choice: string; target: string | null; entity: string; label: string }[];
   acting_as: { entity: string; kind: "player" | "corporation"; primary: boolean; types: string[] }[];
   context: PromptContext;
 }
@@ -152,6 +156,31 @@ export interface Auction {
   current: string | null; to_act: string[]; passed: string[]; open_bidders: string[];
 }
 
+export interface CompanyState {
+  id: string; kind: "private" | "minor" | "concession";
+  owner: { kind: "player" | "corporation" | "bank" | "other"; id: string | null } | null;
+  closed: boolean; face_down: boolean;
+  abilities: { type: string; used: boolean; remaining: number | null }[];
+}
+
+// GET /catalog (#124): the static cards, never changes within a build.
+export interface CatalogCard {
+  id: string; name: string; value: number; revenue: number; text: string; auction_row: number; abilities: string[];
+}
+export interface Catalog {
+  schema: number;
+  privates: CatalogCard[];
+  concessions: CatalogCard[];
+  minors: {
+    id: string; name: string; color: string; text_color: string | null; token_prices: number[]; text: string;
+    charter: CatalogCard;
+  }[];
+  regionals: {
+    id: string; name: string; home: string; zone: string | null; color: string; text_color: string | null;
+    token_prices: number[]; shares: number[]; float_percent: number; text: string;
+  }[];
+}
+
 export interface GameState {
   meta: Meta;
   players: Player[];
@@ -168,6 +197,7 @@ export interface GameState {
   bank: { cash: number };
   auction: Auction | null;
   concession: ConcessionEntry[] | null;
+  companies: CompanyState[];
   zones: Zone[];
   map: HexChange[];
   log: { action: number; text: string }[];

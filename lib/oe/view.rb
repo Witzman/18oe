@@ -37,6 +37,7 @@ module Oe
         bank: { cash: game.bank.cash },
         auction: auction(game),
         concession: concession(game),
+        companies: companies(game, viewer),
         zones: zones(game),
         map: map(game),
         log: log_lines(game, log),
@@ -451,9 +452,11 @@ module Oe
       unsupported = []
       ranges = []
       legal = nil
+      offered = []
       if mine && with_actions
         legal = Oe::LegalActions.new(game, limit: limit, rng: Random.new(0), compact: true)
-        list = legal.call.map { |a| a.to_h.reject { |k, _| %w[id created_at user].include?(k) } }
+        offered = legal.call
+        list = offered.map { |a| a.to_h.reject { |k, _| %w[id created_at user].include?(k) } }
         unsupported = legal.unsupported
         ranges = legal.ranges
       end
@@ -468,9 +471,39 @@ module Oe
         # Families with too many members to list (#91): bids as ranges. Every
         # amount min, min+step .. max is legal; send a normal bid action.
         ranges: ranges,
+        # The step's own texts (#124), English as the engine has them: what the
+        # step is, its help, the label of its pass button, the question of a
+        # `choose` and the label of every offered choice.
+        description: step && safe { step.description },
+        help: step && safe { step.help }.then { |h| h.to_s.empty? ? nil : h },
+        pass_description: step && safe { step.pass_description },
+        choice_name: step && safe { step.respond_to?(:choice_name) ? step.choice_name : nil },
+        choices: choices(game, step, offered),
         acting_as: acting_as(game, step, list),
         context: context(game, step, mine && with_actions ? legal : nil),
       }
+    end
+
+    # One entry per offered `choose` action: the choice id, its target (a company
+    # or corporation id, or nil) and the label the engine gives it. Where the step
+    # has no text for a choice the label is the choice id itself, never empty.
+    def choices(game, step, offered)
+      offered.grep(Engine::Action::Choose).map do |a|
+        { choice: a.choice.to_s, target: a.target&.id, entity: a.entity.id, label: choice_label(game, step, a) }
+      end
+    end
+
+    def choice_label(game, step, action)
+      choice = action.choice
+      label =
+        if action.target && step.respond_to?(:entity_choices) then safe { step.entity_choices(action.target)[choice] }
+        elsif step.respond_to?(:choices) then safe { step.choices[choice] }
+        end
+      if label.nil? && step.respond_to?(:entity_choices)
+        corp = safe { game.corporation_by_id(choice) }
+        label = safe { step.entity_choices(corp)[choice] } if corp
+      end
+      label.to_s.empty? ? choice.to_s : label.to_s
     end
 
     # Who the offered actions are issued for (#91, #123): one entry per acting
@@ -513,6 +546,40 @@ module Oe
         dividend: step.is_a?(Engine::Step::Dividend) ? safe { dividend_context(game, step, entity) } : nil,
         train: step.is_a?(Engine::Step::BuyTrain) ? safe { train_context(game, step, entity) } : nil,
       }
+    end
+
+    # Every private, minor charter and concession and where it is now (#124,
+    # D16): with a player, a corporation, the bank (not yet sold) or nobody
+    # (closed). `abilities` are the card's live abilities with `used` and
+    # `remaining` (nil = unlimited); a face-down private shows none to others.
+    # The static texts are in the catalog (Oe::Catalog).
+    def companies(game, viewer)
+      game.companies.map do |c|
+        own = c.owner.respond_to?(:player?) && c.owner.player? && c.owner.id == viewer
+        hidden = game.face_down_private?(c) && !own
+        {
+          id: c.id,
+          kind: if c.type == :concession then "concession"
+                elsif game.company_becomes_minor?(c) then "minor"
+                else "private"
+                end,
+          owner: company_owner(game, c),
+          closed: c.closed? ? true : false,
+          face_down: game.face_down_private?(c) ? true : false,
+          abilities: hidden ? [] : c.all_abilities.map { |a| { type: a.type.to_s, used: a.used? ? true : false, remaining: a.count } },
+        }
+      end
+    end
+
+    def company_owner(game, company)
+      owner = company.owner
+      return if company.closed? || owner.nil?
+
+      if owner.respond_to?(:player?) && owner.player? then { kind: "player", id: owner.id }
+      elsif owner.respond_to?(:corporation?) && owner.corporation? then { kind: "corporation", id: owner.id }
+      elsif owner.equal?(game.bank) then { kind: "bank", id: nil }
+      else { kind: "other", id: owner.respond_to?(:id) ? owner.id.to_s : nil }
+      end
     end
 
     def token_step?(step)
