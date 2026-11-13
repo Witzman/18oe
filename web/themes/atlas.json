@@ -297,6 +297,7 @@
     "barHeight": 56,
     "sideWidth": 340,
     "gap": 12,
+    "hit": 44,
     "zoneLine": 0.07,
     "focusLine": 0.08,
     "targetAlpha": 0.3,

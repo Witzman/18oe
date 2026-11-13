@@ -74,7 +74,7 @@ export interface Corporation {
   id: string; name: string; type: string; president: string | null;
   ipoed: boolean; floated: boolean; closed: boolean; cash: number;
   share_price: number | null; par_price: number | null;
-  shares: { holder: string; percent: number }[];
+  shares: { holder: string; percent: number; ids: string[] }[];
   reserved: { percent: number; player: string | null } | null;
   trains: Train[];
   tokens: { used: boolean; hex: string | null }[];
@@ -141,9 +141,18 @@ export interface TrainContext {
   reserved: { name: string; price: number } | null;
   cheapest_price: number | null; president_may_contribute: boolean; shortfall: number;
 }
+// Money of the offered share actions of the stock round (#47): cost or proceeds per bundle, where the
+// shares come from, the share price after a sale. Matched to the action by type and share ids.
+export interface StockBundle {
+  type: "buy_shares" | "sell_shares"; corporation: string; shares: string[]; percent: number;
+  source: string; price: number; new_price: number | null;
+}
+// What the president's share costs at an offered par price; `share_price` is the id the `par` action carries.
+export interface StockPar { corporation: string; share_price: string; price: number; percent: number }
+export interface StockContext { bundles: StockBundle[]; pars: StockPar[] }
 export interface PromptContext {
   track: TrackContext | null; token: TokenContext | null;
-  dividend: DividendContext | null; train: TrainContext | null;
+  dividend: DividendContext | null; train: TrainContext | null; stock: StockContext | null;
 }
 
 export interface AuctionCard {
