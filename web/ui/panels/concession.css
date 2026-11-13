@@ -12,3 +12,5 @@
 .concession-help { margin: var(--shape-gap) 0; }
 .concession-zone-list { list-style: none; padding: 0; margin: 0; font-size: .9rem; }
 .concession-zone-list li[data-free="false"] { color: var(--ui-faint); text-decoration: line-through; }
+/* Touch: every tappable control is at least 44 px (2.75rem) high; nothing depends on hover (#172). */
+.concession-card, .concession-target, .concession-price { min-height: 2.75rem; min-width: 2.75rem; }

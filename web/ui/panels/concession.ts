@@ -217,7 +217,8 @@ export function ConcessionPanel(g: Game, sel: Selection, map: MapGeometry | null
     body.push(v("p", { class: "concession-running" }, fillText("concession.running", { who: running.owner, n: running.n })));
   }
   return v("section", { class: "concession-panel", "aria-label": txt("concession.title").de },
-    v("h3", {}, txt("concession.ladder").de), Leiter(steps, txt("concession.ladder").de), ...body);
+    // What the viewer must decide comes first; the ladder (context) below it, so it is never pushed out of view.
+    ...body, v("h3", {}, txt("concession.ladder").de), Leiter(steps, txt("concession.ladder").de));
 }
 
 // ---- mount --------------------------------------------------------------------------------------
