@@ -19,6 +19,7 @@ async function bundle(dir: string) {
   for (const f of ["index.html", "theme.css"]) copyFileSync(join(web, f), join(dir, f));
   copyFileSync(join(web, "ui", "kit", "kit.css"), join(dir, "kit.css"));
   copyFileSync(join(web, "ui", "frame", "frame.css"), join(dir, "frame.css"));
+  copyFileSync(join(web, "ui", "panels", "stock.css"), join(dir, "stock.css"));
   cpSync(join(web, "fonts"), join(dir, "fonts"), { recursive: true });
   copyFileSync(join(web, "fonts", "fonts.css"), join(dir, "fonts.css"));
   const { themesCss } = await import("../themes/css.ts");
