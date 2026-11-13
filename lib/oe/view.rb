@@ -65,6 +65,8 @@ module Oe
         },
         rr_phase: rr_phase(game),
         railroads: railroads(game),
+        operating_order: operating_order(game),
+        priority: priority(game),
         current: entity && entity_ref(entity),
         active_players: game.active_players.map(&:id),
         standings: game.result.map { |id, value| { player: id, value: value } },
@@ -142,6 +144,29 @@ module Oe
         status: Array(safe { game.status_array(corp) }).flatten.map(&:to_s),
         regional_state: regional_state(game, corp),
       }
+    end
+
+    # Who operates when (#122). During an operating round: that round's fixed
+    # entity list (`round.entities`, = `game.operating_order` at its start) with
+    # `done` for those before the current one. Otherwise: the order the next
+    # operating round would have (`game.operating_order`), nothing done.
+    def operating_order(game)
+      round = game.round
+      if round.is_a?(Engine::Round::Operating)
+        index = game.finished ? round.entities.size : round.entity_index
+        round.entities.each_with_index.map { |c, i| { id: c.id, done: i < index } }
+      else
+        game.operating_order.map { |c| { id: c.id, done: false } }
+      end
+    end
+
+    # Player ids in the order of the next stock round, priority deal first
+    # (`game.priority_deal_player`, as in the engine's `reorder_players`).
+    def priority(game)
+      ids = game.players.reject(&:bankrupt).map(&:id)
+      deal = safe { game.priority_deal_player }&.id
+      i = ids.index(deal) || 0
+      ids.rotate(i)
     end
 
     # Railroad phase (#121): auction, concession, regional_minor (regionals and
