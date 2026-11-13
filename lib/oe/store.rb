@@ -48,7 +48,7 @@ module Oe
           created_at TEXT NOT NULL
         );
       SQL
-      3 => <<~SQL
+      3 => <<~SQL,
         CREATE TABLE accounts (
           id            TEXT PRIMARY KEY,   -- opaque; seats reference it as account_id
           name          TEXT NOT NULL UNIQUE COLLATE NOCASE,
