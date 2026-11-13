@@ -11,6 +11,7 @@ import { Auftrag, Geld, mitTooltip, Siegel, toDom, v, Wimpel, type VNode } from 
 import { THEME_CHANGED } from "../theme-switch.ts";
 import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
+import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
 import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stepLabel, type PlayerRow } from "./model.ts";
 import { createViews } from "./views.ts";
@@ -29,6 +30,11 @@ export interface GameFrame {
   claims: ReturnType<typeof createClaims>;
   views: ReturnType<typeof createViews>;
   slots: { context: HTMLElement; main: HTMLElement };
+  // A special panel sets the order sentence, main button and side buttons of the action bar (#213);
+  // returns the release function to call on unmount.
+  setOrder: (spec: OrderSpec) => () => void;
+  // Sends an action with the current seq (what the main button of the generic bar does).
+  send: (action: Record<string, unknown>) => void;
   hooks: { onFocusCorporation?: (id: string) => void };
 }
 
@@ -40,6 +46,7 @@ const put = (el: Element, ...nodes: (VNode | string | null)[]) =>
 
 export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   const claims = createClaims();
+  const orderSlot: OrderSlot = createOrderSlot(() => { if (game) drawBar(); });
   const views = createViews([{
     id: "map", labelKey: "frame.view_map",
     render: ({ container }) => { if (container.childElementCount === 0) container.append(h("p", { class: "muted frame-placeholder" }, txt("frame.view_placeholder").de)); },
@@ -226,7 +233,9 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
     const m = model();
     if (!g || !m) { put(barMain); put(barTools); return; }
     const danger = selected !== null && (m.groups.flatMap((gr) => gr.entries).find((e) => e.key === actionKey(selected!))?.danger ?? false);
-    if (selected) {
+    if (orderSlot.spec) {
+      put(barMain, orderView(orderSlot.spec, { busy, armed: orderSlot.armed, onArm: () => orderSlot.arm() }));
+    } else if (selected) {
       const type = String(selected.type);
       const order = Auftrag({
         sentence: txt(`action.${type}`).de + (danger ? ` ${txt("frame.danger_note").de}` : ""),
@@ -278,7 +287,7 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   document.addEventListener(THEME_CHANGED, () => { if (root.isConnected) drawAll(); });
 
   Object.assign(frame, {
-    root, band, message, claims, views, slots: { context: contextSlot, main: viewEl }, hooks: {},
+    root, band, message, claims, views, setOrder: (spec: OrderSpec) => orderSlot.set(spec), send: (a: Action) => send(a), slots: { context: contextSlot, main: viewEl }, hooks: {},
     render(g: Game) {
       if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; }
       game = g;
