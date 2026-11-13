@@ -40,3 +40,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .msg-warn { color: var(--ui-warn); }
 .band { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 6px 12px; margin: 0 0 12px; background: var(--ui-warn); color: var(--ui-panel); border-radius: var(--shape-radius); }
 .band[hidden] { display: none; }
+.access { max-width: 26rem; margin: 0 auto; }
+.access .field { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.access .field input { width: 100%; box-sizing: border-box; }
+.access small { font-size: 0.8em; }

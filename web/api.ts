@@ -12,6 +12,8 @@ export class ApiError extends Error {
   }
 }
 
+export interface RegisterRequest { name: string; email: string; password: string; code: string }
+
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 // Typed wrapper around the endpoints of #33/#36. The server error format is
@@ -45,8 +47,9 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init)) {
   return {
     me: () => call<Account>("GET", "/me"),
     map: () => call<MapGeometry>("GET", "/map"),
-    accounts: (code: string) => call<{ accounts: Account[] }>("POST", "/accounts", { code }),
-    login: (account: string, code: string) => call<Account>("POST", "/login", { account, code }),
+    // #208: login is the e-mail or the name; the invite code only ever travels in the POST body.
+    register: (r: RegisterRequest) => call<Account>("POST", "/register", r),
+    login: (login: string, password: string) => call<Account>("POST", "/login", { login, password }),
     logout: () => call<{ ok: boolean }>("POST", "/logout"),
     listGames: () => call<{ games: GameSummary[] }>("GET", "/games"),
     createGame: (seats: SeatRequest[]) => call<Game>("POST", "/games", { seats }),

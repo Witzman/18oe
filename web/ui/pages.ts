@@ -9,7 +9,7 @@ export interface Ctx {
   api: Api;
   go: (hash: string) => void;
   me: Account | null;
-  // Filled at login (the list is only given against the access code); empty after a reload.
+  // No account list exists any more (#208); until a replacement for picking co-players exists this stays empty.
   accounts: Account[];
 }
 
@@ -18,34 +18,6 @@ const MAX_SEATS = 7;
 
 function msg(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
-}
-
-export function loginPage(ctx: Ctx, done: (me: Account) => void): HTMLElement {
-  const error = h("p", { class: "error" });
-  const body = h("div");
-  const codeInput = h("input", { type: "password", placeholder: "Zugangswort", autocomplete: "off" });
-  const step1 = async (e: Event) => {
-    e.preventDefault();
-    error.textContent = "";
-    try {
-      const { accounts } = await ctx.api.accounts(codeInput.value);
-      ctx.accounts = accounts;
-      const select = h("select", {}, ...accounts.map((a) => h("option", { value: a.id }, a.name)));
-      const go = async (ev: Event) => {
-        ev.preventDefault();
-        try {
-          done(await ctx.api.login(select.value, codeInput.value));
-        } catch (err) {
-          error.textContent = msg(err);
-        }
-      };
-      body.replaceChildren(h("form", { onsubmit: go }, h("div", { class: "row" }, select, h("button", { type: "submit" }, "Anmelden"))));
-    } catch (err) {
-      error.textContent = err instanceof ApiError && err.status === 401 ? "Zugangswort falsch." : msg(err);
-    }
-  };
-  body.append(h("form", { onsubmit: step1 }, h("div", { class: "row" }, codeInput, h("button", { type: "submit" }, "Weiter"))));
-  return h("div", {}, h("h1", {}, "18OE"), h("div", { class: "panel" }, body, error));
 }
 
 export async function gamesPage(ctx: Ctx): Promise<HTMLElement> {

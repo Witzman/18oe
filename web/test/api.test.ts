@@ -35,11 +35,27 @@ test("postAction sends action and seq", async () => {
   assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { action: { type: "pass" }, seq: 9 });
 });
 
-test("the access code goes to POST /accounts, never into a URL", async () => {
+test("register sends name, e-mail, password and code in the POST body, never in a URL", async () => {
   const calls: { path: string; init?: RequestInit }[] = [];
-  await createApi(fake(200, { accounts: [] }, calls)).accounts("geheim");
-  assert.equal(calls[0]?.path, "/accounts");
+  const me = await createApi(fake(201, { id: "u1", name: "Anna" }, calls))
+    .register({ name: "Anna", email: "a@b.de", password: "geheim123", code: "einlass" });
+  assert.deepEqual(me, { id: "u1", name: "Anna" });
+  assert.equal(calls[0]?.path, "/register");
   assert.equal(calls[0]?.init?.method, "POST");
+  assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { name: "Anna", email: "a@b.de", password: "geheim123", code: "einlass" });
+});
+
+test("login sends login and password to POST /login", async () => {
+  const calls: { path: string; init?: RequestInit }[] = [];
+  await createApi(fake(200, { id: "u1", name: "Anna" }, calls)).login("Anna", "geheim123");
+  assert.equal(calls[0]?.path, "/login");
+  assert.equal(calls[0]?.init?.method, "POST");
+  assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { login: "Anna", password: "geheim123" });
+});
+
+test("a failed login is an ApiError with the server code", async () => {
+  const api = createApi(fake(401, { error: "invalid_login", message: "invalid login or password" }));
+  await assert.rejects(api.login("x", "y"), (e: unknown) => e instanceof ApiError && e.status === 401 && e.code === "invalid_login");
 });
 
 test("server errors become ApiError with status and code", async () => {

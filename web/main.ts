@@ -5,7 +5,8 @@ import type { Account } from "./types.ts";
 import { h, mount } from "./ui/dom.ts";
 import { kitPage } from "./ui/kit/page.ts";
 import { mapDevPage } from "./ui/mapdev.ts";
-import { gameFrame, gamesPage, loginPage, notFoundPage, type Ctx } from "./ui/pages.ts";
+import { accessPage } from "./ui/access.ts";
+import { gameFrame, gamesPage, notFoundPage, type Ctx } from "./ui/pages.ts";
 import { initTheme, themeSwitch } from "./ui/theme-switch.ts";
 
 initTheme();
@@ -36,7 +37,7 @@ async function route() {
       throw e;
     });
     if (!ctx.me) {
-      mount(root, loginPage(ctx, (me: Account) => { ctx.me = me; const back = returnTo; returnTo = null; if (back && back !== location.hash) location.hash = back; else if (back) void route(); else { location.hash = "#/"; void route(); } }));
+      mount(root, accessPage(api, location.hash === "#/register" ? "register" : "login", (me: Account) => { ctx.me = me; const back = returnTo; returnTo = null; if (back && back !== location.hash) location.hash = back; else if (back) void route(); else { location.hash = "#/"; void route(); } }));
       return;
     }
     const game = /^#\/game\/(\d+)$/.exec(location.hash);
