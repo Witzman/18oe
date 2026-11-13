@@ -26,7 +26,10 @@ export interface Meta {
   game_id: number | string;
   finished: boolean;
   round: { type: RoundType | string; number: number | null; turn: number; description: string | null };
-  phase: { name: string; tiles: string[]; operating_rounds: number; status: string[] };
+  phase: {
+    name: string; tiles: string[]; operating_rounds: number; status: string[];
+    train_limits: Record<string, number> | number | null; next: NextPhase | null;
+  };
   current: EntityRef | null;
   active_players: string[];
   standings: { player: string; value: number }[];
@@ -35,6 +38,11 @@ export interface Meta {
   railroads: Railroads;
   operating_order: { id: string; done: boolean }[];
   priority: string[];
+}
+
+export interface NextPhase {
+  name: string; on: string | null; tiles: string[]; operating_rounds: number;
+  train_limits: Record<string, number> | number | null;
 }
 
 export type RegionalState = "unparred" | "parred" | "floated" | "converted" | "removed" | "closed";
@@ -96,6 +104,41 @@ export interface Prompt {
   unsupported: string[];
   ranges: { type: string; entity: string; company: string; min: number; max: number; step: number }[];
   actions: Record<string, unknown>[];
+  context: PromptContext;
+}
+
+// Numbers of the active operating step (#123); one family, the others null.
+export interface TrackContext {
+  points: { budget: number; used: number; left: number };
+  // Only for the viewer to act (the enumeration costs): per buildable hex the
+  // price for this corporation with its parts, the tile points, tiles + rotations.
+  hexes: {
+    hex: string; points: number; cost: number; cost_parts: { label: string; amount: number }[];
+    tiles: { name: string; color: string; rotations: number[] }[];
+  }[] | null;
+}
+export interface TokenContext {
+  kind: "home" | "operating";
+  price: number | null;
+  tokens_left: number;
+  cities: { hex: string; city: number; id: string; price: number }[] | null;
+}
+export interface DividendContext {
+  revenue: number;
+  options: {
+    kind: string; per_share: number; treasury: number; withheld: number;
+    direction: string[]; times: number[]; price: number | null;
+  }[];
+}
+export interface TrainContext {
+  limit: number; count: number; must_buy: boolean;
+  obligation: { active: boolean; fulfilled: boolean };
+  reserved: { name: string; price: number } | null;
+  cheapest_price: number | null; president_may_contribute: boolean; shortfall: number;
+}
+export interface PromptContext {
+  track: TrackContext | null; token: TokenContext | null;
+  dividend: DividendContext | null; train: TrainContext | null;
 }
 
 export interface AuctionCard {
@@ -113,7 +156,14 @@ export interface GameState {
   players: Player[];
   corporations: Corporation[];
   market: { rows: (MarketCell | null)[][] };
-  depot: { available: (Train & { owner: string | null })[]; upcoming: number; next: string | null; discarded: string[] };
+  depot: {
+    available: (Train & { owner: string | null })[]; upcoming: number; next: string | null; discarded: string[];
+    schedule: {
+      name: string; count: number; price: number; phase_on: string | null;
+      rusts_on: string | null; obsolete_on: string | null; available_on: string | null;
+    }[];
+  };
+  tiles: { name: string; color: string; remaining: number; unlimited: boolean; available: boolean }[];
   bank: { cash: number };
   auction: Auction | null;
   concession: ConcessionEntry[] | null;

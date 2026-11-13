@@ -11,6 +11,7 @@
     "meta",
     "players",
     "prompt",
+    "tiles",
     "zones"
   ],
   "meta": [
@@ -36,9 +37,11 @@
   ],
   "phase": [
     "name",
+    "next",
     "operating_rounds",
     "status",
-    "tiles"
+    "tiles",
+    "train_limits"
   ],
   "player": [
     "cash",
@@ -74,6 +77,7 @@
   ],
   "prompt": [
     "actions",
+    "context",
     "ranges",
     "step",
     "types",
@@ -84,6 +88,7 @@
     "available",
     "discarded",
     "next",
+    "schedule",
     "upcoming"
   ],
   "market": [
@@ -108,5 +113,11 @@
     "revenue",
     "row",
     "value"
+  ],
+  "context": [
+    "dividend",
+    "token",
+    "track",
+    "train"
   ]
 }

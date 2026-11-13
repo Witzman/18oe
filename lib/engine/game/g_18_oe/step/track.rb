@@ -12,6 +12,19 @@ module Engine
             @points_used = 0
           end
 
+          attr_reader :points_used
+
+          def points_left(entity)
+            get_tile_lay(entity) - @points_used
+          end
+
+          # Tile points a lay on this hex costs: 1 for a yellow, 2 for an upgrade,
+          # doubled on a metropolis hex.
+          def points_for_hex(hex)
+            base = hex.tile.color == :white ? 1 : 2
+            @game.metropolis_hex?(hex) ? base * 2 : base
+          end
+
           def can_lay_tile?(entity)
             points_available = get_tile_lay(entity) - @points_used
             return false unless points_available.positive?
@@ -72,15 +85,8 @@ module Engine
             return nil unless connected
 
             points_available = get_tile_lay(entity) - @points_used
-            return nil unless points_available
-
-            metropolis = @game.metropolis_hex?(hex)
-            color = hex.tile.color
-            return nil if color == :blue
-            return nil if color == :white && metropolis && points_available < 2
-            return nil if color == :white && points_available < 1
-            return nil if color != :white && metropolis && points_available < 4
-            return nil if color != :white && points_available < 2
+            return nil if hex.tile.color == :blue
+            return nil if points_available < points_for_hex(hex)
 
             connected
           end
