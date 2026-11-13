@@ -40,6 +40,9 @@
 .frame-main { position: relative; display: flex; flex-direction: column; min-height: 0; background: var(--ui-panel-alt); border: 1px dashed var(--ui-rule); border-radius: var(--shape-radius); overflow: auto; }
 .frame-tabs { display: flex; gap: 4px; padding: 4px; } .frame-tabs[hidden] { display: none; }
 .frame-tabs [aria-selected="true"] { background: var(--ui-ink); color: var(--ui-panel); }
+.frame-map { position: absolute; inset: 0; background: var(--ui-bg); } .frame-map:focus { outline: none; }
+.frame-map-status { position: absolute; left: var(--shape-gap); top: var(--shape-gap); z-index: 2; color: var(--ui-bar-ink); font-family: var(--font-head); } .frame-map-status[hidden] { display: none; }
+.frame-map-status p { margin: 0 0 6px; } .frame-map-retry { min-height: 44px; min-width: 44px; }
 .frame-view { flex: 1; position: relative; min-height: 0; }
 .frame-corp { display: flex; width: 100%; gap: 8px; align-items: center; text-align: left; background: transparent; border-color: transparent; border-bottom: 1px solid var(--ui-rule); border-radius: 0; flex-wrap: wrap; }
 .frame-corp:hover, .frame-corp[aria-expanded="true"] { background: var(--ui-panel-alt); }
