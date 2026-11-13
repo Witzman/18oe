@@ -9,6 +9,7 @@ import { mapDevPage } from "./ui/mapdev.ts";
 import { accessPage } from "./ui/access.ts";
 import { loadGeometry } from "./ui/frame/mapview.ts";
 import { mountConcession } from "./ui/panels/concession.ts";
+import { mountTrain } from "./ui/panels/train.ts";
 import { gameFrame, gamesPage, notFoundPage, type Ctx } from "./ui/pages.ts";
 import { initTheme, themeSwitch } from "./ui/theme-switch.ts";
 
@@ -54,6 +55,7 @@ async function route() {
       mount(root, frame.root);
       let mapGeometry: MapGeometry | null = null;
       const concession = mountConcession(frame, { map: () => mapGeometry });
+      mountTrain(frame);
       // Hex names and zones for the home token step; the panel works without them (hex ids only).
       void loadGeometry(api).then((m) => { mapGeometry = m; concession.refresh(); }, () => {});
       self = poller = createPoller({

@@ -1,0 +1,17 @@
+/* Train purchase panel (#175). Colours from ui.* tokens, sizes from shape.* tokens only. */
+.train-list { display: flex; flex-direction: column; gap: var(--shape-gap); }
+.train-row { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: baseline; text-align: left; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 6px 10px; min-height: 2.75rem; }
+.train-row .train-source, .train-row .train-hint, .train-row .train-reason { grid-column: 1 / -1; }
+.train-row .train-mark { justify-self: end; grid-column: 3; grid-row: 1; font-weight: bold; color: var(--ui-accent-ink); background: var(--ui-accent); border-radius: var(--shape-radius); padding: 0 6px; }
+.train-row[data-reserved="true"] .train-price { grid-column: 2; }
+.train-row[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); }
+.train-row[data-state="invalid"] { opacity: .6; cursor: not-allowed; border-style: dashed; }
+.train-reason { color: var(--ui-faint); }
+.train-prices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--shape-gap); }
+.train-price-btn { min-height: 2.75rem; min-width: 2.75rem; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); }
+.train-price-btn[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); }
+.train-duty { margin: 0 0 var(--shape-gap); font-weight: bold; }
+.train-warn { margin: var(--shape-gap) 0 0; padding: 6px 10px; border: 1px solid var(--ui-warn); border-radius: var(--shape-radius); color: var(--ui-warn); }
+.train-insolvency { margin-top: var(--shape-gap); }
+.train-insolvency h4 { margin: 0 0 4px; }
+.train-insolvency ul { margin: 0; padding-left: 1.2rem; font-size: .9rem; }
