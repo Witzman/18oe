@@ -25,6 +25,7 @@ RSpec.describe "Oe::View order (#122)" do
     strategist = Oe::StrategyPlayer.new(game, rng: rng)
     rounds = 0
     announced = nil
+    announced_ids = []
     seen = []
     count = 0
     last_priority = nil
@@ -74,7 +75,7 @@ RSpec.describe "Oe::View order (#122)" do
     until game.finished || count > 8000
       if game.round.is_a?(Engine::Round::Stock)
         prio = Oe::View.render(game, actions: false, log: nil)[:meta][:priority]
-        expect(prio.first).to eq(game.priority_deal_player.id)
+        expect(prio.first).to eq(game.send(:priority_deal_player).id)
         expect(prio.size).to eq(4)
         checked += 1
       end

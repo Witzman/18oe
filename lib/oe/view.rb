@@ -164,7 +164,7 @@ module Oe
     # (`game.priority_deal_player`, as in the engine's `reorder_players`).
     def priority(game)
       ids = game.players.reject(&:bankrupt).map(&:id)
-      deal = safe { game.priority_deal_player }&.id
+      deal = safe { game.send(:priority_deal_player) }&.id # private in Engine::Game::Base
       i = ids.index(deal) || 0
       ids.rotate(i)
     end
