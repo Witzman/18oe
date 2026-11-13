@@ -48,7 +48,7 @@ export const NUMBER_RANGES = {
     // Touch (#259): decay time constant of the pan inertia, window of a double tap (ms).
     inertiaMs: [0, 2000], doubleTapMs: [100, 800] },
   shape: {
-    hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24],
+    hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24], hit: [32, 64],
     // Map strokes in hex side lengths (they scale with the map like printed lines), alpha 0..1 (#44).
     zoneLine: [0.01, 0.3], focusLine: [0.01, 0.3], targetAlpha: [0, 1],
     // Cities, towns and tokens (#147), in side lengths: slot circle, token cylinder, town bar.

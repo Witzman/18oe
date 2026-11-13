@@ -1,0 +1,62 @@
+/* Stock sheet (#47, ui-spec 4.4). Colours from ui.* / map.* tokens, sizes from shape.*; no fixed colours.
+   Every target is at least --shape-hit high and wide (tablet, ui-spec 6): nothing needs hover. */
+.stock-sheet { padding: var(--shape-gap); display: flex; flex-direction: column; gap: var(--shape-gap); min-width: 0; }
+.stock-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--shape-gap); }
+.stock-head h2 { margin: 0; margin-right: auto; }
+.stock-cash { font-family: var(--font-head); font-size: 1.1rem; }
+.stock-status { margin: 0; }
+.stock-warn { margin: 0; padding: 8px 12px; border: 2px solid var(--ui-warn); border-left-width: 6px; border-radius: var(--shape-radius); background: var(--ui-panel); color: var(--ui-ink); font-weight: 700; }
+.stock-head button, .stock-offer, .stock-rowbtn, .stock-cell:is(button) { min-height: var(--shape-hit); min-width: var(--shape-hit); }
+.stock-tabs { display: none; gap: 4px; }
+.stock-tabs button[aria-selected="true"] { background: var(--ui-ink); color: var(--ui-panel); border-color: var(--ui-ink); }
+.stock-body { display: flex; flex-direction: column; gap: calc(var(--shape-gap) * 1.5); min-width: 0; }
+
+/* Kurszettel */
+.stock-list { min-width: 0; overflow-x: auto; }
+.stock-cols, .stock-rowbtn { display: grid; grid-template-columns: minmax(13rem, 2.4fr) 5rem 4.5rem 4.5rem 4.5rem minmax(5rem, 1fr) 4.5rem 1.5rem; gap: 8px; align-items: center; }
+.stock-cols { padding: 0 10px; font-size: .85rem; }
+.stock-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.stock-row { border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); background: var(--ui-panel); }
+.stock-row[data-state="open"] { background: transparent; border-style: dashed; }
+.stock-row[data-actionable="true"] { border-color: var(--ui-ink); }
+.stock-row[data-focus="true"] { box-shadow: inset 4px 0 0 var(--ui-accent); }
+.stock-rowbtn { width: 100%; text-align: left; border: 0; background: transparent; padding: 2px 10px; }
+.stock-rowbtn:hover { background: var(--ui-panel-alt); }
+.stock-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; min-width: 0; overflow-wrap: anywhere; }
+.stock-tier { font-size: .8rem; }
+.stock-price, .stock-num { font-variant-numeric: tabular-nums; }
+.stock-mine { font-weight: 700; }
+.stock-mark { color: var(--ui-accent); font-weight: 700; }
+.stock-detail { display: flex; flex-wrap: wrap; gap: 10px 24px; padding: 6px 10px 10px; border-top: 1px solid var(--ui-rule); background: var(--ui-panel-alt); }
+.stock-detail .stock-idle { margin: 0; }
+.stock-group { display: flex; flex-direction: column; gap: 4px; }
+.stock-offers { display: flex; flex-wrap: wrap; gap: 6px; }
+.stock-offer { padding: 4px 12px; text-align: left; }
+.stock-offer[aria-pressed="true"] { background: var(--ui-ink); color: var(--ui-panel); border-color: var(--ui-ink); box-shadow: inset 4px 0 0 var(--ui-accent); }
+
+/* Kurstafel */
+.stock-grid { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.stock-grid-scroll { overflow-x: auto; padding-bottom: 4px; }
+.stock-grid-row { display: flex; gap: 2px; margin-bottom: 2px; width: max-content; }
+.stock-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 3.4rem; min-height: var(--shape-hit); padding: 2px; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); background: var(--ui-panel); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.stock-cell-empty { border-color: transparent; background: transparent; }
+.stock-cell[data-type="par"], .stock-legend [data-type="par"]::before { background: color-mix(in srgb, var(--ui-accent) 30%, var(--ui-panel)); }
+.stock-cell[data-type="convert_range"], .stock-legend [data-type="convert_range"]::before { background: color-mix(in srgb, var(--ui-info) 25%, var(--ui-panel)); }
+.stock-cell[data-valid="true"] { outline: 2px solid var(--map-valid); outline-offset: 1px; cursor: pointer; }
+.stock-cell[data-chosen="true"] { outline: 3px double var(--map-selected); outline-offset: 1px; background: var(--ui-ink); color: var(--ui-panel); }
+.stock-cell[data-preview="true"] { outline: 2px dashed var(--map-preview); outline-offset: 1px; font-style: italic; }
+.stock-cell-corps { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; }
+.stock-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: .85rem; }
+.stock-legend li::before { content: ""; display: inline-block; width: .9rem; height: .9rem; margin-right: 6px; vertical-align: -2px; border: 1px solid var(--ui-rule); border-radius: 2px; }
+.stock-legend [data-mark="valid"]::before { outline: 2px solid var(--map-valid); }
+.stock-legend [data-mark="preview"]::before { outline: 2px dashed var(--map-preview); }
+
+/* Tablet and narrow windows: one of the two parts at a time (tabs), the row as wrapped label/value pairs. */
+@media (max-width: 1279px) {
+  .stock-tabs { display: flex; }
+  .stock-sheet[data-tab="list"] .stock-grid, .stock-sheet[data-tab="grid"] .stock-list { display: none; }
+  .stock-cols { display: none; }
+  .stock-rowbtn { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .stock-rowbtn .stock-name { flex: 1 1 100%; }
+  .stock-rowbtn [data-label]::before { content: attr(data-label) ": "; color: var(--ui-faint); font-size: .8rem; }
+}

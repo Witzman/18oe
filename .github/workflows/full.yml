@@ -43,10 +43,13 @@ jobs:
         working-directory: web
       - name: rspec shard
         run: |
-          # shard ${{ matrix.shard }} of 4: every 4th spec file (complete suite across the shards)
-          files=$(find spec -name '*_spec.rb' | sort | awk -v n=${{ matrix.shard }} 'NR%4==n%4')
+          # time-balanced shard (.github/scripts/shard.rb); complete suite across the shards
+          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 '')
           echo "$files"
-          bundle exec rspec $files
+          bundle exec rspec $files --format json --out "$RUNNER_TEMP/rspec.json"
+      - name: per-file timings
+        if: always()
+        run: ruby .github/scripts/shard.rb --report "$RUNNER_TEMP/rspec.json"
 
   web:
     name: web (typecheck, unit and browser tests)
@@ -66,13 +69,17 @@ jobs:
       - name: headless Chrome wrapper
         run: |
           wrapper="$RUNNER_TEMP/chrome-headless"
-          printf '#!/bin/sh\nexec "%s" --headless=new "$@"\n' "$(command -v google-chrome)" > "$wrapper"
+          printf '#!/bin/sh\nexec "%s" --headless=new --no-sandbox --disable-dev-shm-usage "$@"\n' "$(command -v google-chrome)" > "$wrapper"
           chmod +x "$wrapper"
           echo "OE_BROWSER=$wrapper" >> "$GITHUB_ENV"
           google-chrome --version
       - run: npm run typecheck
         working-directory: web
-      - run: npm test
+      - name: unit tests (no browser)
+        run: node --test $(ls test/*.test.ts | grep -v -E '(-browser|^test/shot|^test/ipad)')
+        working-directory: web
+      - name: browser tests (flaky files retried once)
+        run: ../.github/scripts/browser-tests.sh
         working-directory: web
 
   script-game:

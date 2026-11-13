@@ -271,9 +271,13 @@ async function main() {
     console.log(`${o.out} (${o.width}x${o.height}${dev ? `@${dev.dpr}x ${o.device} ${o.orientation} chromium-approximation` : ""}${o.fullPage ? "+" : ""}) from ${url}`);
     ws.close();
   } finally {
+    // SIGKILL is asynchronous: Chrome's helper processes may still write into the profile, which made
+    // rmSync fail with ENOTEMPTY and turned a passing run into exit 1 (the CI flakiness of #279).
+    const exited = child.exitCode !== null || child.signalCode !== null ? Promise.resolve() : new Promise((ok) => child.once("exit", ok));
     child.kill("SIGKILL");
     server?.close();
-    rmSync(profile, { recursive: true, force: true });
+    await Promise.race([exited, sleep(3000)]);
+    try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch (e) { console.error(`bin/shot: profile cleanup skipped (${e.code ?? e.message})`); }
   }
 }
 
