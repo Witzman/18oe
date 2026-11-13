@@ -86,6 +86,8 @@ end
 # wrong passwords on /login. In memory, one Puma process.
 set :register_limit, Oe::Accounts::RateLimit.new(max: 10, window: 900)
 set :login_limit, Oe::Accounts::RateLimit.new(max: 10, window: 900)
+# Naming players by name/e-mail when creating a game (#212), per creator account.
+set :lookup_limit, Oe::Accounts::RateLimit.new(max: 20, window: 900)
 
 helpers do
   def too_many!
