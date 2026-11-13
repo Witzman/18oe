@@ -87,6 +87,8 @@ export function mountStock(frame: GameFrame): () => void {
     const inStock = g.state.prompt.step === STOCK_STEP && !g.state.meta.finished;
     // The sheet replaces the map while a stock round is on (G7); the player may go back with "Karte".
     if (inStock && !wasStock) frame.views.activate(MARKET_VIEW);
+    // Back to the map when the operating round begins (the tab "Markt" stays for reading).
+    if (!inStock && wasStock && frame.views.activeId === MARKET_VIEW) frame.views.activate("map");
     wasStock = inStock;
     syncOrder();
   });
