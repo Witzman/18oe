@@ -140,7 +140,9 @@ test("amount form: a fixed price has no field; a bad amount is marked and named"
   assert.equal(input.attrs.min, "40"); assert.equal(input.attrs.max, "1350"); assert.equal(input.attrs.step, "5");
   let got = "";
   bidForm(start, { id: "BBBT", amount: "40" }, { ...noop, onAmount: (v) => { got = v; } });
-  assert.equal(bidForm(start, null, noop), null);
+  assert.match(textOf(bidForm(start, null, noop)!), /Wähle ein Los/); // my turn: the region stays, so the board does not jump
+  const idle = { ...start, state: { ...start.state, prompt: { ...start.state.prompt, viewer_to_act: false } } } as Game;
+  assert.equal(bidForm(idle, null, noop), null);
   assert.equal(got, "");
 });
 
