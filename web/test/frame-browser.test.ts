@@ -26,8 +26,10 @@ async function bundle(dir: string) {
   writeFileSync(join(dir, "themes.css"), themesCss(themes, DEFAULT_THEME_ID));
 }
 
-function stub(dir: string, fixture: string, failWith?: { status: number; body: unknown }) {
-  let game = JSON.parse(readFileSync(join(web, "test", "fixtures", "games", `${fixture}.json`), "utf8"));
+const fixture = (name: string) => JSON.parse(readFileSync(join(web, "test", "fixtures", "games", `${name}.json`), "utf8"));
+
+function stub(dir: string, start: { seq: number }, failWith?: { status: number; body: unknown }) {
+  let game: { seq: number } = start;
   const posted: { action: Record<string, unknown>; seq: number }[] = [];
   const server: Server = createServer((req, res) => {
     const p = new URL(req.url!, "http://x").pathname;
@@ -51,6 +53,17 @@ function stub(dir: string, fixture: string, failWith?: { status: number; body: u
     if (existsSync(f)) { res.writeHead(200, { "Content-Type": MIME[extname(f)] ?? "application/octet-stream" }); res.end(readFileSync(f)); } else { res.writeHead(404); res.end(); }
   });
   return { server, posted };
+}
+
+// spawnSync would block the event loop that serves the stub, so the browser runs as an async child.
+async function run(dir: string, port: number, checks: string): Promise<number> {
+  const { spawn } = await import("node:child_process");
+  return new Promise<number>((resolve) => {
+    const child = spawn(process.execPath, [shot, `http://127.0.0.1:${port}/#/game/1`, join(dir, "out.png"), "--width", "1440", "--height", "900", "--wait-for", ".frame-entry", "--eval", checks], { stdio: "pipe" });
+    let err = "";
+    child.stderr.on("data", (d) => { err += d; });
+    child.on("close", (c) => { if (c) console.error(err); resolve(c ?? 1); });
+  });
 }
 
 // Runs inside the page after the frame is drawn.
@@ -87,24 +100,56 @@ test("frame in the browser: bars drawn, selecting does not send, the main button
   const dir = mkdtempSync(join(tmpdir(), "oe-frame-test-"));
   try {
     await bundle(dir);
-    const { server, posted } = stub(dir, "track");
+    const { server, posted } = stub(dir, fixture("track"));
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     const port = (server.address() as { port: number }).port;
-    const out = join(dir, "out.png");
-    // spawnSync would block the event loop that serves the stub; use the async spawn through a promise.
-    const { spawn } = await import("node:child_process");
-    const code = await new Promise<number>((resolve) => {
-      const child = spawn(process.execPath, [shot, `http://127.0.0.1:${port}/#/game/1`, out, "--width", "1440", "--height", "900", "--wait-for", ".frame-entry", "--eval", CHECKS], { stdio: "pipe" });
-      let err = "";
-      child.stderr.on("data", (d) => { err += d; });
-      child.on("close", (c) => { if (c) console.error(err); resolve(c ?? 1); });
-    });
+    const code = await run(dir, port, CHECKS);
     server.closeAllConnections();
     server.close();
     assert.equal(code, 0, "page checks failed (see stderr)");
     assert.equal(posted.length, 1);
-    const first = JSON.parse(readFileSync(join(web, "test", "fixtures", "games", "track.json"), "utf8")).state.prompt.actions;
+    const first = fixture("track").state.prompt.actions;
     assert.ok(first.some((a: Record<string, unknown>) => JSON.stringify(a) === JSON.stringify(posted[0]!.action)), "sent action is one of the offered actions, unchanged");
-    assert.equal(posted[0]!.seq, JSON.parse(readFileSync(join(web, "test", "fixtures", "games", "track.json"), "utf8")).seq);
+    assert.equal(posted[0]!.seq, fixture("track").seq);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+// Runs inside the page: a dangerous action needs a second click, and a rejected action keeps the selection.
+const DANGER_CHECKS = String.raw`(async () => {
+  const fail = (m) => { throw new Error(m); };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const q = (s) => document.querySelector(s);
+  const posted = async () => (await (await fetch("/__posted")).json()).length;
+  const bankrupt = q('.frame-entry[data-type="bankrupt"]') || fail("no bankrupt entry");
+  bankrupt.click();
+  await sleep(50);
+  q(".kit-main-btn").click();
+  await sleep(300);
+  if ((await posted()) !== 0) fail("a dangerous action was sent on the first click");
+  if (!/Wirklich/.test(q(".kit-main-btn").textContent)) fail("no second-click label: " + q(".kit-main-btn").textContent);
+  q(".kit-main-btn").click();
+  await sleep(600);
+  if ((await posted()) !== 1) fail("second click did not send");
+  if (!/Nicht erlaubt: nope/.test(q(".msg").textContent)) fail("engine message not shown: " + q(".msg").textContent);
+  if (!q(".kit-order")) fail("selection lost after 422");
+  q(".kit-order .kit-side-btn").click();
+  await sleep(50);
+  if (q(".kit-order")) fail("discard did not clear the selection");
+})()`;
+
+test("frame in the browser: dangerous action needs a second click; 422 shows the engine text and keeps the selection", { skip: browser ? false : "no headless browser installed" }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "oe-frame-test-"));
+  try {
+    await bundle(dir);
+    const game = fixture("track");
+    game.state.prompt.actions.unshift({ type: "bankrupt", entity: game.state.prompt.actions[0].entity, entity_type: "corporation" });
+    const { server, posted } = stub(dir, game, { status: 422, body: { error: "rejected", message: "nope" } });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const code = await run(dir, (server.address() as { port: number }).port, DANGER_CHECKS);
+    server.closeAllConnections();
+    server.close();
+    assert.equal(code, 0, "page checks failed (see stderr)");
+    assert.equal(posted.length, 1);
+    assert.equal(posted[0]!.action.type, "bankrupt");
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

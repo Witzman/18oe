@@ -28,7 +28,11 @@ function show(value: unknown): string {
 }
 
 export function actionDetail(g: Game, a: Action): string {
-  const parts = Object.entries(a).filter(([k]) => !META_KEYS.has(k)).map(([k, val]) => `${k} ${show(val)}`);
+  const parts = Object.entries(a).filter(([k]) => !META_KEYS.has(k)).map(([k, val]) => {
+    // Dividend kinds (Rulebook 11.4) have German names; every other parameter is shown as sent.
+    const kind = k === "kind" && typeof val === "string" ? txt(`dividend.${val}`) : null;
+    return kind && kind.de !== `dividend.${val}` ? kind.de : `${k} ${show(val)}`;
+  });
   const who = typeof a.entity === "string" && a.entity !== g.viewer ? fillText("frame.param_entity", { entity: playerName(g, a.entity) }) : "";
   return [...parts, who].filter(Boolean).join(" · ");
 }
