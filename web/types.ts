@@ -213,5 +213,13 @@ export interface Game {
   state: GameState;
 }
 
-export interface GameSummary { id: number; status: string; seats: Seat[]; seq: number; created_at: string }
-export interface Version { seq: number; status: string }
+// Whose turn it is, without a replay (#152): the same fields in GET /games and /version.
+export interface TurnInfo {
+  round: { type: string; number: number | null; turn: number };
+  acting: string[]; // engine player ids to act; [] when finished
+  viewer_to_act: boolean;
+}
+export interface GameSummary extends TurnInfo { id: number; status: string; seats: Seat[]; seq: number; created_at: string }
+export interface Version extends TurnInfo { seq: number; status: string }
+// GET /games/:id/log?from=&limit= (#152)
+export interface LogPage { lines: { action: number; text: string }[]; next: number | null; seq: number }

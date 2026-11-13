@@ -14,7 +14,7 @@ module Oe
   # transactions are BEGIN IMMEDIATE so a second process also queues behind
   # the writer (busy_timeout) instead of failing half way.
   class Store
-    SCHEMA_VERSION = 3
+    SCHEMA_VERSION = 4
     DEFAULT_PATH = "/data/18oe.sqlite3"
 
     MIGRATIONS = {
@@ -48,7 +48,7 @@ module Oe
           created_at TEXT NOT NULL
         );
       SQL
-      3 => <<~SQL
+      3 => <<~SQL,
         CREATE TABLE accounts (
           id            TEXT PRIMARY KEY,   -- opaque; seats reference it as account_id
           name          TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -56,6 +56,11 @@ module Oe
           password_hash TEXT NOT NULL,      -- salted scrypt, never clear text
           created_at    TEXT NOT NULL
         );
+      SQL
+      4 => <<~SQL
+        -- Who is to act and in which round, written with every action so that
+        -- the list and /version never replay (#152). NULL = not yet derived.
+        ALTER TABLE games ADD COLUMN turn TEXT;  -- JSON: {round: {type:, number:}, acting: ["p0", ...]}
       SQL
     }.freeze
 
@@ -119,13 +124,13 @@ module Oe
 
     def game(id)
       row = @mutex.synchronize { @db.get_first_row("SELECT * FROM games WHERE id = ?", [id]) }
-      row && row.merge("seats" => JSON.parse(row["seats"]))
+      row && parse_row(row)
     end
 
     # All games, oldest first (PoC: a handful, so no paging).
     def games
       rows = @mutex.synchronize { @db.execute("SELECT * FROM games ORDER BY id") }
-      rows.map { |row| row.merge("seats" => JSON.parse(row["seats"])) }
+      rows.map { |row| parse_row(row) }
     end
 
     def active_game_count
@@ -154,6 +159,11 @@ module Oe
 
     def set_status(id, status)
       @mutex.synchronize { @db.execute("UPDATE games SET status = ? WHERE id = ?", [status, id]) }
+    end
+
+    # The derived turn summary (see migration 4); `turn` is a Hash.
+    def set_turn(id, turn)
+      @mutex.synchronize { @db.execute("UPDATE games SET turn = ? WHERE id = ?", [JSON.generate(turn), id]) }
     end
 
     def last_seq(game_id)
@@ -206,6 +216,10 @@ module Oe
     end
 
     private
+
+    def parse_row(row)
+      row.merge("seats" => JSON.parse(row["seats"]), "turn" => row["turn"] && JSON.parse(row["turn"]))
+    end
 
     def migrate!
       @mutex.synchronize do

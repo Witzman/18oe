@@ -18,7 +18,7 @@ function setup(opts: { versions: (number | ApiError)[]; visible?: () => boolean 
         const next = queue.shift() ?? current;
         if (next instanceof ApiError) throw next;
         current = next;
-        return { seq: next, status: "active" };
+        return { seq: next, status: "active", round: { type: "OR", number: 1, turn: 1 }, acting: [], viewer_to_act: false };
       },
       getGame: async () => { log.loads++; return game(current); },
     },
