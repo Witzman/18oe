@@ -1,0 +1,61 @@
+# Fast stage (#269): runs on every pull request and on manual dispatch.
+# Frontend: typecheck + unit tests without a browser. Ruby: targeted specs without the long game runs.
+# The full suite is in full.yml (push to main, manual). No secrets, no deploy.
+name: ci
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: web (typecheck, unit tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-progress --no-audit --no-fund
+      - run: npm run typecheck
+      # Unit tests only: the *-browser tests, shot and ipad need a browser (full stage).
+      - name: unit tests (no browser)
+        run: |
+          files=$(ls test/*.test.ts | grep -v -E '(-browser|^test/shot|^test/ipad)')
+          node --test $files
+
+  ruby:
+    name: ruby (targeted specs, contracts)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # spec/web_spec.rb serves web/dist and checks web/view-keys.json against lib/oe/view.rb.
+      - run: npm ci --no-progress --no-audit --no-fund && npm run build
+        working-directory: web
+      - name: specs without the long game runs
+        run: |
+          bundle exec rspec \
+            --exclude-pattern "spec/{script_game_spec.rb,oe/playthrough_spec.rb,oe/bot_simulation_spec.rb,oe/enumeration_timing_spec.rb,engine/**/*_spec.rb}"
