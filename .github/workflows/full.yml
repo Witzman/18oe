@@ -1,0 +1,88 @@
+# Full stage (#269): push to main and manual dispatch. Complete rspec suite, frontend incl. browser
+# tests (Chromium), scripted game. No secrets, no deploy.
+name: full
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      docker:
+        description: "also build the Docker image (no push)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: full-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  rspec:
+    name: rspec (complete suite)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-progress --no-audit --no-fund && npm run build
+        working-directory: web
+      - run: bundle exec rspec
+
+  web:
+    name: web (typecheck, unit and browser tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-progress --no-audit --no-fund
+        working-directory: web
+      # bin/shot and the browser tests start $OE_BROWSER without --headless (the local browser is
+      # chromium-headless-shell). The runner's Google Chrome gets a thin headless wrapper.
+      - name: headless Chrome wrapper
+        run: |
+          wrapper="$RUNNER_TEMP/chrome-headless"
+          printf '#!/bin/sh\nexec "%s" --headless=new "$@"\n' "$(command -v google-chrome)" > "$wrapper"
+          chmod +x "$wrapper"
+          echo "OE_BROWSER=$wrapper" >> "$GITHUB_ENV"
+          google-chrome --version
+      - run: npm run typecheck
+        working-directory: web
+      - run: npm test
+        working-directory: web
+
+  script-game:
+    name: scripted game (bin/script-game --spawn)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - run: bundle exec ruby -I lib bin/script_game.rb --spawn
+
+  docker:
+    name: docker build (optional)
+    if: github.event_name == 'workflow_dispatch' && inputs.docker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t 18oe:ci .
