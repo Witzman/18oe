@@ -27,5 +27,6 @@ for (const file of ["index.html", "theme.css"]) copyFileSync(join(root, file), j
 cpSync(join(root, "fonts"), join(dist, "fonts"), { recursive: true });
 copyFileSync(join(root, "fonts", "fonts.css"), join(dist, "fonts.css"));
 copyFileSync(join(root, "ui", "kit", "kit.css"), join(dist, "kit.css"));
+copyFileSync(join(root, "ui", "frame", "frame.css"), join(dist, "frame.css"));
 // Theme tokens as CSS variables, one rule per theme (#95).
 writeFileSync(join(dist, "themes.css"), themesCss(themes, DEFAULT_THEME_ID));
