@@ -21,9 +21,13 @@ permissions:
 
 jobs:
   rspec:
-    name: rspec (complete suite)
+    name: rspec (complete suite) ${{ matrix.shard }}/4
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
@@ -37,7 +41,12 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci --no-progress --no-audit --no-fund && npm run build
         working-directory: web
-      - run: bundle exec rspec
+      - name: rspec shard
+        run: |
+          # shard ${{ matrix.shard }} of 4: every 4th spec file (complete suite across the shards)
+          files=$(find spec -name '*_spec.rb' | sort | awk -v n=${{ matrix.shard }} 'NR%4==n%4')
+          echo "$files"
+          bundle exec rspec $files
 
   web:
     name: web (typecheck, unit and browser tests)

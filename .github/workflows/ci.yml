@@ -78,9 +78,13 @@ jobs:
         shell: bash
 
   ruby:
-    name: ruby (targeted specs, contracts)
+    name: ruby (targeted specs, contracts) ${{ matrix.shard }}/3
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
@@ -95,7 +99,9 @@ jobs:
       # spec/web_spec.rb serves web/dist and checks web/view-keys.json against lib/oe/view.rb.
       - run: npm ci --no-progress --no-audit --no-fund && npm run build
         working-directory: web
-      - name: specs without the long game runs
+      - name: specs without the long game runs (shard)
         run: |
-          bundle exec rspec \
-            --exclude-pattern "spec/{script_game_spec.rb,oe/playthrough_spec.rb,oe/bot_simulation_spec.rb,oe/enumeration_timing_spec.rb,engine/**/*_spec.rb}"
+          # shard ${{ matrix.shard }} of 3: every 3rd spec file, so shards stay roughly equal
+          files=$(find spec -name '*_spec.rb' -not -path 'spec/engine/*' -not -name script_game_spec.rb -not -name playthrough_spec.rb -not -name bot_simulation_spec.rb -not -name enumeration_timing_spec.rb | sort | awk -v n=${{ matrix.shard }} 'NR%3==n%3')
+          echo "$files"
+          bundle exec rspec $files
