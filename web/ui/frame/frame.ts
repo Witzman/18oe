@@ -36,7 +36,10 @@ export interface GameFrame {
   setOrder: (spec: OrderSpec) => () => void;
   // Sends an action with the current seq (what the main button of the generic bar does).
   send: (action: Record<string, unknown>) => void;
-  hooks: { onFocusCorporation?: (id: string) => void };
+  hooks: { onFocusCorporation?: (id: string) => void; map?: import("./mapview.ts").FrameMap };
+  // Runs the cleanups of mounted views and panels when the page leaves the game (the map frees its WebGL context).
+  onDispose: (fn: () => void) => void;
+  dispose: () => void;
   // Special panels follow the game state: called with every new state before the frame draws it (#46).
   subscribe: (fn: (g: Game) => void) => () => void;
 }
@@ -69,6 +72,7 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   let endOpen = true;
   const frame: GameFrame = {} as GameFrame;
   const listeners = new Set<(g: Game) => void>();
+  const disposers: (() => void)[] = [];
 
   const roundEl = h("header", { class: "frame-roundbar" });
   const playersEl = h("nav", { class: "frame-players", "aria-label": txt("frame.player_bar").de });
@@ -307,6 +311,8 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
 
   Object.assign(frame, {
     root, band, message, claims, views, setOrder: (spec: OrderSpec) => orderSlot.set(spec), send: (a: Action) => send(a), slots: { context: contextSlot, main: viewEl }, hooks: {},
+    onDispose: (fn: () => void) => { disposers.push(fn); },
+    dispose: () => { disposers.splice(0).forEach((f) => f()); },
     subscribe: (fn: (g: Game) => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
     render(g: Game) {
       for (const fn of listeners) fn(g);

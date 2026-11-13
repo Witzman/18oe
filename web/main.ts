@@ -7,6 +7,7 @@ import { h, mount } from "./ui/dom.ts";
 import { kitPage } from "./ui/kit/page.ts";
 import { mapDevPage } from "./ui/mapdev.ts";
 import { accessPage } from "./ui/access.ts";
+import { loadGeometry } from "./ui/frame/mapview.ts";
 import { mountConcession } from "./ui/panels/concession.ts";
 import { gameFrame, gamesPage, notFoundPage, type Ctx } from "./ui/pages.ts";
 import { initTheme, themeSwitch } from "./ui/theme-switch.ts";
@@ -48,12 +49,13 @@ async function route() {
       const hash = location.hash;
       const toLogin = () => { returnTo = hash; ctx.me = null; void route(); };
       let self: ReturnType<typeof createPoller>;
-      const frame = gameFrame(() => void self.tick());
+      const frame = gameFrame(() => void self.tick(), api);
+      page = { stop: () => frame.dispose() };
       mount(root, frame.root);
       let mapGeometry: MapGeometry | null = null;
       const concession = mountConcession(frame, { map: () => mapGeometry });
       // Hex names and zones for the home token step; the panel works without them (hex ids only).
-      void api.map().then((m) => { mapGeometry = m; concession.refresh(); }, () => {});
+      void loadGeometry(api).then((m) => { mapGeometry = m; concession.refresh(); }, () => {});
       self = poller = createPoller({
         api, gameId, onGame: frame.render,
         onUnauthorized: toLogin,
