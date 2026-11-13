@@ -51,7 +51,7 @@ RSpec.describe "Oe::View operating context (#123)" do
       entity = step.current_entity
       label = "action #{game.raw_actions.size} #{step.class.name.split('::').last} #{entity.id}"
       @views << [view, game.depot.upcoming.size, game.tiles.size, game.phase.name, game.phase.current[:train_limit]]
-      check(:shape, label) { expect(ctx.keys).to eq(%i[track token dividend train]); JSON.generate(ctx) }
+      check(:shape, label) { expect(ctx.keys).to eq(%i[track token dividend train stock]); JSON.generate(ctx) }
       acting = view[:prompt][:acting_as]
       check(:acting, label) do
         expect(acting.map { |a| a[:entity] }).to eq(view[:prompt][:actions].map { |a| a["entity"] }.uniq)

@@ -256,9 +256,12 @@ module Oe
       end
     end
 
-    # Percent per holder; the sum over all holders is 100 for an ipoed corporation.
+    # Percent per holder (the sum over all holders is 100 for an ipoed corporation) and the ids of the
+    # shares each holds, so a client can tell which share of an offered `buy_shares` comes from the IPO
+    # (treasury) and which from the market (#47).
     def share_holders(game, corp)
       pool = game.share_pool
+      shares = game.shares_for_corporation(corp)
       corp.share_holders.filter_map do |holder, percent|
         next if percent.to_i.zero?
 
@@ -268,8 +271,9 @@ module Oe
           elsif holder.equal?(corp.ipo_owner) then "ipo"
           else holder.respond_to?(:id) ? holder.id.to_s : holder.class.name
           end
-        [owner, percent]
-      end.sort_by { |owner, _| owner }.map { |owner, percent| { holder: owner, percent: percent } }
+        ids = shares.select { |s| s.owner.equal?(holder) }.map(&:id)
+        [owner, percent, ids]
+      end.sort_by { |owner, _, _| owner }.map { |owner, percent, ids| { holder: owner, percent: percent, ids: ids } }
     end
 
     def reserved(game, corp)
@@ -480,7 +484,7 @@ module Oe
         choice_name: step && safe { step.respond_to?(:choice_name) ? step.choice_name : nil },
         choices: choices(game, step, offered),
         acting_as: acting_as(game, step, list),
-        context: context(game, step, mine && with_actions ? legal : nil),
+        context: context(game, step, mine && with_actions ? legal : nil, offered),
       }
     end
 
@@ -533,8 +537,9 @@ module Oe
     #   train:    train limit, obligation, reserved 2+2, president's contribution
     # `legal` (an Oe::LegalActions) is given only for the viewer to act: choice
     # spaces that need the enumeration (tile lays, token targets) are nil otherwise.
-    def context(game, step, legal)
-      empty = { track: nil, token: nil, dividend: nil, train: nil }
+    def context(game, step, legal, offered = [])
+      empty = { track: nil, token: nil, dividend: nil, train: nil, stock: nil }
+      return empty.merge(stock: safe { stock_context(game, step, offered) }) if stock_step?(step)
       return empty unless step
 
       entity = safe { step.current_entity }
@@ -580,6 +585,69 @@ module Oe
       elsif owner.equal?(game.bank) then { kind: "bank", id: nil }
       else { kind: "other", id: owner.respond_to?(:id) ? owner.id.to_s : nil }
       end
+    end
+
+    def stock_step?(step)
+      step.is_a?(Engine::Game::G18OE::Step::BuySellParShares)
+    end
+
+    # The money of the share actions on offer (#47): per offered `buy_shares` / `sell_shares` the cost or the
+    # proceeds, where the shares come from (`ipo` = treasury, `market`), and for a sale the share price after it
+    # (nil unless every share moves the price one step down, the rule of this game). Matched to the action by
+    # type and share ids; `shares` are the ids of the bundle. Only for the viewer to act.
+    #   stock: { bundles: [{ type:, corporation:, shares: [id], percent:, source:, price:, new_price: }],
+    #            pars: [{ corporation:, share_price: id, price:, percent: }] }
+    def stock_context(game, step, offered)
+      bundles = offered.filter_map do |a|
+        next unless a.is_a?(Engine::Action::BuyShares) || a.is_a?(Engine::Action::SellShares)
+
+        bundle = a.bundle
+        corp = bundle.corporation
+        buy = a.is_a?(Engine::Action::BuyShares)
+        owner = bundle.owner
+        {
+          type: buy ? 'buy_shares' : 'sell_shares',
+          corporation: corp.id,
+          shares: bundle.shares.map(&:id),
+          percent: bundle.percent,
+          source: owner.equal?(corp.ipo_owner) ? 'ipo' : (owner.respond_to?(:share_pool?) && owner.share_pool? ? 'market' : owner.id),
+          price: buy ? step.modify_purchase_price(bundle) : bundle.price,
+          new_price: buy ? nil : price_after_sale(game, corp, bundle),
+        }
+      end
+      { bundles: bundles, pars: par_prices(offered) }
+    end
+
+    # What the president's share costs at each offered par price (#47); a minor is floated in exchange for
+    # its private, so it costs nothing in cash. `share_price` is the id the `par` action carries.
+    def par_prices(offered)
+      offered.filter_map do |a|
+        next unless a.is_a?(Engine::Action::Par)
+
+        corp = a.corporation
+        sp = a.share_price
+        bundle = corp.ipo_shares.first&.to_bundle
+        next unless bundle
+
+        bundle.share_price = sp.price
+        { corporation: corp.id, share_price: sp.id, price: corp.type == :minor ? 0 : bundle.price, percent: bundle.percent }
+      end
+    end
+
+    def price_after_sale(game, corp, bundle)
+      return nil unless game.sell_movement(corp) == :down_share && corp.share_price
+
+      market = game.stock_market
+      coords = corp.share_price.coordinates
+      bundle.num_shares.times do
+        # The same rule as StockMarket#move: a step onto a cell without normal movement is not taken.
+        nxt = market.down(corp, coords)
+        cell = nxt && market.share_price(nxt)
+        coords = nxt if cell&.normal_movement?
+      end
+      market.share_price(coords)&.price
+    rescue StandardError
+      nil
     end
 
     def token_step?(step)

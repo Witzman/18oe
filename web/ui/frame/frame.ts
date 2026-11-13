@@ -257,7 +257,8 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
     const m = model();
     if (!g || !m) { put(barMain); put(barTools); return; }
     const danger = selected !== null && (m.groups.flatMap((gr) => gr.entries).find((e) => e.key === actionKey(selected!))?.danger ?? false);
-    if (orderSlot.spec) {
+    // A choice in the generic bar (an action no panel claimed) wins over the panel's order until it is dropped.
+    if (orderSlot.spec && !selected) {
       put(barMain, orderView(orderSlot.spec, { busy, armed: orderSlot.armed, onArm: () => orderSlot.arm() }));
     } else if (selected) {
       const type = String(selected.type);
