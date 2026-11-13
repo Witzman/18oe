@@ -316,8 +316,13 @@ RSpec.describe Oe::MapData do
 end
 
 RSpec.describe "GET /map" do
+  before do
+    Sinatra::Application.set :store, Oe::Store.new(":memory:")
+    seed_accounts(Sinatra::Application.settings.store, %w[alice])
+  end
+
   def login
-    post "/login", { account: "alice", code: "" }.to_json, "CONTENT_TYPE" => "application/json", "HTTP_HOST" => "127.0.0.1"
+    post "/login", { login: "alice", password: TEST_PASSWORD }.to_json, "CONTENT_TYPE" => "application/json", "HTTP_HOST" => "127.0.0.1"
   end
 
   it "requires login" do

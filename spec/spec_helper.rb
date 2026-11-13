@@ -31,14 +31,14 @@ end
 # covered by accounts_spec).
 module AccountHelper
   def seed_accounts(store, *ids)
-    hash = Oe::Accounts.hash_password("test-password-1")
+    hash = Oe::Accounts.hash_password(TEST_PASSWORD)
     ids.flatten.each do |id|
       store.create_account(id: id, name: id.capitalize, email: "#{id}@example.test", password_hash: hash)
     end
   end
-
-  TEST_PASSWORD = "test-password-1"
 end
+
+TEST_PASSWORD = "test-password-1"
 
 RSpec.configure do |config|
   config.include AccountHelper

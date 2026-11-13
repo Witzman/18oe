@@ -211,7 +211,7 @@ RSpec.describe Oe::BotRunner do
         old.close
 
         upgraded = Oe::Store.new(path)
-        expect(upgraded.schema_version).to eq(2)
+        expect(upgraded.schema_version).to eq(Oe::Store::SCHEMA_VERSION)
         expect(upgraded.game(1)["seed"]).to eq(9)
         upgraded.add_incident(game_id: 1, seq: 0, kind: "stuck", message: "m")
         expect(upgraded.incidents(1).first).to include("kind" => "stuck", "message" => "m")
