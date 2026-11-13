@@ -12,8 +12,7 @@ if ARGV[0] == "--report"
   data = JSON.parse(File.read(ARGV[1]))
   per = Hash.new(0.0)
   data["examples"].each { |e| per[e["file_path"].sub(%r{\A\./}, "")] += e["run_time"].to_f }
-  per.sort_by { |_, v| -v }.each { |f, v| puts "::notice::timing #{f} #{v.round(2)}" }
-  puts "::notice::timing-json #{JSON.generate(per.transform_values { |v| v.round(2) })}"
+  puts "::notice::timing-json #{JSON.generate(per.transform_values { |v| v.round(2) })}" # first: annotations are capped at 10 per step
   exit
 end
 
