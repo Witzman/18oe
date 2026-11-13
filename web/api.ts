@@ -52,7 +52,8 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init)) {
     login: (login: string, password: string) => call<Account>("POST", "/login", { login, password }),
     logout: () => call<{ ok: boolean }>("POST", "/logout"),
     listGames: () => call<{ games: GameSummary[] }>("GET", "/games"),
-    createGame: (seats: SeatRequest[]) => call<Game>("POST", "/games", { seats }),
+    createGame: (seats: SeatRequest[], seed?: number) =>
+      call<Game>("POST", "/games", seed === undefined ? { seats } : { seats, seed }),
     getGame: (id: number, log = 40) => call<Game>("GET", `/games/${id}?log=${log}`),
     version: (id: number) => call<Version>("GET", `/games/${id}/version`),
     postAction: (id: number, action: Record<string, unknown>, seq: number) =>

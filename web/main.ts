@@ -13,7 +13,7 @@ initTheme();
 const root = document.getElementById("app")!;
 document.body.append(themeSwitch());
 const api = createApi();
-const ctx: Ctx = { api, me: null, accounts: [], go: (hash) => { location.hash = hash; } };
+const ctx: Ctx = { api, me: null, go: (hash) => { location.hash = hash; } };
 let poller: ReturnType<typeof createPoller> | null = null;
 let page: { stop: () => void } | null = null;
 // After a 401 the player logs in again and lands on the same game and view (#162).
@@ -71,6 +71,8 @@ async function route() {
       mount(root, await gamesPage(ctx));
     }
   } catch (e) {
+    // Session ended while the lobby loaded: back to the login page.
+    if (e instanceof ApiError && e.status === 401) { ctx.me = null; mount(root, accessPage(api, "login", (me: Account) => { ctx.me = me; void route(); })); return; }
     mount(root, h("p", { class: "error" }, e instanceof Error ? e.message : String(e)));
   }
 }

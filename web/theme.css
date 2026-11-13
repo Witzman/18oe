@@ -44,3 +44,13 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .access .field { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
 .access .field input { width: 100%; box-sizing: border-box; }
 .access small { font-size: 0.8em; }
+
+/* Lobby, issue 211: colours from theme tokens only. */
+.lobby .game-list { list-style: none; margin: 0; padding: 0; }
+.lobby .game-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid var(--ui-rule); }
+.lobby .game-link { font-weight: 700; }
+.lobby .game-open { margin-left: auto; }
+.lobby .new-game .field { display: flex; flex-direction: column; gap: 2px; margin: 10px 0; max-width: 16rem; }
+.lobby .seat strong { min-width: 5rem; }
+.lobby .seat input { flex: 1; min-width: 12rem; }
+.lobby .seat input[hidden] { display: none; }
