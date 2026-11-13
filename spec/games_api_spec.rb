@@ -189,6 +189,16 @@ RSpec.describe "games API (#36)" do
       expect(ApiClient.new(Sinatra::Application).api(:get, "/games/#{game['id']}/log")[0]).to eq(401)
     end
 
+    it "serves the history series on request only, not in the default state (#115)" do
+      id = game["id"]
+      expect(alice.api(:get, "/games/#{id}")[1]["state"]).not_to include("history", "share_prices")
+      status, body = alice.api(:get, "/games/#{id}/history")
+      expect(status).to eq(200)
+      expect(body).to include("seq", "share_prices", "player_values", "revenue")
+      expect(alice.api(:get, "/games/999/history")[0]).to eq(404)
+      expect(ApiClient.new(Sinatra::Application).api(:get, "/games/#{id}/history")[0]).to eq(401)
+    end
+
     it "returns 404 JSON for unknown games" do
       expect(alice.api(:get, "/games/999")[0]).to eq(404)
       expect(alice.api(:get, "/games/999/version")[0]).to eq(404)
