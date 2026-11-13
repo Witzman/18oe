@@ -178,5 +178,10 @@ get "/healthz" do
   content_type :json
   # status/build as before (#41); version = roadmap version from VERSION, engine = engine
   # revision that new games are stamped with (#271). Fields are only ever added.
-  JSON.generate(status: "ok", build: Oe::BuildId.value, version: Oe::Version.value, engine: Oe::GameSession.engine_rev)
+  # A database that cannot be written makes the app useless: 503 + "degraded", so Docker's
+  # healthcheck and Dokploy see it (the volume mount is the usual culprit).
+  db_ok = settings.store.writable?
+  status(db_ok ? 200 : 503)
+  JSON.generate(status: db_ok ? "ok" : "degraded", build: Oe::BuildId.value, version: Oe::Version.value,
+                engine: Oe::GameSession.engine_rev, db: db_ok ? "writable" : "not writable")
 end
