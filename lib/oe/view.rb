@@ -535,6 +535,7 @@ module Oe
     #   token:    the price of the next token and per legal city its price
     #   dividend: per option the amount per share, to the treasury, the new price
     #   train:    train limit, obligation, reserved 2+2, president's contribution
+    #   stock:    price and new share price of the offered share actions (#47)
     # `legal` (an Oe::LegalActions) is given only for the viewer to act: choice
     # spaces that need the enumeration (tile lays, token targets) are nil otherwise.
     def context(game, step, legal, offered = [])
@@ -550,6 +551,7 @@ module Oe
         token: token_step?(step) ? safe { token_context(game, step, entity, legal) } : nil,
         dividend: step.is_a?(Engine::Step::Dividend) ? safe { dividend_context(game, step, entity) } : nil,
         train: step.is_a?(Engine::Step::BuyTrain) ? safe { train_context(game, step, entity) } : nil,
+        stock: nil,
       }
     end
 
@@ -588,7 +590,8 @@ module Oe
     end
 
     def stock_step?(step)
-      step.is_a?(Engine::Game::G18OE::Step::BuySellParShares)
+      # The concession step is a subclass but has its own panel (#172) and a par there may cost nothing (par_only).
+      step.is_a?(Engine::Game::G18OE::Step::BuySellParShares) && !step.is_a?(Engine::Game::G18OE::Step::Concession)
     end
 
     # The money of the share actions on offer (#47): per offered `buy_shares` / `sell_shares` the cost or the

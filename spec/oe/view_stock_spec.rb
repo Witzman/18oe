@@ -11,10 +11,10 @@ RSpec.describe "Oe::View stock context (#47)" do
 
   it "names cost, proceeds and new price of the offered bundles as the engine charges them" do
     checked = { "buy_shares" => 0, "sell_shares" => 0, "price" => 0, "par" => 0 }
-    [1, 2].each do |seed|
+    [1, 2, 3, 4].each do |seed|
       game = G::Game.new(%w[p0 p1 p2], id: seed, seed: seed)
       rng = Random.new(seed)
-      800.times do
+      1500.times do
         break if game.finished
 
         action = nil
@@ -25,7 +25,8 @@ RSpec.describe "Oe::View stock context (#47)" do
 
         view = Oe::View.render(game, viewer: game.active_players.first&.id, log: nil)
         stock = view[:prompt][:context][:stock]
-        unless step.is_a?(G::Step::BuySellParShares)
+        # The concession step is a subclass with its own panel (#172): no stock context there.
+        unless step.is_a?(G::Step::BuySellParShares) && !step.is_a?(G::Step::Concession)
           expect(stock).to be_nil
           game.process_action(acts.sample(random: rng))
           next
@@ -33,7 +34,7 @@ RSpec.describe "Oe::View stock context (#47)" do
 
         shares = acts.select { |a| a.is_a?(Engine::Action::BuyShares) || a.is_a?(Engine::Action::SellShares) }
         pars = acts.select { |a| a.is_a?(Engine::Action::Par) }
-        expect(stock[:bundles].size).to eq(shares.size)
+        expect(stock[:bundles].size).to eq(shares.size), "bundles=#{stock[:bundles].size} shares=#{shares.size} step=#{step.class} acts=#{acts.size}"
         expect(stock[:pars].size).to eq(pars.size)
         action = pars.sample(random: rng) if rng.rand < 0.4
         if action.is_a?(Engine::Action::Par)
@@ -41,7 +42,7 @@ RSpec.describe "Oe::View stock context (#47)" do
           expect(offer).not_to be_nil
           cash = action.entity.cash
           game.process_action(action)
-          expect(cash - action.entity.cash).to eq(offer[:price])
+          expect(cash - action.entity.cash).to eq(offer[:price]), "par #{action.corporation.id} (#{action.corporation.type}) offer=#{offer.inspect} paid=#{cash - action.entity.cash} step_now=#{game.round.active_step.class}"
           checked["par"] += 1
           next
         end
