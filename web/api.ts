@@ -1,3 +1,4 @@
+import type { MapGeometry } from "./render/mapdata.ts";
 import type { Account, Game, GameSummary, SeatRequest, Version } from "./types.ts";
 
 export class ApiError extends Error {
@@ -43,6 +44,7 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init)) {
 
   return {
     me: () => call<Account>("GET", "/me"),
+    map: () => call<MapGeometry>("GET", "/map"),
     accounts: (code: string) => call<{ accounts: Account[] }>("POST", "/accounts", { code }),
     login: (account: string, code: string) => call<Account>("POST", "/login", { account, code }),
     logout: () => call<{ ok: boolean }>("POST", "/logout"),

@@ -28,3 +28,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .sw-tile { background: var(--map-tile-yellow); display: grid; place-items: center; }
 .sw-tile i { width: 70%; height: 3px; background: var(--map-track); }
 :root[data-tile-style="inner"] .sw-tile { background: linear-gradient(var(--map-tile-yellow), var(--map-tile-yellow)) center / calc(100% - 8px) calc(100% - 8px) no-repeat var(--map-land); }
+
+/* Dev page #/map (#44): the map fills the window. */
+.map-dev { position: fixed; inset: 0; background: var(--ui-bg); }
+.map-dev:focus { outline: none; }
+.map-dev-status { position: absolute; left: 16px; top: 16px; margin: 0; color: var(--ui-bar-ink); font: 14px var(--font-head); }
