@@ -80,6 +80,7 @@ a.kit-pennant:hover, .kit-pennant[data-state="hover"] { background: var(--ui-pan
 .kit-order-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
 .kit-main-btn { background: var(--ui-accent); color: var(--ui-accent-ink); border-color: var(--ui-accent); font-weight: 700; }
 .kit-main-btn:hover { background: var(--ui-accent); filter: brightness(1.08); }
+.kit-main-btn, .kit-side-btn { min-height: var(--shape-hit, 44px); }
 .kit-main-btn:disabled, .kit-side-btn:disabled { opacity: .55; cursor: not-allowed; }
 .kit-order[data-state="preview"] .kit-order-sentence, .kit-order[data-state="preview"] .kit-after { font-style: italic; }
 .kit-order[data-state="valid"] { border-left-color: var(--map-valid); }

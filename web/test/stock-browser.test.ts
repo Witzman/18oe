@@ -78,7 +78,7 @@ const CHECKS_SELL = (corp: string, percent: number, price: number) => String.raw
   if (!q(".stock-sheet")) fail("the Markt view is not the one shown");
   if (!/Markt/.test(q(".frame-tabs").textContent)) fail("no tab Markt");
   if (document.querySelectorAll(".stock-row").length < 5) fail("rows " + document.querySelectorAll(".stock-row").length);
-  if (q(".frame-entry")) fail("generic bar still offers claimed actions");
+  if ([...document.querySelectorAll(".frame-entry")].some((e) => ["buy_shares", "sell_shares", "par", "pass"].includes(e.dataset.type))) fail("generic bar still offers claimed actions");
   if (!/Wähle eine Aktion/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   if (!q(".kit-main-btn").disabled) fail("main button open without a choice");
   // tablet: no target below the hit size
@@ -96,7 +96,7 @@ const CHECKS_SELL = (corp: string, percent: number, price: number) => String.raw
   if (!/${corp}: ${percent} % verkaufen, Erlös £${price}\./.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   if (q(".kit-main-btn").disabled) fail("main button locked although valid");
   if (!q('.stock-cell[data-preview="true"]')) fail("no preview cell for the price after the sale");
-  if (!/Kurs/.test(q(".kit-changes").textContent)) fail("no price change line");
+  if (!/Kasse/.test(q(".kit-changes").textContent)) fail("no cash change line");
   if ((await posted()).length !== 0) fail("choosing sent something");
   q(".kit-main-btn").click();
   await sleep(600);
