@@ -178,6 +178,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "error.registration_failed": e("Registrierung nicht möglich", "Registration failed", "—"),
 
   // --- Zugang: Anmelden und Registrieren (#210) -----------------------------
+  "access.game_title": e("On the Rails of the Orient Express", "On the Rails of the Orient Express", "—"),
   "access.title_login": e("Anmelden", "Log in", "—"),
   "access.title_register": e("Registrieren", "Register", "—"),
   "access.login_label": e("E-Mail oder Name", "E-mail or name", "—"),
