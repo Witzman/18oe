@@ -38,5 +38,5 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .msg { min-height: 1.4em; }
 .msg-error { color: var(--ui-error); }
 .msg-warn { color: var(--ui-warn); }
-.band { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 6px 12px; margin: 0 0 12px; background: var(--ui-warn); color: var(--ui-accent-ink); border-radius: var(--shape-radius); }
+.band { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 6px 12px; margin: 0 0 12px; background: var(--ui-warn); color: var(--ui-panel); border-radius: var(--shape-radius); }
 .band[hidden] { display: none; }
