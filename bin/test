@@ -2,15 +2,64 @@
 # Single entry point for all test suites.
 #   bin/test            rspec (engine, backend) + frontend typecheck and unit tests
 #   bin/test web        frontend only (typecheck + node tests)
+#   bin/test changed    only the tests of files changed against origin/main (see below)
 #   bin/test <args>     rspec with the given arguments (files, -e, --tag ...)
+# Every run waits for the machine-wide heavy lock (tmp/heavy.lock of the main checkout), at most
+# $OE_LOCK_TIMEOUT seconds (default 600). On timeout it exits 75 with a clear message; it never retries.
+# OE_HEAVY_LOCK_HELD=1 skips the lock (caller already holds it).
 set -euo pipefail
 source "$(dirname "$0")/_env"
 cd "$ROOT"
 
+if [ -z "${OE_HEAVY_LOCK_HELD:-}" ] && command -v flock >/dev/null 2>&1; then
+  common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+  lock="$(cd "$ROOT" && cd "$(dirname "$common")" 2>/dev/null && pwd)/tmp/heavy.lock"
+  mkdir -p "$(dirname "$lock")"
+  limit="${OE_LOCK_TIMEOUT:-600}"
+  exec 9>>"$lock"
+  if ! flock -w "$limit" 9; then
+    echo "bin/test: TIMEOUT after ${limit}s waiting for $lock (another heavy run holds it)." >&2
+    echo "bin/test: not retrying. Use 'bin/test changed' for fewer files, push and read the CI checks, or raise OE_LOCK_TIMEOUT." >&2
+    exit 75
+  fi
+  export OE_HEAVY_LOCK_HELD=1
+fi
+
 web() { (cd "$ROOT/web" && npm run --silent typecheck && npm test --silent); }
+
+# Changed files against origin/main (plus uncommitted) -> matching spec and unit-test files.
+# Browser tests (*-browser, shot, ipad) are left to the CI job "browser".
+changed() {
+  local files specs=() tests=() f base
+  files="$( { git diff --name-only origin/main...HEAD; git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u)"
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    base="$(basename "$f")"; base="${base%.*}"
+    case "$f" in
+      spec/*_spec.rb) [ -f "$f" ] && specs+=("$f") ;;
+      lib/*.rb|lib/**/*.rb|bin/*.rb)
+        while IFS= read -r s; do specs+=("$s"); done < <(find spec -name "${base}_spec.rb" -o -name "*${base}*_spec.rb" | grep -v -E 'script_game|playthrough|bot_simulation|enumeration_timing' || true) ;;
+      web/test/*.test.ts) case "$f" in *-browser*|*shot*|*ipad*) ;; *) [ -f "$f" ] && tests+=("test/$(basename "$f")") ;; esac ;;
+      web/*.ts) [ -f "web/test/${base}.test.ts" ] && tests+=("test/${base}.test.ts") ;;
+    esac
+  done <<< "$files"
+  if [ "${#specs[@]}" -eq 0 ] && [ "${#tests[@]}" -eq 0 ]; then
+    echo "bin/test changed: no matching tests for the changed files (nothing run). Push and read the CI checks." >&2
+    return 0
+  fi
+  if [ "${#specs[@]}" -gt 0 ]; then
+    mapfile -t specs < <(printf '%s\n' "${specs[@]}" | sort -u)
+    echo "rspec: ${specs[*]}"; bundler exec rspec "${specs[@]}"
+  fi
+  if [ "${#tests[@]}" -gt 0 ]; then
+    mapfile -t tests < <(printf '%s\n' "${tests[@]}" | sort -u)
+    echo "node: ${tests[*]}"; (cd "$ROOT/web" && npm run --silent typecheck && node --test "${tests[@]}")
+  fi
+}
 
 case "${1:-}" in
   web) web ;;
+  changed) changed ;;
   "") bundler exec rspec; web ;;
   *) bundler exec rspec "$@" ;;
 esac
