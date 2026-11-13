@@ -193,6 +193,16 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "access.hint_name": e("2 bis 30 Zeichen, ohne @", "2 to 30 characters, no @", "—"),
   "access.hint_password": e("Mindestens 8 Zeichen", "At least 8 characters", "—"),
   "access.hint_code": e("Den Code hast du vom Spielleiter erhalten.", "The code comes from the host", "—"),
+  // Passwort zurücksetzen, POC (#282)
+  "access.to_reset": e("Passwort vergessen?", "Forgot password?", "—"),
+  "access.title_reset": e("Passwort zurücksetzen", "Reset password", "—"),
+  "access.hint_reset": e("Gib die E-Mail-Adresse deines Kontos ein. Du bekommst sofort ein neues Passwort angezeigt; es wird keine Mail verschickt.", "Enter your account's e-mail address. A new password is shown right away; no mail is sent.", "—"),
+  "access.submit_reset": e("Neues Passwort erzeugen", "Generate new password", "—"),
+  "access.reset_done": e("Dein neues Passwort (wird nur jetzt angezeigt):", "Your new password (shown only now):", "—"),
+  "access.reset_copy": e("Kopieren", "Copy", "—"),
+  "access.reset_copied": e("Kopiert", "Copied", "—"),
+  "access.reset_then": e("Merke es dir oder speichere es im Passwortmanager, dann melde dich damit an.", "Note it down or save it in a password manager, then log in with it.", "—"),
+  "access.err_unknown_email": e("Zu dieser E-Mail-Adresse gibt es kein Konto.", "No account with this e-mail address", "—"),
   // Versionsangabe (#271)
   "version.label": e("Version", "Version", "—"),
   "version.line": e("Version {version} · Build {build} · Engine {engine}", "Version {version} · build {build} · engine {engine}", "—"),

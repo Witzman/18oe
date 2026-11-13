@@ -46,6 +46,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .access small { font-size: 0.8em; }
 .access input, .access button { min-height: 44px; }
 .access button[type="submit"] { padding-inline: 20px; }
+.access .new-password { font-family: monospace; font-size: 1.3em; letter-spacing: 0.05em; user-select: all; padding: 6px 10px; border: 1px solid currentColor; border-radius: 4px; }
 .access a { display: inline-block; padding: 12px 0; }
 
 /* Title and login screen (issue 280). Every colour from tokens; run time from motion.runMsPerHex

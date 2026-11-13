@@ -74,6 +74,21 @@ module Oe
       row && ok ? public_view(row) : nil
     end
 
+    GENERATED_PASSWORD_LENGTH = 14
+
+    # POC password reset (#282): no mail, no confirmation link (owner decision
+    # 2026-11-13). Sets a freshly generated password for the account with this
+    # e-mail and returns it once; nil when no account has that e-mail. The
+    # full flow with a mailed link is #283 (v0.2) and replaces this.
+    def self.reset_password(store, email)
+      row = store.account_by_login(normalize_email(email), nil)
+      return nil unless row && row["email"] == normalize_email(email)
+
+      password = SecureRandom.alphanumeric(GENERATED_PASSWORD_LENGTH)
+      store.update_password(row["id"], hash_password(password))
+      password
+    end
+
     def self.find(store, id)
       row = id && store.account(id.to_s)
       row && public_view(row)
