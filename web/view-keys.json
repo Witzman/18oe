@@ -2,6 +2,7 @@
   "state": [
     "auction",
     "bank",
+    "concession",
     "corporations",
     "depot",
     "log",
@@ -9,7 +10,8 @@
     "market",
     "meta",
     "players",
-    "prompt"
+    "prompt",
+    "zones"
   ],
   "meta": [
     "active_players",
@@ -17,7 +19,9 @@
     "finished",
     "game_id",
     "phase",
+    "railroads",
     "round",
+    "rr_phase",
     "seq",
     "standings",
     "winner"
@@ -56,6 +60,7 @@
     "orient_express_marker",
     "par_price",
     "president",
+    "regional_state",
     "reserved",
     "share_price",
     "shares",

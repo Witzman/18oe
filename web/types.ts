@@ -26,6 +26,22 @@ export interface Meta {
   active_players: string[];
   standings: { player: string; value: number }[];
   winner: string | null;
+  rr_phase: "auction" | "concession" | "regional_minor" | "major" | "consolidation";
+  railroads: Railroads;
+}
+
+export type RegionalState = "unparred" | "parred" | "floated" | "converted" | "removed" | "closed";
+export interface Railroads {
+  minors: { floated: number; total: number };
+  regionals: {
+    unparred: number; parred: number; floated: number; converted: number; removed: number; closed: number;
+    total: number; max_floated: number; max_removed: number;
+  };
+  regional_states: { id: string; state: RegionalState }[];
+}
+export interface ConcessionEntry { id: string; name: string; owner: string | null; status: "done" | "current" | "open" }
+export interface Zone {
+  id: string; price: number; chits_left: number; free: boolean; taken_by: string[]; discount: number;
 }
 
 export interface PlayerShare { corporation: string; percent: number; president: boolean }
@@ -58,6 +74,7 @@ export interface Corporation {
   track_rights: string[];
   orient_express_marker: boolean;
   status: string[];
+  regional_state: RegionalState | null;
 }
 
 export interface MarketCell { price: number; type: string | null; corporations: string[] }
@@ -92,6 +109,8 @@ export interface GameState {
   depot: { available: (Train & { owner: string | null })[]; upcoming: number; next: string | null; discarded: string[] };
   bank: { cash: number };
   auction: Auction | null;
+  concession: ConcessionEntry[] | null;
+  zones: Zone[];
   map: HexChange[];
   log: { action: number; text: string }[];
   prompt: Prompt;

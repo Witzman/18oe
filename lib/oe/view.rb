@@ -35,6 +35,8 @@ module Oe
         depot: depot(game),
         bank: { cash: game.bank.cash },
         auction: auction(game),
+        concession: concession(game),
+        zones: zones(game),
         map: map(game),
         log: log_lines(game, log),
         prompt: prompt(game, viewer, actions, actions_limit),
@@ -61,6 +63,8 @@ module Oe
           operating_rounds: phase.operating_rounds,
           status: Array(phase.status).map(&:to_s),
         },
+        rr_phase: rr_phase(game),
+        railroads: railroads(game),
         current: entity && entity_ref(entity),
         active_players: game.active_players.map(&:id),
         standings: game.result.map { |id, value| { player: id, value: value } },
@@ -136,7 +140,91 @@ module Oe
         track_rights: Array(safe { game.track_rights_zones(corp) }).map(&:to_s),
         orient_express_marker: game.orient_express_marker?(corp) ? true : false,
         status: Array(safe { game.status_array(corp) }).flatten.map(&:to_s),
+        regional_state: regional_state(game, corp),
       }
+    end
+
+    # Railroad phase (#121): auction, concession, regional_minor (regionals and
+    # minors still being floated), major (`major_phase?`: all minors floated, the
+    # unfloated regionals gone) or consolidation (the consolidation round, which
+    # interrupts the major phase).
+    def rr_phase(game)
+      case round_type(game.round)
+      when "auction", "concession", "consolidation" then round_type(game.round)
+      else game.major_phase? ? "major" : "regional_minor"
+      end
+    end
+
+    # Per regional exactly one state; nil for any other corporation. A converted
+    # regional has become a major (type changes) but keeps its regional id.
+    def regional_state(game, corp)
+      return unless game.class::CORPORATIONS_TRACK_RIGHTS.key?(corp.id)
+
+      if corp.type == :major then "converted"
+      elsif corp.closed? then corp.par_price ? "closed" : "removed"
+      elsif corp.floated? then "floated"
+      elsif corp.ipoed then "parred"
+      else "unparred"
+      end
+    end
+
+    REGIONAL_STATES = %w[unparred parred floated converted removed closed].freeze
+
+    # Closed corporations leave `game.corporations`, so the six removed
+    # regionals are looked up by id.
+    def regional_states(game)
+      game.class::CORPORATIONS_TRACK_RIGHTS.keys.map do |id|
+        { id: id, state: regional_state(game, game.corporation_by_id(id)) }
+      end
+    end
+
+    def railroads(game)
+      list = regional_states(game)
+      tally = list.map { |r| r[:state] }.tally
+      regionals = REGIONAL_STATES.to_h { |s| [s.to_sym, tally.fetch(s, 0)] }
+      {
+        minors: { floated: game.minor_floated_regions.size, total: game.class::CORPORATIONS.count { |c| c[:type].to_s == "minor" } },
+        regionals: regionals.merge(
+          total: tally.values.sum,
+          floated: regionals[:floated] + regionals[:converted], # floated at some point, converted ones included
+          max_floated: game.class::MAX_FLOATED_REGIONALS,
+          max_removed: tally.values.sum - game.class::MAX_FLOATED_REGIONALS,
+        ),
+        regional_states: list,
+      }
+    end
+
+    # The concession round (#121): CON1..CON10 in execution order with the
+    # holder at the start of the round and status done / current / open. The
+    # current one stays current while its home token is still to be placed. nil
+    # before the concession round began.
+    def concession(game)
+      owners = game.concession_owners
+      return unless owners
+
+      running = round_type(game.round) == "concession" && !game.finished ? game.round.current_concession : nil
+      game.concessions.map do |c|
+        status = c.equal?(running) ? "current" : c.closed? ? "done" : "open"
+        { id: c.id, name: c.name, owner: owners[c.id], status: status }
+      end
+    end
+
+    # Track-rights zones for minors (#121): home-token price, whether a chit is
+    # still free, who took one. `discount` is the zone's percent discount.
+    def zones(game)
+      klass = game.class
+      taken = game.minor_floated_regions.group_by { |_, zone| zone }
+      klass::MINOR_TRACK_RIGHTS_CHITS.keys.map do |zone|
+        left = game.minor_available_regions[zone] || 0
+        {
+          id: zone,
+          price: game.track_rights_cost(zone),
+          chits_left: left,
+          free: left.positive?,
+          taken_by: taken.fetch(zone, []).map(&:first).sort,
+          discount: klass::ZONE_DISCOUNT_ZONES.include?(zone) ? (klass::ZONE_DISCOUNT_RATE * 100).to_i : 0,
+        }
+      end
     end
 
     # Percent per holder; the sum over all holders is 100 for an ipoed corporation.
