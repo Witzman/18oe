@@ -392,3 +392,91 @@ RSpec.describe "games API authorizer (#36)" do
       .to raise_error(Oe::GameSession::Forbidden)
   end
 end
+
+RSpec.describe "games API: naming players by name or e-mail (#212)" do
+  def client_for(login)
+    c = ApiClient.new(Sinatra::Application)
+    status, = c.api(:post, "/login", { login: login, password: TEST_PASSWORD })
+    raise "login failed for #{login}: #{status}" unless status == 200
+
+    c
+  end
+
+  before do
+    ENV.delete("OE_MAX_GAMES")
+    Sinatra::Application.set :store, Oe::Store.new(":memory:")
+    seed_accounts(Sinatra::Application.settings.store, %w[alice bob carol erin])
+  end
+
+  let(:alice) { client_for("alice") }
+  let(:bob) { client_for("bob") }
+  let(:bots) { [{ kind: "bot" }, { kind: "bot" }] }
+
+  def create(client, seats)
+    client.api(:post, "/games", { seats: seats, seed: 2 })
+  end
+
+  it "seats two humans by name (case-insensitive) and by e-mail, rest bots; both see the game" do
+    status, game = create(alice, [{ kind: "human", account: "ALICE" }, { kind: "human", account: " Bob@Example.TEST " }] + bots)
+    expect(status).to eq(201), game.inspect
+    expect(game["seats"].first(2).map { |s| [s["account_id"], s["name"]] }).to eq([%w[alice Alice], %w[bob Bob]])
+    expect(game["seats"].to_s).not_to include("example.test")
+    id = game["id"]
+    expect(alice.api(:get, "/games")[1]["games"].map { |g| g["id"] }).to eq([id])
+    expect(bob.api(:get, "/games")[1]["games"].map { |g| g["id"] }).to eq([id])
+    expect(client_for("erin").api(:get, "/games")[1]["games"]).to eq([])
+    expect(bob.api(:get, "/games/#{id}")[1]["viewer"]).to eq("p1")
+  end
+
+  it "lets only the player on turn move (403 for the other human and for a stranger)" do
+    _, game = create(alice, [{ kind: "human", account: "Alice" }, { kind: "human", account: "bob" }] + bots)
+    id = game["id"]
+    acting = game["state"]["meta"]["active_players"].first
+    mover, other = acting == "p0" ? [alice, bob] : [bob, alice]
+    pick = mover.api(:get, "/games/#{id}")[1]["state"]["prompt"]["actions"].first
+
+    status, body = other.api(:post, "/games/#{id}/actions", { action: pick, seq: 0 })
+    expect([status, body["error"]]).to eq([403, "not_your_turn"])
+    status, body = client_for("erin").api(:post, "/games/#{id}/actions", { action: pick, seq: 0 })
+    expect([status, body["error"]]).to eq([403, "forbidden"])
+    status, = mover.api(:post, "/games/#{id}/actions", { action: pick, seq: 0 })
+    expect(status).to eq(200)
+  end
+
+  it "answers an unknown name and an unknown e-mail identically, and creates nothing" do
+    answers = ["nobody", "nobody@example.test"].map do |who|
+      create(alice, [{ kind: "human", account: "alice" }, { kind: "human", account: who }] + bots)
+    end
+    expect(answers.map(&:first)).to eq([422, 422])
+    expect(answers.map { |_, b| b["error"] }).to eq(%w[unknown_player unknown_player])
+    expect(answers.map { |_, b| b["message"] }.uniq.size).to eq(1)
+    expect(answers.to_s).not_to include("nobody")
+    expect(alice.api(:get, "/games")[1]["games"]).to eq([])
+  end
+
+  it "does not answer differently for an existing and a missing e-mail beyond success (limit on lookups)" do
+    seats = ->(who) { [{ kind: "human", account: "alice" }, { kind: "human", account: who }] + bots }
+    20.times { alice.api(:post, "/games", { seats: seats.call("ghost@example.test") }) }
+    status, body = create(alice, seats.call("bob@example.test"))
+    expect([status, body["error"]]).to eq([429, "rate_limited"])
+  end
+
+  it "does not accept non-string or empty names" do
+    [nil, "", "   ", 5, ["bob"]].each do |who|
+      status, body = create(alice, [{ kind: "human", account: "alice" }, { kind: "human", account: who }] + bots)
+      expect([status, body["error"]]).to eq([422, "unknown_player"])
+    end
+  end
+
+  it "refuses the same account twice (also named two ways) and a creator without a seat" do
+    status, body = create(alice, [{ kind: "human", account: "alice" }, { kind: "human", account: "alice@example.test" }] + bots)
+    expect([status, body["error"]]).to eq([422, "invalid_seats"])
+    status, body = create(alice, [{ kind: "human", account: "bob" }] + bots + [{ kind: "bot" }])
+    expect([status, body["error"]]).to eq([422, "invalid_seats"])
+  end
+
+  it "still accepts the account_id form" do
+    status, = create(alice, [{ kind: "human", account_id: "alice" }, { kind: "human", account: "bob" }] + bots)
+    expect(status).to eq(201)
+  end
+end

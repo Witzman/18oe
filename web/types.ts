@@ -11,7 +11,12 @@ export interface Seat {
   account_id?: string;
 }
 
-export type SeatRequest = { kind: "human"; account_id: string } | { kind: "bot" };
+// A human seat names its player by `account` (name or e-mail, resolved server-side, #212)
+// or by the opaque `account_id`; the creator must hold a seat themselves.
+export type SeatRequest =
+  | { kind: "human"; account: string }
+  | { kind: "human"; account_id: string }
+  | { kind: "bot" };
 
 export type RoundType = "auction" | "concession" | "stock" | "operating" | "consolidation";
 export type EntityRef = { kind: "player" | "corporation"; id: string; owner?: string };

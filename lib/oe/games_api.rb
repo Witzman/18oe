@@ -15,7 +15,7 @@ module Oe
   #
   # Errors are always JSON `{error: <code>, message: <text>}`:
   #   400 bad_request   401 login_required   403 forbidden / not_your_turn
-  #   404 not_found     409 conflict (stale seq)   422 rejected / invalid_seats / game_limit
+  #   404 not_found     409 conflict (stale seq)   422 rejected / invalid_seats / unknown_player / game_limit
   module GamesApi
     MAX_ACTIVE_DEFAULT = 10
     RUNNER_LOCK = Mutex.new
@@ -79,6 +79,25 @@ module Oe
         halt api_error(400, "bad_request", "invalid JSON")
       end
 
+      # A human seat names its player either by `account` (name or e-mail,
+      # case-insensitive; #212) or by `account_id` (the opaque id, kept for
+      # scripted games). Unknown name/e-mail: one neutral 422 that does not say
+      # whether an e-mail is registered; failed lookups (and every e-mail
+      # lookup) count against a per-creator limit, so this is no oracle.
+      def human_account(entry, index)
+        if entry.key?("account")
+          limit = settings.lookup_limit
+          halt api_error(429, "rate_limited", "too many attempts, try again later") if limit.blocked?(current_account["id"])
+          account = Accounts.resolve(store, entry["account"])
+          limit.fail!(current_account["id"]) if account.nil? || entry["account"].to_s.include?("@")
+          halt api_error(422, "unknown_player", "no registered player found for seat #{index + 1}") unless account
+        else
+          account = Accounts.find(store, entry["account_id"])
+          halt api_error(422, "invalid_seats", "unknown account at seat #{index}") unless account
+        end
+        account
+      end
+
       def build_seats(data)
         raw = data["seats"]
         return halt(api_error(422, "invalid_seats", "seats must be a list")) unless raw.is_a?(Array)
@@ -93,8 +112,7 @@ module Oe
           kind = entry.is_a?(Hash) ? entry["kind"] : nil
           case kind
           when "human"
-            account = Accounts.find(store, entry["account_id"])
-            halt api_error(422, "invalid_seats", "unknown account at seat #{i}") unless account
+            account = human_account(entry, i)
             humans << account["id"]
             { "seat" => i, "kind" => "human", "account_id" => account["id"], "name" => account["name"] }
           when "bot"

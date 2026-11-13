@@ -79,6 +79,18 @@ module Oe
       row && public_view(row)
     end
 
+    # Looks up one account by what a creator typed (#212): name or e-mail,
+    # case-insensitive. Returns {"id","name"} or nil. Never lists accounts.
+    def self.resolve(store, text)
+      return nil unless text.is_a?(String)
+
+      text = text.strip
+      return nil if text.empty? || text.length > EMAIL_MAX
+
+      row = text.include?("@") ? store.account_by_login(normalize_email(text), nil) : store.account_by_login(nil, normalize_name(text))
+      row && public_view(row)
+    end
+
     def self.public_view(row)
       { "id" => row["id"], "name" => row["name"] }
     end
