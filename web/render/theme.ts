@@ -22,6 +22,11 @@ export interface RenderTheme {
   zoneLine: number;
   focusLine: number;
   targetAlpha: number;
+  /** Cities, towns and tokens in side lengths (#147). */
+  slotRadius: number;
+  tokenRadius: number;
+  townLength: number;
+  townWidth: number;
   font: Theme["font"];
   /** Panel metrics in px (CSS reads them as --shape-*). */
   barHeight: number;
@@ -51,6 +56,10 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     zoneLine: t.shape.zoneLine,
     focusLine: t.shape.focusLine,
     targetAlpha: t.shape.targetAlpha,
+    slotRadius: t.shape.slotRadius,
+    tokenRadius: t.shape.tokenRadius,
+    townLength: t.shape.townLength,
+    townWidth: t.shape.townWidth,
     font: { ...t.font },
     barHeight: t.shape.barHeight,
     sideWidth: t.shape.sideWidth,
