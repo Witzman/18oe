@@ -53,13 +53,17 @@ export type PathEnd = { edge: number } | { node: number };
 export interface TilePath { a: PathEnd; b: PathEnd; terminal?: boolean }
 
 /** The track-relevant parts of a tile or printed hex, as GET /map delivers them. */
+export type Revenue = number | Record<string, number>;
+
 export interface TileParts {
-  cities?: { node: number; slots?: number; loc?: string | number }[];
-  towns?: { node: number; loc?: string | number }[];
-  double_towns?: { node: number; axis: number; revenue_loc?: number[] }[];
-  offboards?: { node: number }[];
+  cities?: { node: number; slots?: number; loc?: string | number; revenue?: Revenue }[];
+  towns?: { node: number; loc?: string | number; revenue?: Revenue }[];
+  double_towns?: { node: number; axis: number; revenue_loc?: number[]; revenue?: Revenue }[];
+  offboards?: { node: number; revenue?: Revenue }[];
   junction?: number;
   paths?: TilePath[];
+  /** Tile labels (Y, A, B, L, N, S, P, C, ABP). */
+  labels?: string[];
 }
 
 export type Curve =

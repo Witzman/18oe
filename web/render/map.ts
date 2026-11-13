@@ -10,6 +10,8 @@
 // grid, tiles, overlay of the sea level, then of the land level, ...), so a raised hex covers the
 // lines and tiles of the lower hexes behind it. Drawing happens on demand (no running ticker).
 //
+// Cities, towns, off-boards, tokens (#147): flat parts in the tile container, standing tokens in the
+// objects layer, revenue shields and token symbols in the labels layer (from Z2).
 // Built here: sea and land plates in theme colours, hex lines, province borders, terrain signs
 // with costs, tile surfaces with per-hex redraw, hover and valid targets, pan/zoom/centre/fly,
 // block culling, redraw on oe:themechange. Stored but drawn by later issues: setPreview (#48),
@@ -22,9 +24,11 @@ import { between, centerOn, clampPan, fit, frame, panBy, zoomAt, zoomStage, Z1_F
 import { drawGrid, drawPlate, type Block } from "./layers/static.ts";
 import { drawTileSurface } from "./layers/tiles.ts";
 import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
-import { hexFrame, tileGeometry, type Axis } from "./track-axes.ts";
+import { drawNodes, drawTargetCity, inkOn, makeToken, type Ring } from "./layers/nodes.ts";
+import { citySlots, companyIndex, hitSlot, labelAt, revenueAll, revenueNow, shieldAt, medallionExtent, type Slot } from "./stones.ts";
+import { hexFrame, tileGeometry, type TileGeometry, type TileParts } from "./track-axes.ts";
 import type { MapGeometry } from "./mapdata.ts";
-import { levelMatrix, mapCenter, pick, project, worldCorners, type Vec, type View } from "./projection.ts";
+import { levelMatrix, mapCenter, pick, project, unproject, worldCorners, type Vec, type View } from "./projection.ts";
 import { boxOnScreen, buildScene, COST_AT, terrainMark, type Scene } from "./scene.ts";
 import { currentRenderTheme, type RenderTheme } from "./theme.ts";
 import { changedHexes, signatures, type TileSignatures } from "./tilestate.ts";
@@ -52,7 +56,9 @@ export interface MapLayers {
 export type MapEvent = "hex" | "city" | "hover";
 export interface MapEventData {
   hex: string | null;
+  /** Engine city index and slot of a "city" event (a click on a token slot; "hex" fires as well). */
   city?: number;
+  slot?: number;
 }
 
 export interface MapOptions {
@@ -104,6 +110,8 @@ function reducedMotion(theme: RenderTheme): boolean {
 }
 
 const DRAG_PX = 4;
+/** A slot is hit within at least this many px, so a finger finds a small token (ui-spec 6). */
+const MIN_HIT_PX = 12;
 /** Below this element size in px the map keeps its last size (hidden or collapsed element). */
 const MIN_SIZE = 64;
 
@@ -135,6 +143,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     return [n, c];
   })) as Record<LayerName, Container>;
 
+  layers.objects.sortableChildren = true; // tokens nearer the viewer cover those behind (zIndex = screen y)
+
   // Per-build state (rebuilt on theme change).
   let scene!: Scene;
   let levelRL: RenderLayer[] = [];
@@ -144,8 +154,13 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let blocks: Block[] = [];
   let tileNodes = new Map<string, Container>();
   let trackNodes = new Map<string, TrackNode>();
+  /** Standing tokens and text marks (token symbols, revenue shields, tile labels) per hex. */
+  interface TokenObj { c: Container; at: Vec; z: number; sym: Text; symWidth: number }
+  interface Mark { text: Text; at: Vec; z: number }
+  let tokenObjs = new Map<string, TokenObj[]>();
+  let marks = new Map<string, Mark[]>();
   const frame3 = hexFrame(geometry.layout.edge_vectors);
-  const axesCache = new Map<string, Axis[]>();
+  const geomCache = new Map<string, TileGeometry>();
   let targetG: Graphics[] = [];
   let hoverG!: Graphics;
   let costs: { id: string; text: Text; at: Vec; z: number }[] = [];
@@ -157,6 +172,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let baseZoom = 10;
   let state: GameState | null = null;
   let sigs: TileSignatures = new Map();
+  let nodeSigs: TileSignatures = new Map();
   let entries = new Map<string, HexChange>();
   let targets: MapTargets | null = null;
   let preview: MapPreview = null;
@@ -208,7 +224,10 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     // Tiles: printed and laid.
     tileNodes = new Map();
     trackNodes = new Map();
-    for (const id of new Set([...printed.keys(), ...entries.keys(), ...geometry.hexes.filter((h) => h.paths?.length).map((h) => h.id)])) drawTile(id);
+    tokenObjs = new Map();
+    marks = new Map();
+    for (const id of new Set([...printed.keys(), ...entries.keys(), ...geometry.hexes.filter((h) => h.paths?.length || hasNodes(h)).map((h) => h.id)])) drawTile(id);
+    nodeSigs = computeNodeSigs();
     // Overlay: targets per level, one hover outline.
     targetG = levelNodes.overlay.map((c) => c.addChild(new Graphics()));
     hoverG = new Graphics();
@@ -231,15 +250,95 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     app.renderer.background.color = theme.ui.bg;
   }
 
-  /** Axes of the tile on hex id: the laid tile from the catalog, else the printed one (rotation 0). Cached per tile and rotation. */
-  function axesOf(id: string): Axis[] {
+  const hasNodes = (p: TileParts) => !!(p.cities?.length || p.towns?.length || p.double_towns?.length || p.offboards?.length);
+
+  /** Parts of the tile on hex id: the laid tile from the catalog, else the printed one (rotation 0). */
+  function partsOf(id: string): TileParts | undefined {
     const laid = entries.get(id)?.tile;
-    const parts = laid ? geometry.tiles?.[laid.name] : scene.hexById.get(id);
-    if (!parts?.paths?.length) return [];
-    const key = laid ? `${laid.name}|${laid.rotation}` : `printed|${id}`;
-    let axes = axesCache.get(key);
-    if (!axes) axesCache.set(key, (axes = tileGeometry(parts, laid ? laid.rotation : 0, frame3).axes));
-    return axes;
+    // A hex with tokens but no laid tile reports its printed tile, which is not in the catalog: draw the printed parts.
+    return (laid && geometry.tiles?.[laid.name]) || scene.hexById.get(id);
+  }
+
+  /** Axes and nodes of that tile. Cached per tile and rotation. */
+  function geomOf(id: string): TileGeometry | null {
+    const laid = entries.get(id)?.tile;
+    const parts = partsOf(id);
+    if (!parts || !(parts.paths?.length || hasNodes(parts))) return null;
+    const key = laid && geometry.tiles?.[laid.name] ? `${laid.name}|${laid.rotation}` : `printed|${id}`;
+    let geom = geomCache.get(key);
+    if (!geom) geomCache.set(key, (geom = tileGeometry(parts, laid ? laid.rotation : 0, frame3)));
+    return geom;
+  }
+
+  // ---- game state seen by the nodes (tokens, home rings, revenue) ----------------------------
+
+  /** Company colour: stable index into the placeholder colours company.c1..c6 (ASSUMPTION until #99). */
+  const corpColor = (corp: string) => theme.company[`c${companyIndex(state?.corporations ?? [], corp, 6) + 1}` as keyof typeof theme.company];
+  const homeHexes = (corp: string) => (geometry.homes ?? []).filter((h) => h.corporation === corp).map((h) => h.hex);
+  const phaseColors = () => state?.meta.phase?.tiles ?? ["yellow"];
+  /** Tokens per city of the hex: corporation ids per slot. */
+  const tokensOf = (id: string) => entries.get(id)?.tokens ?? [];
+  const minSlotsOf = (id: string) => tokensOf(id).reduce<number[]>((m, t) => { m[t.city] = t.corporations.length; return m; }, []);
+
+  /** Slots of the tile on hex id (hex coordinates), for drawing, tokens and hit tests. */
+  function slotsOf(id: string): Slot[] {
+    const parts = partsOf(id), geom = geomOf(id);
+    if (!parts || !geom) return [];
+    return citySlots(parts, geom.nodes, theme.slotRadius, minSlotsOf(id));
+  }
+
+  /** Home token (light ring at the foot) or reserved home slot (dashed ring). ASSUMPTION: the home city is city 0, its first free slot. */
+  function ringsOf(id: string, slots: Slot[]): Ring[] {
+    if (!state) return [];
+    const out: Ring[] = [];
+    const taken = new Set<string>();
+    tokensOf(id).forEach((t) => t.corporations.forEach((c, i) => {
+      if (!c) return;
+      taken.add(`${t.city}/${i}`);
+      if (!homeHexes(c).includes(id)) return;
+      const slot = slots.find((s) => s.city === t.city && s.slot === i);
+      if (slot) out.push({ slot, kind: "home", color: corpColor(c) });
+    }));
+    for (const corp of state.corporations) {
+      if (corp.closed || !homeHexes(corp.id).includes(id)) continue;
+      if (tokensOf(id).some((t) => t.corporations.includes(corp.id))) continue;
+      const slot = slots.find((s) => s.city === 0 && !taken.has(`0/${s.slot}`));
+      if (!slot) continue;
+      taken.add(`0/${slot.slot}`);
+      out.push({ slot, kind: "reserved", color: corpColor(corp.id) });
+    }
+    return out;
+  }
+
+  /** What the nodes of a hex show that does not come from state.map: rings, colours, revenue now. Compared per setState. */
+  function nodeSig(id: string): string {
+    const parts = partsOf(id);
+    if (!parts || !hasNodes(parts)) return "";
+    const colors = phaseColors();
+    const revs = [...(parts.cities ?? []), ...(parts.towns ?? []), ...(parts.double_towns ?? [])].map((n) => revenueNow(n.revenue, colors));
+    return JSON.stringify([ringsOf(id, slotsOf(id)).map((r) => [r.kind, r.slot.city, r.slot.slot, r.color]), revs, tokensOf(id).flatMap((t) => t.corporations.map((c) => c && corpColor(c)))]);
+  }
+
+  const computeNodeSigs = (): TileSignatures => new Map(geometry.hexes.map((x) => [x.id, nodeSig(x.id)] as const).filter(([, v]) => v !== ""));
+
+  function mark(id: string, text: string, at: Vec, z: number) {
+    const t = new Text({
+      text, resolution: dpr,
+      style: { fontFamily: theme.font.body, fontSize: 10, fontWeight: "700", fill: theme.map.label, stroke: { color: theme.map.labelHalo, width: 3, join: "round" } },
+    });
+    t.anchor.set(0.5);
+    t.visible = false;
+    layers.labels.addChild(t);
+    const m = marks.get(id) ?? [];
+    m.push({ text: t, at, z });
+    marks.set(id, m);
+  }
+
+  function dropMarks(id: string) {
+    for (const m of marks.get(id) ?? []) m.text.destroy();
+    marks.delete(id);
+    for (const t of tokenObjs.get(id) ?? []) { t.c.destroy({ children: true }); t.sym.destroy(); }
+    tokenObjs.delete(id);
   }
 
   function drawTile(id: string) {
@@ -247,17 +346,57 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     if (!g) return;
     const old = tileNodes.get(id);
     if (old) { old.destroy({ children: true }); tileNodes.delete(id); trackNodes.delete(id); }
+    dropMarks(id);
     const color = entries.get(id)?.tile.color ?? printed.get(id);
     const surface = drawTileSurface(scene.grid, g, color, theme);
-    const axes = axesOf(id);
-    if (!surface && !axes.length) return;
+    const geom = geomOf(id);
+    const axes = geom?.axes ?? [];
+    if (!surface && !geom) return;
     const node = new Container({ label: id });
+    const origin = { x: g.x, y: g.y };
     if (surface) node.addChild(surface);
     if (axes.length) {
-      const t = drawTrack(axes, { x: g.x, y: g.y }, theme);
+      const t = drawTrack(axes, origin, theme);
       setTrackStage(t, zoomStage(view.zoom));
       node.addChild(t.node);
       trackNodes.set(id, t);
+    }
+    const parts = partsOf(id);
+    if (geom && parts && hasNodes(parts)) {
+      const slots = slotsOf(id);
+      const patronage = Object.keys(entries.get(id)?.patronage ?? {}).length ? (parts.cities ?? []).map((_, i) => i) : [];
+      node.addChild(drawNodes({ parts, nodes: geom.nodes, axes, frame: frame3, origin, rings: ringsOf(id, slots), patronage, minSlots: minSlotsOf(id) }, theme));
+      // Tokens: standing cylinders in the objects layer, symbol on top from Z2.
+      const objs: TokenObj[] = [];
+      for (const t of tokensOf(id)) {
+        t.corporations.forEach((corp, i) => {
+          const s = corp && slots.find((x) => x.city === t.city && x.slot === i);
+          if (!corp || !s) return;
+          const c = makeToken(theme, corpColor(corp));
+          layers.objects.addChild(c);
+          const sym = new Text({ text: corp, resolution: dpr, style: { fontFamily: theme.font.body, fontSize: 11, fontWeight: "700", fill: inkOn(corpColor(corp), theme) } });
+          sym.anchor.set(0.5);
+          sym.visible = false;
+          layers.labels.addChild(sym);
+          objs.push({ c, sym, symWidth: sym.width, at: { x: g.x + s.pos.x, y: g.y + s.pos.y }, z: g.z });
+        });
+      }
+      if (objs.length) tokenObjs.set(id, objs);
+      // Revenue shields (from Z2): cities and towns by the phase now, double towns on revenue_loc, off-boards all phases.
+      const colors = phaseColors();
+      for (const n of geom.nodes) {
+        const part = [...(parts.cities ?? []), ...(parts.towns ?? []), ...(parts.double_towns ?? []), ...(parts.offboards ?? [])].find((x) => x.node === n.node);
+        const v = revenueNow(part?.revenue, colors);
+        const text = n.kind === "offboard" ? revenueAll(part?.revenue) : v ? String(v) : null;
+        if (!text) continue;
+        const slotsN = n.kind === "city" ? (parts.cities?.find((c) => c.node === n.node)?.slots ?? 1) : 1;
+        const at = shieldAt(n, medallionExtent(slotsN, theme.slotRadius), frame3);
+        mark(id, text, { x: g.x + at.x, y: g.y + at.y }, g.z);
+      }
+    }
+    if (parts?.labels?.length) {
+      const at = labelAt(frame3);
+      mark(id, parts.labels.join(""), { x: g.x + at.x, y: g.y + at.y }, g.z);
     }
     levelNodes.tiles[scene.levelOf.get(id)!]!.addChild(node);
     tileNodes.set(id, node);
@@ -272,6 +411,15 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       g.poly(worldCorners(scene.grid, h).flatMap((p) => [p.x, p.y]))
         .fill({ color: theme.map.valid, alpha: theme.targetAlpha })
         .stroke({ width: theme.focusLine * 0.6, color: theme.map.valid });
+    }
+    drawCityTargets();
+  }
+
+  function drawCityTargets() {
+    for (const c of targets?.cities ?? []) {
+      const h = scene.grid.byId.get(c.hex);
+      if (!h) continue;
+      drawTargetCity(targetG[scene.levelOf.get(c.hex)!]!, slotsOf(c.hex).filter((s) => s.city === c.city), { x: h.x, y: h.y }, theme);
     }
   }
 
@@ -310,6 +458,30 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       const on = showCosts && !entries.has(c.id) && p.x > -40 && p.x < width + 40 && p.y > -20 && p.y < height + 20;
       c.text.visible = on;
       if (on) c.text.position.set(Math.round(p.x), Math.round(p.y));
+    }
+    for (const list of tokenObjs.values()) {
+      for (const t of list) {
+        const p = project(view, t.at, t.z);
+        const on = p.x > -40 && p.x < width + 40 && p.y > -40 && p.y < height + 40;
+        t.c.visible = on;
+        if (!on) { t.sym.visible = false; continue; }
+        t.c.position.set(p.x, p.y);
+        t.c.scale.set(view.zoom);
+        t.c.zIndex = p.y;
+        const top = p.y - theme.camera.heightToken * Math.sin((view.pitch * Math.PI) / 180) * view.zoom;
+        t.sym.visible = stage >= 2;
+        // The symbol shrinks to fit the top of the token (never grows past its font size).
+        t.sym.scale.set(Math.min(1, (1.75 * theme.tokenRadius * view.zoom) / t.symWidth));
+        t.sym.position.set(Math.round(p.x), Math.round(top));
+      }
+    }
+    for (const list of marks.values()) {
+      for (const m of list) {
+        const p = project(view, m.at, m.z);
+        const on = stage >= 2 && p.x > -40 && p.x < width + 40 && p.y > -20 && p.y < height + 20;
+        m.text.visible = on;
+        if (on) m.text.position.set(Math.round(p.x), Math.round(p.y));
+      }
     }
     if (options.cache) {
       // One texture resolution per power of two of the zoom: re-rendered only when that changes.
@@ -434,8 +606,15 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
     if (e.type === "pointerup" && drag && !drag.moved && pointers.size === 0) {
-      const id = pickId(pos(e));
-      if (id) emit("hex", { hex: id });
+      const p = pos(e);
+      const id = pickId(p);
+      if (id) {
+        const h = scene.grid.byId.get(id)!;
+        const w = unproject(view, p, h.z);
+        const hit = hitSlot(slotsOf(id), { x: w.x - h.x, y: w.y - h.y }, theme.slotRadius, MIN_HIT_PX / view.zoom);
+        if (hit) emit("city", { hex: id, city: hit.city, slot: hit.slot });
+        emit("hex", { hex: id });
+      }
     }
     if (pointers.size === 0) drag = null;
   };
@@ -507,8 +686,10 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       state = "state" in game ? game.state : game;
       entries = new Map(state.map.map((m) => [m.hex, m]));
       const next = signatures(state.map);
-      const changed = changedHexes(sigs, next);
+      const nextNodes = computeNodeSigs();
+      const changed = [...new Set([...changedHexes(sigs, next), ...changedHexes(nodeSigs, nextNodes)])];
       sigs = next;
+      nodeSigs = nextNodes;
       changed.forEach(drawTile);
       stats.stateHexes = changed.length;
       render();
