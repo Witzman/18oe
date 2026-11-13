@@ -2,6 +2,7 @@
   "state": [
     "auction",
     "bank",
+    "companies",
     "concession",
     "corporations",
     "depot",
@@ -78,7 +79,12 @@
   "prompt": [
     "acting_as",
     "actions",
+    "choice_name",
+    "choices",
     "context",
+    "description",
+    "help",
+    "pass_description",
     "ranges",
     "step",
     "types",
