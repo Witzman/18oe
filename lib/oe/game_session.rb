@@ -3,6 +3,7 @@
 require "engine"
 require_relative "build_id"
 require_relative "store"
+require_relative "view"
 
 module Oe
   # One game, rebuilt from its action log (#34). The loaded game is cached per
@@ -40,7 +41,34 @@ module Oe
     # seats: [{"seat" => 0, "kind" => "human", "account_id" => "anna", "name" => "Anna"}, ...]
     def self.create(store, seats:, seed:, status: "active")
       id = store.create_game(seats: seats, seed: seed, engine_rev: engine_rev, status: status)
-      load(store, id)
+      session = load(store, id)
+      store.set_turn(id, turn_of(session.game))
+      session
+    end
+
+    # Who is to act and in which round, derived from a loaded game. Stored with
+    # the game row (see Store migration 4) so that listings and /version stay
+    # cheap. acting: engine player ids; empty when the game is finished.
+    def self.turn_of(game)
+      round = game.round
+      {
+        "round" => {
+          "type" => Oe::View.round_type(round),
+          "number" => round.respond_to?(:round_num) ? round.round_num : nil,
+          "turn" => game.turn,
+        },
+        "acting" => game.finished ? [] : game.active_players.map(&:id),
+      }
+    end
+
+    # The stored turn of a game row; derives (one replay) and stores it for
+    # rows from before the column existed.
+    def self.turn_for(store, row)
+      return row["turn"] if row["turn"]
+
+      turn = turn_of(load(store, row["id"]).game)
+      store.set_turn(row["id"], turn)
+      turn
     end
 
     def self.player_names(seats)
@@ -122,6 +150,7 @@ module Oe
         payload = @game.raw_actions.last
         @store.insert_action(game_id: @id, seq: db_seq + 1, actor: actor.to_s, payload: payload)
         @store.set_status(@id, "finished") if @game.finished
+        @store.set_turn(@id, self.class.turn_of(@game))
         @seq = db_seq + 1
         @store.sessions[@id] = { seq: @seq, game: @game }
         @seq
