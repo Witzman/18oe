@@ -44,6 +44,7 @@ export function mountMapView(frame: GameFrame, api: Api): () => void {
   let game: Game | null = null;
   let loading: Promise<MapView | null> | null = null;
   let disposed = false;
+  let fitted = false; // the map was framed at its real size (a map mounted while hidden is framed on first show)
   const subs = new Map<MapEvent, Set<(d: MapEventData) => void>>();
   const unsubs: (() => void)[] = [];
 
@@ -67,6 +68,7 @@ export function mountMapView(frame: GameFrame, api: Api): () => void {
         map = m;
         for (const ev of ["hex", "city", "hover"] as const) unsubs.push(m.on(ev, emit(ev)));
         if (game) m.setState(game);
+        fitted = host.isConnected && host.clientWidth >= 64 && host.clientHeight >= 64;
         say(null);
         host.dataset.state = "ready";
         // Test and screenshot handle, like the dev page (#44).
@@ -94,6 +96,12 @@ export function mountMapView(frame: GameFrame, api: Api): () => void {
       // The frame clears the container on view switches; the host (and the map in it) is only re-attached.
       if (host.parentElement !== container) container.append(host);
       if (!map && !loading && host.dataset.state !== "error") void load();
+      if (map && !fitted && host.isConnected) {
+        fitted = true;
+        const m = map;
+        // After the renderer has taken over the real size (ResizeObserver), frame the whole map once.
+        requestAnimationFrame(() => requestAnimationFrame(() => { if (!disposed) m.fit(false); }));
+      }
     },
   });
 
