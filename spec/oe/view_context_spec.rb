@@ -52,6 +52,11 @@ RSpec.describe "Oe::View operating context (#123)" do
       label = "action #{game.raw_actions.size} #{step.class.name.split('::').last} #{entity.id}"
       @views << [view, game.depot.upcoming.size, game.tiles.size, game.phase.name, game.phase.current[:train_limit]]
       check(:shape, label) { expect(ctx.keys).to eq(%i[track token dividend train]); JSON.generate(ctx) }
+      acting = view[:prompt][:acting_as]
+      check(:acting, label) do
+        expect(acting.map { |a| a[:entity] }).to eq(view[:prompt][:actions].map { |a| a["entity"] }.uniq)
+        expect(acting.select { |a| a[:primary] }.map { |a| a[:entity] } - [entity.id]).to eq([])
+      end
       check(:track, label) { check_track(ctx[:track], view, step, entity, game) } if ctx[:track]
       check(:token, label) { check_token(ctx[:token], step, entity, game) } if ctx[:token]
       check(:train, label) { check_train(ctx[:train], step, entity, game) } if ctx[:train]
@@ -122,11 +127,20 @@ RSpec.describe "Oe::View operating context (#123)" do
     @short = true if train[:shortfall].positive?
   end
 
-  %i[track token dividend train shape].each do |family|
+  %i[track token dividend train shape acting].each do |family|
     it "has verified #{family} against the engine at every state it appears in" do
       expect(@counts[family]).to be > 0
       expect(@errors[family].first(3)).to eq([])
     end
+  end
+
+  it "marks actions issued for someone other than the active entity as not primary" do
+    game = G::Game.new(%w[p0 p1 p2 p3], id: 1, seed: 1)
+    list = [{ "type" => "pass", "entity" => "p0", "entity_type" => "player" },
+            { "type" => "convert", "entity" => "LNWR", "entity_type" => "corporation" }]
+    acting = Oe::View.acting_as(game, game.round.active_step, list)
+    expect(acting).to eq([{ entity: "p0", kind: "player", primary: true, types: ["pass"] },
+                          { entity: "LNWR", kind: "corporation", primary: false, types: ["convert"] }])
   end
 
   it "saw a president having to chip in for a train" do

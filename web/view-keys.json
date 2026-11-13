@@ -76,6 +76,7 @@
     "type"
   ],
   "prompt": [
+    "acting_as",
     "actions",
     "context",
     "ranges",

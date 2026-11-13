@@ -104,6 +104,7 @@ export interface Prompt {
   unsupported: string[];
   ranges: { type: string; entity: string; company: string; min: number; max: number; step: number }[];
   actions: Record<string, unknown>[];
+  acting_as: { entity: string; kind: "player" | "corporation"; primary: boolean; types: string[] }[];
   context: PromptContext;
 }
 

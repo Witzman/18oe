@@ -59,7 +59,7 @@ RSpec.describe Oe::View do
 
   it "has the documented top-level shape in every state" do
     @samples.each do |label, view, _|
-      expect(view.keys).to eq(%i[meta players corporations market depot bank auction concession zones map log prompt]), label
+      expect(view.keys).to eq(%i[meta players corporations market depot tiles bank auction concession zones map log prompt]), label
       expect(view[:meta].keys).to include(:seq, :finished, :round, :phase, :current, :active_players, :standings), label
       expect(view[:players].size).to eq(4), label
     end

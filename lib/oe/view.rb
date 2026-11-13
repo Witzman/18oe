@@ -468,8 +468,26 @@ module Oe
         # Families with too many members to list (#91): bids as ranges. Every
         # amount min, min+step .. max is legal; send a normal bid action.
         ranges: ranges,
+        acting_as: acting_as(game, step, list),
         context: context(game, step, mine && with_actions ? legal : nil),
       }
+    end
+
+    # Who the offered actions are issued for (#91, #123): one entry per acting
+    # entity in `actions`, the entity the step waits for first (`primary`), the
+    # others are "also possible" (a president selling shares for a corporation
+    # that must buy a train, a player converting a regional).
+    def acting_as(game, step, list)
+      current = step && safe { step.current_entity }&.id
+      list.group_by { |a| a["entity"] }.map do |id, actions|
+        entity = game.get(actions.first["entity_type"], id)
+        {
+          entity: id,
+          kind: entity.player? ? "player" : "corporation",
+          primary: id == current || (current.nil? && entity.player?),
+          types: actions.map { |a| a["type"] }.uniq,
+        }
+      end
     end
 
     # The numbers of the active operating step (#123), as the engine knows them,
