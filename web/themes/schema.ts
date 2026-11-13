@@ -46,7 +46,7 @@ export const NUMBER_RANGES = {
   },
   motion: { runMsPerHex: [50, 1000], runMaxMs: [500, 20000], queueMaxMs: [500, 30000], flashMs: [100, 2000], flyMs: [0, 3000] },
   shape: {
-    hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24],
+    hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24], hit: [32, 64],
     // Map strokes in hex side lengths (they scale with the map like printed lines), alpha 0..1 (#44).
     zoneLine: [0.01, 0.3], focusLine: [0.01, 0.3], targetAlpha: [0, 1],
     // Cities, towns and tokens (#147), in side lengths: slot circle, token cylinder, town bar.

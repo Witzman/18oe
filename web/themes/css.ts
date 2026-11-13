@@ -17,7 +17,7 @@ export function themeVars(theme: Theme): [name: string, value: string][] {
   vars.push(["--font-head", theme.font.head], ["--font-body", theme.font.body]);
   // Numbers keep their unit-free value (angles in degrees, lengths in hex side lengths,
   // times in ms) except the panel metrics, which are pixels.
-  const px = new Set(["radius", "barHeight", "sideWidth", "gap"]);
+  const px = new Set(["radius", "barHeight", "sideWidth", "gap", "hit"]);
   for (const [group, values] of [["camera", theme.camera], ["track", theme.track], ["motion", theme.motion], ["shape", theme.shape]] as const) {
     for (const [key, value] of Object.entries(values)) {
       if (key === "tileStyle") continue; // a data attribute (themes/choice.ts)
