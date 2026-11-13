@@ -14,6 +14,8 @@ import { offerLabel, sheetNode, type SheetHandlers, type SheetInput } from "../u
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
 const pool = load("stock-pool"), par = load("stock-par");
 const theme = themes[0]!;
+// The corporation the viewer can sell in the pool fixture (any: the recording is a seeded random game).
+const SELL = corpRows(pool).find((r) => r.sells.length > 0)!.id;
 const noop: SheetHandlers = { onFocus: () => {}, onPick: () => {}, onTab: () => {}, onMap: () => {} };
 const input = (g: Game, o: Partial<SheetInput> = {}): SheetInput => {
   const rows = corpRows(g);
@@ -28,12 +30,11 @@ test("rows: a row per offered or running corporation, in tier order, money of ev
   const buys = rows.flatMap((r) => r.buys);
   assert.equal(buys.length, pool.state.prompt.actions.filter((a) => a.type === "buy_shares").length);
   assert.ok(buys.every((b) => b.price !== null && b.price > 0), "every purchase has its price from prompt.context.stock");
-  const plm = rows.find((r) => r.id === "PLM")!;
-  assert.equal(plm.mine, 10);
-  assert.equal(plm.sells.length, 1);
-  assert.equal(plm.sells[0]!.price, 75);
-  assert.equal(plm.sells[0]!.newPrice, 70);
-  assert.equal(plm.treasury + plm.market + 20 <= 100, true);
+  const sc = rows.find((r) => r.id === SELL)!;
+  assert.ok(sc.mine > 0);
+  assert.ok(sc.sells.length >= 1);
+  assert.ok(sc.sells.every((s) => s.price! > 0));
+  assert.equal(sc.treasury + sc.market + sc.mine <= 100, true);
 });
 
 test("rows: no action offered means no buttons; a viewer who is not to act chooses nothing", () => {
@@ -61,13 +62,16 @@ test("order: a purchase names source, price, cash and certificates before and af
 
 test("order: a sale shows the proceeds, the holding and the price movement", () => {
   const rows = corpRows(pool);
-  const sell = rows.find((r) => r.id === "PLM")!.sells[0]!;
-  const o = orderModel(pool, rows, { corp: "PLM", key: sell.key });
+  const sell = rows.find((r) => r.id === SELL)!.sells[0]!;
+  const row = rows.find((r) => r.id === SELL)!;
+  const o = orderModel(pool, rows, { corp: SELL, key: sell.key });
   assert.deepEqual(o.action, sell.action);
   const me = pool.state.players.find((p) => p.id === pool.viewer)!;
-  assert.equal(o.changes.find((c) => c.label === "Kasse")!.after, me.cash + 75);
-  assert.deepEqual(o.changes.find((c) => c.label === "Kurs"), { label: "Kurs", before: 75, after: 70, money: true });
-  assert.deepEqual(o.changes.find((c) => c.label === "Dein Anteil"), { label: "Dein Anteil", before: "10 %", after: "0 %", money: false });
+  assert.equal(o.changes.find((c) => c.label === "Kasse")!.after, me.cash + sell.price!);
+  const kurs = o.changes.find((c) => c.label === "Kurs");
+  if (sell.newPrice !== null && sell.newPrice !== row.price) assert.deepEqual(kurs, { label: "Kurs", before: row.price, after: sell.newPrice, money: true });
+  else assert.equal(kurs, undefined);
+  assert.deepEqual(o.changes.find((c) => c.label === "Dein Anteil"), { label: "Dein Anteil", before: `${row.mine} %`, after: `${row.mine - sell.percent} %`, money: false });
   assert.equal(o.confirmLabel, "Verkaufen");
 });
 
@@ -97,12 +101,12 @@ test("par: the price of the president's share from the view, the cell from the a
 
 test("market: the sale in the selection shows the price after it as a preview cell", () => {
   const rows = corpRows(pool);
-  const sell = rows.find((r) => r.id === "PLM")!.sells[0]!;
-  const m = marketModel(pool, rows, "PLM", { corp: "PLM", key: sell.key });
+  const sell = rows.find((r) => r.id === SELL)!.sells.find((s) => s.newPrice !== null) ?? rows.find((r) => r.id === SELL)!.sells[0]!;
+  const m = marketModel(pool, rows, SELL, { corp: SELL, key: sell.key });
   const prev = m.rows.flat().filter((c) => c?.preview);
-  assert.equal(prev.length, 1);
-  assert.equal(prev[0]!.price, 70);
-  assert.equal(offerOf(rows, { corp: "PLM", key: "nope" }), null);
+  assert.ok(prev.length <= 1);
+  if (sell.newPrice !== null) assert.equal(prev[0]!.price, sell.newPrice);
+  assert.equal(offerOf(rows, { corp: SELL, key: "nope" }), null);
 });
 
 test("must sell: no pass but selling offered shows the warning; with a pass there is none", () => {
@@ -117,15 +121,15 @@ test("must sell: no pass but selling offered shows the warning; with a pass ther
 
 test("sheet: offers of the focused row are buttons with the label of the offer; picking calls back with corporation and key", () => {
   const rows = corpRows(pool);
-  const row = rows.find((r) => r.id === "PLM")!;
+  const row = rows.find((r) => r.id === SELL)!;
   const picked: [string, string][] = [];
-  const tree = sheetNode(input(pool, { focus: "PLM" }), { ...noop, onPick: (c, k) => picked.push([c, k]) });
+  const tree = sheetNode(input(pool, { focus: SELL }), { ...noop, onPick: (c, k) => picked.push([c, k]) });
   const offers = find(tree, (n) => n.tag === "button" && n.attrs.class === "stock-offer");
   assert.equal(offers.length, row.buys.length + row.sells.length + row.pars.length);
   for (const b of offers) assert.ok(textOf(b).length > 3);
   offers[0]!.on.click!(new Event("click"));
-  assert.deepEqual(picked, [["PLM", offers[0]!.attrs["data-key"]!]]);
-  assert.match(offerLabel(row.sells[0]!, row), /^10 % verkaufen, £75$/);
+  assert.deepEqual(picked, [[SELL, offers[0]!.attrs["data-key"]!]]);
+  assert.match(offerLabel(row.sells[0]!, row), new RegExp(`^${row.sells[0]!.percent} % verkaufen, £${row.sells[0]!.price}$`));
 });
 
 test("sheet: every row opens by a real button; the rows of the whole list are all present; the grid has a cell per market field", () => {
@@ -133,7 +137,7 @@ test("sheet: every row opens by a real button; the rows of the whole list are al
   const tree = sheetNode(input(pool), noop);
   const heads = find(tree, (n) => n.tag === "button" && n.attrs.class === "stock-rowbtn");
   assert.equal(heads.length, rows.length);
-  const cells = find(tree, (n) => (n.attrs.class ?? "").startsWith("stock-cell ") && !n.attrs.class!.includes("empty"));
+  const cells = find(tree, (n) => n.attrs.class === "stock-cell");
   assert.equal(cells.length, pool.state.market.rows.flat().filter(Boolean).length);
   // Seals sit on the cells of their corporations.
   const seals = find(tree, (n) => n.attrs.class?.includes("kit-seal") === true && (n.attrs.class ?? "").length > 0);

@@ -69,7 +69,7 @@ async function run(dir: string, port: number, checks: string): Promise<number> {
 }
 
 
-const CHECKS_SELL = (corp: string) => String.raw`(async () => {
+const CHECKS_SELL = (corp: string, percent: number, price: number) => String.raw`(async () => {
   const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s);
@@ -92,7 +92,7 @@ const CHECKS_SELL = (corp: string) => String.raw`(async () => {
   const sell = offers.find((b) => b.dataset.kind === "sell") || fail("no sell offer");
   sell.click();
   await sleep(50);
-  if (!/${corp}: 10 % verkaufen, Erlös £75\./.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/${corp}: ${percent} % verkaufen, Erlös £${price}\./.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   if (q(".kit-main-btn").disabled) fail("main button locked although valid");
   if (!q('.stock-cell[data-preview="true"]')) fail("no preview cell for the price after the sale");
   if (!/Kurs/.test(q(".kit-changes").textContent)) fail("no price change line");
@@ -144,9 +144,14 @@ async function scenario(name: string, checks: string) {
 const skip = browser ? false : "no headless browser installed";
 
 test("stock sheet in the browser: choosing a sale sends nothing, shows the price after it, the main button sends the exact action; targets are 44 px", { skip }, async () => {
-  const { posted, game } = await scenario("stock-pool", CHECKS_SELL("PLM"));
+  // The recording is a seeded random game: take the first sale it offers, with the money the view names for it.
+  const g0 = fixture("stock-pool");
+  const first = g0.state.prompt.actions.find((a: Record<string, unknown>) => a.type === "sell_shares")!;
+  const b = g0.state.prompt.context!.stock!.bundles.find((x) => x.type === "sell_shares" && JSON.stringify(x.shares) === JSON.stringify(first.shares))!;
+  const corp = b.corporation;
+  const { posted, game } = await scenario("stock-pool", CHECKS_SELL(corp, b.percent, b.price));
   assert.equal(posted.length, 1);
-  assert.deepEqual(posted[0]!.action, game.state.prompt.actions.find((a: Record<string, unknown>) => a.type === "sell_shares"));
+  assert.deepEqual(posted[0]!.action, game.state.prompt.actions.find((a: Record<string, unknown>) => a.type === "sell_shares" && JSON.stringify(a.shares) === JSON.stringify(first.shares)));
   assert.equal(posted[0]!.seq, game.seq);
 });
 
