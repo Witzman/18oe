@@ -1,2 +1,13 @@
 .git
+.github
+.tools
+.bundle
+.worktrees
+vendor
+tmp
+spec
+bin
 *.md
+web/node_modules
+web/dist
+web/test
