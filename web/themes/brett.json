@@ -118,8 +118,8 @@
     "zoneLine": 0.08,
     "focusLine": 0.09,
     "targetAlpha": 0.35,
-    "slotRadius": 0.17,
-    "tokenRadius": 0.14,
+    "slotRadius": 0.2,
+    "tokenRadius": 0.165,
     "townLength": 0.34,
     "townWidth": 0.07
   }

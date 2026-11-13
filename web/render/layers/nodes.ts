@@ -63,18 +63,22 @@ export function drawNodes(input: NodesInput, theme: RenderTheme): Container {
         .fill({ color: theme.map.city }).stroke({ width: EDGE_LINE, color: theme.map.cityEdge, join: "round" });
     }
   }
+  g.beginPath(); // a fill or stroke without a new shape would paint the last one again
   // Towns: bars across the track.
   for (const bar of townBars(nodes, axes, theme.townLength, theme.townWidth)) {
     g.poly(bar.map((v, i) => v + (i % 2 === 0 ? origin.x : origin.y)), true).fill({ color: theme.map.cityEdge });
   }
+  g.beginPath();
   // Cities: the plate is the union of the slot circles (edge first, then fill), the rings sit on top.
   const slots = citySlots(parts, nodes, r, input.minSlots);
   const plate = (extra: number, color: number) => {
     for (const s of slots) { const [x, y] = flat(s.pos, origin); g.circle(x, y, r + extra); }
     g.fill({ color });
   };
-  plate(EDGE_LINE, theme.map.cityEdge);
-  plate(0, theme.map.city);
+  if (slots.length) {
+    plate(EDGE_LINE, theme.map.cityEdge);
+    plate(0, theme.map.city);
+  }
   for (const s of slots) {
     const [x, y] = flat(s.pos, origin);
     g.circle(x, y, r * 0.78).stroke({ width: EDGE_LINE * 0.7, color: theme.map.cityEdge });

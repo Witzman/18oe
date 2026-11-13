@@ -100,7 +100,7 @@ export function townBars(nodes: readonly NodeGeom[], axes: readonly Axis[], leng
 }
 
 /** Off-board wedges: the tip at the node, the base across the hex edge the track enters through. */
-export function offboardWedges(node: NodeGeom, axes: readonly Axis[], frame: HexFrame, halfBase = 0.32): number[][] {
+export function offboardWedges(node: NodeGeom, axes: readonly Axis[], frame: HexFrame, halfBase = 0.22): number[][] {
   const out: number[][] = [];
   for (const a of axes) {
     const edgeEnd = "edge" in a.a && "node" in a.b && a.b.node === node.node ? a.a : "edge" in a.b && "node" in a.a && a.a.node === node.node ? a.b : null;

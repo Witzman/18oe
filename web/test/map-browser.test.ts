@@ -113,6 +113,25 @@ const CHECKS = String.raw`(async () => {
   const all = m.scene.grid.hexes.every((h) => { const p = m.hexOnScreen(h.id); return p.x > -1 && p.y > -30 && p.x < box.width + 1 && p.y < box.height + 1; });
   if (!all) fail("key 0 does not show the whole map");
 
+  // Cities and tokens (#147): Q30 has three one-slot cities; a token in city 0 and one in city 1 stand in the
+  // objects layer, a click on a token reports "city" with its slot (and "hex" as well), a click beside it only "hex".
+  m.setState({ meta: { current: null }, corporations: [{ id: "PLM", closed: false, floated: true, tokens: [] }, { id: "KK", closed: false, floated: true, tokens: [] }],
+    map: [{ hex: "Q30", tile: { name: "x", rotation: 0, color: "yellow" }, tokens: [{ city: 0, corporations: ["PLM"] }, { city: 1, corporations: ["KK"] }] }] });
+  if (m.layer("objects").children.length !== 2) fail("tokens in the objects layer: " + m.layer("objects").children.length);
+  m.flyTo("Q30");
+  await sleep(1200); await m.rendered();
+  const toks = m.layer("objects").children.filter((k) => k.visible);
+  if (toks.length !== 2) fail("visible tokens " + toks.length);
+  const cityEv = []; const hexEv = [];
+  m.on("city", (d) => cityEv.push(d)); m.on("hex", (d) => hexEv.push(d));
+  const foot = toks[0].position;
+  ev("pointerdown", { x: foot.x, y: foot.y }); ev("pointerup", { x: foot.x, y: foot.y });
+  if (cityEv.length !== 1 || cityEv[0].hex !== "Q30" || cityEv[0].slot !== 0 || (cityEv[0].city !== 0 && cityEv[0].city !== 1)) fail("city click " + JSON.stringify(cityEv));
+  if (hexEv.length !== 1 || hexEv[0].hex !== "Q30") fail("hex click with the city " + JSON.stringify(hexEv));
+  const far = { x: foot.x + 120, y: foot.y + 120 };
+  ev("pointerdown", far); ev("pointerup", far);
+  if (cityEv.length !== 1) fail("a click away from the slots reported a city");
+
   // Theme change rebuilds with the new theme's heights.
   document.documentElement.dataset.theme = "atlas";
   document.dispatchEvent(new CustomEvent("oe:themechange"));

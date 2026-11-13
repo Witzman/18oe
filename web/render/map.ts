@@ -155,7 +155,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let tileNodes = new Map<string, Container>();
   let trackNodes = new Map<string, TrackNode>();
   /** Standing tokens and text marks (token symbols, revenue shields, tile labels) per hex. */
-  interface TokenObj { c: Container; at: Vec; z: number; sym: Text }
+  interface TokenObj { c: Container; at: Vec; z: number; sym: Text; symWidth: number }
   interface Mark { text: Text; at: Vec; z: number }
   let tokenObjs = new Map<string, TokenObj[]>();
   let marks = new Map<string, Mark[]>();
@@ -255,7 +255,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   /** Parts of the tile on hex id: the laid tile from the catalog, else the printed one (rotation 0). */
   function partsOf(id: string): TileParts | undefined {
     const laid = entries.get(id)?.tile;
-    return laid ? geometry.tiles?.[laid.name] : scene.hexById.get(id);
+    // A hex with tokens but no laid tile reports its printed tile, which is not in the catalog: draw the printed parts.
+    return (laid && geometry.tiles?.[laid.name]) || scene.hexById.get(id);
   }
 
   /** Axes and nodes of that tile. Cached per tile and rotation. */
@@ -263,7 +264,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     const laid = entries.get(id)?.tile;
     const parts = partsOf(id);
     if (!parts || !(parts.paths?.length || hasNodes(parts))) return null;
-    const key = laid ? `${laid.name}|${laid.rotation}` : `printed|${id}`;
+    const key = laid && geometry.tiles?.[laid.name] ? `${laid.name}|${laid.rotation}` : `printed|${id}`;
     let geom = geomCache.get(key);
     if (!geom) geomCache.set(key, (geom = tileGeometry(parts, laid ? laid.rotation : 0, frame3)));
     return geom;
@@ -373,11 +374,11 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
           if (!corp || !s) return;
           const c = makeToken(theme, corpColor(corp));
           layers.objects.addChild(c);
-          const sym = new Text({ text: corp, resolution: dpr, style: { fontFamily: theme.font.body, fontSize: 9, fontWeight: "700", fill: inkOn(corpColor(corp), theme) } });
+          const sym = new Text({ text: corp, resolution: dpr, style: { fontFamily: theme.font.body, fontSize: 11, fontWeight: "700", fill: inkOn(corpColor(corp), theme) } });
           sym.anchor.set(0.5);
           sym.visible = false;
           layers.labels.addChild(sym);
-          objs.push({ c, sym, at: { x: g.x + s.pos.x, y: g.y + s.pos.y }, z: g.z });
+          objs.push({ c, sym, symWidth: sym.width, at: { x: g.x + s.pos.x, y: g.y + s.pos.y }, z: g.z });
         });
       }
       if (objs.length) tokenObjs.set(id, objs);
@@ -469,6 +470,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
         t.c.zIndex = p.y;
         const top = p.y - theme.camera.heightToken * Math.sin((view.pitch * Math.PI) / 180) * view.zoom;
         t.sym.visible = stage >= 2;
+        // The symbol shrinks to fit the top of the token (never grows past its font size).
+        t.sym.scale.set(Math.min(1, (1.75 * theme.tokenRadius * view.zoom) / t.symWidth));
         t.sym.position.set(Math.round(p.x), Math.round(top));
       }
     }
