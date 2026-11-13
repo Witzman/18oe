@@ -96,3 +96,27 @@ body:has(.frame) .dev-menu { top: 8px; bottom: auto; right: 12px; z-index: 20; }
 .frame-bar-order .frame-order-panel .kit-changes { display: flex; gap: 4px 12px; flex-wrap: wrap; margin: 0; }
 .frame-order-panel .kit-changes dt { display: inline; font-weight: 600; margin: 0; }
 .frame-order-panel .kit-changes dd { display: inline; margin: 0; }
+
+/* Final standings (issue 176, panels/endgame.ts): a board above the views; collapses to one line for "Karte ansehen" */
+.frame-end-slot { flex: 0 0 auto; } .frame-end-slot[hidden] { display: none; }
+.frame-end { padding: 12px var(--shape-gap); background: var(--ui-panel); border-bottom: 2px solid var(--ui-accent); max-height: 70%; overflow: auto; }
+.frame-end[data-open="false"] { display: flex; gap: var(--shape-gap); align-items: center; padding: 6px var(--shape-gap); }
+.frame-end h2, .frame-end h3 { margin: 0; }
+.frame-end-head { display: flex; gap: var(--shape-gap); align-items: baseline; flex-wrap: wrap; }
+.frame-end-head p, .frame-end-winner { margin: 0; }
+.frame-end-winner { font-family: var(--font-head); font-weight: 700; color: var(--ui-ink); }
+.frame-end-buttons { display: flex; gap: var(--shape-gap); align-items: center; margin: 8px 0; }
+.frame-end-lobby { padding: 3px 8px; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); color: var(--ui-ink); text-decoration: none; }
+.frame-end-lobby:hover { border-color: var(--ui-accent); }
+.frame-end-name { display: inline-flex; gap: 8px; align-items: center; }
+.frame-end-crown { color: var(--ui-accent); font-weight: 700; }
+.frame-end-rank { font-family: var(--font-head); font-weight: 700; }
+.frame-end-note { margin: 4px 0 8px; font-size: .85rem; }
+.frame-end-cards { display: flex; gap: var(--shape-gap); flex-wrap: wrap; margin-bottom: 12px; }
+.frame-end-card { flex: 1 1 14rem; padding: 8px 12px; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); }
+.frame-end-card[data-winner="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); }
+.frame-end-holdings { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.frame-end-holding { display: inline-flex; gap: 4px; align-items: center; }
+.frame-end-privates { list-style: none; padding: 0; margin: 0; }
+.frame-end-sub { display: block; width: 100%; color: var(--ui-faint); }
+.frame-end-sub::before { content: "= "; }

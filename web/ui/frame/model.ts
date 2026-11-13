@@ -40,6 +40,7 @@ export function stepLabel(step: string | null): string {
 
 export function roundLabel(g: Game): string {
   const r = g.state.meta.round;
+  if (g.state.meta.finished) return txt("frame.over").de;
   const name = txt(`round.${r.type}`).de;
   if (r.type === "operating" && r.number !== null) return fillText("frame.round_nt", { name, n: r.number, t: r.turn });
   if (r.number !== null) return fillText("frame.round_n", { name, n: r.number });
