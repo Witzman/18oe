@@ -15,6 +15,7 @@ import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./or
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
 import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stepLabel, type PlayerRow } from "./model.ts";
 import { createViews } from "./views.ts";
+import { endgameModel, Endstand } from "../panels/endgame.ts";
 
 export interface GameFrame {
   root: HTMLElement;
@@ -63,6 +64,7 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   let outlinerOpen = true;
   let genericOpen: boolean | null = null; // null = automatic (open while there is something to choose)
   let logOpen = false;
+  let endOpen = true;
   const frame: GameFrame = {} as GameFrame;
 
   const roundEl = h("header", { class: "frame-roundbar" });
@@ -72,7 +74,8 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   const mainEl = h("main", { class: "frame-main", "aria-label": txt("frame.main").de });
   const tabsEl = h("div", { class: "frame-tabs", role: "tablist" });
   const viewEl = h("div", { class: "frame-view" });
-  mainEl.append(tabsEl, viewEl);
+  const endEl = h("div", { class: "frame-end-slot" });
+  mainEl.append(endEl, tabsEl, viewEl);
   const outlinerEl = h("aside", { class: "frame-outliner", "aria-label": txt("frame.outliner").de });
   const drawerEl = h("div", { class: "frame-drawer" });
   const barEl = h("footer", { class: "frame-bar", "aria-label": txt("frame.action_bar").de });
@@ -208,6 +211,19 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   }
   views.onChange(() => { viewEl.replaceChildren(); drawMain(); });
 
+  // ---- end of game (#176): the final standings above the views; the views and the log stay readable --------
+  function drawEnd() {
+    endEl.hidden = !game?.state.meta.finished;
+    if (!game || !game.state.meta.finished) return put(endEl);
+    const g = game;
+    put(endEl, Endstand(endgameModel(g), {
+      theme: theme(), corpColor: (id) => corpColor(theme(), g, id), open: endOpen,
+      onToggle: () => { endOpen = true; drawEnd(); },
+      onMap: () => { endOpen = false; drawEnd(); },
+      onLog: () => { logOpen = true; drawBar(); },
+    }));
+  }
+
   // ---- action bar ------------------------------------------------------------------------------
   function send(a: Action) {
     if (!game || !frame.session || busy) return;
@@ -281,7 +297,7 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   }
 
   function drawAll() {
-    drawLayout(); drawRound(); drawPlayers(); drawContext(); drawOutliner(); drawMain(); drawBar();
+    drawLayout(); drawRound(); drawPlayers(); drawContext(); drawOutliner(); drawMain(); drawEnd(); drawBar();
   }
 
   document.addEventListener(THEME_CHANGED, () => { if (root.isConnected) drawAll(); });
