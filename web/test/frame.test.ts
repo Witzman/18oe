@@ -158,3 +158,87 @@ test("frame.css uses only theme variables and no fixed colours (rule 10)", async
   assert.deepEqual([...new Set(used)].filter((v) => !defined.has(v)), []);
   assert.deepEqual(css.match(/#[0-9a-f]{3,8}\b|rgba?\(/gi) ?? [], []);
 });
+
+// ---- order interface for special panels (#213) ----------------------------------------------------
+import { createOrderSlot, orderView, type OrderSpec } from "../ui/frame/order.ts";
+
+const buttons = (n: ReturnType<typeof orderView>) => find(n, (x) => x.tag === "button");
+const main = (n: ReturnType<typeof orderView>) => find(n, (x) => x.tag === "button" && String(x.attrs.class).includes("kit-main-btn"))[0]!;
+
+test("order: a panel sets sentence, changes, one main button and side buttons; release restores the generic bar", () => {
+  let changes = 0;
+  const slot = createOrderSlot(() => { changes++; });
+  assert.equal(slot.spec, null);
+  const sent: string[] = [];
+  const spec: OrderSpec = {
+    sentence: "PLM 10 % aus dem Markt kaufen", changes: [{ label: "Kasse", before: "£260", after: "£95" }], confirmLabel: "Kaufen",
+    onConfirm: () => sent.push("buy"), side: [{ label: "Passen", onClick: () => sent.push("pass") }, { label: "Gesperrt", onClick: () => sent.push("x"), disabled: true, reason: "kein Geld" }],
+  };
+  const release = slot.set(spec);
+  assert.equal(slot.spec, spec);
+  const view = orderView(slot.spec!, { busy: false, armed: false, onArm: () => slot.arm() });
+  const text = textOf(view);
+  assert.ok(text.includes("PLM 10 %") && text.includes("£260") && text.includes("£95") && text.includes("Kaufen") && text.includes("Passen"));
+  assert.equal(find(view, (x) => x.tag === "button" && String(x.attrs.class).includes("kit-main-btn")).length, 1, "exactly one main button");
+  assert.ok(!text.includes("Abbrechen"), "no cancel unless the panel lists one");
+  main(view).on.click!(new Event("click"));
+  buttons(view).find((b) => textOf(b) === "Passen")!.on.click!(new Event("click"));
+  assert.deepEqual(sent, ["buy", "pass"]);
+  assert.equal(buttons(view).find((b) => textOf(b) === "Gesperrt")!.attrs.disabled, "");
+  release();
+  assert.equal(slot.spec, null);
+  assert.ok(changes >= 2);
+  release(); // idempotent
+});
+
+test("order: a newer order wins, an old release must not clear it", () => {
+  const slot = createOrderSlot(() => {});
+  const r1 = slot.set({ sentence: "eins", onConfirm: () => {} });
+  const second: OrderSpec = { sentence: "zwei", onConfirm: () => {} };
+  const r2 = slot.set(second);
+  r1();
+  assert.equal(slot.spec, second);
+  r2();
+  assert.equal(slot.spec, null);
+});
+
+test("order: busy locks main and side buttons and shows dots; invalid locks the main button with reason", () => {
+  const spec: OrderSpec = { sentence: "x", onConfirm: () => {}, side: [{ label: "Passen", onClick: () => {} }] };
+  const busy = orderView(spec, { busy: true, armed: false, onArm: () => {} });
+  assert.ok(buttons(busy).every((b) => b.attrs.disabled === ""));
+  assert.ok(textOf(busy).includes("•••"));
+  let sent = 0;
+  const invalid = orderView({ ...spec, state: "invalid", reason: "zu wenig Bargeld", onConfirm: () => { sent++; } }, { busy: false, armed: false, onArm: () => {} });
+  main(invalid).on.click!(new Event("click"));
+  assert.equal(sent, 0);
+  assert.equal(main(invalid).attrs.disabled, "");
+});
+
+test("order: danger needs a second click; setting a new order resets the arming", () => {
+  const slot = createOrderSlot(() => {});
+  let sent = 0;
+  const spec: OrderSpec = { sentence: "Konkurs", danger: true, confirmLabel: "Konkurs", onConfirm: () => { sent++; } };
+  slot.set(spec);
+  const render = () => orderView(slot.spec!, { busy: false, armed: slot.armed, onArm: () => slot.arm() });
+  main(render()).on.click!(new Event("click"));
+  assert.equal(sent, 0);
+  assert.ok(slot.armed);
+  assert.ok(textOf(main(render())).includes(txt("frame.confirm_danger").de));
+  main(render()).on.click!(new Event("click"));
+  assert.equal(sent, 1);
+  slot.set(spec);
+  assert.equal(slot.armed, false);
+});
+
+test("order: example panel claims its action type and sets its order; unmounting gives both back", () => {
+  const g = games["track"]!;
+  const claims = createClaims();
+  const slot = createOrderSlot(() => {});
+  const mount = () => { const a = claims.claim("Track", "lay_tile"); const b = slot.set({ sentence: "Kachel legen", onConfirm: () => {} }); return () => { a(); b(); }; };
+  const before = genericModel(g, claims).count;
+  const unmount = mount();
+  assert.ok(genericModel(g, claims).count < before && slot.spec !== null);
+  unmount();
+  assert.equal(genericModel(g, claims).count, before);
+  assert.equal(slot.spec, null);
+});

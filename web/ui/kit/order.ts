@@ -14,6 +14,8 @@ export interface OrderOptions {
   reason?: string;
   onConfirm?: () => void;
   onCancel?: () => void;
+  /** Default true; panels that bring their own side buttons turn the cancel button off. */
+  showCancel?: boolean;
 }
 
 export function Auftrag(o: OrderOptions): VNode {
@@ -34,5 +36,5 @@ export function Auftrag(o: OrderOptions): VNode {
       v("dt", {}, c.label),
       v("dd", {}, v("span", { class: "kit-before" }, c.before), v("span", { class: "kit-arrow", "aria-hidden": "true" }, " → "), v("span", { class: "kit-after" }, c.after)),
     ])),
-    v("div", { class: "kit-order-actions" }, confirmCell, cancel));
+    v("div", { class: "kit-order-actions" }, confirmCell, o.showCancel === false ? null : cancel));
 }
