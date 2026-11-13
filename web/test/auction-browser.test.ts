@@ -142,3 +142,23 @@ test("auction in the browser: the pass button sends the offered pass", { skip: b
   assert.equal(posted.length, 1);
   assert.deepEqual(posted[0]!.action, game.state.prompt.actions.find((a: Record<string, unknown>) => a.type === "pass"));
 });
+
+const CHECKS_RUNNING = String.raw`(async () => {
+  const fail = (m) => { throw new Error(m); };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const q = (s) => document.querySelector(s);
+  if (!q(".auction-running") || !/Silver Banner Line/.test(q(".auction-running").textContent)) fail("no running auction box");
+  if (!/Höchstgebot £130 von p3/.test(q(".auction-running").textContent)) fail("high bid: " + q(".auction-running").textContent);
+  if (q(".auction-card[data-running=true]").getAttribute("aria-pressed") !== "true") fail("running lot not preselected");
+  if (q(".auction-bidform input").value !== "135") fail("amount " + q(".auction-bidform input").value);
+  if (!/Bieten: Silver Banner Line mit £135/.test(q(".kit-order-sentence").textContent)) fail("sentence " + q(".kit-order-sentence").textContent);
+  if (q('.auction-card[data-card="B"]').dataset.state !== "blocked") fail("other lots must not be choosable during the auction");
+  q(".kit-main-btn").click();
+  await sleep(600);
+  if ((await (await fetch("/__posted")).json()).length !== 1) fail("not sent");
+})()`;
+
+test("auction in the browser: a running auction preselects its lot and bids from the offered range", { skip: browser ? false : "no headless browser installed" }, async () => {
+  const { posted } = await scenario("auction-open", CHECKS_RUNNING);
+  assert.deepEqual(posted[0]!.action, { type: "bid", entity: "p0", entity_type: "player", company: "A", price: 135 });
+});
