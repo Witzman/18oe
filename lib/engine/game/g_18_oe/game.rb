@@ -28,7 +28,7 @@ module Engine
         include G18OE::Map
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
-        attr_reader :concessions, :merged_minors, :wcf_placeholder
+        attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder
 
         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
                            { group: :white, count: 3 }, { group: :green, count: 8 }].freeze
@@ -959,6 +959,8 @@ module Engine
 
         def new_concession_round
           @log << '-- Concession RR Phase --'
+          # Closing a concession drops its owner; remember who held which one (#121).
+          @concession_owners = concessions.to_h { |concession| [concession.id, concession.owner&.id] }
           Round::G18OE::Concession.new(self, [
             G18OE::Step::HomeToken,
             G18OE::Step::Concession,
