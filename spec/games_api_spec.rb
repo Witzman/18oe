@@ -29,23 +29,20 @@ RSpec.describe "games API (#36)" do
 
   def client_for(account)
     c = ApiClient.new(Sinatra::Application)
-    status, = c.api(:post, "/login", { account: account, code: "sesame" })
+    status, = c.api(:post, "/login", { login: account, password: TEST_PASSWORD })
     raise "login failed for #{account}: #{status}" unless status == 200
 
     c
   end
 
   before do
-    ENV["OE_ACCESS_CODE"] = "sesame"
-    ENV.delete("OE_ACCOUNTS")
     ENV.delete("OE_MAX_GAMES")
     Sinatra::Application.set :store, Oe::Store.new(":memory:")
+    seed_accounts(Sinatra::Application.settings.store, %w[alice bob carol dave erin])
   end
 
   after do
-    ENV.delete("OE_ACCESS_CODE")
     ENV.delete("OE_MAX_GAMES")
-    ENV.delete("OE_ACCOUNTS")
   end
 
   let(:humans) { %w[alice bob carol dave].to_h { |n| [n, client_for(n)] } }
@@ -85,7 +82,6 @@ RSpec.describe "games API (#36)" do
     it "lists only the games the account holds a seat in" do
       create_game(alice, seats4)
       create_game(humans["bob"], [{ kind: "human", account_id: "bob" }, { kind: "bot" }])
-      ENV["OE_ACCOUNTS"] = "alice:Alice,bob:Bob,carol:Carol,dave:Dave,erin:Erin"
       _, mine = alice.api(:get, "/games")
       _, bobs = humans["bob"].api(:get, "/games")
       _, none = client_for("erin").api(:get, "/games")
@@ -135,7 +131,6 @@ RSpec.describe "games API (#36)" do
     let!(:game) { create_game(alice, seats4)[1] }
 
     it "gives every account its own view; strangers see a spectator view without actions" do
-      ENV["OE_ACCOUNTS"] = "alice:Alice,bob:Bob,carol:Carol,dave:Dave,erin:Erin"
       _, mine = alice.api(:get, "/games/#{game['id']}")
       _, bobs = humans["bob"].api(:get, "/games/#{game['id']}")
       _, seen = client_for("erin").api(:get, "/games/#{game['id']}")
@@ -215,7 +210,6 @@ RSpec.describe "games API (#36)" do
     end
 
     it "refuses a stranger without a seat (403)" do
-      ENV["OE_ACCOUNTS"] = "alice:Alice,bob:Bob,carol:Carol,dave:Dave,erin:Erin"
       erin = client_for("erin")
       action = offered(active_client(state_of(alice))).first
       status, body = erin.api(:post, "/games/#{id}/actions", { action: action, seq: 0 })
@@ -301,18 +295,17 @@ RSpec.describe "games API with bot seats (#39)" do
 
   let(:alice) do
     c = BotApiClient.new
-    c.post "/login", { account: "alice", code: "sesame" }, { "HTTP_HOST" => "127.0.0.1" }
+    c.post "/login", { login: "alice", password: TEST_PASSWORD }, { "HTTP_HOST" => "127.0.0.1" }
     c
   end
   let(:seats) { [{ kind: "human", account_id: "alice" }, { kind: "bot" }, { kind: "bot" }] }
 
   before do
-    ENV["OE_ACCESS_CODE"] = "sesame"
     Sinatra::Application.set :store, Oe::Store.new(":memory:")
+    seed_accounts(Sinatra::Application.settings.store, %w[alice])
   end
 
   after do
-    ENV.delete("OE_ACCESS_CODE")
     Sinatra::Application.set :bot_mode, :off
   end
 

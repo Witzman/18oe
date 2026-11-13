@@ -26,6 +26,25 @@ module AppHelper
   end
 end
 
+# Test accounts (#208): id "alice", name "Alice", e-mail alice@example.test,
+# password "pw-alice-1234" -- created straight in the store (registration is
+# covered by accounts_spec).
+module AccountHelper
+  def seed_accounts(store, *ids)
+    hash = Oe::Accounts.hash_password("test-password-1")
+    ids.flatten.each do |id|
+      store.create_account(id: id, name: id.capitalize, email: "#{id}@example.test", password_hash: hash)
+    end
+  end
+
+  TEST_PASSWORD = "test-password-1"
+end
+
 RSpec.configure do |config|
+  config.include AccountHelper
+  config.before do
+    Sinatra::Application.settings.register_limit.reset!
+    Sinatra::Application.settings.login_limit.reset!
+  end
   config.include AppHelper
 end

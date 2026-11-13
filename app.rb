@@ -26,10 +26,10 @@ set :host_authorization, { permitted_hosts: ["oe.witzman.de", "127.0.0.1", "loca
 
 # Session cookie. SESSION_SECRET comes from the environment (Dokploy), never
 # the repo. Outside test/dev the app refuses to start without it and without
-# the shared access code, because the site is open on the internet.
+# the invite code (#208), because the site is open on the internet.
 dev_mode = %w[test development].include?(ENV["APP_ENV"] || ENV["RACK_ENV"] || "production")
 unless dev_mode
-  %w[SESSION_SECRET OE_ACCESS_CODE].each do |key|
+  %w[SESSION_SECRET OE_INVITE_CODE].each do |key|
     abort "#{key} must be set outside test/dev" if ENV[key].to_s.empty?
   end
 end
@@ -62,7 +62,7 @@ helpers do
 
   def current_account
     id = session[:account]
-    id && Oe::Accounts.find(id)
+    id && Oe::Accounts.find(settings.store, id)
   end
 
   def request_params
@@ -82,12 +82,48 @@ before "/map" do
   halt api_error(401, "login_required", "login required") unless current_account
 end
 
-post "/login" do
+# Guessing limits per client address (#208): wrong invite codes on /register,
+# wrong passwords on /login. In memory, one Puma process.
+set :register_limit, Oe::Accounts::RateLimit.new(max: 10, window: 900)
+set :login_limit, Oe::Accounts::RateLimit.new(max: 10, window: 900)
+
+helpers do
+  def too_many!
+    halt api_error(429, "rate_limited", "too many attempts, try again later")
+  end
+end
+
+post "/register" do
+  limit = settings.register_limit
+  too_many! if limit.blocked?(request.ip)
   data = request_params
-  account = Oe::Accounts.find(data["account"])
-  unless account && Oe::Accounts.access_ok?(data["code"])
+  data = {} unless data.is_a?(Hash)
+  unless Oe::Accounts.invite_ok?(data["code"])
+    limit.fail!(request.ip)
+    halt api_error(403, "invalid_invite", "invalid invite code")
+  end
+  begin
+    account = Oe::Accounts.register(settings.store, name: data["name"], email: data["email"], password: data["password"])
+  rescue Oe::Accounts::Invalid => e
+    status_code = e.code == "name_taken" || e.code == "registration_failed" ? 409 : 422
+    halt api_error(status_code, e.code, e.message)
+  end
+  session.clear
+  session[:account] = account["id"]
+  json 201, account
+end
+
+# login: e-mail or name.
+post "/login" do
+  limit = settings.login_limit
+  too_many! if limit.blocked?(request.ip)
+  data = request_params
+  data = {} unless data.is_a?(Hash)
+  account = Oe::Accounts.authenticate(settings.store, data["login"], data["password"])
+  unless account
+    limit.fail!(request.ip)
     session.clear
-    halt api_error(401, "invalid_login", "invalid account or access code")
+    halt api_error(401, "invalid_login", "invalid login or password")
   end
   session.clear
   session[:account] = account["id"]
@@ -102,14 +138,6 @@ end
 get "/me" do
   account = current_account
   account ? json(200, account) : api_error(401, "login_required", "login required")
-end
-
-# The account list holds real names, so it is only given to someone who knows the
-# shared access code (the login picker asks for the code first).
-post "/accounts" do
-  halt api_error(401, "invalid_login", "invalid access code") unless Oe::Accounts.access_ok?(request_params["code"])
-
-  json 200, accounts: Oe::Accounts.all.map { |id, name| { id: id, name: name } }
 end
 
 register Oe::GamesApi

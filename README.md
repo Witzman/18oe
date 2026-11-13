@@ -71,6 +71,16 @@ Runs on Dokploy (`orient18oe`), building this repo's `Dockerfile`/
 `docker-compose.yml` directly. DNS/vhost routing (the server also runs
 Apache for other domains) is being finished separately.
 
+### Access (#208)
+
+Accounts are registered at `POST /register` (`name`, `email`, `password`,
+`code`) with the single invite code from `OE_INVITE_CODE`; `POST /login`
+takes `login` (e-mail or name) and `password`. Passwords are stored as
+salted scrypt hashes. Set `SESSION_SECRET` and `OE_INVITE_CODE` in Dokploy
+(both are listed in `docker-compose.yml`; the app refuses to start without
+them). Until someone has registered with the code, nobody can log in. No
+confirmation mail and no password reset yet.
+
 ## Status
 
 Walking skeleton only — `app.rb` answers `/healthz`, no game logic yet.

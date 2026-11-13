@@ -14,7 +14,7 @@ module Oe
   # transactions are BEGIN IMMEDIATE so a second process also queues behind
   # the writer (busy_timeout) instead of failing half way.
   class Store
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
     DEFAULT_PATH = "/data/18oe.sqlite3"
 
     MIGRATIONS = {
@@ -38,7 +38,7 @@ module Oe
           UNIQUE (game_id, seq)
         );
       SQL
-      2 => <<~SQL
+      2 => <<~SQL,
         CREATE TABLE incidents (
           id         INTEGER PRIMARY KEY,
           game_id    INTEGER NOT NULL REFERENCES games(id),
@@ -48,7 +48,26 @@ module Oe
           created_at TEXT NOT NULL
         );
       SQL
+      3 => <<~SQL
+        CREATE TABLE accounts (
+          id            TEXT PRIMARY KEY,   -- opaque; seats reference it as account_id
+          name          TEXT NOT NULL UNIQUE COLLATE NOCASE,
+          email         TEXT NOT NULL UNIQUE,  -- stored lower-case
+          password_hash TEXT NOT NULL,      -- salted scrypt, never clear text
+          created_at    TEXT NOT NULL
+        );
+      SQL
     }.freeze
+
+    # A UNIQUE constraint on accounts was hit; `field` is :name or :email.
+    class Duplicate < StandardError
+      attr_reader :field
+
+      def initialize(field)
+        @field = field
+        super("duplicate account #{field}")
+      end
+    end
 
     attr_reader :path, :sessions
 
@@ -159,6 +178,31 @@ module Oe
         @db.execute("SELECT payload FROM actions WHERE game_id = ? ORDER BY seq", [game_id])
       end
       rows.map { |row| JSON.parse(row["payload"]) }
+    end
+
+    # Accounts (#208). Password hashes are only ever read by Oe::Accounts.
+    def create_account(id:, name:, email:, password_hash:)
+      transaction do
+        @db.execute("INSERT INTO accounts (id, name, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
+                    [id, name, email, password_hash, now])
+      end
+      { "id" => id, "name" => name }
+    rescue SQLite3::ConstraintException => e
+      raise Duplicate.new(e.message.include?("accounts.name") ? :name : :email) if e.message.include?("UNIQUE")
+
+      raise
+    end
+
+    def account(id)
+      @mutex.synchronize { @db.get_first_row("SELECT * FROM accounts WHERE id = ?", [id]) }
+    end
+
+    # By e-mail (already lower-case) or by name (case-insensitive).
+    def account_by_login(email, name)
+      @mutex.synchronize do
+        @db.get_first_row("SELECT * FROM accounts WHERE email = ? OR name = ? COLLATE NOCASE ORDER BY email = ? DESC LIMIT 1",
+                          [email, name, email])
+      end
     end
 
     private
