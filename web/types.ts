@@ -28,6 +28,8 @@ export interface Meta {
   winner: string | null;
   rr_phase: "auction" | "concession" | "regional_minor" | "major" | "consolidation";
   railroads: Railroads;
+  operating_order: { id: string; done: boolean }[];
+  priority: string[];
 }
 
 export type RegionalState = "unparred" | "parred" | "floated" | "converted" | "removed" | "closed";
