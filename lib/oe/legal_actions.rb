@@ -66,6 +66,34 @@ module Oe
       actions + acting_for(step)
     end
 
+    # The whole choice space of a tile lay, not sampled (#123): per affordable
+    # hex the upgradeable tiles with their legal rotations,
+    # [[hex, [[tile, [rotation, ...]], ...]], ...]. Tile rotations are reset
+    # before returning.
+    def lay_tile_options(step, entity)
+      @game.hexes.filter_map do |hex|
+        next unless step.available_hex(entity, hex)
+        next if @game.upgrade_cost(hex.tile, hex, entity, entity) > entity.cash
+
+        tiles = step.upgradeable_tiles(entity, hex).map do |tile|
+          rotations = tile.legal_rotations.dup
+          tile.rotate!(0)
+          [tile, rotations]
+        end
+        [hex, tiles] unless tiles.empty?
+      end
+    end
+
+    # The cities a token may be placed in now (#123).
+    def token_targets(step, entity)
+      tokens = step.available_tokens(entity)
+      tokener = step.is_a?(Engine::Step::HomeToken) ? tokens.first.corporation : entity
+      token_cities(step, entity).select do |city|
+        city.tokenable?(tokener, free: false, tokens: tokens) && home_region_ok?(step, tokener, city) &&
+          connected_for_token?(step, entity, city)
+      end
+    end
+
     private
 
     # Actions a non-active entity issues while the step waits for someone else:
@@ -315,16 +343,8 @@ module Oe
     # ---- operating round --------------------------------------------------
 
     def generate_lay_tile(step, entity)
-      actions = []
-      @game.hexes.each do |hex|
-        next unless step.available_hex(entity, hex)
-        next if @game.upgrade_cost(hex.tile, hex, entity, entity) > entity.cash
-
-        tiles = step.upgradeable_tiles(entity, hex)
-        tiles.each do |tile|
-          tile.legal_rotations.each { |rotation| actions << [tile, hex, rotation] }
-          tile.rotate!(0)
-        end
+      actions = lay_tile_options(step, entity).flat_map do |hex, tiles|
+        tiles.flat_map { |tile, rotations| rotations.map { |rotation| [tile, hex, rotation] } }
       end
       sample(actions).map do |tile, hex, rotation|
         A::LayTile.new(entity, tile: tile, hex: hex, rotation: rotation)
@@ -332,13 +352,7 @@ module Oe
     end
 
     def generate_place_token(step, entity)
-      tokens = step.available_tokens(entity)
-      tokener = step.is_a?(Engine::Step::HomeToken) ? tokens.first.corporation : entity
-      cities = token_cities(step, entity).select do |city|
-        city.tokenable?(tokener, free: false, tokens: tokens) && home_region_ok?(step, tokener, city) &&
-          connected_for_token?(step, entity, city)
-      end
-      sample(cities).map { |city| A::PlaceToken.new(entity, city: city) }
+      sample(token_targets(step, entity)).map { |city| A::PlaceToken.new(entity, city: city) }
     end
 
     # Tokens laid by operating (not home/merge tokens) must connect to a route
