@@ -73,6 +73,16 @@ module Oe
         }
       end
 
+      # What the list and /version say about whose turn it is (#152): from the
+      # stored turn summary, no replay. Never names accounts, only whether the
+      # logged-in viewer's own seat is among the acting ones.
+      def turn_info(row)
+        turn = GameSession.turn_for(store, row)
+        mine = viewer_player_id(row["seats"])
+        { round: turn["round"], acting: turn["acting"],
+          viewer_to_act: !mine.nil? && row["status"] != "finished" && turn["acting"].include?(mine) }
+      end
+
       def json_body
         data = JSON.parse(request.body.read)
         data.is_a?(Hash) ? data : halt(api_error(400, "bad_request", "JSON object expected"))
@@ -181,6 +191,7 @@ module Oe
         mine = store.games.select { |g| g["seats"].any? { |s| s["account_id"] == current_account["id"] } }
         json 200, games: mine.map { |g|
           { id: g["id"], status: g["status"], seats: g["seats"], seq: store.last_seq(g["id"]), created_at: g["created_at"] }
+            .merge(turn_info(g))
         }
       end
 
@@ -208,7 +219,23 @@ module Oe
         row = id && store.game(id)
         halt api_error(404, "not_found", "no such game") unless row
 
-        json 200, seq: store.last_seq(id), status: row["status"]
+        json 200, { seq: store.last_seq(id), status: row["status"] }.merge(turn_info(row))
+      end
+
+      # Log lines after action id `from` (default 0 = all), at most `limit`
+      # (default 100, max 500), oldest first (#152). `next` is the id to pass as
+      # `from` for the following page, nil when there is nothing more.
+      app.get "/games/:id/log" do
+        session = load_session(params[:id])
+        from = Integer(params["from"] || 0, exception: false)
+        limit = Integer(params["limit"] || 100, exception: false)
+        halt api_error(400, "bad_request", "from must be an integer >= 0") unless from && from >= 0
+        halt api_error(400, "bad_request", "limit must be an integer 1..500") unless limit && (1..500).cover?(limit)
+
+        lines = session.game.log.select { |e| e.action_id > from }
+        page = lines.first(limit)
+        json 200, lines: page.map { |e| { action: e.action_id, text: e.message.to_s } },
+                  next: lines.size > limit ? page.last.action_id : nil, seq: session.seq
       end
 
       app.get "/games/:id/actions" do

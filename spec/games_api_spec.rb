@@ -150,8 +150,43 @@ RSpec.describe "games API (#36)" do
       end
     end
 
-    it "answers /version with just seq and status" do
-      expect(alice.api(:get, "/games/#{game['id']}/version")).to eq([200, { "seq" => 0, "status" => "active" }])
+    it "answers /version with seq, status, round and whether the viewer is to act" do
+      acting = game["state"]["meta"]["active_players"]
+      round = game["state"]["meta"]["round"]
+      humans.each_value do |c|
+        status, v = c.api(:get, "/games/#{game['id']}/version")
+        expect(status).to eq(200)
+        expect(v.keys).to match_array(%w[seq status round acting viewer_to_act])
+        expect(v).to include("seq" => 0, "status" => "active", "acting" => acting)
+        expect(v["round"]).to eq(round.slice("type", "number", "turn"))
+        expect(v["viewer_to_act"]).to eq(acting.include?(c.api(:get, "/games/#{game['id']}")[1]["viewer"]))
+      end
+      expect(client_for("erin").api(:get, "/games/#{game['id']}/version")[1]["viewer_to_act"]).to be(false)
+    end
+
+    it "lists round and viewer_to_act per game without accounts or e-mail" do
+      _, list = alice.api(:get, "/games")
+      entry = list["games"].find { |g| g["id"] == game["id"] }
+      acting = game["state"]["meta"]["active_players"]
+      expect(entry["round"]).to include("type" => game["state"]["meta"]["round"]["type"])
+      expect(entry["viewer_to_act"]).to eq(acting.include?("p0"))
+      expect(entry.to_json).not_to include("@")
+    end
+
+    it "derives the turn for a game stored before the column existed" do
+      Sinatra::Application.settings.store.instance_variable_get(:@db).execute("UPDATE games SET turn = NULL")
+      expect(alice.api(:get, "/games/#{game['id']}/version")[1]["round"]).to include("type")
+      expect(Sinatra::Application.settings.store.game(game["id"])["turn"]).to include("acting")
+    end
+
+    it "serves log lines after an action id, paged" do
+      _, all = alice.api(:get, "/games/#{game['id']}/log")
+      expect(all["lines"]).to all(include("action", "text"))
+      expect(alice.api(:get, "/games/#{game['id']}/log?from=999")[1]).to include("lines" => [], "next" => nil)
+      expect(alice.api(:get, "/games/#{game['id']}/log?from=-1")[0]).to eq(400)
+      expect(alice.api(:get, "/games/#{game['id']}/log?limit=0")[0]).to eq(400)
+      expect(alice.api(:get, "/games/999/log")[0]).to eq(404)
+      expect(ApiClient.new(Sinatra::Application).api(:get, "/games/#{game['id']}/log")[0]).to eq(401)
     end
 
     it "returns 404 JSON for unknown games" do
@@ -188,7 +223,11 @@ RSpec.describe "games API (#36)" do
         expect(status).to eq(200), body.inspect
         expect(body["seq"]).to eq(n + 1)
         expect(body["state"]["meta"]["seq"]).to eq(n + 1)
-        expect(alice.api(:get, "/games/#{id}/version")[1]["seq"]).to eq(n + 1)
+        _, version = alice.api(:get, "/games/#{id}/version")
+        expect(version["seq"]).to eq(n + 1)
+        expect(version["acting"]).to eq(body["state"]["meta"]["active_players"])
+        expect(version["round"]).to eq(body["state"]["meta"]["round"].slice("type", "number", "turn"))
+        expect(version["viewer_to_act"]).to eq(body["state"]["meta"]["active_players"].include?("p0"))
       end
 
       _, log = alice.api(:get, "/games/#{id}/actions")
@@ -327,6 +366,15 @@ RSpec.describe "games API with bot seats (#39)" do
     expect(status).to eq(200)
     expect(after["seq"]).to be >= before_seq + 3 # the human's move and both bots' replies
     expect(after["state"]["prompt"]["viewer_to_act"]).to be(true)
+    # after the bots' moves /version tells the human it is their turn again (#152)
+    _, version = alice.api(:get, "/games/#{game['id']}/version")
+    expect(version).to include("seq" => after["seq"], "viewer_to_act" => true)
+    _, listed = alice.api(:get, "/games")
+    expect(listed["games"].first).to include("viewer_to_act" => true)
+    # log?from= gives exactly the lines of the later actions
+    _, page = alice.api(:get, "/games/#{game['id']}/log?from=#{before_seq}")
+    expect(page["lines"].map { |l| l["action"] }.min).to be > before_seq
+    expect(page["lines"].map { |l| l["action"] }).to eq(after["state"]["log"].map { |l| l["action"] }.select { |a| a > before_seq })
 
     _, log = alice.api(:get, "/games/#{game['id']}/actions")
     expect(log["actions"].map { |a| a["actor"] }.uniq.sort).to eq(%w[alice bot:1 bot:2])
