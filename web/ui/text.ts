@@ -168,6 +168,20 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "error.internal_error": e("Interner Fehler", "Internal error", "—"),
   "error.network": e("Keine Verbindung zum Server", "Network error", "—"),
 
+  // --- Meldungen der Fehlerbehandlung (ui-spec §3.6, #162) -------------------
+  // `{n}` und `{message}` ersetzt der Code; der Engine-Text selbst bleibt unverändert englisch.
+  "msg.rejected": e("Nicht erlaubt: {message}", "Not allowed: {message}", "—"),
+  "msg.conflict": e("Der Spielstand hat sich geändert, bitte neu wählen.", "State changed, choose again", "—"),
+  "msg.not_your_turn": e("Du bist gerade nicht am Zug.", "You are not to act right now", "—"),
+  "msg.bad_request": e("Programmfehler: {message}", "Program error: {message}", "—"),
+  "msg.server_error": e("Serverfehler: {message}", "Server error: {message}", "—"),
+  "msg.network_band": e("Keine Verbindung, neuer Versuch in {n} s", "No connection, retrying in {n} s", "—"),
+  "msg.network_retry": e("Jetzt", "Retry now", "—"),
+  "msg.network_action": e("Keine Verbindung, die Aktion wurde nicht gesendet. Auswahl bleibt.", "No connection, action not sent", "—"),
+  "msg.not_found_title": e("Partie nicht gefunden", "Game not found", "—"),
+  "msg.not_found_link": e("Zur Liste der Partien", "Back to the list of games", "—"),
+  "msg.sending": e("…", "Waiting for the server", "—"),
+
   // --- Regelverweise ---------------------------------------------------------
   "ref.§4": e("Regelwerk §4: Aktienmarkt", "Rulebook section 4: Stock Market", "§4"),
   "ref.§4.4": e("Regelwerk §4.4: Kursmarke", "Rulebook section 4.4: Share Value Marker Movement", "§4.4"),

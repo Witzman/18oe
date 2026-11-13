@@ -7,6 +7,10 @@ export interface PollerOptions {
   onGame: (game: Game) => void;
   onError?: (e: ApiError) => void;
   onUnauthorized?: () => void;
+  // A check or load worked (clears the "no connection" band).
+  onOk?: () => void;
+  // The last check failed; the next attempt follows in `ms` (drives the countdown band).
+  onRetryIn?: (ms: number) => void;
   isVisible?: () => boolean;
   intervalMs?: number;
   setTimer?: (fn: () => void, ms: number) => unknown;
@@ -27,11 +31,15 @@ export function createPoller(opts: PollerOptions) {
   const is = (s: PollState) => (state as PollState) === s;
   let lastSeq: number | null = null;
   let handle: unknown = null;
+  // >0 while the player's own action is in flight (#162: the poller pauses during sending).
+  let paused = 0;
+  let failed = false;
 
   function schedule() {
     if (is("stopped")) return;
     state = "waiting";
     handle = setTimer(() => void tick(), interval);
+    if (failed) opts.onRetryIn?.(interval);
   }
 
   // One check; used by the timer, on first start and on "tab visible again".
@@ -39,7 +47,7 @@ export function createPoller(opts: PollerOptions) {
     if (is("stopped") || is("checking") || is("loading")) return;
     if (handle !== null) clearTimer(handle);
     handle = null;
-    if (!visible() && !force) return schedule();
+    if (paused > 0 || (!visible() && !force)) return schedule();
     try {
       state = "checking";
       const v = await opts.api.version(opts.gameId);
@@ -51,6 +59,8 @@ export function createPoller(opts: PollerOptions) {
         lastSeq = game.seq;
         opts.onGame(game);
       }
+      failed = false;
+      opts.onOk?.();
     } catch (e) {
       if (is("stopped")) return;
       const err = e instanceof ApiError ? e : new ApiError(0, "network", String(e));
@@ -59,6 +69,7 @@ export function createPoller(opts: PollerOptions) {
         opts.onUnauthorized?.();
         return;
       }
+      failed = err.status === 0;
       opts.onError?.(err);
     }
     schedule();
@@ -82,5 +93,10 @@ export function createPoller(opts: PollerOptions) {
     opts.onGame(game);
   }
 
-  return { start, stop, tick: () => tick(), adopt, get state() { return state; }, get lastSeq() { return lastSeq; } };
+  // Pause/resume around a sent action. A check that is already running finishes; its result is
+  // harmless because the action's answer (full state) goes through adopt() afterwards.
+  function pause() { paused++; }
+  function resume() { paused = Math.max(0, paused - 1); }
+
+  return { start, stop, pause, resume, get paused() { return paused > 0; }, tick: () => tick(), adopt, get state() { return state; }, get lastSeq() { return lastSeq; } };
 }
