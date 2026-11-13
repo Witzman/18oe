@@ -15,13 +15,16 @@
 // Built here: sea and land plates in theme colours, hex lines, province borders, terrain signs
 // with costs, tile surfaces with per-hex redraw, hover and valid targets, pan/zoom/centre/fly,
 // block culling, redraw on oe:themechange. Stored but drawn by later issues: setPreview (#48),
-// setLayers apart from terrainCost (#151), showRoutes (#155), cities and the "city" event (#147),
-// walls (#145), labels (#149).
+// setLayers apart from terrainCost (#151), showRoutes (#155), labels (#149).
+// Walls (#145): one container per level in the walls layer, drawn in unit screen coordinates
+// (zoom 1, pan 0) and carried by position = pan, scale = zoom; redrawn in build() (theme or tile
+// height change), not on pan or zoom. A laid tile raises its hex by heightTile: when the set of
+// tiled hexes changes, setState rebuilds the scene.
 import { Application, Container, Graphics, Matrix, RenderLayer, Text } from "pixi.js";
 import type { Game, GameState, HexChange } from "../types.ts";
 import { THEME_CHANGED } from "../ui/theme-switch.ts";
 import { between, centerOn, clampPan, fit, frame, panBy, zoomAt, zoomStage, Z1_FROM, Z2_FROM, type Viewport } from "./camera.ts";
-import { drawGrid, drawPlate, type Block } from "./layers/static.ts";
+import { drawGrid, drawPlate, drawWalls, type Block } from "./layers/static.ts";
 import { drawTileSurface } from "./layers/tiles.ts";
 import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
 import { drawNodes, drawTargetCity, inkOn, makeToken, type Ring } from "./layers/nodes.ts";
@@ -149,6 +152,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let scene!: Scene;
   let levelRL: RenderLayer[] = [];
   let levelNodes: Record<Leveled, Container[]> = { land: [], grid: [], tiles: [], overlay: [] };
+  let wallNodes: Container[] = [];
   let seaLevel!: Container;
   let seaMarksLevel!: Container;
   let blocks: Block[] = [];
@@ -194,11 +198,15 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
 
   function build() {
     clearLayers();
-    scene = buildScene(geometry, theme);
     printed = new Map(geometry.hexes.filter((h) => h.color && h.color !== "white" && h.color !== "blue").map((h) => [h.id, h.color!]));
+    scene = buildScene(geometry, theme, tiledHexes());
+    const c = mapCenter(scene.grid);
+    view = { ...view, centerX: c.x, centerY: c.y };
     seaLevel = layers.sea.addChild(new Container({ label: "level0" }));
     seaMarksLevel = layers.seaMarks.addChild(new Container({ label: "level0" }));
     levelNodes = { land: [], grid: [], tiles: [], overlay: [] };
+    wallNodes = [];
+    const wallGraphics = drawWalls(scene, { ...view, zoom: 1, panX: 0, panY: 0 }, theme);
     scene.levels.forEach((z, i) => {
       const rl = new RenderLayer();
       app.stage.addChildAt(rl, 2 + i);
@@ -207,6 +215,13 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
         const c = layers[n].addChild(new Container({ label: `level${i} z=${z}` }));
         levelNodes[n].push(c);
         rl.attach(c);
+        if (n === "land") {
+          // The walls of this level come right after its tops: higher hexes cover them, lower ones do not.
+          const w = layers.walls.addChild(new Container({ label: `walls${i} z=${z}` }));
+          w.addChild(wallGraphics[i]!);
+          wallNodes.push(w);
+          rl.attach(w);
+        }
       }
     });
     blocks = [];
@@ -248,6 +263,16 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       costs.push({ id: g.id, text, at: { x: g.x + COST_AT.x, y: g.y + COST_AT.y }, z: g.z });
     }
     app.renderer.background.color = theme.ui.bg;
+  }
+
+  /** Hexes raised by a laid tile, with the tile colour. ASSUMPTION: an entry whose colour differs from the printed one (so a hex that only reports its printed tile because of tokens stays low). */
+  function tiledHexes(): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const [id, e] of entries) {
+      const color = e.tile.color;
+      if (color && color !== "white" && color !== "blue" && color !== printed.get(id)) out.set(id, color);
+    }
+    return out;
   }
 
   const hasNodes = (p: TileParts) => !!(p.cities?.length || p.towns?.length || p.double_towns?.length || p.offboards?.length);
@@ -443,6 +468,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     seaLevel.setFromMatrix(mats[0]!);
     seaMarksLevel.setFromMatrix(mats[0]!);
     for (const n of LEVELED) levelNodes[n].forEach((c, i) => c.setFromMatrix(mats[i]!));
+    for (const w of wallNodes) { w.position.set(view.panX, view.panY); w.scale.set(view.zoom); }
     const stage = zoomStage(view.zoom);
     for (const t of trackNodes.values()) setTrackStage(t, stage);
     let visible = 0;
@@ -674,8 +700,6 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
 
   // ---- first build -------------------------------------------------------------------------
   build();
-  const c = mapCenter(scene.grid);
-  view = { ...view, centerX: c.x, centerY: c.y };
   fitView();
   await rendered();
   stats.buildMs = performance.now() - t0;
@@ -690,8 +714,16 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       const changed = [...new Set([...changedHexes(sigs, next), ...changedHexes(nodeSigs, nextNodes)])];
       sigs = next;
       nodeSigs = nextNodes;
-      changed.forEach(drawTile);
-      stats.stateHexes = changed.length;
+      const tiled = tiledHexes();
+      if (tiled.size !== scene.tiled.size || [...tiled].some(([id, c]) => scene.tiled.get(id) !== c)) {
+        // The set of raised hexes changed: heights, levels and walls change with it.
+        build();
+        stats.stateHexes = geometry.hexes.length;
+        setView(view);
+      } else {
+        changed.forEach(drawTile);
+        stats.stateHexes = changed.length;
+      }
       render();
       void rendered().then(() => { stats.stateMs = performance.now() - t; });
     },

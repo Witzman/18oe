@@ -75,14 +75,22 @@ const CHECKS = String.raw`(async () => {
   clicked = null; ev("pointerdown", at); ev("pointerup", at);
   if (clicked !== "R55") fail("after zoom the pointer is over " + clicked);
 
-  // setState redraws only changed hexes.
+  // setState redraws only changed hexes, except that a change in the set or colour of the raised
+  // (tiled) hexes rebuilds the scene (heights, levels and walls: #145), reported as every hex.
   const game = (map) => ({ meta: { current: null }, corporations: [], map });
   const t = (hex, name, color, rotation = 0) => ({ hex, tile: { name, rotation, color } });
   m.setState(game([t("Q30", "57", "yellow"), t("R55", "57", "yellow")]));
-  if (m.stats().stateHexes !== 2) fail("first state " + m.stats().stateHexes);
+  if (m.stats().stateHexes !== 1492) fail("first state " + m.stats().stateHexes);
+  const lvl = m.scene.levels.length;
+  if (!m.scene.tiled.has("Q30")) fail("Q30 not raised by its tile");
+  m.setState(game([t("Q30", "57", "yellow")]));
+  m.setState(game([t("Q30", "57", "yellow"), t("R55", "57", "yellow")]));
   m.setState(game([t("Q30", "57", "yellow"), t("R55", "57", "yellow")]));
   if (m.stats().stateHexes !== 0) fail("same state " + m.stats().stateHexes);
   m.setState(game([t("Q30", "57", "yellow"), t("R55", "15", "green", 2)]));
+  if (m.stats().stateHexes !== 1492) fail("colour change rebuilds " + m.stats().stateHexes);
+  if (m.scene.levels.length < lvl) fail("levels lost");
+  m.setState(game([t("Q30", "57", "yellow"), t("R55", "15", "green", 3)]));
   if (m.stats().stateHexes !== 1) fail("one change " + m.stats().stateHexes);
   await m.rendered();
   if (!(m.stats().stateMs >= 0)) fail("stateMs");
