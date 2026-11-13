@@ -26,7 +26,7 @@ export function mapDevParams(hash: string): { src: string | null; pitch?: number
 export function mapDevPage(api: Api, hash: string): { root: HTMLElement; ready: Promise<MapView | null>; stop: () => void } {
   const p = mapDevParams(hash);
   const root = h("div", { class: "map-dev" });
-  const status = h("p", { class: "map-dev-status" }, "Karte lädt …");
+  const status = h("p", { class: "map-dev-status" }, "Loading map …");
   root.append(status);
   let map: MapView | null = null;
   let stopped = false;
