@@ -90,10 +90,13 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
     if (Math.abs(dx - 120) > 25 || Math.abs(dy - 60) > 15) fail("pan " + dx + "," + dy);
     if (picker()) fail("list after drag");
     // Fast flick: the view keeps moving after the finger lifted (inertia), then stops.
-    const f0 = m.view;
-    await window.oeTouch("start", [abs({ x: 300, y: 300 })]); await sleep(10);
-    for (let i = 1; i <= 5; i++) { await window.oeTouch("move", [abs({ x: 300 + i * 30, y: 300 })]); await sleep(8); }
-    await window.oeTouch("end", []);
+    // (zoomed in, so the map edge does not clamp the glide)
+    c.dispatchEvent(new WheelEvent("wheel", { deltaY: -800, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, bubbles: true, cancelable: true })); await m.rendered();
+    // The CDP round trip is slower than a real finger's 60 Hz, so the flick is sent as touch pointer events with real-time spacing.
+    const te = (type, x) => c.dispatchEvent(new PointerEvent(type, { clientX: box.left + x, clientY: box.top + 300, pointerId: 7, pointerType: "touch", isPrimary: true, bubbles: true }));
+    te("pointerdown", 300);
+    for (let i = 1; i <= 6; i++) { await sleep(16); te("pointermove", 300 + i * 30); }
+    te("pointerup", 480);
     const atRelease = m.view.panX;
     await sleep(500); await m.rendered();
     if (!(m.view.panX > atRelease + 5)) fail("no inertia: " + atRelease + " -> " + m.view.panX);
