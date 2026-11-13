@@ -35,6 +35,32 @@ Note: in the agent sandbox only the headless *shell* starts (`AF_UNIX` sockets a
 the full `chromium` needs one); WebGL runs in software (SwiftShader). The smoke test in
 `web/test/shot.test.ts` is skipped when no browser is installed.
 
+### iPad profile (#260)
+
+```sh
+bin/shot web/dist/index.html#/map?src=/map.json out.png --device ipad --orientation portrait
+cd web && node --test test/ipad-browser.test.ts     # map scene under iPad profile, both orientations
+```
+
+`--device ipad` (iPad Pro 11, 834x1194) or `ipad-10.2` (810x1080), `--orientation landscape|portrait`:
+viewport, devicePixelRatio 2, mobile, touch emulation, iPad Safari user agent. In `--eval`,
+`await window.oeTouch("start"|"move"|"end", [{x,y,id}])` sends real touch input (taps, two-finger pinch).
+
+**Engine status: real WebKit does NOT run in the agent sandbox yet; the iPad profile currently runs on
+Chromium and is an APPROXIMATION** (right size/DPR/touch/UA, but Chromium's rendering, WebGL, viewport
+units and touch handling, not Safari's; the real iPad stays the owner's playtest). `--engine auto` (default)
+tries WebKit first and says on stderr which engine was used; `--engine webkit` fails instead of falling back.
+
+Real WebKit setup (done once; the pieces except the system libraries are in place on this machine):
+`mkdir -p .tools/pw && cd .tools/pw && npm i playwright-core@1.65.0 && PLAYWRIGHT_BROWSERS_PATH=$PWD/browsers node node_modules/playwright-core/cli.js install webkit`
+(hosts: registry.npmjs.org, cdn.playwright.dev). WebKit then needs ~124 Debian system packages
+(`sudo node node_modules/playwright-core/cli.js install-deps webkit`, root); list: `... install-deps --dry-run webkit`.
+In the WebKit engine only `oeTouch("tap", [{x,y}])` exists.
+
+**One browser at a time:** `bin/shot` (and so every browser test) takes the machine-wide
+`flock` on `tmp/heavy.lock` of the main `18oe` checkout before it starts a browser; other heavy jobs
+use `flock /home/witzman/18oe/tmp/heavy.lock <command>`. `OE_HEAVY_LOCK_HELD=1` skips it if you already hold it.
+
 ## Rules engine
 
 `lib/engine/` is the rules engine, extracted from the open-source
