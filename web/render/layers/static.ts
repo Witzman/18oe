@@ -2,10 +2,10 @@
 // terrain signs. Drawn per block of 8 x 8 hexes in flat world coordinates; the level container
 // above carries the camera matrix. Redrawn only on a theme change.
 import { Container, Graphics } from "pixi.js";
-import { worldCorners, type Vec } from "../projection.ts";
+import { worldCorners, type Vec, type View } from "../projection.ts";
 import {
-  BLOCK, blockKey, GLYPH_AT, gridEdges, rimColor, terrainGlyph, terrainMark, topColor, zoneSegments,
-  type Plate, type Scene,
+  BLOCK, blockKey, GLYPH_AT, gridEdges, terrainGlyph, terrainMark, topColor, zoneSegments,
+  wallFaces, type Plate, type Scene,
 } from "../scene.ts";
 import type { RenderTheme } from "../theme.ts";
 import type { Box } from "../projection.ts";
@@ -21,17 +21,29 @@ export interface Block {
 
 const flat = (ps: Vec[]) => ps.flatMap((p) => [p.x, p.y]);
 
-/** A plate: every hex of the block whose column reaches the level, top colour or rim colour. */
+/** A plate: the tops of the hexes of one block on one level (the walls between levels are drawWalls). */
 export function drawPlate(scene: Scene, plate: Plate, theme: RenderTheme): Block {
   const g = new Graphics();
   for (const h of plate.hexes) {
     const hex = scene.hexById.get(h.id)!;
-    const color = scene.levelOf.get(h.id) === plate.level
-      ? topColor(hex, h, theme.map, scene.bounds)
-      : rimColor(hex, h, plate.level, theme.map, scene.bounds, theme.camera.wallShade);
-    g.poly(flat(worldCorners(scene.grid, h))).fill({ color });
+    g.poly(flat(worldCorners(scene.grid, h))).fill({ color: topColor(hex, h, theme.map, scene.bounds) });
   }
   return { level: plate.level, box: plate.box, node: g };
+}
+
+/**
+ * Wall layer (#145): one Graphics per height level with the front faces of the hexes of that level,
+ * back to front, in screen units of `unit` (the view with zoom 1 and pan 0). The level container
+ * carries position = pan and scale = zoom, so the faces are redrawn only when pitch, yaw or the
+ * theme change, not when the camera pans or zooms. Empty at pitch 0.
+ */
+export function drawWalls(scene: Scene, unit: View, theme: RenderTheme): Graphics[] {
+  const out = scene.levels.map(() => new Graphics());
+  for (const f of wallFaces(scene, unit, theme)) {
+    // A hairline in the face colour closes the seams between neighbouring faces under anti-aliasing.
+    out[f.level]!.poly(flat(f.polygon)).fill({ color: f.color }).stroke({ width: 0.012, color: f.color, join: "round" });
+  }
+  return out;
 }
 
 /**

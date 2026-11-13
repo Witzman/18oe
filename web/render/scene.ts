@@ -2,12 +2,11 @@
 // layer modules turn this into Graphics, the tests check it under `node --test`.
 //
 // The map is a model on a table: the sea is the lowest plate (z = 0), land is a raised plate,
-// hills and mountains are raised further. Every height level is drawn as a plate under all hexes
-// that reach at least that high, so between two levels the lower plate shows as a darker rim
-// (in the colour of the hex above, shaded by camera.wallShade). That stands in for the walls
-// until #145 draws real ones; the walls layer stays empty here.
+// hills and mountains are raised further, a laid tile adds heightTile (#145). A plate is the
+// top of the hexes of one height level in one block. The walls (#145, wallFaces) are the front
+// faces between a hex and its lower neighbours, drawn per level so a higher hex covers them.
 import { hexHeight, type MapGeometry, type MapHex } from "./mapdata.ts";
-import { apply, buildGrid, levelMatrix, worldCorners, type Box, type GridHex, type HexGrid, type Vec, type View } from "./projection.ts";
+import { apply, buildGrid, levelMatrix, walls, worldCorners, type Box, type GridHex, type HexGrid, type Vec, type View } from "./projection.ts";
 import type { RenderTheme } from "./theme.ts";
 
 /** Hexes per block side (ui-spec 2.3): static layers are drawn, culled and cached per block. */
@@ -26,7 +25,7 @@ export interface Plate {
   /** Index into Scene.levels. */
   level: number;
   block: string;
-  /** Hexes whose column reaches this level (top >= level). */
+  /** Hexes whose top is on this level. */
   hexes: GridHex[];
   /** World box around the hexes' corners. */
   box: Box;
@@ -42,6 +41,8 @@ export interface Scene {
   plates: Plate[];
   /** World box around every hex. */
   bounds: Box;
+  /** Hexes raised by a laid tile (#145), with the colour name of that tile. */
+  tiled: ReadonlyMap<string, string>;
 }
 
 function emptyBox(): Box {
@@ -55,10 +56,10 @@ function grow(box: Box, p: Vec): void {
   if (p.y > box.maxY) box.maxY = p.y;
 }
 
-/** Heights from the theme camera (ui-spec 2.4). Laid tiles do not raise a hex yet (heightTile is #145). */
-export function buildScene(geometry: MapGeometry, theme: Pick<RenderTheme, "camera">): Scene {
+/** Heights from the theme camera (ui-spec 2.4); `tiled` = hexes with a laid tile, which stand heightTile higher. */
+export function buildScene(geometry: MapGeometry, theme: Pick<RenderTheme, "camera">, tiled: ReadonlyMap<string, string> = new Map()): Scene {
   const hexById = new Map(geometry.hexes.map((h) => [h.id, h]));
-  const grid = buildGrid(geometry.hexes, geometry.layout.edge_vectors, (id) => hexHeight(hexById.get(id)!, theme.camera));
+  const grid = buildGrid(geometry.hexes, geometry.layout.edge_vectors, (id) => hexHeight(hexById.get(id)!, theme.camera, tiled.has(id)));
   const levels = [...grid.levels].sort((a, b) => a - b);
   if (levels[0] !== 0) levels.unshift(0);
   const levelOf = new Map(grid.hexes.map((h) => [h.id, levels.indexOf(h.z)]));
@@ -68,16 +69,15 @@ export function buildScene(geometry: MapGeometry, theme: Pick<RenderTheme, "came
     const corners = worldCorners(grid, h);
     corners.forEach((p) => grow(bounds, p));
     const key = blockKey(h);
-    for (let l = 0; l <= levelOf.get(h.id)!; l++) {
-      const k = `${l}/${key}`;
-      let plate = byKey.get(k);
-      if (!plate) byKey.set(k, (plate = { level: l, block: key, hexes: [], box: emptyBox() }));
-      plate.hexes.push(h);
-      corners.forEach((p) => grow(plate!.box, p));
-    }
+    const l = levelOf.get(h.id)!;
+    const k = `${l}/${key}`;
+    let plate = byKey.get(k);
+    if (!plate) byKey.set(k, (plate = { level: l, block: key, hexes: [], box: emptyBox() }));
+    plate.hexes.push(h);
+    corners.forEach((p) => grow(plate!.box, p));
   }
   const plates = [...byKey.values()].sort((a, b) => a.level - b.level || a.block.localeCompare(b.block));
-  return { geometry, grid, hexById, levels, levelOf, plates, bounds };
+  return { geometry, grid, hexById, levels, levelOf, plates, bounds, tiled };
 }
 
 // ---------------------------------------------------------------------------
@@ -125,13 +125,89 @@ export function topColor(hex: MapHex, gridHex: GridHex, map: MapColors, bounds: 
   return map.land;
 }
 
+const TILE_COLOR = { yellow: "tileYellow", green: "tileGreen", brown: "tileBrown", gray: "tileGray", red: "tileRed" } as const;
+
+/** Surface colour of a tile colour name (map.tile<Colour>), null for tiles without a coloured surface. */
+export function tileColor(color: string | undefined, map: MapColors): number | null {
+  const key = TILE_COLOR[color as keyof typeof TILE_COLOR];
+  return key ? map[key] : null;
+}
+
+// ---------------------------------------------------------------------------
+// Walls (#145, ui-spec 2.4)
+
+/** Brightness change of a wall by its angle to the light, at most +-this (ui-spec 2.4). */
+export const WALL_LIGHT = 0.1;
+
 /**
- * Colour of a hex on a plate below its top: the rim between two levels. The sea plate under land
- * is the coast (map.landLow), higher plates use the top colour; both shaded by wallShade.
+ * Light on a wall: cos of the angle between its outward normal and the direction towards the
+ * light (camera.lightAzimuth, degrees, same convention as the token shadow: the light lies at
+ * (cos az, sin az) in world x/y). Facing the light = 1, away = -1.
  */
-export function rimColor(hex: MapHex, gridHex: GridHex, level: number, map: MapColors, bounds: Box, wallShade: number): number {
-  const base = level === 0 ? map.landLow : topColor(hex, gridHex, map, bounds);
-  return shade(base, wallShade);
+export function wallLight(normal: Vec, azimuth: number): number {
+  const az = (azimuth * Math.PI) / 180;
+  const len = Math.hypot(normal.x, normal.y) || 1;
+  return (normal.x * Math.cos(az) + normal.y * Math.sin(az)) / len;
+}
+
+/** Colour of a wall face: base darkened by wallShade, then lightened or darkened by up to WALL_LIGHT by the light. */
+export function wallColor(base: number, wallShade: number, light: number): number {
+  const c = shade(base, wallShade);
+  return light >= 0 ? mix(c, 0xffffff, WALL_LIGHT * light) : mix(c, 0x000000, -WALL_LIGHT * light);
+}
+
+export interface WallFace {
+  hex: string;
+  edge: number;
+  /** Index into Scene.levels of the hex (the level container the face is drawn in). */
+  level: number;
+  /** Screen polygon of the view given to wallFaces (top corner A, B, foot B, A). */
+  polygon: Vec[];
+  color: number;
+  /** Back to front, ascending. */
+  depth: number;
+}
+
+/**
+ * The visible wall faces of the whole map for a view (none at pitch 0). A wall runs from the hex
+ * top down to the lower neighbour's top (0 at the map border) and is split where its colour
+ * changes: the tile slab in the tile's colour, the part below heightLand next to the sea in
+ * map.landLow (the coast), the rest in the hex top colour; all darkened by wallShade and lit by
+ * the light direction. Pass a view with zoom 1 and pan 0 to get unit coordinates.
+ */
+export function wallFaces(scene: Scene, view: View, theme: Pick<RenderTheme, "camera" | "map">): WallFace[] {
+  const out: WallFace[] = [];
+  const { camera, map } = theme;
+  const eps = 1e-9;
+  const edges = scene.grid.shape.edges;
+  for (const h of scene.grid.hexes) {
+    const hex = scene.hexById.get(h.id)!;
+    const tileName = scene.tiled.get(h.id);
+    const ground = tileName === undefined ? h.z : h.z - camera.heightTile;
+    const slab = tileName === undefined ? null : tileColor(tileName, map);
+    const corners = worldCorners(scene.grid, h);
+    for (const w of walls(scene.grid, view, h)) {
+      const breaks = [...new Set([w.bottom, h.z, ...scene.levels, camera.heightLand, ground])]
+        .filter((z) => z >= w.bottom - eps && z <= h.z + eps).sort((a, b) => a - b);
+      const a = corners[(w.edge + 5) % 6]!, b = corners[w.edge]!;
+      const e = edges[w.edge]!;
+      const light = wallLight(e, camera.lightAzimuth);
+      for (let i = 0; i + 1 < breaks.length; i++) {
+        const lo = breaks[i]!, hi = breaks[i + 1]!;
+        if (hi - lo < eps) continue;
+        const base = slab !== null && lo >= ground - eps ? slab
+          : w.bottom === 0 && hi <= camera.heightLand + eps ? map.landLow
+          : topColor(hex, h, map, scene.bounds);
+        const mlo = levelMatrix(view, lo), mhi = levelMatrix(view, hi);
+        out.push({
+          hex: h.id, edge: w.edge, level: scene.levelOf.get(h.id)!,
+          polygon: [apply(mhi, a), apply(mhi, b), apply(mlo, b), apply(mlo, a)],
+          color: wallColor(base, camera.wallShade, light), depth: w.depth,
+        });
+      }
+    }
+  }
+  return out.sort((p, q) => p.depth - q.depth);
 }
 
 // ---------------------------------------------------------------------------

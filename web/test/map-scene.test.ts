@@ -15,7 +15,7 @@ import {
 import type { MapGeometry, MapHex } from "../render/mapdata.ts";
 import { levelMatrix, mapCenter, pick, project, unproject, worldCorners, type View } from "../render/projection.ts";
 import {
-  BLOCK, blockKey, boxOnScreen, buildScene, engineVertexToCorner, gridEdges, mix, rimColor, seaT, shade,
+  BLOCK, blockKey, boxOnScreen, buildScene, engineVertexToCorner, gridEdges, mix, seaT, shade,
   terrainGlyph, terrainMark, topColor, zoneSegments,
 } from "../render/scene.ts";
 import { renderTheme } from "../render/theme.ts";
@@ -37,11 +37,11 @@ test("levels: sea at 0, then land, hill, mountain from the theme, ascending", ()
   for (const h of scene.grid.hexes) assert.equal(scene.levels[scene.levelOf.get(h.id)!], h.z, h.id);
 });
 
-test("plates: every hex sits on each plate up to its own level, in one 8 x 8 block", () => {
+test("plates: every hex sits on exactly the plate of its own level, in one 8 x 8 block", () => {
   const count = new Map<string, number>();
   for (const p of scene.plates) {
     for (const h of p.hexes) {
-      assert.ok(scene.levelOf.get(h.id)! >= p.level, `${h.id} on plate ${p.level}`);
+      assert.equal(scene.levelOf.get(h.id), p.level, `${h.id} on plate ${p.level}`);
       assert.equal(blockKey(h), p.block);
       count.set(h.id, (count.get(h.id) ?? 0) + 1);
     }
@@ -52,9 +52,8 @@ test("plates: every hex sits on each plate up to its own level, in one 8 x 8 blo
       assert.ok(q.x >= p.box.minX - 1e-9 && q.x <= p.box.maxX + 1e-9 && q.y >= p.box.minY - 1e-9 && q.y <= p.box.maxY + 1e-9);
     }
   }
-  for (const h of scene.grid.hexes) assert.equal(count.get(h.id), scene.levelOf.get(h.id)! + 1, h.id);
+  for (const h of scene.grid.hexes) assert.equal(count.get(h.id), 1, h.id);
   const blocks = new Set(scene.grid.hexes.map(blockKey));
-  assert.equal(scene.plates.filter((p) => p.level === 0).length, blocks.size, "the sea plate covers every block");
   assert.ok(blocks.size >= 25 && blocks.size <= 40, `${blocks.size} blocks`);
 });
 
@@ -74,7 +73,6 @@ test("colours come from the theme: sea gradient north-west deep to south-east sh
         const kind = terrainMark(h)?.kind;
         assert.equal(c, kind === "mountain" ? m.mountain : kind === "hill" ? m.hill : kind === "water" ? m.water : m.land, h.id);
       }
-      assert.equal(rimColor(h, g, 0, m, scene.bounds, 0.5), shade(m.landLow, 0.5));
     }
   }
   assert.equal(shade(0xffffff, 0.5), 0x808080);
