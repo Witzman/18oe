@@ -44,13 +44,17 @@ export const NUMBER_RANGES = {
     gauge: [0.02, 0.3], railWidth: [0.005, 0.08], sleeperSpacing: [0.03, 0.3],
     sleeperLength: [0.05, 0.5], sleeperWidth: [0.01, 0.1], bedWidth: [0.05, 0.6],
   },
-  motion: { runMsPerHex: [50, 1000], runMaxMs: [500, 20000], queueMaxMs: [500, 30000], flashMs: [100, 2000], flyMs: [0, 3000] },
+  motion: { runMsPerHex: [50, 1000], runMaxMs: [500, 20000], queueMaxMs: [500, 30000], flashMs: [100, 2000], flyMs: [0, 3000],
+    // Touch (#259): decay time constant of the pan inertia, window of a double tap (ms).
+    inertiaMs: [0, 2000], doubleTapMs: [100, 800] },
   shape: {
     hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24],
     // Map strokes in hex side lengths (they scale with the map like printed lines), alpha 0..1 (#44).
     zoneLine: [0.01, 0.3], focusLine: [0.01, 0.3], targetAlpha: [0, 1],
     // Cities, towns and tokens (#147), in side lengths: slot circle, token cylinder, town bar.
     slotRadius: [0.05, 0.35], tokenRadius: [0.04, 0.3], townLength: [0.1, 0.6], townWidth: [0.02, 0.2],
+    // Hit radius and drag threshold in px (#259): mouse and touch. 22 px radius = Apple's 44 px minimum target.
+    hitPx: [4, 40], hitTouchPx: [16, 48], dragPx: [1, 20], dragTouchPx: [4, 30],
   },
 } as const satisfies Record<string, Record<string, readonly [number, number]>>;
 

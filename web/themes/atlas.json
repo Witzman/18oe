@@ -286,6 +286,8 @@
     "queueMaxMs": 9000,
     "flashMs": 600,
     "flyMs": 500,
+    "inertiaMs": 350,
+    "doubleTapMs": 300,
     "enabled": true
   },
   "shape": {
@@ -303,6 +305,10 @@
     "slotRadius": 0.2,
     "tokenRadius": 0.165,
     "townLength": 0.34,
-    "townWidth": 0.07
+    "townWidth": 0.07,
+    "hitPx": 12,
+    "hitTouchPx": 22,
+    "dragPx": 4,
+    "dragTouchPx": 10
   }
 }

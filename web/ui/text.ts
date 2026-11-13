@@ -193,6 +193,9 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "access.hint_password": e("Mindestens 8 Zeichen", "At least 8 characters", "—"),
   "access.hint_code": e("Den Code hast du vom Spielleiter erhalten.", "The code comes from the host", "—"),
   // Versionsangabe (#271)
+  "map.pick.title": e("Auswahl", "Selection", "—"),
+  "map.pick.hex": e("Feld {hex}", "Hex {hex}", "—"),
+  "map.pick.slot": e("Stadt {city}, Platz {slot}", "City {city}, slot {slot}", "—"),
   "version.label": e("Version", "Version", "—"),
   "version.line": e("Version {version} · Build {build} · Engine {engine}", "Version {version} · build {build} · engine {engine}", "—"),
   "version.title": e("Versionsangabe", "Version information", "—"),
