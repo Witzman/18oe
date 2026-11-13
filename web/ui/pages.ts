@@ -4,6 +4,7 @@ import { createGameFrame, type GameFrame } from "./frame/frame.ts";
 import { h } from "./dom.ts";
 import { lobbyPage } from "./lobby.ts";
 import { mountAuction } from "./panels/auction.ts";
+import { mountStock } from "./panels/stock.ts";
 import { txt } from "./text.ts";
 
 export interface Ctx {
@@ -25,5 +26,6 @@ export function notFoundPage(): HTMLElement {
 export function gameFrame(retryNow: () => void = () => {}): GameFrame {
   const frame = createGameFrame(retryNow);
   mountAuction(frame);
+  mountStock(frame);
   return frame;
 }
