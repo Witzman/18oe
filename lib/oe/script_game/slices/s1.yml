@@ -1,0 +1,25 @@
+# Target list of slice S1 (notes/reference/poc-slices.md): every combination
+# round / step / action type that must be executed through the API at least
+# once. "choose:<choice>" names the choice of a choose action.
+slice: S1
+combos:
+  - auction/WaterfallAuction/bid
+  - auction/WaterfallAuction/pass
+  - concession/Concession/par
+  - concession/HomeToken/place_token
+  - stock/BuySellParShares/par
+  - stock/BuySellParShares/buy_shares
+  - stock/BuySellParShares/pass
+  - stock/BuySellParShares/choose:remove_private
+  - stock/BuySellParShares/choose:flip_private
+  - stock/HomeToken/place_token
+  - stock/ReserveShare/choose:reserve
+  - stock/ReserveShare/pass
+  - operating/Track/lay_tile
+  - operating/Track/pass
+  - operating/Token/place_token
+  - operating/Token/pass
+  - operating/Route/run_routes
+  - operating/Dividend/dividend
+  - operating/BuyTrain/buy_train
+  - operating/BuyTrain/pass
