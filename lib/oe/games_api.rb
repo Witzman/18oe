@@ -93,7 +93,7 @@ module Oe
           kind = entry.is_a?(Hash) ? entry["kind"] : nil
           case kind
           when "human"
-            account = Accounts.find(entry["account_id"])
+            account = Accounts.find(store, entry["account_id"])
             halt api_error(422, "invalid_seats", "unknown account at seat #{i}") unless account
             humans << account["id"]
             { "seat" => i, "kind" => "human", "account_id" => account["id"], "name" => account["name"] }

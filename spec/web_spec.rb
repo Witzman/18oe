@@ -65,12 +65,9 @@ RSpec.describe "web frontend (#40)" do
     let(:keys) { JSON.parse(File.read(File.expand_path("../web/view-keys.json", __dir__))) }
 
     before do
-      ENV["OE_ACCESS_CODE"] = "sesame"
-      ENV.delete("OE_ACCOUNTS")
       Sinatra::Application.set :store, Oe::Store.new(":memory:")
+      seed_accounts(Sinatra::Application.settings.store, %w[alice])
     end
-
-    after { ENV.delete("OE_ACCESS_CODE") }
 
     def post_json(path, body)
       post path, JSON.generate(body), { "CONTENT_TYPE" => "application/json", "HTTP_HOST" => "127.0.0.1" }
@@ -78,7 +75,7 @@ RSpec.describe "web frontend (#40)" do
     end
 
     it "matches the key sets declared in web/view-keys.json (mirrors web/types.ts)" do
-      post_json("/login", { account: "alice", code: "sesame" })
+      post_json("/login", { login: "alice", password: TEST_PASSWORD })
       game = post_json("/games", { seats: [{ kind: "human", account_id: "alice" }, { kind: "bot" }, { kind: "bot" }], seed: 1 })
 
       expect(game.keys.sort).to eq(%w[id seats seq state status viewer])
