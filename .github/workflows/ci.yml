@@ -59,28 +59,14 @@ jobs:
       - name: headless Chrome wrapper
         run: |
           wrapper="$RUNNER_TEMP/chrome-headless"
-          printf '#!/bin/sh\nexec "%s" --headless=new --no-sandbox "$@"\n' "$(command -v google-chrome)" > "$wrapper"
+          printf '#!/bin/sh\nexec "%s" --headless=new --no-sandbox --disable-dev-shm-usage "$@"\n' "$(command -v google-chrome)" > "$wrapper"
           chmod +x "$wrapper"
           echo "OE_BROWSER=$wrapper" >> "$GITHUB_ENV"
           google-chrome --version
-      # The browser tests skip silently without a browser: here a skip is a failure, so a green check
-      # means they really ran. The counts stay visible in the log.
-      - name: browser tests (no skips allowed)
-        run: |
-          files=$(ls test/*.test.ts | grep -E '(-browser|^test/shot|^test/ipad)')
-          echo "$files"
-          set +e +o pipefail  # the runner shell is -e -o pipefail: keep going to report the result
-          node --test --test-concurrency=1 --test-reporter=tap $files 2>&1 | tee "$RUNNER_TEMP/browser.tap"
-          status=${PIPESTATUS[0]}
-          grep -E '^# (tests|pass|fail|skipped) ' "$RUNNER_TEMP/browser.tap"
-          # Failing and skipped tests also as annotations (readable without the raw log).
-          grep -E '^ *(not ok|ok .*# SKIP)' "$RUNNER_TEMP/browser.tap" | head -30 | while IFS= read -r l; do echo "::error::${l:0:300}"; done
-          # stderr of the page checks (bin/shot) is in the same stream
-          grep -a -i -E 'bin/shot|timeout|timed out|check|expected|fail|webgl|no browser' "$RUNNER_TEMP/browser.tap" | grep -v -E '^ *(ok|not ok|#|duration)' | cut -c1-240 | head -25 | while IFS= read -r l; do echo "::warning::stderr: $l"; done
-          grep -E -A14 '^ *not ok' "$RUNNER_TEMP/browser.tap" | grep -v -E '^ *(duration_ms|type|location|stack|at )' | cut -c1-240 | head -60 | while IFS= read -r l; do echo "::warning::$l"; done
-          if ! grep -q '^# skipped 0$' "$RUNNER_TEMP/browser.tap"; then echo "::error::browser tests were skipped"; exit 1; fi
-          if grep -q '^# tests 0$' "$RUNNER_TEMP/browser.tap"; then echo "::error::no browser tests ran"; exit 1; fi
-          exit $status
+      # The browser tests skip silently without a browser: here a skip is a failure. One node process per
+      # file, a failing file is retried once; first failures stay visible as annotations (.github/scripts).
+      - name: browser tests (no skips allowed, flaky files retried once)
+        run: ../.github/scripts/browser-tests.sh
         shell: bash
 
   ruby:
@@ -105,9 +91,12 @@ jobs:
       # spec/web_spec.rb serves web/dist and checks web/view-keys.json against lib/oe/view.rb.
       - run: npm ci --no-progress --no-audit --no-fund && npm run build
         working-directory: web
-      - name: specs without the long game runs (shard)
+      - name: specs without the long game runs and view_railroad_phase_spec (195 s, full stage) (shard)
         run: |
-          # shard ${{ matrix.shard }} of 3: every 3rd spec file, so shards stay roughly equal
-          files=$(find spec -name '*_spec.rb' -not -path 'spec/engine/*' -not -name script_game_spec.rb -not -name playthrough_spec.rb -not -name bot_simulation_spec.rb -not -name enumeration_timing_spec.rb | sort | awk -v n=${{ matrix.shard }} 'NR%3==n%3')
+          # time-balanced shard (.github/scripts/shard.rb, timings in .github/rspec-timings.json)
+          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 3 '(^spec/engine/|script_game_spec|playthrough_spec|bot_simulation_spec|enumeration_timing_spec|view_railroad_phase_spec)')
           echo "$files"
-          bundle exec rspec $files
+          bundle exec rspec $files --format json --out "$RUNNER_TEMP/rspec.json"
+      - name: per-file timings (to refresh .github/rspec-timings.json)
+        if: always()
+        run: ruby .github/scripts/shard.rb --report "$RUNNER_TEMP/rspec.json"
