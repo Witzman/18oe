@@ -1,0 +1,315 @@
+{
+  "_note": "Excerpt of GET /map (Oe::MapData.build, #172): id, name, zone of the hexes offered as home token targets in games/home-token.json (hexes without name or zone omit the key).",
+  "hexes": [
+    {
+      "id": "A64",
+      "name": "Finland",
+      "zone": "RU"
+    },
+    {
+      "id": "B67",
+      "name": "Helsinki",
+      "zone": "RU"
+    },
+    {
+      "id": "C48",
+      "name": "Christiania",
+      "zone": "SC"
+    },
+    {
+      "id": "D57",
+      "name": "Stockholm",
+      "zone": "SC"
+    },
+    {
+      "id": "D77",
+      "name": "Veliky Novgorod",
+      "zone": "RU"
+    },
+    {
+      "id": "E56",
+      "name": "Norrköping",
+      "zone": "SC"
+    },
+    {
+      "id": "F25",
+      "name": "Glasgow",
+      "zone": "UK"
+    },
+    {
+      "id": "G26",
+      "name": "Edinburgh",
+      "zone": "UK"
+    },
+    {
+      "id": "G68",
+      "name": "Riga",
+      "zone": "RU"
+    },
+    {
+      "id": "H21",
+      "name": "Belfast",
+      "zone": "UK"
+    },
+    {
+      "id": "H47",
+      "name": "Aarhus",
+      "zone": "SC"
+    },
+    {
+      "id": "H63",
+      "name": "Libavo",
+      "zone": "RU"
+    },
+    {
+      "id": "H87",
+      "name": "Tula",
+      "zone": "RU"
+    },
+    {
+      "id": "I52",
+      "name": "Malmö",
+      "zone": "SC"
+    },
+    {
+      "id": "I76",
+      "name": "Vitsyebsk",
+      "zone": "RU"
+    },
+    {
+      "id": "J15",
+      "name": "Cork",
+      "zone": "UK"
+    },
+    {
+      "id": "J25",
+      "name": "Liverpool",
+      "zone": "UK"
+    },
+    {
+      "id": "J63",
+      "name": "Königsberg",
+      "zone": "PHS"
+    },
+    {
+      "id": "J69",
+      "name": "Vilna",
+      "zone": "RU"
+    },
+    {
+      "id": "K78",
+      "name": "Bobruisk",
+      "zone": "RU"
+    },
+    {
+      "id": "K86",
+      "name": "Orel",
+      "zone": "RU"
+    },
+    {
+      "id": "L37",
+      "name": "Amsterdam",
+      "zone": "PHS"
+    },
+    {
+      "id": "M36",
+      "name": "Rotterdam",
+      "zone": "PHS"
+    },
+    {
+      "id": "M44",
+      "name": "Hannover",
+      "zone": "PHS"
+    },
+    {
+      "id": "M68",
+      "name": "Brest-Litovsk",
+      "zone": "RU"
+    },
+    {
+      "id": "N31",
+      "name": "Lille",
+      "zone": "FR"
+    },
+    {
+      "id": "N87",
+      "name": "Kharkov",
+      "zone": "RU"
+    },
+    {
+      "id": "O28",
+      "name": "Le Havre",
+      "zone": "FR"
+    },
+    {
+      "id": "O40",
+      "name": "Köln",
+      "zone": "PHS"
+    },
+    {
+      "id": "O52",
+      "name": "Dresden",
+      "zone": "PHS"
+    },
+    {
+      "id": "O56",
+      "name": "Breslau",
+      "zone": "PHS"
+    },
+    {
+      "id": "P53",
+      "name": "Praha",
+      "zone": "AH"
+    },
+    {
+      "id": "P69",
+      "name": "Lemberg",
+      "zone": "AH"
+    },
+    {
+      "id": "Q38",
+      "name": "Nancy",
+      "zone": "FR"
+    },
+    {
+      "id": "Q40",
+      "name": "Straßburg",
+      "zone": "PHS"
+    },
+    {
+      "id": "R23",
+      "name": "Nantes",
+      "zone": "FR"
+    },
+    {
+      "id": "S42",
+      "name": "Zürich",
+      "zone": "PHS"
+    },
+    {
+      "id": "S50",
+      "name": "Salzburg",
+      "zone": "AH"
+    },
+    {
+      "id": "S78",
+      "name": "Kischinev",
+      "zone": "RU"
+    },
+    {
+      "id": "T53",
+      "name": "Graz",
+      "zone": "AH"
+    },
+    {
+      "id": "T69",
+      "name": "Klausenburg",
+      "zone": "AH"
+    },
+    {
+      "id": "T81",
+      "name": "Odessa",
+      "zone": "RU"
+    },
+    {
+      "id": "T87",
+      "name": "Sevastopol",
+      "zone": "RU"
+    },
+    {
+      "id": "U32",
+      "name": "Saint-Étienne",
+      "zone": "FR"
+    },
+    {
+      "id": "V17",
+      "name": "Bilbao",
+      "zone": "SP"
+    },
+    {
+      "id": "V27",
+      "name": "Toulouse",
+      "zone": "FR"
+    },
+    {
+      "id": "V39",
+      "name": "Torino",
+      "zone": "IT"
+    },
+    {
+      "id": "V51",
+      "name": "Trieste",
+      "zone": "AH"
+    },
+    {
+      "id": "V55",
+      "name": "Zagreb",
+      "zone": "AH"
+    },
+    {
+      "id": "W6",
+      "name": "Pôrto",
+      "zone": "SP"
+    },
+    {
+      "id": "W40",
+      "name": "Genova",
+      "zone": "IT"
+    },
+    {
+      "id": "X13",
+      "name": "Valladolid",
+      "zone": "SP"
+    },
+    {
+      "id": "X33",
+      "name": "Marseille",
+      "zone": "FR"
+    },
+    {
+      "id": "X45",
+      "name": "Firenze",
+      "zone": "IT"
+    },
+    {
+      "id": "Y20",
+      "name": "Zaragoza",
+      "zone": "SP"
+    },
+    {
+      "id": "AA20",
+      "name": "Valencia",
+      "zone": "SP"
+    },
+    {
+      "id": "AB57",
+      "name": "Brindisi",
+      "zone": "IT"
+    },
+    {
+      "id": "AC8",
+      "name": "Sevilla",
+      "zone": "SP"
+    },
+    {
+      "id": "AC16",
+      "name": "Murcia",
+      "zone": "SP"
+    },
+    {
+      "id": "AC40",
+      "name": "Cagliari",
+      "zone": "IT"
+    },
+    {
+      "id": "AD9",
+      "name": "Málaga",
+      "zone": "SP"
+    },
+    {
+      "id": "AF49",
+      "name": "Palermo",
+      "zone": "IT"
+    }
+  ]
+}
