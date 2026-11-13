@@ -48,7 +48,8 @@ async function route() {
       const hash = location.hash;
       const toLogin = () => { returnTo = hash; ctx.me = null; void route(); };
       let self: ReturnType<typeof createPoller>;
-      const frame = gameFrame(() => void self.tick());
+      const frame = gameFrame(() => void self.tick(), api);
+      page = { stop: () => frame.dispose() };
       mount(root, frame.root);
       let mapGeometry: MapGeometry | null = null;
       const concession = mountConcession(frame, { map: () => mapGeometry });
