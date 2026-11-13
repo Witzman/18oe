@@ -9,7 +9,7 @@ module Oe
   # how a deploy is verified from outside (see 18oe-workshop#41).
   module BuildId
     ROOT = File.expand_path("../..", __dir__)
-    PATTERNS = ["app.rb", "Gemfile.lock", "lib/**/*"].freeze
+    PATTERNS = ["app.rb", "Gemfile.lock", "VERSION", "lib/**/*"].freeze
 
     def self.files
       PATTERNS.flat_map { |pattern| Dir.glob(pattern, base: ROOT) }

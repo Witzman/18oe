@@ -12,7 +12,7 @@ COPY Gemfile Gemfile.lock ./
 ENV BUNDLE_WITHOUT=test
 RUN bundle install
 
-COPY app.rb ./
+COPY VERSION app.rb ./
 COPY lib/ ./lib/
 
 ENV PORT=80 DATABASE_PATH=/data/18oe.sqlite3

@@ -54,3 +54,14 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .lobby .seat strong { min-width: 5rem; }
 .lobby .seat input { flex: 1; min-width: 12rem; }
 .lobby .seat input[hidden] { display: none; }
+
+/* Version display (issue 271): colours from theme tokens only. */
+.version-note { margin: 16px 0 0; font-size: 0.8em; text-align: center; }
+.version-note[data-stale] { color: var(--ui-warn); }
+.version-open { position: absolute; top: 0; right: var(--shape-gap); height: var(--shape-bar-height); z-index: 2; background: transparent; color: var(--ui-bar-ink); border-color: transparent; font: 0.75rem var(--font-head); opacity: .75; }
+.version-open[data-stale] { color: var(--ui-warn); opacity: 1; }
+.version-dialog { background: var(--ui-panel); color: var(--ui-ink); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); max-width: min(26rem, calc(100vw - 32px)); }
+.version-dialog::backdrop { background: color-mix(in srgb, var(--ui-bg) 70%, transparent); }
+.version-dialog dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 8px; }
+.version-dialog dt { color: var(--ui-faint); }
+.version-dialog dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
