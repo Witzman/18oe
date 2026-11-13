@@ -70,11 +70,13 @@ jobs:
           files=$(ls test/*.test.ts | grep -E '(-browser|^test/shot|^test/ipad)')
           echo "$files"
           set +e +o pipefail  # the runner shell is -e -o pipefail: keep going to report the result
-          node --test --test-concurrency=1 --test-reporter=tap $files | tee "$RUNNER_TEMP/browser.tap"
+          node --test --test-concurrency=1 --test-reporter=tap $files 2>&1 | tee "$RUNNER_TEMP/browser.tap"
           status=${PIPESTATUS[0]}
           grep -E '^# (tests|pass|fail|skipped) ' "$RUNNER_TEMP/browser.tap"
           # Failing and skipped tests also as annotations (readable without the raw log).
           grep -E '^ *(not ok|ok .*# SKIP)' "$RUNNER_TEMP/browser.tap" | head -30 | while IFS= read -r l; do echo "::error::${l:0:300}"; done
+          # stderr of the page checks (bin/shot) is in the same stream
+          grep -a -i -E 'bin/shot|timeout|timed out|check|expected|fail|webgl|no browser' "$RUNNER_TEMP/browser.tap" | grep -v -E '^ *(ok|not ok|#|duration)' | cut -c1-240 | head -25 | while IFS= read -r l; do echo "::warning::stderr: $l"; done
           grep -E -A14 '^ *not ok' "$RUNNER_TEMP/browser.tap" | grep -v -E '^ *(duration_ms|type|location|stack|at )' | cut -c1-240 | head -60 | while IFS= read -r l; do echo "::warning::$l"; done
           if ! grep -q '^# skipped 0$' "$RUNNER_TEMP/browser.tap"; then echo "::error::browser tests were skipped"; exit 1; fi
           if grep -q '^# tests 0$' "$RUNNER_TEMP/browser.tap"; then echo "::error::no browser tests ran"; exit 1; fi
