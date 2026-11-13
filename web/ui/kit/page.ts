@@ -1,16 +1,18 @@
 // Musterseite #/kit: every block in every state, in the active theme (switch via the Look menu).
 // Hover cannot be forced with :hover, so the sample sets data-state="hover" (the CSS treats both alike).
 import { choiceFromRoot } from "../../themes/choice.ts";
+import { companyBg } from "../../themes/companies.ts";
 import type { Theme } from "../../themes/schema.ts";
 import { Auftrag, Dialog, Geld, Leiter, mitTooltip, Siegel, stepsAt, STATES, Tabelle, toDom, v, Wimpel, type Corp, type Sort, type State, type VNode } from "./index.ts";
 import { nextSort } from "./table.ts";
 
-// Sample data. Company colours are the theme placeholders company.c1..c4 (real ones come from the engine, #99).
+// Sample data. Company colours are the theme's `companies` tokens (#99); sample syms without a token (KK, DR, SNCB are
+// not engine ids) fall back to the placeholders company.c1..c6.
 const corps = (theme: Theme): Corp[] => [
-  { sym: "PLM", name: "Paris-Lyon-Méditerranée", color: theme.company.c1 },
-  { sym: "KK", name: "Kaiserlich-Königliche Staatsbahn", color: theme.company.c2 },
-  { sym: "DR", name: "Deutsche Reichsbahn", color: theme.company.c4 },
-  { sym: "SNCB", name: "Belgische Staatsbahn", color: theme.company.c6 },
+  { sym: "PLM", name: "Paris-Lyon-Méditerranée", color: companyBg(theme, "PLM") },
+  { sym: "KK", name: "Kaiserlich-Königliche Staatsbahn", color: companyBg(theme, "KK", ["", "KK"]) },
+  { sym: "DR", name: "Deutsche Reichsbahn", color: companyBg(theme, "DR", ["", "", "", "DR"]) },
+  { sym: "SNCB", name: "Belgische Staatsbahn", color: companyBg(theme, "SNCB", ["", "", "", "", "", "SNCB"]) },
 ];
 const PLAYERS = ["Anna", "Ben", "Clara", "Dirk", "Eva", "Finn", "Gita"].map((name, i) => ({ seat: i + 1, name }));
 const rowsOf = (c: Corp[]) => [
@@ -38,7 +40,7 @@ export function kitSections(theme: Theme, state: { sort?: Sort; dialog: boolean 
     reason: s === "invalid" ? "Die Kasse reicht nicht (£165 nötig, £95 da)." : undefined,
   });
   return [
-    section("Siegel", ...STATES.map((s): [string, ...VNode[]] => [label(s), ...CORPS.map((c) => Siegel(c, { theme, state: s })), Siegel(CORPS[0]!, { theme, state: s, size: "l" })])),
+    section("Siegel", ["Alle 36 (Minors, Regionals)", ...Object.keys(theme.companies).map((sym) => Siegel({ sym, color: theme.companies[sym]!.bg }, { theme }))], ...STATES.map((s): [string, ...VNode[]] => [label(s), ...CORPS.map((c) => Siegel(c, { theme, state: s })), Siegel(CORPS[0]!, { theme, state: s, size: "l" })])),
     section("Wimpel", ...STATES.map((s): [string, ...VNode[]] => [label(s), ...PLAYERS.slice(0, 3).map((p) => Wimpel(p, { theme, state: s }))]),
       ["alle 7 Farben", ...PLAYERS.map((p) => Wimpel(p, { theme }))]),
     section("Geld", ["Beträge", Geld(0), Geld(5), Geld(1250), Geld(-40)], ["Änderung", Geld(5, { delta: true }), Geld(-5, { delta: true })]),

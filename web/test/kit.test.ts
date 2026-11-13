@@ -17,7 +17,7 @@ const kitDir = join(dirname(fileURLToPath(import.meta.url)), "..", "ui", "kit");
 
 test("Siegel: abbreviation on company colour, text colour computed per theme, readable on all company colours", () => {
   for (const theme of themes) {
-    for (const color of Object.values(theme.company)) {
+    for (const color of [...Object.values(theme.company), ...Object.values(theme.companies).map((c) => c.bg)]) {
       assert.ok(inkReadable(color, theme), `${theme.id} ${color}`);
       const s = Siegel({ sym: "PLM", color }, { theme });
       assert.equal(textOf(s), "PLM");
@@ -177,7 +177,7 @@ test("sample page shows every block in all seven states", () => {
   for (const theme of themes) {
     const secs = kitSections(theme, { dialog: false }, { sort: () => {}, dialog: () => {} });
     const rowsOf = (title: string) => find(secs.find((s) => textOf(find(s, (n) => n.tag === "h2")[0]!) === title)!, (n) => n.tag === "dt" && !["Kasse", "Zertifikate"].includes(textOf(n))).length;
-    assert.deepEqual(["Siegel", "Wimpel", "Auftrag"].map(rowsOf), [7, 8, 7]);
+    assert.deepEqual(["Siegel", "Wimpel", "Auftrag"].map(rowsOf), [8, 8, 7]);
     const states = (title: string) => new Set(find(secs.find((s) => textOf(find(s, (n) => n.tag === "h2")[0]!) === title)!, (n) => "data-state" in n.attrs).map((n) => n.attrs["data-state"]));
     for (const title of ["Siegel", "Wimpel", "Tabelle", "Auftrag"]) assert.deepEqual([...states(title)].sort(), [...STATES].sort(), title);
     assert.deepEqual(secs.length, 8);

@@ -297,8 +297,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
 
   // ---- game state seen by the nodes (tokens, home rings, revenue) ----------------------------
 
-  /** Company colour: stable index into the placeholder colours company.c1..c6 (ASSUMPTION until #99). */
-  const corpColor = (corp: string) => theme.company[`c${companyIndex(state?.corporations ?? [], corp, 6) + 1}` as keyof typeof theme.company];
+  /** Company colour: the theme's `companies` token (#99); unknown ids fall back to the placeholders company.c1..c6 by list position. */
+  const corpColor = (corp: string) => theme.companies[corp]?.bg ?? theme.company[`c${companyIndex(state?.corporations ?? [], corp, 6) + 1}` as keyof typeof theme.company];
   const homeHexes = (corp: string) => (geometry.homes ?? []).filter((h) => h.corporation === corp).map((h) => h.hex);
   const phaseColors = () => state?.meta.phase?.tiles ?? ["yellow"];
   /** Tokens per city of the hex: corporation ids per slot. */

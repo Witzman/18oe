@@ -115,14 +115,18 @@ test("player bar: one entry per player in seat order, one priority star, bots ma
   for (const r of rows) assert.ok(r.certLimit > 0 && r.cash === g.state.players.find((p) => p.id === r.id)!.cash);
 });
 
-test("outliner lists founded corporations and counts the rest; company colours cycle through the theme's colours", () => {
+test("outliner lists founded corporations and counts the rest; company colours come from the theme's companies tokens, unknown ids fall back to the placeholders", () => {
   const g = games["track"]!;
   const { shown, hidden } = outlinerCorps(g);
   assert.equal(shown.length + hidden, g.state.corporations.filter((c) => !c.closed).length);
   assert.ok(shown.every((c) => c.ipoed || c.floated));
+  for (const c of g.state.corporations) assert.equal(corpColor(theme, g, c.id), theme.companies[c.id]!.bg, c.id);
   const colors = Object.values(theme.company);
-  assert.equal(corpColor(theme, g, g.state.corporations[0]!.id), colors[0]);
-  assert.equal(corpColor(theme, g, g.state.corporations[colors.length]!.id), colors[0]);
+  const unknown = structuredClone(g);
+  unknown.state.corporations[0]!.id = "ZZZ";
+  unknown.state.corporations[colors.length]!.id = "YYY";
+  assert.equal(corpColor(theme, unknown, "ZZZ"), colors[0]);
+  assert.equal(corpColor(theme, unknown, "YYY"), colors[0]);
 });
 
 test("outliner follows meta.operating_order when the view model has it", () => {

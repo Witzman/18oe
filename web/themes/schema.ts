@@ -14,7 +14,7 @@ export const COLOR_KEYS = {
     "label", "labelHalo", "valid", "selected", "invalid", "preview", "shadow",
   ],
   ui: ["bg", "panel", "panelAlt", "ink", "faint", "rule", "accent", "accentInk", "bar", "barInk", "error", "ok", "warn", "info", "overlay"],
-  // Placeholders until the real company colours come from the engine.
+  // Fallback palette for company ids without an entry in `companies` (unknown or future ids).
   company: ["c1", "c2", "c3", "c4", "c5", "c6"],
   player: ["p1", "p2", "p3", "p4", "p5", "p6", "p7"],
 } as const;
@@ -58,7 +58,11 @@ export const CAMERA_KEYS = Object.keys(NUMBER_RANGES.camera) as (keyof typeof NU
 export const TRACK_KEYS = [...Object.keys(NUMBER_RANGES.track), "colorMode", "colorPart"] as const;
 export const MOTION_KEYS = [...Object.keys(NUMBER_RANGES.motion), "enabled"] as const;
 export const SHAPE_KEYS = ["tileStyle", "shadow", ...Object.keys(NUMBER_RANGES.shape)] as const;
-export const TOP_KEYS = ["id", "name", "colorScheme", "map", "ui", "company", "player", "font", "camera", "track", "motion", "shape"] as const;
+export const TOP_KEYS = ["id", "name", "colorScheme", "map", "ui", "company", "companies", "player", "font", "camera", "track", "motion", "shape"] as const;
+
+/** Colours of one company (#99): seal/token background, text on it, edge. Ink is checked for 4.5:1 by the specs. */
+export const COMPANY_COLOR_KEYS = ["bg", "ink", "edge"] as const;
+export type CompanyColors = Record<(typeof COMPANY_COLOR_KEYS)[number], string>;
 
 export interface Theme {
   id: string;
@@ -67,6 +71,8 @@ export interface Theme {
   map: Colors<"map">;
   ui: Colors<"ui">;
   company: Colors<"company">;
+  /** Real company colours by company id (engine sym), derived from the engine by themes/derive-companies.ts. */
+  companies: Record<string, CompanyColors>;
   player: Colors<"player">;
   font: Record<(typeof FONT_KEYS)[number], string>;
   camera: Record<keyof typeof NUMBER_RANGES.camera, number>;
@@ -115,6 +121,16 @@ export function themeProblems(raw: unknown): string[] {
     if (!isRecord(colors)) continue;
     for (const [k, v] of Object.entries(colors)) {
       if (typeof v !== "string" || !HEX.test(v)) problems.push(`${group}.${k}: expected a colour like #1a2b3c`);
+    }
+  }
+  if (!isRecord(raw.companies)) problems.push("companies: not an object");
+  else {
+    for (const [id, entry] of Object.entries(raw.companies)) {
+      problems.push(...keyProblems(`companies.${id}`, entry, COMPANY_COLOR_KEYS));
+      if (!isRecord(entry)) continue;
+      for (const [k, v] of Object.entries(entry)) {
+        if (typeof v !== "string" || !HEX.test(v)) problems.push(`companies.${id}.${k}: expected a colour like #1a2b3c`);
+      }
     }
   }
   problems.push(...keyProblems("font", raw.font, FONT_KEYS));

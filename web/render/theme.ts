@@ -11,6 +11,8 @@ export interface RenderTheme {
   map: Numeric<"map">;
   ui: Numeric<"ui">;
   company: Numeric<"company">;
+  /** Company colours by company id (#99), numeric. */
+  companies: Record<string, { bg: number; ink: number; edge: number }>;
   player: Numeric<"player">;
   camera: Theme["camera"];
   track: Theme["track"];
@@ -46,6 +48,7 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     map: numeric(t, "map"),
     ui: numeric(t, "ui"),
     company: numeric(t, "company"),
+    companies: Object.fromEntries(Object.entries(t.companies).map(([id, c]) => [id, { bg: hexToNumber(c.bg), ink: hexToNumber(c.ink), edge: hexToNumber(c.edge) }])),
     player: numeric(t, "player"),
     camera: { ...t.camera },
     track: { ...t.track },

@@ -1,5 +1,6 @@
 // What the frame shows, derived from the view model (pure: no DOM, tests run under node).
 // Everything here only reads `Game`; no rule checks in the client (ui-spec 3.5).
+import { companyBg } from "../../themes/companies.ts";
 import type { Theme } from "../../themes/schema.ts";
 import type { Corporation, Game, Player } from "../../types.ts";
 import { fillText, txt } from "../text.ts";
@@ -25,12 +26,10 @@ export interface PlayerRow {
 
 export const playerName = (g: Game, id: string): string => g.state.players.find((p) => p.id === id)?.name ?? id;
 
-// Company colours come from the theme placeholders until the engine delivers real ones (#99; assumption):
-// the corporation's position in the list picks one of the theme's colours.
+// Company colour by id from the theme's `companies` tokens (#99); an id without a token falls back to the
+// placeholder palette by the corporation's position in the list.
 export function corpColor(theme: Theme, g: Game, id: string): string {
-  const colors = Object.values(theme.company);
-  const i = Math.max(0, g.state.corporations.findIndex((c) => c.id === id));
-  return colors[i % colors.length]!;
+  return companyBg(theme, id, g.state.corporations.map((c) => c.id));
 }
 
 export function stepLabel(step: string | null): string {
