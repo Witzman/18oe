@@ -23,7 +23,10 @@
 .auction-price { font-variant-numeric: tabular-nums; }
 .auction-mark { position: absolute; top: 4px; right: 8px; color: var(--ui-accent); font-weight: 700; }
 .auction-running { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; padding: 8px 12px; border: 2px solid var(--ui-accent); border-radius: var(--shape-radius); background: var(--ui-panel); }
-.auction-bidform { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); background: var(--ui-panel); position: sticky; bottom: 0; }
+.auction-bidform { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 12px; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); background: var(--ui-panel); min-height: 3.2rem; }
+.auction-bidform label { display: inline-flex; align-items: center; gap: 8px; }
+.auction-idle { margin: 0; align-items: center; }
+.auction-sold { margin: 0; padding: 4px 8px; border: 1px dashed var(--ui-rule); border-radius: var(--shape-radius); color: var(--ui-faint); }
 .auction-bidform input { width: 7rem; font-variant-numeric: tabular-nums; }
 .auction-bidform input[aria-invalid="true"] { border-color: var(--ui-error); outline: 2px solid var(--ui-error); }
 .auction-players, .auction-owned { list-style: none; margin: 0; padding: 0; }

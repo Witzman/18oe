@@ -18,6 +18,8 @@ export interface CardModel {
   /** The offered bid range for this lot and the viewer, when there is one. */
   range: Range | null;
   top: boolean;
+  /** Can be bought now at its price: top row and no open auction running. */
+  buyNow: boolean;
   /** The lot of the running open auction. */
   running: boolean;
   state: CardState;
@@ -72,7 +74,7 @@ export function sheetModel(g: Game, selectedId: string | null): SheetModel | nul
             : fillText("auction.why_other", {});
         }
       }
-      return { card, range, top: card.row === top, running, state, why };
+      return { card, range, top: card.row === top, buyNow: card.row === top && current === null, running, state, why };
     });
     rows.push({ row: n, roman: roman(n), top: n === top, sold: cards.length === 0, cards });
   }

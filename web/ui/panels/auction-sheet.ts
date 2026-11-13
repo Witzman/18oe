@@ -24,7 +24,7 @@ function cardNode(c: CardModel, g: Game, theme: Theme, h: SheetHandlers): VNode 
     v("span", { class: "auction-kind", "data-kind": card.kind }, txt(`auction.kind_${card.kind}`).de),
     v("strong", { class: "auction-name" }, card.name),
     v("span", { class: "auction-price" },
-      card.bid ? fillText("auction.high_bid", { amount: formatGeld(card.bid.price) }) : fillText("auction.min_bid", { amount: formatGeld(price) }),
+      card.bid ? fillText("auction.high_bid", { amount: formatGeld(card.bid.price) }) : fillText(c.buyNow ? "auction.price_top" : "auction.min_bid", { amount: formatGeld(price) }),
       card.discount > 0 ? v("small", { class: "auction-discount" }, ` ${fillText("auction.discount", { amount: formatGeld(card.discount) })}`) : null),
     card.bid ? v("span", { class: "auction-buyer" }, pennant(g, card.bid.player, theme)) : null,
     card.revenue > 0 ? v("small", { class: "muted" }, fillText("auction.revenue", { amount: formatGeld(card.revenue) })) : null,
@@ -54,7 +54,7 @@ function rowNode(r: RowModel, g: Game, theme: Theme, h: SheetHandlers): VNode {
 export function bidForm(g: Game, sel: Selection | null, h: SheetHandlers): VNode | null {
   const range = sel ? g.state.prompt.ranges.find((r) => r.type === "bid" && r.company === sel.id) : undefined;
   const card = sel ? g.state.auction?.cards.find((c) => c.id === sel.id) : undefined;
-  if (!sel || !range || !card) return null;
+  if (!sel || !range || !card) return g.state.prompt.viewer_to_act ? v("p", { class: "auction-bidform auction-idle muted" }, txt("auction.form_idle").de) : null;
   if (range.min === range.max) return v("p", { class: "auction-bidform auction-fixed" }, v("strong", {}, card.name), " ", fillText("auction.fixed", { amount: formatGeld(range.min) }));
   const bad = rangeValue(range, sel.amount) === null;
   return v("form", { class: "auction-bidform", onsubmit: (e) => e.preventDefault() },
@@ -66,6 +66,21 @@ export function bidForm(g: Game, sel: Selection | null, h: SheetHandlers): VNode
     })),
     v("span", { id: "auction-amount-hint", class: bad ? "msg-error" : "muted", "data-bad": bad ? "true" : "false" }, amountHint(range)),
     card.kind === "minor" ? v("small", { class: "muted" }, txt("auction.minor_hint").de) : null);
+}
+
+/** Rows without lots left shrink to one line (consecutive ones merged), so the open rows stay in view. */
+function rowNodes(rows: RowModel[], g: Game, theme: Theme, h: SheetHandlers): VNode[] {
+  const out: VNode[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]!;
+    if (!r.sold) { out.push(rowNode(r, g, theme, h)); continue; }
+    let j = i;
+    while (rows[j + 1]?.sold) j++;
+    const label = j === i ? fillText("auction.row", { roman: r.roman }) : fillText("auction.rows", { from: r.roman, to: rows[j]!.roman });
+    out.push(v("p", { class: "auction-sold", "data-rows": `${r.row}-${rows[j]!.row}` }, v("strong", {}, label), ` ${txt("auction.row_sold").de}`));
+    i = j;
+  }
+  return out;
 }
 
 export function sheetNode(m: SheetModel, g: Game, sel: Selection | null, theme: Theme, h: SheetHandlers): VNode {
@@ -85,8 +100,8 @@ export function sheetNode(m: SheetModel, g: Game, sel: Selection | null, theme: 
       run.high ? v("span", {}, fillText("auction.running_high", { amount: formatGeld(run.high.price), who: playerName(g, run.high.player) }), " ", pennant(g, run.high.player, theme)) : null,
       v("span", {}, fillText("auction.running_in", { names: run.inNames.join(", ") || "—" })),
       run.outNames.length > 0 ? v("span", { class: "muted" }, fillText("auction.running_out", { names: run.outNames.join(", ") })) : null) : null,
-    v("div", { class: "auction-rows" }, ...m.rows.map((r) => rowNode(r, g, theme, h))),
-    bidForm(g, sel, h));
+    bidForm(g, sel, h),
+    v("div", { class: "auction-rows" }, ...rowNodes(m.rows, g, theme, h)));
 }
 
 export function openingNode(rows: OpeningRow[], theme: Theme): VNode {
