@@ -4,6 +4,7 @@
 // (kein Konten-Listing, die Auflösung geschieht auf dem Server). Alle Texte stehen in text.ts.
 import { ApiError, type Api } from "../api.ts";
 import type { Account, GameSummary, SeatRequest } from "../types.ts";
+import { applyAttention } from "./attention.ts";
 import { h } from "./dom.ts";
 import { txt } from "./text.ts";
 
@@ -65,11 +66,12 @@ function statusText(status: string): string {
   return known.de === `lobby.status_${status}` ? status : known.de;
 }
 
-// Eine Zeile der Liste. Runde und "wer ist dran" liefert GET /games noch nicht (#152/#163).
+// Eine Zeile der Liste; Marke "Du bist dran" nach viewer_to_act aus GET /games (#152, D11).
 export function gameRow(g: GameSummary, me: Account | null): HTMLElement {
   const others = g.seats.filter((s) => s.account_id !== me?.id).map((s) => s.name).join(", ");
-  return h("li", { class: "game-row" },
+  return h("li", { class: "game-row", "data-to-act": g.viewer_to_act ? "true" : "false" },
     h("a", { class: "game-link", href: `#/game/${g.id}` }, fill("lobby.game_title", { id: g.id })),
+    g.viewer_to_act ? h("span", { class: "game-turn turn" }, txt("lobby.game_to_act").de) : null,
     h("span", { class: "muted" }, [statusText(g.status), fill("lobby.game_seq", { seq: g.seq }),
       fill("lobby.game_players", { names: others })].join(" · ")),
     h("a", { class: "game-open", href: `#/game/${g.id}` }, txt("lobby.game_open").de));
@@ -152,7 +154,9 @@ export async function lobbyPage(ctx: LobbyCtx): Promise<HTMLElement> {
   const me = ctx.me;
   let list: HTMLElement;
   try {
-    list = gameList((await ctx.api.listGames()).games, me);
+    const games = (await ctx.api.listGames()).games;
+    list = gameList(games, me);
+    applyAttention(games.some((g) => g.viewer_to_act), null);
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) throw e; // main.ts leitet auf die Anmeldung
     list = h("p", { class: "error" }, fill("lobby.err_list", { message: e instanceof ApiError ? e.message : String(e) }));

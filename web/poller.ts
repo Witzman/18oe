@@ -12,18 +12,24 @@ export interface PollerOptions {
   // The last check failed; the next attempt follows in `ms` (drives the countdown band).
   onRetryIn?: (ms: number) => void;
   isVisible?: () => boolean;
-  intervalMs?: number;
+  // Takt (ui-spec 3.7): sichtbarer Reiter schnell, Hintergrund langsam; wieder sichtbar -> sofort (main.ts ruft tick()).
+  activeMs?: number;
+  hiddenMs?: number;
   setTimer?: (fn: () => void, ms: number) => unknown;
   clearTimer?: (handle: unknown) => void;
 }
 
+export const POLL_ACTIVE_MS = 2000;
+export const POLL_HIDDEN_MS = 10000;
+
 export type PollState = "stopped" | "waiting" | "checking" | "loading";
 
 // Polls GET /games/:id/version (cheap) and loads the full state only when seq
-// moved. Skips while the tab is hidden; resumes with an immediate check.
+// moved. Every 2 s while the tab is visible, every 10 s in the background (so title and favicon stay
+// current there); an immediate check when the tab becomes visible again.
 export function createPoller(opts: PollerOptions) {
-  const interval = opts.intervalMs ?? 5000;
   const visible = opts.isVisible ?? (() => true);
+  const nextMs = () => (visible() ? opts.activeMs ?? POLL_ACTIVE_MS : opts.hiddenMs ?? POLL_HIDDEN_MS);
   const setTimer = opts.setTimer ?? ((fn, ms) => setTimeout(fn, ms));
   const clearTimer = opts.clearTimer ?? ((h) => clearTimeout(h as ReturnType<typeof setTimeout>));
   let state: PollState = "stopped";
@@ -38,16 +44,17 @@ export function createPoller(opts: PollerOptions) {
   function schedule() {
     if (is("stopped")) return;
     state = "waiting";
-    handle = setTimer(() => void tick(), interval);
-    if (failed) opts.onRetryIn?.(interval);
+    const ms = nextMs();
+    handle = setTimer(() => void tick(), ms);
+    if (failed) opts.onRetryIn?.(ms);
   }
 
   // One check; used by the timer, on first start and on "tab visible again".
-  async function tick(force = false): Promise<void> {
+  async function tick(): Promise<void> {
     if (is("stopped") || is("checking") || is("loading")) return;
     if (handle !== null) clearTimer(handle);
     handle = null;
-    if (paused > 0 || (!visible() && !force)) return schedule();
+    if (paused > 0) return schedule();
     try {
       state = "checking";
       const v = await opts.api.version(opts.gameId);
@@ -78,7 +85,7 @@ export function createPoller(opts: PollerOptions) {
   function start() {
     if (!is("stopped")) return;
     state = "waiting";
-    void tick(true);
+    void tick();
   }
 
   function stop() {
