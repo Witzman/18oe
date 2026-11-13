@@ -1,0 +1,14 @@
+/* Concession round panel (#172). Colours from ui.* tokens, sizes from shape.* tokens only. */
+.concession-panel .kit-ladder { flex-direction: column; }
+.concession-panel .kit-ladder li { border-bottom-width: 2px; }
+.concession-cards, .concession-targets { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: var(--shape-gap); }
+.concession-card, .concession-target { display: flex; gap: 8px; align-items: center; text-align: left; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 6px 8px; }
+.concession-card-text { display: flex; flex-direction: column; min-width: 0; }
+.concession-card[aria-pressed="true"], .concession-target[aria-pressed="true"], .concession-price[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); }
+.concession-prices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--shape-gap); }
+.concession-price { display: flex; flex-direction: column; align-items: center; min-width: 5.5rem; }
+.concession-price[data-state="invalid"] { opacity: .5; cursor: not-allowed; border-style: dashed; }
+.concession-price small { color: var(--ui-faint); }
+.concession-help { margin: var(--shape-gap) 0; }
+.concession-zone-list { list-style: none; padding: 0; margin: 0; font-size: .9rem; }
+.concession-zone-list li[data-free="false"] { color: var(--ui-faint); text-decoration: line-through; }

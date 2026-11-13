@@ -1,0 +1,3157 @@
+{
+ "id": 1,
+ "status": "active",
+ "seats": [
+  {
+   "seat": 0,
+   "kind": "human",
+   "name": "p0"
+  },
+  {
+   "seat": 1,
+   "kind": "human",
+   "name": "p1"
+  },
+  {
+   "seat": 2,
+   "kind": "human",
+   "name": "p2"
+  },
+  {
+   "seat": 3,
+   "kind": "bot",
+   "name": "p3"
+  }
+ ],
+ "viewer": "p2",
+ "seq": 2357,
+ "state": {
+  "meta": {
+   "seq": 2357,
+   "game_id": 1,
+   "finished": false,
+   "round": {
+    "type": "concession",
+    "number": 1,
+    "turn": 1,
+    "description": "Concession Round 1"
+   },
+   "phase": {
+    "name": "2",
+    "tiles": [
+     "yellow"
+    ],
+    "operating_rounds": 2,
+    "status": [
+     "train_obligation"
+    ]
+   },
+   "rr_phase": "concession",
+   "railroads": {
+    "minors": {
+     "floated": 0,
+     "total": 12
+    },
+    "regionals": {
+     "unparred": 24,
+     "parred": 0,
+     "floated": 0,
+     "converted": 0,
+     "removed": 0,
+     "closed": 0,
+     "total": 24,
+     "max_floated": 18,
+     "max_removed": 6
+    },
+    "regional_states": [
+     {
+      "id": "LNWR",
+      "state": "unparred"
+     },
+     {
+      "id": "GWR",
+      "state": "unparred"
+     },
+     {
+      "id": "GSWR",
+      "state": "unparred"
+     },
+     {
+      "id": "PLM",
+      "state": "unparred"
+     },
+     {
+      "id": "MIDI",
+      "state": "unparred"
+     },
+     {
+      "id": "OU",
+      "state": "unparred"
+     },
+     {
+      "id": "BEL",
+      "state": "unparred"
+     },
+     {
+      "id": "BHB",
+      "state": "unparred"
+     },
+     {
+      "id": "POB",
+      "state": "unparred"
+     },
+     {
+      "id": "KSS",
+      "state": "unparred"
+     },
+     {
+      "id": "KBS",
+      "state": "unparred"
+     },
+     {
+      "id": "SB",
+      "state": "unparred"
+     },
+     {
+      "id": "MAV",
+      "state": "unparred"
+     },
+     {
+      "id": "SFAI",
+      "state": "unparred"
+     },
+     {
+      "id": "SFR",
+      "state": "unparred"
+     },
+     {
+      "id": "CHN",
+      "state": "unparred"
+     },
+     {
+      "id": "MZA",
+      "state": "unparred"
+     },
+     {
+      "id": "RCP",
+      "state": "unparred"
+     },
+     {
+      "id": "MSP",
+      "state": "unparred"
+     },
+     {
+      "id": "MKV",
+      "state": "unparred"
+     },
+     {
+      "id": "LRZD",
+      "state": "unparred"
+     },
+     {
+      "id": "WW",
+      "state": "unparred"
+     },
+     {
+      "id": "DSJ",
+      "state": "unparred"
+     },
+     {
+      "id": "BJV",
+      "state": "unparred"
+     }
+    ]
+   },
+   "operating_order": [
+    {
+     "id": "E",
+     "done": false
+    }
+   ],
+   "priority": [
+    "p2",
+    "p3",
+    "p0",
+    "p1"
+   ],
+   "current": {
+    "kind": "corporation",
+    "id": "E",
+    "owner": "p2"
+   },
+   "active_players": [
+    "p2"
+   ],
+   "standings": [
+    {
+     "player": "p2",
+     "value": 2105
+    },
+    {
+     "player": "p1",
+     "value": 1335
+    },
+    {
+     "player": "p0",
+     "value": 905
+    },
+    {
+     "player": "p3",
+     "value": 205
+    }
+   ],
+   "winner": null
+  },
+  "players": [
+   {
+    "id": "p2",
+    "name": "p2",
+    "order": 0,
+    "cash": 1055,
+    "value": 2105,
+    "certs": 10,
+    "cert_limit": 36,
+    "shares": [
+     {
+      "corporation": "E",
+      "percent": 100,
+      "president": true
+     }
+    ],
+    "companies": [
+     {
+      "id": "BBE",
+      "name": "Brandt and Brandau, Engineers",
+      "value": 100,
+      "face_down": false
+     },
+     {
+      "id": "C",
+      "name": "Golden Bell Marketplace",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "CCTC",
+      "name": "Central Circle Transport Corporation",
+      "value": 60,
+      "face_down": false
+     },
+     {
+      "id": "CON5",
+      "name": "5th Concession",
+      "value": 10,
+      "face_down": false
+     },
+     {
+      "id": "CON7",
+      "name": "7th Concession",
+      "value": 0,
+      "face_down": false
+     },
+     {
+      "id": "D",
+      "name": "Green Junction Mercantile",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "F",
+      "name": "White Peak Mountain Railway",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "H",
+      "name": "Great Western Steamship Company",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "J",
+      "name": "Grey Locomotive Works",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "K",
+      "name": "Vermilion Seal Couriers",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "RSC",
+      "name": "Robert Stephenson and Company",
+      "value": 20,
+      "face_down": false
+     }
+    ]
+   },
+   {
+    "id": "p3",
+    "name": "p3",
+    "order": 1,
+    "cash": 25,
+    "value": 205,
+    "certs": 2,
+    "cert_limit": 36,
+    "shares": [],
+    "companies": [
+     {
+      "id": "CON10",
+      "name": "10th Concession",
+      "value": 0,
+      "face_down": false
+     },
+     {
+      "id": "CON9",
+      "name": "9th Concession",
+      "value": 0,
+      "face_down": false
+     },
+     {
+      "id": "SHTC",
+      "name": "Star Harbor Trading Company",
+      "value": 60,
+      "face_down": false
+     },
+     {
+      "id": "SML",
+      "name": "Swift Metropolitan Line",
+      "value": 120,
+      "face_down": false
+     }
+    ]
+   },
+   {
+    "id": "p0",
+    "name": "p0",
+    "order": 2,
+    "cash": 665,
+    "value": 905,
+    "certs": 3,
+    "cert_limit": 36,
+    "shares": [],
+    "companies": [
+     {
+      "id": "A",
+      "name": "Silver Banner Line",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "BBBT",
+      "name": "Barclay, Bevan, Barclay and Tritton",
+      "value": 40,
+      "face_down": false
+     },
+     {
+      "id": "CON2",
+      "name": "2nd Concession",
+      "value": 20,
+      "face_down": false
+     },
+     {
+      "id": "CON8",
+      "name": "8th Concession",
+      "value": 0,
+      "face_down": false
+     },
+     {
+      "id": "WCF",
+      "name": "White Cliffs Ferry",
+      "value": 60,
+      "face_down": false
+     }
+    ]
+   },
+   {
+    "id": "p1",
+    "name": "p1",
+    "order": 3,
+    "cash": 675,
+    "value": 1335,
+    "certs": 7,
+    "cert_limit": 36,
+    "shares": [],
+    "companies": [
+     {
+      "id": "B",
+      "name": "Orange Scroll Surveyors",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "CON3",
+      "name": "3rd Concession",
+      "value": 20,
+      "face_down": false
+     },
+     {
+      "id": "CON4",
+      "name": "4th Concession",
+      "value": 10,
+      "face_down": false
+     },
+     {
+      "id": "CON6",
+      "name": "6th Concession",
+      "value": 10,
+      "face_down": false
+     },
+     {
+      "id": "G",
+      "name": "Indigo Foundry and Iron Works",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "HMLC",
+      "name": "Hochberg Mining and Lumber Company",
+      "value": 80,
+      "face_down": false
+     },
+     {
+      "id": "L",
+      "name": "Krasnaya Strela",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "M",
+      "name": "Compagnie Internationale des Wagons-Lits",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "PeC",
+      "name": "Ponts et Chaussees",
+      "value": 20,
+      "face_down": false
+     },
+     {
+      "id": "WS",
+      "name": "Wien S\u00fcdbahnhof",
+      "value": 40,
+      "face_down": false
+     }
+    ]
+   }
+  ],
+  "corporations": [
+   {
+    "id": "A",
+    "name": "Silver Banner Line",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 120,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "B",
+    "name": "Orange Scroll Surveyors",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 120,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "C",
+    "name": "Golden Bell Marketplace",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 45,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "D",
+    "name": "Green Junction Mercantile",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 45,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "E",
+    "name": "Blue Coast Bridge Construction Company",
+    "type": "minor",
+    "president": "p2",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 40,
+    "share_price": 70,
+    "par_price": 70,
+    "shares": [
+     {
+      "holder": "p2",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "F",
+    "name": "White Peak Mountain Railway",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 35,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "G",
+    "name": "Indigo Foundry and Iron Works",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 35,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "H",
+    "name": "Great Western Steamship Company",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 45,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "J",
+    "name": "Grey Locomotive Works",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 40,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "K",
+    "name": "Vermilion Seal Couriers",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 35,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "L",
+    "name": "Krasnaya Strela",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 35,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "M",
+    "name": "Compagnie Internationale des Wagons-Lits",
+    "type": "minor",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 30,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "LNWR",
+    "name": "London and North Western Railway",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "UK"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "GWR",
+    "name": "Great Western Railway",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "UK"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "GSWR",
+    "name": "Great Southern and Western Railway",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "UK"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "PLM",
+    "name": "CF Paris a Lyon et a la Mediterranee",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "FR"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "MIDI",
+    "name": "CF du Midi",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "FR"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "OU",
+    "name": "CF de l'Ouest",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "FR"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "BEL",
+    "name": "SNCF Belges",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "FR"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "BHB",
+    "name": "Berlin Hamburger Bahn",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "PHS"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "POB",
+    "name": "Preu\u00dfische Ostbahn",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "PHS"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "KSS",
+    "name": "K\u00f6niglich S\u00e4chsische Staatseisenbahnen",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "PHS"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "KBS",
+    "name": "K\u00f6niglich Bayerische Staatseisenbahnen",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "PHS"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "SB",
+    "name": "\u00d6sterreichische S\u00fcdbahn",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "AH"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "MAV",
+    "name": "Magyar Allamvasutak",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "AH"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "SFAI",
+    "name": "Societa per le Ferrovie dell'Alta Italia",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "IT"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "SFR",
+    "name": "Societa per le strade ferrate romane",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "IT"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "CHN",
+    "name": "Caminos de Hierro del Norte de Espana",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "SP"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "MZA",
+    "name": "Cia de los Ferrocarriles de Madrid a Zaragoza y Alicante",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "SP"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "RCP",
+    "name": "Companhia Real dos Caminhos de Ferro Portugueses",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "SP"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "MSP",
+    "name": "Petersburgo-Moskovskaya Zheleznaya Doroga",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "RU"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "MKV",
+    "name": "Moskovsko-Kiyevo-Voronezhskaya Zheleznaya Doroga",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "RU"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "LRZD",
+    "name": "Libavo-Romenskaya Zheleznaya Doroga",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "RU"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "WW",
+    "name": "Droga Zelazna Warszawsko-Wiedenska",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "RU"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "DSJ",
+    "name": "Det Sjaellandske Jernbaneselskab",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "SC"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "BJV",
+    "name": "Bergslagernas J\u00e4rnv\u00e4gar",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "SC"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   }
+  ],
+  "market": {
+   "rows": [
+    [
+     null,
+     {
+      "price": 110,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 120,
+      "type": "convert_range",
+      "corporations": []
+     },
+     {
+      "price": 135,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 150,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 165,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 180,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 200,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 225,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 250,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 280,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 310,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 350,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 390,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 440,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 490,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 550,
+      "type": null,
+      "corporations": []
+     }
+    ],
+    [
+     {
+      "price": 90,
+      "type": "par",
+      "corporations": []
+     },
+     {
+      "price": 100,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 110,
+      "type": "convert_range",
+      "corporations": []
+     },
+     {
+      "price": 120,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 135,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 150,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 165,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 180,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 200,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 225,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 250,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 280,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 310,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 350,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 390,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 440,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 490,
+      "type": null,
+      "corporations": []
+     }
+    ],
+    [
+     {
+      "price": 80,
+      "type": "par",
+      "corporations": []
+     },
+     {
+      "price": 90,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 100,
+      "type": "convert_range",
+      "corporations": []
+     },
+     {
+      "price": 110,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 120,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 135,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 150,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 165,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 180,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 200,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 225,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 250,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 280,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 310,
+      "type": null,
+      "corporations": []
+     }
+    ],
+    [
+     {
+      "price": 75,
+      "type": "par",
+      "corporations": []
+     },
+     {
+      "price": 80,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 90,
+      "type": "convert_range",
+      "corporations": []
+     },
+     {
+      "price": 100,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 110,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 120,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 135,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 150,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 165,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 180,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 200,
+      "type": null,
+      "corporations": []
+     }
+    ],
+    [
+     {
+      "price": 70,
+      "type": "par",
+      "corporations": [
+       "E"
+      ]
+     },
+     {
+      "price": 75,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 80,
+      "type": "convert_range",
+      "corporations": []
+     },
+     {
+      "price": 90,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 100,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 110,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 120,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 135,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 150,
+      "type": null,
+      "corporations": []
+     }
+    ],
+    [
+     {
+      "price": 65,
+      "type": "par",
+      "corporations": []
+     },
+     {
+      "price": 70,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 75,
+      "type": "convert_range",
+      "corporations": []
+     },
+     {
+      "price": 80,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 90,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 100,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 110,
+      "type": null,
+      "corporations": []
+     }
+    ],
+    [
+     {
+      "price": 60,
+      "type": "par",
+      "corporations": []
+     },
+     {
+      "price": 65,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 70,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 75,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 80,
+      "type": null,
+      "corporations": []
+     }
+    ],
+    [
+     {
+      "price": 50,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 60,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 65,
+      "type": null,
+      "corporations": []
+     },
+     {
+      "price": 70,
+      "type": null,
+      "corporations": []
+     }
+    ]
+   ]
+  },
+  "depot": {
+   "available": [
+    {
+     "id": "2+2-0",
+     "name": "2+2",
+     "price": 100,
+     "distance": [
+      {
+       "nodes": [
+        "town"
+       ],
+       "pay": 2,
+       "visit": 99
+      },
+      {
+       "nodes": [
+        "city",
+        "offboard",
+        "town"
+       ],
+       "pay": 2,
+       "visit": 2
+      }
+     ],
+     "rusts_on": "4",
+     "obsolete_on": null,
+     "owner": null
+    }
+   ],
+   "upcoming": 96,
+   "next": "2+2",
+   "discarded": []
+  },
+  "bank": {
+   "cash": 50955
+  },
+  "auction": null,
+  "concession": [
+   {
+    "id": "CON1",
+    "name": "1st Concession",
+    "owner": "p2",
+    "status": "current"
+   },
+   {
+    "id": "CON2",
+    "name": "2nd Concession",
+    "owner": "p0",
+    "status": "open"
+   },
+   {
+    "id": "CON3",
+    "name": "3rd Concession",
+    "owner": "p1",
+    "status": "open"
+   },
+   {
+    "id": "CON4",
+    "name": "4th Concession",
+    "owner": "p1",
+    "status": "open"
+   },
+   {
+    "id": "CON5",
+    "name": "5th Concession",
+    "owner": "p2",
+    "status": "open"
+   },
+   {
+    "id": "CON6",
+    "name": "6th Concession",
+    "owner": "p1",
+    "status": "open"
+   },
+   {
+    "id": "CON7",
+    "name": "7th Concession",
+    "owner": "p2",
+    "status": "open"
+   },
+   {
+    "id": "CON8",
+    "name": "8th Concession",
+    "owner": "p0",
+    "status": "open"
+   },
+   {
+    "id": "CON9",
+    "name": "9th Concession",
+    "owner": "p3",
+    "status": "open"
+   },
+   {
+    "id": "CON10",
+    "name": "10th Concession",
+    "owner": "p3",
+    "status": "open"
+   }
+  ],
+  "zones": [
+   {
+    "id": "UK",
+    "price": 40,
+    "chits_left": 2,
+    "free": true,
+    "taken_by": [],
+    "discount": 0
+   },
+   {
+    "id": "PHS",
+    "price": 40,
+    "chits_left": 2,
+    "free": true,
+    "taken_by": [],
+    "discount": 0
+   },
+   {
+    "id": "FR",
+    "price": 20,
+    "chits_left": 2,
+    "free": true,
+    "taken_by": [],
+    "discount": 0
+   },
+   {
+    "id": "AH",
+    "price": 20,
+    "chits_left": 2,
+    "free": true,
+    "taken_by": [],
+    "discount": 0
+   },
+   {
+    "id": "IT",
+    "price": 10,
+    "chits_left": 2,
+    "free": true,
+    "taken_by": [],
+    "discount": 20
+   },
+   {
+    "id": "SP",
+    "price": 10,
+    "chits_left": 2,
+    "free": true,
+    "taken_by": [],
+    "discount": 20
+   },
+   {
+    "id": "SC",
+    "price": 10,
+    "chits_left": 2,
+    "free": true,
+    "taken_by": [],
+    "discount": 20
+   },
+   {
+    "id": "RU",
+    "price": 10,
+    "chits_left": 2,
+    "free": true,
+    "taken_by": [],
+    "discount": 20
+   }
+  ],
+  "map": [
+   {
+    "hex": "AB69",
+    "tile": {
+     "name": "AB69",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 60,
+     "green": 80,
+     "brown": 100,
+     "gray": 120
+    }
+   },
+   {
+    "hex": "AC16",
+    "tile": {
+     "name": "AC16",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 20,
+     "green": 30,
+     "brown": 40,
+     "gray": 50
+    }
+   },
+   {
+    "hex": "AC40",
+    "tile": {
+     "name": "AC40",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 60,
+     "green": 80,
+     "brown": 100,
+     "gray": 120
+    }
+   },
+   {
+    "hex": "AF49",
+    "tile": {
+     "name": "AF49",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 60,
+     "green": 80,
+     "brown": 100,
+     "gray": 120
+    }
+   },
+   {
+    "hex": "B67",
+    "tile": {
+     "name": "B67",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 20,
+     "green": 30,
+     "brown": 40,
+     "gray": 50
+    }
+   },
+   {
+    "hex": "F25",
+    "tile": {
+     "name": "F25",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 30,
+     "green": 40,
+     "brown": 50,
+     "gray": 70
+    }
+   },
+   {
+    "hex": "G68",
+    "tile": {
+     "name": "G68",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 30,
+     "green": 40,
+     "brown": 50,
+     "gray": 70
+    }
+   },
+   {
+    "hex": "H63",
+    "tile": {
+     "name": "H63",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 40,
+     "green": 60,
+     "brown": 70,
+     "gray": 80
+    }
+   },
+   {
+    "hex": "M36",
+    "tile": {
+     "name": "M36",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 30,
+     "green": 40,
+     "brown": 50,
+     "gray": 70
+    }
+   },
+   {
+    "hex": "O52",
+    "tile": {
+     "name": "O52",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 30,
+     "green": 40,
+     "brown": 50,
+     "gray": 70
+    }
+   },
+   {
+    "hex": "S76",
+    "tile": {
+     "name": "S76",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 30,
+     "green": 40,
+     "brown": 50,
+     "gray": 70
+    }
+   },
+   {
+    "hex": "T69",
+    "tile": {
+     "name": "T69",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 60,
+     "green": 80,
+     "brown": 100,
+     "gray": 120
+    }
+   },
+   {
+    "hex": "U32",
+    "tile": {
+     "name": "U32",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 30,
+     "green": 40,
+     "brown": 50,
+     "gray": 70
+    }
+   },
+   {
+    "hex": "V27",
+    "tile": {
+     "name": "V27",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 20,
+     "green": 30,
+     "brown": 40,
+     "gray": 50
+    }
+   },
+   {
+    "hex": "W40",
+    "tile": {
+     "name": "W40",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 30,
+     "green": 40,
+     "brown": 50,
+     "gray": 70
+    }
+   },
+   {
+    "hex": "W64",
+    "tile": {
+     "name": "W64",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 30,
+     "green": 40,
+     "brown": 50,
+     "gray": 70
+    }
+   },
+   {
+    "hex": "Y20",
+    "tile": {
+     "name": "Y20",
+     "rotation": 0,
+     "color": "white"
+    },
+    "tokens": [],
+    "patronage": {
+     "yellow": 40,
+     "green": 60,
+     "brown": 70,
+     "gray": 80
+    }
+   }
+  ],
+  "log": [
+   {
+    "action": 2324,
+    "text": "p2 bids \u00a3905 for 10th Concession"
+   },
+   {
+    "action": 2325,
+    "text": "p3 bids \u00a3910 for 10th Concession"
+   },
+   {
+    "action": 2326,
+    "text": "p2 bids \u00a3915 for 10th Concession"
+   },
+   {
+    "action": 2327,
+    "text": "p3 bids \u00a3920 for 10th Concession"
+   },
+   {
+    "action": 2328,
+    "text": "p2 bids \u00a3925 for 10th Concession"
+   },
+   {
+    "action": 2329,
+    "text": "p3 bids \u00a3930 for 10th Concession"
+   },
+   {
+    "action": 2330,
+    "text": "p2 bids \u00a3935 for 10th Concession"
+   },
+   {
+    "action": 2331,
+    "text": "p3 bids \u00a3940 for 10th Concession"
+   },
+   {
+    "action": 2332,
+    "text": "p2 bids \u00a3945 for 10th Concession"
+   },
+   {
+    "action": 2333,
+    "text": "p3 bids \u00a3950 for 10th Concession"
+   },
+   {
+    "action": 2334,
+    "text": "p2 bids \u00a3955 for 10th Concession"
+   },
+   {
+    "action": 2335,
+    "text": "p3 bids \u00a3960 for 10th Concession"
+   },
+   {
+    "action": 2336,
+    "text": "p2 bids \u00a3965 for 10th Concession"
+   },
+   {
+    "action": 2337,
+    "text": "p3 bids \u00a3970 for 10th Concession"
+   },
+   {
+    "action": 2338,
+    "text": "p2 bids \u00a3975 for 10th Concession"
+   },
+   {
+    "action": 2339,
+    "text": "p3 bids \u00a3980 for 10th Concession"
+   },
+   {
+    "action": 2340,
+    "text": "p2 bids \u00a3985 for 10th Concession"
+   },
+   {
+    "action": 2341,
+    "text": "p3 bids \u00a3990 for 10th Concession"
+   },
+   {
+    "action": 2342,
+    "text": "p2 bids \u00a3995 for 10th Concession"
+   },
+   {
+    "action": 2343,
+    "text": "p3 bids \u00a31000 for 10th Concession"
+   },
+   {
+    "action": 2344,
+    "text": "p2 bids \u00a31005 for 10th Concession"
+   },
+   {
+    "action": 2345,
+    "text": "p3 bids \u00a31010 for 10th Concession"
+   },
+   {
+    "action": 2346,
+    "text": "p2 bids \u00a31015 for 10th Concession"
+   },
+   {
+    "action": 2347,
+    "text": "p3 bids \u00a31020 for 10th Concession"
+   },
+   {
+    "action": 2348,
+    "text": "p2 bids \u00a31025 for 10th Concession"
+   },
+   {
+    "action": 2349,
+    "text": "p3 bids \u00a31030 for 10th Concession"
+   },
+   {
+    "action": 2350,
+    "text": "p2 bids \u00a31035 for 10th Concession"
+   },
+   {
+    "action": 2351,
+    "text": "p3 bids \u00a31040 for 10th Concession"
+   },
+   {
+    "action": 2352,
+    "text": "p2 bids \u00a31045 for 10th Concession"
+   },
+   {
+    "action": 2353,
+    "text": "p3 bids \u00a31050 for 10th Concession"
+   },
+   {
+    "action": 2354,
+    "text": "p2 bids \u00a31055 for 10th Concession"
+   },
+   {
+    "action": 2355,
+    "text": "p3 bids \u00a31060 for 10th Concession"
+   },
+   {
+    "action": 2356,
+    "text": "p2 passes on 10th Concession"
+   },
+   {
+    "action": 2356,
+    "text": "p3 wins the auction for 10th Concession with a bid of \u00a31060"
+   },
+   {
+    "action": 2356,
+    "text": "-- Concession RR Phase --"
+   },
+   {
+    "action": 2357,
+    "text": "p2 floats E"
+   },
+   {
+    "action": 2357,
+    "text": "p2 becomes the president of E"
+   },
+   {
+    "action": 2357,
+    "text": "E floats"
+   },
+   {
+    "action": 2357,
+    "text": "E must choose city for home token"
+   },
+   {
+    "action": 2357,
+    "text": "p2 executes the 1st Concession"
+   }
+  ],
+  "prompt": {
+   "step": "HomeToken",
+   "types": [
+    "place_token"
+   ],
+   "viewer_to_act": true,
+   "actions": [
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "Q38-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "S78-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "O56-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "P69-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "G26-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "N31-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "J15-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "V27-2-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "V17-7-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "W6-8-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "X13-9-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "Y20-10-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "AA20-11-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "AC8-12-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "AC16-13-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "W40-15-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "H21-16-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "C48-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "AB57-1-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "AC40-3-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "AF49-4-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "B67-5-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "D77-6-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "E56-7-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "G68-8-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "H47-9-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "H63-10-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "H87-11-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "I76-12-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "J69-13-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "K78-14-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "K86-15-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "M44-16-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "M68-17-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "T53-18-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "T81-19-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "V51-20-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "V55-21-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "F25-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "R23-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "V39-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "U32-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "AD9-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "D57-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "O28-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "X33-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "P53-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "I52-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "J63-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "M36-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "O40-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "Q40-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "O52-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "S42-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "S50-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "T69-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "X45-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "L37-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "J25-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "A64-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "N87-0-0"
+    },
+    {
+     "type": "place_token",
+     "entity": "E",
+     "entity_type": "corporation",
+     "city": "T87-0-0"
+    }
+   ],
+   "unsupported": [],
+   "ranges": []
+  }
+ }
+}
