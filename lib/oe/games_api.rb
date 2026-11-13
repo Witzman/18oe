@@ -5,6 +5,7 @@ require "securerandom"
 require_relative "accounts"
 require_relative "bot_runner"
 require_relative "catalog"
+require_relative "history"
 require_relative "game_session"
 require_relative "store"
 require_relative "view"
@@ -236,6 +237,13 @@ module Oe
         page = lines.first(limit)
         json 200, lines: page.map { |e| { action: e.action_id, text: e.message.to_s } },
                   next: lines.size > limit ? page.last.action_id : nil, seq: session.seq
+      end
+
+      # Time series (#115): share price per corporation, player value and
+      # operating-round revenue. Derived by replay, on request only (#91).
+      app.get "/games/:id/history" do
+        session = load_session(params[:id])
+        json 200, { seq: session.seq }.merge(History.for_session(store, session))
       end
 
       app.get "/games/:id/actions" do

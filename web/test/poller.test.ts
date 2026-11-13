@@ -11,6 +11,7 @@ function setup(opts: { versions: (number | ApiError)[]; visible?: () => boolean 
   let current = 0; // what the fake server reports; getGame returns the same seq
   const log = { loads: 0, versions: 0, games: [] as number[], errors: [] as ApiError[], unauthorized: 0 };
   const timers: (() => void)[] = [];
+  const delays: number[] = [];
   const poller = createPoller({
     api: {
       version: async () => {
@@ -27,11 +28,11 @@ function setup(opts: { versions: (number | ApiError)[]; visible?: () => boolean 
     onError: (e) => log.errors.push(e),
     onUnauthorized: () => { log.unauthorized++; },
     isVisible: opts.visible,
-    setTimer: (fn) => { timers.push(fn); return timers.length; },
+    setTimer: (fn, ms) => { timers.push(fn); delays.push(ms); return timers.length; },
     clearTimer: () => {},
   });
   const flush = () => new Promise((r) => setImmediate(r));
-  return { poller, log, timers, flush };
+  return { poller, log, timers, delays, flush };
 }
 
 test("loads the full state on the first check and only again when seq changes", async () => {
@@ -47,18 +48,27 @@ test("loads the full state on the first check and only again when seq changes", 
   assert.equal(log.versions, 3);
 });
 
-test("does not poll while the tab is hidden, but keeps the timer going", async () => {
-  let visible = false;
-  const { poller, log, timers, flush } = setup({ versions: [1], visible: () => visible });
-  poller.start(); // first check is forced
-  await flush();
-  assert.equal(log.versions, 1);
+test("polls every 2 s while visible and every 10 s in the background, switching without a restart", async () => {
+  let visible = true;
+  const { poller, log, timers, delays, flush } = setup({ versions: [1, 1, 1], visible: () => visible });
+  poller.start(); await flush();
+  assert.deepEqual(delays, [2000]);
+  visible = false;
   timers.shift()!(); await flush();
-  assert.equal(log.versions, 1, "hidden: no request");
-  assert.equal(timers.length, 1, "still rescheduled");
+  assert.equal(log.versions, 2, "hidden: still checks (title and favicon stay current)");
+  assert.deepEqual(delays, [2000, 10000]);
   visible = true;
   timers.shift()!(); await flush();
+  assert.deepEqual(delays, [2000, 10000, 2000]);
+});
+
+test("tick() right away (tab visible again) checks at once, without waiting for the timer", async () => {
+  const { poller, log, timers, flush } = setup({ versions: [1, 2] });
+  poller.start(); await flush();
+  await poller.tick(); await flush();
   assert.equal(log.versions, 2);
+  assert.equal(log.loads, 2);
+  assert.equal(poller.state, "waiting");
 });
 
 test("a network error is reported and polling continues", async () => {

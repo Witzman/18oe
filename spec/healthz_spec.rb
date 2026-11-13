@@ -21,6 +21,18 @@ RSpec.describe "GET /healthz" do
     expect(body["engine"]).to end_with("+#{body['build']}")
   end
 
+  it "reports the database as writable" do
+    get "/healthz"
+    expect(JSON.parse(last_response.body)["db"]).to eq("writable")
+  end
+
+  it "answers 503 and degraded when the database cannot be written" do
+    allow(app.settings.store).to receive(:writable?).and_return(false)
+    get "/healthz"
+    expect(last_response.status).to eq(503)
+    expect(JSON.parse(last_response.body)).to include("status" => "degraded", "db" => "not writable")
+  end
+
   it "still rejects unknown hosts" do
     get "/healthz", {}, { "HTTP_HOST" => "evil.example" }
     expect(last_response.status).to eq(403)

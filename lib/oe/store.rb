@@ -93,6 +93,14 @@ module Oe
       @mutex.synchronize { @db.close }
     end
 
+    # True when a write transaction can be opened and committed (BEGIN IMMEDIATE
+    # fails on a read-only or locked database). Used by /healthz (#41).
+    def writable?
+      transaction { true }
+    rescue SQLite3::Exception
+      false
+    end
+
     def schema_version
       @mutex.synchronize { @db.get_first_value("PRAGMA user_version") }
     end

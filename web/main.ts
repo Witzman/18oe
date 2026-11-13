@@ -9,10 +9,14 @@ import { mapDevPage } from "./ui/mapdev.ts";
 import { accessPage } from "./ui/access.ts";
 import { loadGeometry } from "./ui/frame/mapview.ts";
 import { mountConcession } from "./ui/panels/concession.ts";
+import { mountTrain } from "./ui/panels/train.ts";
 import { gameFrame, gamesPage, notFoundPage, type Ctx } from "./ui/pages.ts";
+import { applyAttention, watchTheme } from "./ui/attention.ts";
 import { initTheme, themeSwitch } from "./ui/theme-switch.ts";
 
 initTheme();
+watchTheme();
+applyAttention(false, null);
 const root = document.getElementById("app")!;
 document.body.append(themeSwitch());
 const api = createApi();
@@ -27,6 +31,7 @@ async function route() {
   poller = null;
   page?.stop();
   page = null;
+  applyAttention(false, null);
   if (location.hash === "#/kit") { mount(root, kitPage()); return; }
   if (/^#\/map(\?|$)/.test(location.hash)) {
     const dev = mapDevPage(api, location.hash);
@@ -54,10 +59,12 @@ async function route() {
       mount(root, frame.root);
       let mapGeometry: MapGeometry | null = null;
       const concession = mountConcession(frame, { map: () => mapGeometry });
+      mountTrain(frame);
       // Hex names and zones for the home token step; the panel works without them (hex ids only).
       void loadGeometry(api).then((m) => { mapGeometry = m; concession.refresh(); }, () => {});
       self = poller = createPoller({
-        api, gameId, onGame: frame.render,
+        api, gameId,
+        onGame: (g) => { frame.render(g); applyAttention(g.state.prompt.viewer_to_act, gameId); },
         onUnauthorized: toLogin,
         onOk: () => frame.band.ok(),
         onRetryIn: (ms) => frame.band.failed(ms),
