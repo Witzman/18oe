@@ -125,6 +125,14 @@ test("outliner lists founded corporations and counts the rest; company colours c
   assert.equal(corpColor(theme, g, g.state.corporations[colors.length]!.id), colors[0]);
 });
 
+test("outliner follows meta.operating_order when the view model has it", () => {
+  const g = structuredClone(games["track"]!);
+  const ids = outlinerCorps(g).shown.map((c) => c.id);
+  assert.ok(ids.length >= 2);
+  g.state.meta.operating_order = [...ids].reverse().map((id) => ({ id, done: false }));
+  assert.deepEqual(outlinerCorps(g).shown.map((c) => c.id), [...ids].reverse());
+});
+
 test("view registry: first registered view is active, activate switches, unregister falls back", () => {
   const views = createViews();
   let changes = 0;

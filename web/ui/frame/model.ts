@@ -89,9 +89,11 @@ export function playerRows(g: Game): PlayerRow[] {
   }));
 }
 
-// Floated or founded corporations first-class in the outliner. Order is the engine's list until the
-// operating order is delivered (#122, assumption).
+// Founded corporations in operating order (meta.operating_order, #122); corporations the order does not
+// name (and states recorded before #122) keep the engine's list order after the named ones.
 export function outlinerCorps(g: Game): { shown: Corporation[]; hidden: number } {
-  const shown = g.state.corporations.filter((c) => !c.closed && (c.ipoed || c.floated));
+  const order = new Map((g.state.meta.operating_order ?? []).map((o, i) => [o.id, i]));
+  const rank = (c: Corporation) => order.get(c.id) ?? Number.MAX_SAFE_INTEGER;
+  const shown = g.state.corporations.filter((c) => !c.closed && (c.ipoed || c.floated)).sort((a, b) => rank(a) - rank(b));
   return { shown, hidden: g.state.corporations.filter((c) => !c.closed).length - shown.length };
 }
