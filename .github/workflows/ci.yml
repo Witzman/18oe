@@ -1,5 +1,6 @@
 # Fast stage (#269): runs on every pull request and on manual dispatch.
 # Frontend: typecheck + unit tests without a browser. Ruby: targeted specs without the long game runs.
+# Browser job (#277): the *-browser tests, shot and ipad on the runner's Chrome; fails if any is skipped.
 # The full suite is in full.yml (push to main, manual). No secrets, no deploy.
 name: ci
 
@@ -36,6 +37,45 @@ jobs:
         run: |
           files=$(ls test/*.test.ts | grep -v -E '(-browser|^test/shot|^test/ipad)')
           node --test $files
+
+  browser:
+    name: browser (Chrome, iPad profile)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-progress --no-audit --no-fund
+      # The tests start $OE_BROWSER without --headless (locally chromium-headless-shell); the runner's
+      # preinstalled Google Chrome gets a thin headless wrapper. bin/shot --device ipad uses the Chromium
+      # iPad profile (viewport, DPR 2, touch, UA); real WebKit (.tools/pw) is not installed here.
+      - name: headless Chrome wrapper
+        run: |
+          wrapper="$RUNNER_TEMP/chrome-headless"
+          printf '#!/bin/sh\nexec "%s" --headless=new --no-sandbox "$@"\n' "$(command -v google-chrome)" > "$wrapper"
+          chmod +x "$wrapper"
+          echo "OE_BROWSER=$wrapper" >> "$GITHUB_ENV"
+          google-chrome --version
+      # The browser tests skip silently without a browser: here a skip is a failure, so a green check
+      # means they really ran. The counts stay visible in the log.
+      - name: browser tests (no skips allowed)
+        run: |
+          files=$(ls test/*.test.ts | grep -E '(-browser|^test/shot|^test/ipad)')
+          echo "$files"
+          node --test --test-reporter=tap $files | tee "$RUNNER_TEMP/browser.tap"
+          status=${PIPESTATUS[0]}
+          grep -E '^# (tests|pass|fail|skipped) ' "$RUNNER_TEMP/browser.tap"
+          if ! grep -q '^# skipped 0$' "$RUNNER_TEMP/browser.tap"; then echo "::error::browser tests were skipped"; exit 1; fi
+          if grep -q '^# tests 0$' "$RUNNER_TEMP/browser.tap"; then echo "::error::no browser tests ran"; exit 1; fi
+          exit $status
+        shell: bash
 
   ruby:
     name: ruby (targeted specs, contracts)
