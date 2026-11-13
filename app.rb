@@ -12,6 +12,7 @@ require "sinatra"
 require "json"
 require "securerandom"
 require_relative "lib/oe/build_id"
+require_relative "lib/oe/version"
 require_relative "lib/oe/accounts"
 require_relative "lib/oe/games_api"
 require_relative "lib/oe/map_data"
@@ -175,5 +176,7 @@ end
 
 get "/healthz" do
   content_type :json
-  JSON.generate(status: "ok", build: Oe::BuildId.value)
+  # status/build as before (#41); version = roadmap version from VERSION, engine = engine
+  # revision that new games are stamped with (#271). Fields are only ever added.
+  JSON.generate(status: "ok", build: Oe::BuildId.value, version: Oe::Version.value, engine: Oe::GameSession.engine_rev)
 end

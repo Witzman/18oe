@@ -5,6 +5,7 @@ import { ApiError, type Api } from "../api.ts";
 import type { Account } from "../types.ts";
 import { h } from "./dom.ts";
 import { txt } from "./text.ts";
+import { versionFooter } from "./version.ts";
 
 export type AccessMode = "login" | "register";
 
@@ -77,5 +78,6 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
     h("div", { class: "panel" },
       h("h2", {}, txt(reg ? "access.title_register" : "access.title_login").de),
       h("form", { onsubmit, novalidate: true }, ...fields, h("div", { class: "row" }, submit), error),
-      h("p", {}, h("a", { href: reg ? "#/login" : "#/register" }, txt(reg ? "access.to_login" : "access.to_register").de))));
+      h("p", {}, h("a", { href: reg ? "#/login" : "#/register" }, txt(reg ? "access.to_login" : "access.to_register").de))),
+    versionFooter());
 }
