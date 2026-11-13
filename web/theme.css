@@ -65,3 +65,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .version-dialog dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 8px; }
 .version-dialog dt { color: var(--ui-faint); }
 .version-dialog dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* Touch targets (issue 259, Apple guideline): 44 px on coarse pointers (iPad); mouse layout unchanged. */
+@media (pointer: coarse) {
+  button, select, input, summary { min-height: 44px; min-width: 44px; }
+}

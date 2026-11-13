@@ -79,7 +79,7 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
     m.fit(); await sleep(1000); await m.rendered();
     // Pan with one finger: 120 px right/down, slowly (no inertia at rest), no hex event.
     events.length = 0;
-    const a = { x: 400, y: 300 };
+    const a = { x: box.width * 0.35, y: box.height * 0.4 };
     const v0 = m.view;
     await window.oeTouch("start", [abs(a)]); await sleep(20);
     for (let i = 1; i <= 6; i++) { await window.oeTouch("move", [abs({ x: a.x + i * 20, y: a.y + i * 10 })]); await sleep(30); }
@@ -104,7 +104,7 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
     if (Math.abs(m.view.panX - later) > 60) fail("inertia did not settle");
     // Pinch: fingers 80 px apart spread to 240 px about their midpoint: the ground under the midpoint stays, zoom x3.
     m.fit(); await sleep(1000); await m.rendered();
-    const mid = { x: 600, y: 350 };
+    const mid = { x: box.width * 0.5, y: box.height * 0.45 };
     const z0 = m.view.zoom;
     const under0 = m.scene.grid.hexes.map((x) => x.id).find((i) => { const p = m.hexOnScreen(i); return p && Math.hypot(p.x - mid.x, p.y - mid.y) < 8; });
     const pa = { x: mid.x - 40, y: mid.y, id: 1 }, pb = { x: mid.x + 40, y: mid.y, id: 2 };
@@ -116,7 +116,7 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
     if (under0) { const q = m.hexOnScreen(under0); if (Math.hypot(q.x - mid.x, q.y - mid.y) > 25) fail("pinch drifted from the midpoint: " + JSON.stringify(q)); }
     // Double tap zooms in about the finger.
     m.fit(); await sleep(1000); await m.rendered();
-    const z1 = m.view.zoom, dt = { x: 500, y: 300 };
+    const z1 = m.view.zoom, dt = { x: box.width * 0.45, y: box.height * 0.4 };
     const u = m.scene.grid.hexes.map((x) => x.id).find((i) => { const p = m.hexOnScreen(i); return p && Math.hypot(p.x - dt.x, p.y - dt.y) < 8; });
     await window.oeTouch("start", [abs(dt)]); await sleep(20); await window.oeTouch("end", []); await sleep(80);
     await window.oeTouch("start", [abs(dt)]); await sleep(20); await window.oeTouch("end", []);
