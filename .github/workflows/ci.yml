@@ -72,6 +72,9 @@ jobs:
           node --test --test-reporter=tap $files | tee "$RUNNER_TEMP/browser.tap"
           status=${PIPESTATUS[0]}
           grep -E '^# (tests|pass|fail|skipped) ' "$RUNNER_TEMP/browser.tap"
+          # Failing and skipped tests also as annotations (readable without the raw log).
+          grep -E '^ *(not ok|ok .*# SKIP)' "$RUNNER_TEMP/browser.tap" | head -30 | while IFS= read -r l; do echo "::error::${l:0:300}"; done
+          grep -E -A12 '^ *not ok' "$RUNNER_TEMP/browser.tap" | grep -E 'error:|message|expected|actual|Error' | head -20 | while IFS= read -r l; do echo "::warning::${l:0:300}"; done
           if ! grep -q '^# skipped 0$' "$RUNNER_TEMP/browser.tap"; then echo "::error::browser tests were skipped"; exit 1; fi
           if grep -q '^# tests 0$' "$RUNNER_TEMP/browser.tap"; then echo "::error::no browser tests ran"; exit 1; fi
           exit $status
