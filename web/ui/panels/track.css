@@ -1,0 +1,18 @@
+/* Track and token panels of the operating round (#48, #174). Colours from ui.* and map.* tokens, sizes from
+   shape.* tokens only; every target at least 44 px (2.75rem) for touch (ui-spec 6, CLAUDE.md rule 18). */
+.track-points, .token-left { margin: 0 0 var(--shape-gap); font-weight: bold; }
+.track-hint, .token-hint { margin: 0 0 var(--shape-gap); font-size: .9rem; }
+.track-map { min-height: 2.75rem; margin-bottom: var(--shape-gap); }
+.track-hexes, .token-cities { display: flex; flex-direction: column; gap: var(--shape-gap); }
+.track-hex, .token-city { min-height: 2.75rem; text-align: left; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 6px 10px; }
+.track-hex[aria-pressed="true"], .token-city[aria-pressed="true"], .track-tile[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); }
+.track-choice { margin-top: var(--shape-gap); }
+.track-choice h4 { margin: 0 0 4px; }
+.track-tiles { display: flex; flex-wrap: wrap; gap: var(--shape-gap); }
+.track-tile { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 2.75rem; min-height: 2.75rem; padding: 4px; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); }
+.track-tile .tile-svg { display: block; }
+.track-tile-name { font-size: .85rem; }
+.track-rotation { display: flex; align-items: center; gap: var(--shape-gap); margin-top: var(--shape-gap); }
+.track-turn { min-width: 2.75rem; min-height: 2.75rem; font-size: 1.2rem; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); }
+.track-turn:disabled { opacity: .5; cursor: not-allowed; }
+.track-cost { margin: var(--shape-gap) 0 0; }
