@@ -2,10 +2,12 @@
 // height of a hex (ui-spec 2.4). World coordinates x/y come from the server
 // (Oe::MapData.world is the only coordinate conversion); nothing here recomputes them.
 import type { Theme } from "../themes/schema.ts";
+import type { TileParts } from "./track-axes.ts";
 
 export type HexKind = "land" | "sea" | "offboard";
 
-export interface MapHex {
+/** A hex carries the track parts of its printed tile (paths, cities, towns, ...; rotation 0) as /map delivers them. */
+export interface MapHex extends TileParts {
   id: string;
   /** Flat world position of the centre, side length 1, y down. */
   x: number;
@@ -40,6 +42,8 @@ export interface MapGeometry {
   hexes: MapHex[];
   /** Home hex per corporation (used by flyTo(corpId) before a company has tokens). */
   homes?: { corporation: string; type: string; hex: string }[];
+  /** Tile catalog by tile name: colour and track parts (laid tiles are drawn from these, #146). */
+  tiles?: Record<string, TileParts & { color?: string }>;
 }
 
 type Heights = Pick<Theme["camera"], "heightLand" | "heightHill" | "heightMountain" | "heightTile">;

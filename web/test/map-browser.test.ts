@@ -18,7 +18,12 @@ function fixtureMap(): string {
   const read = (f: string) => JSON.parse(readFileSync(join(web, "test", "fixtures", f), "utf8"));
   const geometry = read("map-geometry.json");
   const zones = new Map((read("map-zones.json").hexes as { id: string }[]).map((h) => [h.id, h]));
-  geometry.hexes = geometry.hexes.map((h: { id: string }) => ({ ...h, ...zones.get(h.id) }));
+  // Track parts (#146): printed track per hex and the tile catalog, from the #144 excerpt of GET /map.
+  const tracks = read("map-tiles.json");
+  const printed = new Map((tracks.hexes as { id: string }[]).map((h) => [h.id, h]));
+  const parts = ({ paths, cities, towns, double_towns, offboards, junction }: Record<string, unknown>) => ({ paths, cities, towns, double_towns, offboards, junction });
+  geometry.hexes = geometry.hexes.map((h: { id: string }) => ({ ...h, ...zones.get(h.id), ...parts(printed.get(h.id) ?? {}) }));
+  geometry.tiles = tracks.tiles;
   return JSON.stringify(geometry);
 }
 
@@ -81,6 +86,18 @@ const CHECKS = String.raw`(async () => {
   if (m.stats().stateHexes !== 1) fail("one change " + m.stats().stateHexes);
   await m.rendered();
   if (!(m.stats().stateMs >= 0)) fail("stateMs");
+
+  // Track (#146): printed hexes and the laid tile R55 carry a "track" container with the four parts;
+  // the zoom stage only toggles their visibility.
+  const tracks = [];
+  const walk = (n) => { if (n.label === "track") tracks.push(n); n.children?.forEach(walk); };
+  walk(m.layer("tiles"));
+  if (tracks.length < 50) fail("only " + tracks.length + " track containers");
+  if (tracks.some((n) => n.children.length !== 4)) fail("a track container without its four parts");
+  const stageVisible = () => tracks.map((n) => n.children.map((g) => g.visible ? 1 : 0).join(""));
+  await m.rendered();
+  const stages = new Set(stageVisible());
+  if (stages.size !== 1) fail("track parts differ between hexes: " + [...stages]);
   m.setTargets({ kind: "tile", hexes: ["Q30", "S42"] });
 
   // flyTo a hex and a corporation home; unknown targets are refused.

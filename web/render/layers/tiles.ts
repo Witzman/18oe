@@ -1,7 +1,7 @@
 // Tiles layer (ui-spec 2.3 layer 6, 2.5): one container per hex, redrawn only when that hex's
 // entry in state.map changes. This issue (#44) draws the tile surface only: a full hex in
 // map.tile<Colour> (inset 12 % when tileStyle is "inner"); printed white/blue tiles have none.
-// Track (#146), cities and tokens (#147) are drawn into the same per-hex container later.
+// Track (#146, track.ts) is drawn into the same per-hex container; cities and tokens (#147) are drawn into the same per-hex container later.
 import { Graphics } from "pixi.js";
 import { worldCorners, type GridHex, type HexGrid } from "../projection.ts";
 import type { RenderTheme } from "../theme.ts";
