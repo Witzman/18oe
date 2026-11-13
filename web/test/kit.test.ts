@@ -17,7 +17,7 @@ const kitDir = join(dirname(fileURLToPath(import.meta.url)), "..", "ui", "kit");
 
 test("Siegel: abbreviation on company colour, text colour computed per theme, readable on all company colours", () => {
   for (const theme of themes) {
-    for (const color of Object.values(theme.company)) {
+    for (const color of [...Object.values(theme.company), ...Object.values(theme.companies).map((c) => c.bg)]) {
       assert.ok(inkReadable(color, theme), `${theme.id} ${color}`);
       const s = Siegel({ sym: "PLM", color }, { theme });
       assert.equal(textOf(s), "PLM");
