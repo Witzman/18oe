@@ -1,10 +1,11 @@
 import { createApi, ApiError } from "./api.ts";
 import { createPoller } from "./poller.ts";
+import { createSession } from "./session.ts";
 import type { Account } from "./types.ts";
 import { h, mount } from "./ui/dom.ts";
 import { kitPage } from "./ui/kit/page.ts";
 import { mapDevPage } from "./ui/mapdev.ts";
-import { gameFrame, gamesPage, loginPage, type Ctx } from "./ui/pages.ts";
+import { gameFrame, gamesPage, loginPage, notFoundPage, type Ctx } from "./ui/pages.ts";
 import { initTheme, themeSwitch } from "./ui/theme-switch.ts";
 
 initTheme();
@@ -14,6 +15,8 @@ const api = createApi();
 const ctx: Ctx = { api, me: null, accounts: [], go: (hash) => { location.hash = hash; } };
 let poller: ReturnType<typeof createPoller> | null = null;
 let page: { stop: () => void } | null = null;
+// After a 401 the player logs in again and lands on the same game and view (#162).
+let returnTo: string | null = null;
 
 async function route() {
   poller?.stop();
@@ -33,18 +36,34 @@ async function route() {
       throw e;
     });
     if (!ctx.me) {
-      mount(root, loginPage(ctx, (me: Account) => { ctx.me = me; location.hash = "#/"; void route(); }));
+      mount(root, loginPage(ctx, (me: Account) => { ctx.me = me; const back = returnTo; returnTo = null; if (back && back !== location.hash) location.hash = back; else if (back) void route(); else { location.hash = "#/"; void route(); } }));
       return;
     }
     const game = /^#\/game\/(\d+)$/.exec(location.hash);
     if (game) {
-      const frame = gameFrame();
+      const gameId = Number(game[1]);
+      const hash = location.hash;
+      const toLogin = () => { returnTo = hash; ctx.me = null; void route(); };
+      let self: ReturnType<typeof createPoller>;
+      const frame = gameFrame(() => void self.tick());
       mount(root, frame.root);
-      poller = createPoller({
-        api, gameId: Number(game[1]), onGame: frame.render,
-        onUnauthorized: () => { ctx.me = null; void route(); },
-        onError: (e) => frame.root.append(h("p", { class: "error" }, e.message)),
+      self = poller = createPoller({
+        api, gameId, onGame: frame.render,
+        onUnauthorized: toLogin,
+        onOk: () => frame.band.ok(),
+        onRetryIn: (ms) => frame.band.failed(ms),
+        onError: (e) => {
+          if (e.status === 404) { self.stop(); mount(root, notFoundPage()); }
+          else if (e.status !== 0) frame.message.say(e.message, "error");
+        },
         isVisible: () => !document.hidden,
+      });
+      frame.session = createSession({
+        api, gameId, poller: self,
+        say: frame.message.say, clearMessage: frame.message.clear, setBusy: frame.setBusy,
+        discardSelection: frame.discardSelection,
+        onUnauthorized: toLogin,
+        onNotFound: () => { self.stop(); mount(root, notFoundPage()); },
       });
       poller.start();
     } else {

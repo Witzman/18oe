@@ -1,6 +1,9 @@
 import { ApiError, type Api } from "../api.ts";
 import type { Account, Game, GameSummary, SeatRequest } from "../types.ts";
+import type { createSession } from "../session.ts";
+import { connectionBand, messageArea } from "./connection.ts";
 import { h } from "./dom.ts";
+import { txt } from "./text.ts";
 
 export interface Ctx {
   api: Api;
@@ -102,10 +105,28 @@ function newGameForm(ctx: Ctx): HTMLElement {
 }
 
 // Empty frame of the game page: what the later UI issues (#45 ff.) fill in.
-export function gameFrame(): { root: HTMLElement; render: (g: Game) => void } {
+export interface GameFrame {
+  root: HTMLElement;
+  render: (g: Game) => void;
+  band: ReturnType<typeof connectionBand>;
+  message: ReturnType<typeof messageArea>;
+  // Selection of the action bar (#45); the session calls this when the state is stale.
+  discardSelection: () => void;
+  setBusy: (busy: boolean) => void;
+  // Set by main once the poller exists; the action bar sends through it.
+  session?: ReturnType<typeof createSession>;
+}
+
+export function notFoundPage(): HTMLElement {
+  return h("div", {}, h("h1", {}, txt("msg.not_found_title").de), h("p", {}, h("a", { href: "#/" }, txt("msg.not_found_link").de)));
+}
+
+export function gameFrame(retryNow: () => void = () => {}): GameFrame {
   const status = h("div", { class: "panel" });
   const log = h("pre", { class: "panel muted" });
-  const root = h("div", {}, h("p", {}, h("a", { href: "#/" }, "← Partien")), h("h1", {}, "18OE"), status, log);
+  const band = connectionBand({ retryNow });
+  const message = messageArea();
+  const root = h("div", {}, h("p", {}, h("a", { href: "#/" }, "← Partien")), h("h1", {}, "18OE"), band.el, status, message.el, log);
   const render = (g: Game) => {
     const m = g.state.meta;
     const mine = g.state.prompt.viewer_to_act;
@@ -116,5 +137,9 @@ export function gameFrame(): { root: HTMLElement; render: (g: Game) => void } {
     );
     log.textContent = g.state.log.map((l) => l.text).join("\n");
   };
-  return { root, render };
+  const setBusy = (busy: boolean) => {
+    root.toggleAttribute("aria-busy", busy);
+    for (const b of root.querySelectorAll("button")) b.disabled = busy;
+  };
+  return { root, render, band, message, discardSelection: () => {}, setBusy };
 }
