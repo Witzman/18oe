@@ -128,7 +128,7 @@ test("poller: pauses while an action is in flight; reports network loss with the
   const timers: (() => void)[] = [];
   const poller = createPoller({
     api: {
-      version: async () => { log.versions++; if (fail) throw new ApiError(0, "network", "x"); return { seq: 1, status: "active" }; },
+      version: async () => { log.versions++; if (fail) throw new ApiError(0, "network", "x"); return { seq: 1, status: "active", round: { type: "OR", number: 1, turn: 1 }, acting: [], viewer_to_act: false }; },
       getGame: async () => game(1),
     },
     gameId: 1, intervalMs: 5000, onGame: () => {}, onOk: () => { log.ok++; }, onRetryIn: (ms) => log.retry.push(ms),
