@@ -1,6 +1,7 @@
 // The stock sheet in a real browser (#47): bundles main.ts, serves it with a stub API (one recorded engine
 // state per run, POST /games/1/actions recorded) and drives the page with bin/shot --eval. The page script
 // throws on the first failed check. Skipped without a headless browser.
+import type { StockBundle } from "../types.ts";
 import assert from "node:assert/strict";
 import { copyFileSync, cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -147,7 +148,7 @@ test("stock sheet in the browser: choosing a sale sends nothing, shows the price
   // The recording is a seeded random game: take the first sale it offers, with the money the view names for it.
   const g0 = fixture("stock-pool");
   const first = g0.state.prompt.actions.find((a: Record<string, unknown>) => a.type === "sell_shares")!;
-  const b = g0.state.prompt.context!.stock!.bundles.find((x) => x.type === "sell_shares" && JSON.stringify(x.shares) === JSON.stringify(first.shares))!;
+  const b = g0.state.prompt.context!.stock!.bundles.find((x: StockBundle) => x.type === "sell_shares" && JSON.stringify(x.shares) === JSON.stringify(first.shares))!;
   const corp = b.corporation;
   const { posted, game } = await scenario("stock-pool", CHECKS_SELL(corp, b.percent, b.price));
   assert.equal(posted.length, 1);
