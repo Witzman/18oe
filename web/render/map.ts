@@ -21,6 +21,8 @@ import { THEME_CHANGED } from "../ui/theme-switch.ts";
 import { between, centerOn, clampPan, fit, frame, panBy, zoomAt, zoomStage, Z1_FROM, Z2_FROM, type Viewport } from "./camera.ts";
 import { drawGrid, drawPlate, type Block } from "./layers/static.ts";
 import { drawTileSurface } from "./layers/tiles.ts";
+import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
+import { hexFrame, tileGeometry, type Axis } from "./track-axes.ts";
 import type { MapGeometry } from "./mapdata.ts";
 import { levelMatrix, mapCenter, pick, project, worldCorners, type Vec, type View } from "./projection.ts";
 import { boxOnScreen, buildScene, COST_AT, terrainMark, type Scene } from "./scene.ts";
@@ -141,6 +143,9 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let seaMarksLevel!: Container;
   let blocks: Block[] = [];
   let tileNodes = new Map<string, Container>();
+  let trackNodes = new Map<string, TrackNode>();
+  const frame3 = hexFrame(geometry.layout.edge_vectors);
+  const axesCache = new Map<string, Axis[]>();
   let targetG: Graphics[] = [];
   let hoverG!: Graphics;
   let costs: { id: string; text: Text; at: Vec; z: number }[] = [];
@@ -202,7 +207,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     stats.blocks = blocks.length;
     // Tiles: printed and laid.
     tileNodes = new Map();
-    for (const id of new Set([...printed.keys(), ...entries.keys()])) drawTile(id);
+    trackNodes = new Map();
+    for (const id of new Set([...printed.keys(), ...entries.keys(), ...geometry.hexes.filter((h) => h.paths?.length).map((h) => h.id)])) drawTile(id);
     // Overlay: targets per level, one hover outline.
     targetG = levelNodes.overlay.map((c) => c.addChild(new Graphics()));
     hoverG = new Graphics();
@@ -225,16 +231,34 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     app.renderer.background.color = theme.ui.bg;
   }
 
+  /** Axes of the tile on hex id: the laid tile from the catalog, else the printed one (rotation 0). Cached per tile and rotation. */
+  function axesOf(id: string): Axis[] {
+    const laid = entries.get(id)?.tile;
+    const parts = laid ? geometry.tiles?.[laid.name] : scene.hexById.get(id);
+    if (!parts?.paths?.length) return [];
+    const key = laid ? `${laid.name}|${laid.rotation}` : `printed|${id}`;
+    let axes = axesCache.get(key);
+    if (!axes) axesCache.set(key, (axes = tileGeometry(parts, laid ? laid.rotation : 0, frame3).axes));
+    return axes;
+  }
+
   function drawTile(id: string) {
     const g = scene.grid.byId.get(id);
     if (!g) return;
     const old = tileNodes.get(id);
-    if (old) { old.destroy({ children: true }); tileNodes.delete(id); }
+    if (old) { old.destroy({ children: true }); tileNodes.delete(id); trackNodes.delete(id); }
     const color = entries.get(id)?.tile.color ?? printed.get(id);
     const surface = drawTileSurface(scene.grid, g, color, theme);
-    if (!surface) return;
+    const axes = axesOf(id);
+    if (!surface && !axes.length) return;
     const node = new Container({ label: id });
-    node.addChild(surface);
+    if (surface) node.addChild(surface);
+    if (axes.length) {
+      const t = drawTrack(axes, { x: g.x, y: g.y }, theme);
+      setTrackStage(t, zoomStage(view.zoom));
+      node.addChild(t.node);
+      trackNodes.set(id, t);
+    }
     levelNodes.tiles[scene.levelOf.get(id)!]!.addChild(node);
     tileNodes.set(id, node);
   }
@@ -272,6 +296,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     seaMarksLevel.setFromMatrix(mats[0]!);
     for (const n of LEVELED) levelNodes[n].forEach((c, i) => c.setFromMatrix(mats[i]!));
     const stage = zoomStage(view.zoom);
+    for (const t of trackNodes.values()) setTrackStage(t, stage);
     let visible = 0;
     for (const b of blocks) {
       b.node.visible = boxOnScreen(b.box, view, scene.levels[b.level]!, width, height, 8);
