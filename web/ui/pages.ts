@@ -3,6 +3,7 @@ import type { Account } from "../types.ts";
 import { createGameFrame, type GameFrame } from "./frame/frame.ts";
 import { h } from "./dom.ts";
 import { lobbyPage } from "./lobby.ts";
+import { mountAuction } from "./panels/auction.ts";
 import { txt } from "./text.ts";
 
 export interface Ctx {
@@ -22,5 +23,7 @@ export function notFoundPage(): HTMLElement {
 }
 
 export function gameFrame(retryNow: () => void = () => {}): GameFrame {
-  return createGameFrame(retryNow);
+  const frame = createGameFrame(retryNow);
+  mountAuction(frame);
+  return frame;
 }
