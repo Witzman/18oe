@@ -9,6 +9,7 @@ the short version and the pointer.
 ```sh
 bin/setup   # gems into vendor/bundle, Node 22 into .tools/node (idempotent)
 bin/test    # runs the test suites (rspec for now)
+bin/script-game --spawn   # scripted game over the real HTTP API, report of executed round/step/action combinations (#132)
 ```
 
 Docker is not required for tests. Everything stays inside the repo
