@@ -37,6 +37,8 @@ export interface GameFrame {
   // Sends an action with the current seq (what the main button of the generic bar does).
   send: (action: Record<string, unknown>) => void;
   hooks: { onFocusCorporation?: (id: string) => void };
+  // Special panels follow the game state: called with every new state before the frame draws it (#46).
+  subscribe: (fn: (g: Game) => void) => () => void;
 }
 
 type Focus = { kind: "player" | "corporation"; id: string } | null;
@@ -66,6 +68,7 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   let logOpen = false;
   let endOpen = true;
   const frame: GameFrame = {} as GameFrame;
+  const listeners = new Set<(g: Game) => void>();
 
   const roundEl = h("header", { class: "frame-roundbar" });
   const playersEl = h("nav", { class: "frame-players", "aria-label": txt("frame.player_bar").de });
@@ -304,7 +307,9 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
 
   Object.assign(frame, {
     root, band, message, claims, views, setOrder: (spec: OrderSpec) => orderSlot.set(spec), send: (a: Action) => send(a), slots: { context: contextSlot, main: viewEl }, hooks: {},
+    subscribe: (fn: (g: Game) => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
     render(g: Game) {
+      for (const fn of listeners) fn(g);
       if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; }
       game = g;
       drawAll();
