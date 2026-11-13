@@ -48,9 +48,15 @@ const CHECKS = String.raw`(async () => {
   if (host.dataset.state !== "ready") fail("map not ready: " + host.dataset.state);
   const m = window.oeMap || fail("no oeMap");
   const c = host.querySelector("canvas") || fail("no canvas");
-  const hb = host.getBoundingClientRect(), cb = c.getBoundingClientRect();
+  // The renderer follows the host through a ResizeObserver, so the canvas catches up a frame after layout settles.
+  let hb, cb;
+  for (let i = 0; i < 20; i++) {
+    hb = host.getBoundingClientRect(); cb = c.getBoundingClientRect();
+    if (Math.abs(cb.width - hb.width) <= 2 && Math.abs(cb.height - hb.height) <= 2) break;
+    await sleep(100);
+  }
   if (hb.width < 300 || hb.height < 200) fail("host too small " + hb.width + "x" + hb.height);
-  if (Math.abs(cb.width - hb.width) > 2 || Math.abs(cb.height - hb.height) > 2) fail("canvas does not fill the host");
+  if (Math.abs(cb.width - hb.width) > 2 || Math.abs(cb.height - hb.height) > 2) fail("canvas does not fill the host " + JSON.stringify([hb.width, hb.height, cb.width, cb.height]));
   if (q(".frame-map-status") && !q(".frame-map-status").hidden) fail("status still shown");
   // Events reach the frame.
   const seen = [];
