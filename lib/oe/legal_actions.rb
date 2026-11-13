@@ -112,7 +112,7 @@ module Oe
 
       values = [min, max]
       if @limit.nil? || exhaustive
-        values = (min..max).step(step_size).to_a
+        values.concat((min..max).step(step_size).to_a)
       else
         values.concat(Array.new([@limit - 2, 0].max) { min + (@rng.rand(((max - min) / step_size) + 1) * step_size) })
       end

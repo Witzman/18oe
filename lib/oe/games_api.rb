@@ -126,6 +126,23 @@ module Oe
         seats
       end
 
+      # Entities that are not active themselves but act on behalf of the
+      # acting side (see Oe::LegalActions#acting_for, #132): a regional that its
+      # president converts, the president selling shares in a train purchase.
+      # Allowed when the entity belongs to the viewer and the viewer is the
+      # acting player (or the president of the active corporation).
+      def acting_for?(game, viewer, entity_id)
+        other = game.players.find { |p| p.id == entity_id } || game.corporation_by_id(entity_id)
+        return false unless other
+
+        other_player = other.player? ? other : other.player
+        return false unless other_player && other_player.id == viewer
+
+        game.round.active_entities.any? do |e|
+          (e.player? ? e : e.player)&.id == viewer
+        end
+      end
+
       # Authorization as a block for GameSession#append: runs inside the
       # transaction on the current state. The viewer must hold a seat and be
       # the acting player of the entity named in the action.
@@ -136,6 +153,7 @@ module Oe
           entity = game.round.active_entities.find { |e| e.id == action["entity"] }
           owner = entity && (entity.player? ? entity : entity.player)
           next if owner && owner.id == viewer
+          next if acting_for?(game, viewer, action["entity"])
 
           raise GameSession::Forbidden.new("not_your_turn", "it is not your turn, or the entity is not yours to act for")
         end

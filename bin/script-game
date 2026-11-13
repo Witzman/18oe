@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Scripted game over the real API (#132): bin/script-game --help
+set -euo pipefail
+source "$(dirname "$0")/_env"
+cd "$ROOT"
+bundler exec ruby -I lib bin/script_game.rb "$@"

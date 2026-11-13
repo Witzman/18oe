@@ -6,6 +6,7 @@ require "engine"
 require_relative "bot"
 require_relative "game_session"
 require_relative "script_game/clients"
+require_relative "script_game/report"
 
 module Oe
   # A scripted game over the real HTTP API (#132): the seats are all humans,
@@ -51,9 +52,9 @@ module Oe
     end
 
     Result = Struct.new(:slice, :status, :actions, :seed, :game_id, :ledger, :missing, :finished, :standings,
-                        :seconds, :detail, keyword_init: true) do
+                        :seconds, :detail, :targets, keyword_init: true) do
       def ok?
-        status == :finished && missing.empty? && ledger.problems.empty?
+        %i[finished covered].include?(status) && missing.empty? && ledger.problems.empty?
       end
     end
 
@@ -62,11 +63,17 @@ module Oe
     end
 
     # clients: {account_id => client}, in seat order; the first creates the game.
-    def initialize(clients:, slice: "s1", seed: 1, max_actions: 20_000, log: nil)
+    # game: index into the slice's `games` (each: name, seed, finish, rush, combos).
+    def initialize(clients:, slice: "s1", game: 0, seed: nil, max_actions: 20_000, log: nil)
       @clients = clients
       @slice = self.class.slice(slice)
       @slice_name = @slice.fetch("slice")
-      @targets = @slice.fetch("combos")
+      definition = @slice.fetch("games").fetch(game)
+      @game_name = definition.fetch("name")
+      @targets = definition.fetch("combos")
+      @finish = definition.fetch("finish")
+      @rush = definition["rush"]
+      seed ||= definition.fetch("seed")
       @seed = seed
       @max_actions = max_actions
       @log = log
@@ -74,10 +81,27 @@ module Oe
       @rng = Random.new(seed)
     end
 
-    def self.key(round, step, action)
+    # "round/Step/type", refined by what the action is about: the choice of a
+    # `choose`, the corporation type (minor/regional/...) of par, buy_shares and
+    # sell_shares.
+    def key(round, step, action)
       type = action["type"]
-      type = "#{type}:#{action['choice']}" if type == "choose"
-      "#{round}/#{step}/#{type}"
+      detail = case type
+               when "choose" then action["choice"]
+               when "par" then corporation_type(action["corporation"])
+               when "buy_shares", "sell_shares" then corporation_type(action["shares"].first.sub(/_\d+\z/, ""))
+               end
+      "#{round}/#{step}/#{[type, detail].compact.join(':')}"
+    end
+
+    def corporation_type(id)
+      @mirror.corporation_by_id(id)&.type
+    end
+
+    attr_reader :game_name
+
+    def self.games(slice)
+      slice(slice).fetch("games").size
     end
 
     def run
@@ -98,6 +122,10 @@ module Oe
       while count < @max_actions
         if state["state"]["meta"]["finished"]
           status = :finished
+          break
+        end
+        if !@finish && (@targets - @ledger.executed.keys).empty?
+          status = :covered
           break
         end
         pid = state["state"]["meta"]["active_players"].first
@@ -159,8 +187,8 @@ module Oe
         return :dead_end
       end
 
-      offered = prompt["actions"].map { |a| self.class.key(round, step, a) } +
-                prompt["ranges"].map { |r| self.class.key(round, step, r) }
+      offered = prompt["actions"].map { |a| key(round, step, a) } +
+                prompt["ranges"].map { |r| key(round, step, r) }
       offered.uniq.each { |k| @ledger.offered[k] += 1 }
 
       action = director(round, step, prompt) || bot_move(pid, prompt)
@@ -175,17 +203,63 @@ module Oe
       post(pid, state, action, round, step)
     end
 
-    # Take a missing target when one is on offer.
+    # Take a missing target when one is on offer. Some targets need a state a
+    # normal game never reaches on its own (see #rush?); the director then
+    # steers towards it first.
     def director(round, step, prompt)
       missing = @targets - @ledger.executed.keys
       return nil if missing.empty?
 
-      candidates = prompt["actions"].select { |a| missing.include?(self.class.key(round, step, a)) }
-      return candidates.sample(random: @rng) unless candidates.empty?
+      if @rush && rush?(missing)
+        pars = prompt["actions"].select { |a| a["type"] == "par" }
+        return pars.min_by { |a| a["share_price"].to_i } unless pars.empty?
+      end
 
-      range = prompt["ranges"].find { |r| missing.include?(self.class.key(round, step, r)) }
+      if @rush && missing.any? { |k| k.start_with?("stock/ReserveShare/") }
+        fitting = reservable(prompt["actions"].select { |a| a["type"] == "buy_shares" })
+        return fitting.sample(random: @rng) unless fitting.empty? || !reserve_question?(fitting.first)
+      end
+
+      candidates = prompt["actions"].select { |a| missing.include?(key(round, step, a)) }
+      # In the order of the target list: e.g. reserve before decline, so the
+      # first reservation question is answered with "reserve", the next with "pass".
+      unless candidates.empty?
+        first = candidates.map { |a| missing.index(key(round, step, a)) }.min
+        best = candidates.select { |a| missing.index(key(round, step, a)) == first }
+        return reservable(best).sample(random: @rng)
+      end
+
+      range = prompt["ranges"].find { |r| missing.include?(key(round, step, r)) }
       range && { "type" => "bid", "entity" => range["entity"], "entity_type" => "player",
                  "company" => range["company"], "price" => range["min"] }
+    end
+
+    # Buying a regional's treasury shares (and so the reserved-share question,
+    # §8.4, which exists only in the Initial SR) is off sale until the Major
+    # Railroad Phase starts, i.e. until all 18 regionals and all 12 minors are
+    # floated. In the Initial SR that happens only if everybody floats as much
+    # as they can, so while such a target is missing the director pars first.
+    def rush?(missing)
+      @mirror.turn == 1 && !@mirror.major_phase? && missing.any? { |k| k.start_with?("stock/ReserveShare/") || k.include?("buy_shares:regional") }
+    end
+
+    # A purchase by another player of a regional whose president could still
+    # reserve a share is what raises the reservation question (§8.4).
+    def reservable(actions)
+      return actions unless @rush
+
+      fitting = actions.select do |a|
+        next false unless a["type"] == "buy_shares"
+
+        corporation = @mirror.corporation_by_id(a["shares"].first.sub(/_\d+\z/, ""))
+        corporation.owner && corporation.owner.id != a["entity"] && @mirror.can_reserve_regional?(corporation.owner, corporation)
+      end
+      fitting.empty? ? actions : fitting
+    end
+
+    def reserve_question?(action)
+      corporation = @mirror.corporation_by_id(action["shares"].first.sub(/_\d+\z/, ""))
+      corporation.owner && corporation.owner.id != action["entity"] && @mirror.can_reserve_regional?(corporation.owner, corporation)
     end
 
     def bot_move(pid, prompt)
@@ -214,7 +288,7 @@ module Oe
         return :rejected
       end
 
-      @ledger.executed[self.class.key(round, step, action)] += 1
+      @ledger.executed[key(round, step, action)] += 1
       @mirror.process_action(action.merge("user" => pid))
       if @mirror.exception
         @ledger.problem(:mirror_diverged, "mirror rejected an action the server accepted: #{@mirror.exception.message}")
@@ -229,16 +303,17 @@ module Oe
       finished = view["meta"]["finished"]
       status = :finished if finished
       missing = @targets - @ledger.executed.keys
-      @ledger.problem(:not_finished, "stopped with #{status} after #{count} actions") unless finished
-      Result.new(slice: @slice_name, status: status, actions: count, seed: @seed, game_id: @game_id, ledger: @ledger,
+      @ledger.problem(:not_finished, "stopped with #{status} after #{count} actions") if @finish && !finished
+      Result.new(slice: "#{@slice_name} / #{@game_name}", status: status, actions: count, seed: @seed, game_id: @game_id, ledger: @ledger,
                  missing: missing, finished: finished, standings: view["meta"]["standings"],
-                 seconds: (clock - started).round(1), detail: nil)
+                 seconds: (clock - started).round(1), detail: nil, targets: @targets)
     end
 
     def abort_result(status, detail, started)
       @ledger.problem(status, detail)
-      Result.new(slice: @slice_name, status: status, actions: 0, seed: @seed, game_id: nil, ledger: @ledger,
-                 missing: @targets, finished: false, standings: nil, seconds: (clock - started).round(1), detail: detail)
+      Result.new(slice: "#{@slice_name} / #{@game_name}", status: status, actions: 0, seed: @seed, game_id: nil, ledger: @ledger,
+                 missing: @targets, finished: false, standings: nil, seconds: (clock - started).round(1), detail: detail,
+                 targets: @targets)
     end
   end
 end
