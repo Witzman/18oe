@@ -40,6 +40,7 @@ export function kitSections(theme: Theme, state: { sort?: Sort; dialog: boolean 
     reason: s === "invalid" ? "Die Kasse reicht nicht (£165 nötig, £95 da)." : undefined,
   });
   return [
+    section("Siegel, alle Firmen der Engine (#99)", ["Alle 36 (Minors, Regionals)", ...Object.keys(theme.companies).map((sym) => Siegel({ sym, color: theme.companies[sym]!.bg }, { theme }))]),
     section("Siegel", ...STATES.map((s): [string, ...VNode[]] => [label(s), ...CORPS.map((c) => Siegel(c, { theme, state: s })), Siegel(CORPS[0]!, { theme, state: s, size: "l" })])),
     section("Wimpel", ...STATES.map((s): [string, ...VNode[]] => [label(s), ...PLAYERS.slice(0, 3).map((p) => Wimpel(p, { theme, state: s }))]),
       ["alle 7 Farben", ...PLAYERS.map((p) => Wimpel(p, { theme }))]),
