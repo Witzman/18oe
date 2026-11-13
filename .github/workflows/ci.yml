@@ -91,10 +91,10 @@ jobs:
       # spec/web_spec.rb serves web/dist and checks web/view-keys.json against lib/oe/view.rb.
       - run: npm ci --no-progress --no-audit --no-fund && npm run build
         working-directory: web
-      - name: specs without the long game runs (shard)
+      - name: specs without the long game runs and view_railroad_phase_spec (195 s, full stage) (shard)
         run: |
           # time-balanced shard (.github/scripts/shard.rb, timings in .github/rspec-timings.json)
-          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 3 '(^spec/engine/|script_game_spec|playthrough_spec|bot_simulation_spec|enumeration_timing_spec)')
+          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 3 '(^spec/engine/|script_game_spec|playthrough_spec|bot_simulation_spec|enumeration_timing_spec|view_railroad_phase_spec)')
           echo "$files"
           bundle exec rspec $files --format json --out "$RUNNER_TEMP/rspec.json"
       - name: per-file timings (to refresh .github/rspec-timings.json)
