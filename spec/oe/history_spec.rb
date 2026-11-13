@@ -79,7 +79,7 @@ RSpec.describe Oe::History do
 
       expect(rows.map { |r| [r["turn"], r["number"]] }).to eq(corp.operating_history.keys)
       expect(rows.map { |r| r["revenue"] }).to eq(corp.operating_history.values.map(&:revenue))
-      expect(rows.map { |r| r["dividend"] }).to all(be_in(%w[payout half withhold]))
+      expect(rows.map { |r| r["dividend"] }).to all(satisfy { |d| %w[payout half withhold].include?(d) })
     end
   end
 
