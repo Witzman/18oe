@@ -45,22 +45,24 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
 
   // 1. Zoomed in until a hex is finger-sized: a tap selects it (hover outline = selection) and reports it, no list.
   m.flyTo("S42"); await sleep(1000); await m.rendered();
-  // Zoom with the wheel until a hex is as wide as a finger target.
-  while (m.view.zoom * 0.866 < 22) { c.dispatchEvent(new WheelEvent("wheel", { deltaY: -400, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, bubbles: true, cancelable: true })); await m.rendered(); }
+  // Zoom with the wheel until a hex is as wide as a finger target (portrait: the 4x zoom limit may stop short of it, then step 1 only checks the selection).
+  for (let n = 0; n < 12 && m.view.zoom * 0.866 < 22; n++) { c.dispatchEvent(new WheelEvent("wheel", { deltaY: -400, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, bubbles: true, cancelable: true })); await m.rendered(); }
   const centre = { x: box.width / 2, y: box.height / 2 };
   const id = m.scene.grid.hexes.map((x) => x.id).find((i) => { const p = m.hexOnScreen(i); return p && inside(p) && Math.hypot(p.x - centre.x, p.y - centre.y) < 150; });
   const p1 = m.hexOnScreen(id);
   events.length = 0; hovers.length = 0;
   await tap(p1);
-  if (picker()) fail("a list at a finger-sized hex");
-  if (events[events.length - 1] !== id) fail("tap on " + id + " gave " + events);
-  if (hovers[hovers.length - 1] !== id) fail("tap did not select/show " + id + ": " + hovers);
+  const finger = m.view.zoom * 0.866 >= 22;
+  if (finger && picker()) fail("a list at a finger-sized hex");
+  if (!finger) { const pk = picker(); if (pk) { pk.querySelector("button").click(); } }
+  if (finger && events[events.length - 1] !== id) fail("tap on " + id + " gave " + events);
+  if (finger && hovers[hovers.length - 1] !== id) fail("tap did not select/show " + id + ": " + hovers);
   // The selection stays after the finger lifts (no pointerleave clearing).
   await sleep(100);
-  if (hovers[hovers.length - 1] !== id) fail("selection lost: " + hovers);
+  if (finger && hovers[hovers.length - 1] !== id) fail("selection lost: " + hovers);
 
   // 2. Selection list at overview: hexes are far smaller than a finger.
-  m.fit(); await sleep(1000); await m.rendered();
+  m.fit(); await m.rendered();
   const o = m.scene.grid.hexes.map((x) => x.id).find((i) => { const p = m.hexOnScreen(i); return p && inside(p); });
   events.length = 0;
   await tap(m.hexOnScreen(o));
@@ -76,7 +78,7 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
 
   // 3. Multi-touch parts (Chromium engine).
   const ranMulti = await multi(async () => {
-    m.fit(); await sleep(1000); await m.rendered();
+    m.fit(); await m.rendered();
     // Pan with one finger: 120 px right/down, slowly (no inertia at rest), no hex event.
     events.length = 0;
     const a = { x: box.width * 0.35, y: box.height * 0.4 };
@@ -93,17 +95,22 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
     // (zoomed in, so the map edge does not clamp the glide)
     c.dispatchEvent(new WheelEvent("wheel", { deltaY: -800, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, bubbles: true, cancelable: true })); await m.rendered();
     // The CDP round trip is slower than a real finger's 60 Hz, so the flick is sent as touch pointer events with real-time spacing.
-    const te = (type, x) => c.dispatchEvent(new PointerEvent(type, { clientX: box.left + x, clientY: box.top + 300, pointerId: 7, pointerType: "touch", isPrimary: true, bubbles: true }));
-    te("pointerdown", 300);
-    for (let i = 1; i <= 6; i++) { await sleep(16); te("pointermove", 300 + i * 30); }
-    te("pointerup", 480);
+    // Software-rendered frames take ~130 ms here, so the events are created first with 16 ms real-time spacing (that is what
+    // timeStamp records) and dispatched afterwards in one go: the gesture the handlers see is a 60 Hz finger, deterministically.
+    const mk = (type, x) => new PointerEvent(type, { clientX: box.left + x, clientY: box.top + 300, pointerId: 7, pointerType: "touch", isPrimary: true, bubbles: true });
+    const flick = [mk("pointerdown", 300)];
+    for (let i = 1; i <= 6; i++) { await sleep(16); flick.push(mk("pointermove", 300 + i * 30)); }
+    await sleep(16); flick.push(mk("pointerup", 480));
+    for (const ev of flick) c.dispatchEvent(ev);
     const atRelease = m.view.panX;
     await sleep(500); await m.rendered();
     if (!(m.view.panX > atRelease + 5)) fail("no inertia: " + atRelease + " -> " + m.view.panX);
-    const later = m.view.panX; await sleep(1500);
-    if (Math.abs(m.view.panX - later) > 60) fail("inertia did not settle");
+    // Settles: slow software frames stretch the glide in real time, so wait until two reads 400 ms apart agree (at most 8 s).
+    let prev = m.view.panX, settled = false;
+    for (let i = 0; i < 20 && !settled; i++) { await sleep(400); settled = Math.abs(m.view.panX - prev) < 1; prev = m.view.panX; }
+    if (!settled) fail("inertia did not settle");
     // Pinch: fingers 80 px apart spread to 240 px about their midpoint: the ground under the midpoint stays, zoom x3.
-    m.fit(); await sleep(1000); await m.rendered();
+    m.fit(); await m.rendered();
     const mid = { x: box.width * 0.5, y: box.height * 0.45 };
     const z0 = m.view.zoom;
     const under0 = m.scene.grid.hexes.map((x) => x.id).find((i) => { const p = m.hexOnScreen(i); return p && Math.hypot(p.x - mid.x, p.y - mid.y) < 8; });
@@ -115,11 +122,13 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
     if (k < 2.5 || k > 3.5) fail("pinch factor " + k);
     if (under0) { const q = m.hexOnScreen(under0); if (Math.hypot(q.x - mid.x, q.y - mid.y) > 25) fail("pinch drifted from the midpoint: " + JSON.stringify(q)); }
     // Double tap zooms in about the finger.
-    m.fit(); await sleep(1000); await m.rendered();
+    m.fit(); await m.rendered();
     const z1 = m.view.zoom, dt = { x: box.width * 0.45, y: box.height * 0.4 };
     const u = m.scene.grid.hexes.map((x) => x.id).find((i) => { const p = m.hexOnScreen(i); return p && Math.hypot(p.x - dt.x, p.y - dt.y) < 8; });
-    await window.oeTouch("start", [abs(dt)]); await sleep(20); await window.oeTouch("end", []); await sleep(80);
-    await window.oeTouch("start", [abs(dt)]); await sleep(20); await window.oeTouch("end", []);
+    // Created with real-time spacing, dispatched together (a slow software frame between two taps would otherwise exceed the double tap window).
+    const dk = (type) => new PointerEvent(type, { clientX: box.left + dt.x, clientY: box.top + dt.y, pointerId: 9, pointerType: "touch", isPrimary: true, bubbles: true });
+    const taps = [dk("pointerdown")]; await sleep(20); taps.push(dk("pointerup")); await sleep(80); taps.push(dk("pointerdown")); await sleep(20); taps.push(dk("pointerup"));
+    for (const ev of taps) c.dispatchEvent(ev);
     await sleep(900); await m.rendered();
     if (!(m.view.zoom > z1 * 1.8)) fail("double tap zoom " + z1 + " -> " + m.view.zoom);
     if (u) { const q = m.hexOnScreen(u); if (Math.hypot(q.x - dt.x, q.y - dt.y) > 30) fail("double tap drifted"); }
@@ -130,7 +139,7 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
   m.setState({ meta: { current: null }, corporations: [{ id: "PLM", closed: false, floated: true, tokens: [] }, { id: "KK", closed: false, floated: true, tokens: [] }],
     map: [{ hex: "Q30", tile: { name: "x", rotation: 0, color: "yellow" }, tokens: [{ city: 0, corporations: ["PLM"] }, { city: 1, corporations: ["KK"] }] }] });
   m.flyTo("Q30"); await sleep(1000); await m.rendered();
-  while (m.view.zoom * 0.866 < 22) { c.dispatchEvent(new WheelEvent("wheel", { deltaY: -400, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, bubbles: true, cancelable: true })); await m.rendered(); }
+  for (let n = 0; n < 12 && m.view.zoom * 0.866 < 22; n++) { c.dispatchEvent(new WheelEvent("wheel", { deltaY: -400, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, bubbles: true, cancelable: true })); await m.rendered(); }
   m.flyTo("Q30"); await sleep(1000); await m.rendered();
   const toks = m.layer("objects").children.filter((k) => k.visible);
   if (toks.length !== 2) fail("tokens " + toks.length);

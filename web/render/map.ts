@@ -136,7 +136,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   app.ticker.stop();
   const canvas = app.canvas;
   // The canvas follows the element's size and never sets it (no feedback through layout).
-  canvas.style.cssText = "position:absolute;left:0;top:0;display:block;touch-action:none";
+  // Not cssText: that would wipe the CSS width/height autoDensity set, and a 2x canvas would be 2x the element on a retina iPad.
+  Object.assign(canvas.style, { position: "absolute", left: "0", top: "0", display: "block", touchAction: "none" });
   if (getComputedStyle(el).position === "static") el.style.position = "relative";
   el.style.overflow = "hidden";
   el.append(canvas);
