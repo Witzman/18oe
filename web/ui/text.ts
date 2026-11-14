@@ -32,6 +32,11 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "round.concession": e("Konzessionsphase", "Concession Railroad Phase", "§5.1.2, §8.1"),
   "round.stock": e("Aktienrunde", "Stock Round", "§10"),
   "round.operating": e("Betriebsrunde", "Operating Round", "§11"),
+  "round.auction_short": e("Auk", "Auction", "§7"),
+  "round.concession_short": e("Kon", "Concession", "§5.1.2, §8.1"),
+  "round.stock_short": e("AR", "SR", "§10"),
+  "round.operating_short": e("BR", "OR", "§11"),
+  "round.consolidation_short": e("Kons", "Consolidation", "§10.6"),
   "round.consolidation": e("Konsolidierungsrunde", "Consolidation Railroad Phase", "§10.6"),
 
   // --- Schritte (g_18_oe/step/*.rb, lib/engine/step/*.rb laut ui-spec §4.1) --
@@ -330,6 +335,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "frame.stall_waiting": e("Warte auf {names}.", "Waiting for {names}.", "—"),
   "frame.finished": e("Partie beendet, Sieger: {winner}", "Finished, winner: {winner}", "§13"),
   "frame.unknown": e("unbekannt", "unknown", "—"),
+  "frame.head_order": e("Betriebsreihenfolge", "Operating order", "§11"),
   "frame.bank": e("Bank", "Bank", "—"),
   "frame.player_bar": e("Spieler", "Players", "—"),
   "frame.certs": e("{n}/{limit}", "{n}/{limit}", "§2.2.7"),

@@ -61,3 +61,18 @@ export function OrBandView(b: OrBand, theme: Theme): VNode {
     v("span", { class: "or-sr" }, ` ${txt(`op.state_${e.state}`).de}`))));
   return v("section", { class: "or-band", "aria-label": txt("op.order").de }, card, v("h3", { class: "or-title" }, txt("op.order").de), list);
 }
+
+// Compact strip for the head bar (#300): one chip per company in operating order (seal in company colour,
+// owner), the acting one marked, done ones muted. Not interactive; the title carries the details.
+export function OrStripView(b: OrBand, theme: Theme): VNode {
+  const ownerText = (e: OrEntry) => e.mine ? txt("op.you").de : `${e.owner ?? "?"}${e.bot ? ` · ${txt("frame.bot").de}` : ""}`;
+  return v("ol", { class: "head-order", "aria-label": txt("frame.head_order").de },
+    ...b.entries.map((e) => v("li", {
+      class: "head-order-item", "data-id": e.id, "data-state": e.state, "data-mine": e.mine ? "true" : "false",
+      "aria-current": e.state === "current" ? "step" : undefined,
+      title: `${e.id} · ${e.name} · ${e.tier} · ${ownerText(e)} · ${txt(`op.state_${e.state}`).de}`,
+    },
+    Siegel({ sym: e.id, color: e.color, name: e.name }, { theme, size: "s" }),
+    v("span", { class: "head-order-owner" }, e.mine ? txt("op.you").de : e.owner ?? "?"),
+    v("span", { class: "or-sr" }, ` ${txt(`op.state_${e.state}`).de}`))));
+}
