@@ -89,6 +89,31 @@ export function playerRows(g: Game): PlayerRow[] {
   }));
 }
 
+// A hang is never silent (#289): what the frame says when the game cannot go on by itself. `waitedMs` is
+// how long the state (seq) has not changed. Null when everything is normal.
+//  - nobody to act in a running game, or the viewer is to act but the server offers no action: error;
+//  - only bots to act and nothing happened for BOT_STALL_MS: warning (a bot that does not move);
+//  - another human to act: the plain "waiting for X" (always, so the viewer knows why nothing moves).
+export const BOT_STALL_MS = 30_000;
+export interface StallNotice { kind: "nobody" | "no_action" | "bot_stall" | "waiting"; tone: "error" | "warn" | "info"; text: string }
+
+export function stallNotice(g: Game, waitedMs: number): StallNotice | null {
+  if (g.state.meta.finished) return null;
+  const p = g.state.prompt;
+  const acting = g.state.meta.active_players;
+  if (acting.length === 0) return { kind: "nobody", tone: "error", text: txt("frame.stall_nobody").de };
+  if (p.viewer_to_act) {
+    const offered = p.actions.length + p.ranges.length + p.choices.length;
+    return offered === 0 ? { kind: "no_action", tone: "error", text: txt("frame.stall_no_action").de } : null;
+  }
+  const rows = playerRows(g).filter((r) => r.toAct);
+  const names = rows.map((r) => r.name).join(", ");
+  if (rows.length > 0 && rows.every((r) => r.bot) && waitedMs >= BOT_STALL_MS) {
+    return { kind: "bot_stall", tone: "warn", text: fillText("frame.stall_bot", { names, s: Math.floor(waitedMs / 1000) }) };
+  }
+  return { kind: "waiting", tone: "info", text: fillText("frame.stall_waiting", { names: names || acting.join(", ") }) };
+}
+
 // Founded corporations in operating order (meta.operating_order, #122); corporations the order does not
 // name (and states recorded before #122) keep the engine's list order after the named ones.
 export function outlinerCorps(g: Game): { shown: Corporation[]; hidden: number } {

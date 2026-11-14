@@ -29,7 +29,7 @@ async function bundle(dir: string) {
 
 const fixture = (name: string) => JSON.parse(readFileSync(join(web, "test", "fixtures", "games", `${name}.json`), "utf8"));
 
-function stub(dir: string, start: { seq: number }) {
+function stub(dir: string, start: { seq: number }, next?: { seq: number }) {
   let game: { seq: number } = start;
   const posted: { action: Record<string, unknown>; seq: number }[] = [];
   const server: Server = createServer((req, res) => {
@@ -42,7 +42,7 @@ function stub(dir: string, start: { seq: number }) {
     if (p === "/games/1/actions" && req.method === "POST") {
       let b = "";
       req.on("data", (c) => { b += c; });
-      req.on("end", () => { posted.push(JSON.parse(b)); game = { ...game, seq: game.seq + 1 }; json(game); });
+      req.on("end", () => { posted.push(JSON.parse(b)); game = next ?? { ...game, seq: game.seq + 1 }; json(game); });
       return;
     }
     const f = join(dir, p === "/" ? "index.html" : p);
@@ -100,12 +100,12 @@ const CHECKS_HOME = String.raw`(async () => {
   if ((await (await fetch("/__posted")).json()).length !== 1) fail("not sent once");
 })()`;
 
-async function scenario(name: string, waitFor: string, checks: string) {
+async function scenario(name: string, waitFor: string, checks: string, nextName?: string) {
   const dir = mkdtempSync(join(tmpdir(), "oe-concession-test-"));
   try {
     await bundle(dir);
     const game = fixture(name);
-    const { server, posted } = stub(dir, game);
+    const { server, posted } = stub(dir, game, nextName ? fixture(nextName) : undefined);
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     const code = await run(dir, (server.address() as { port: number }).port, waitFor, checks);
     if (process.env.OE_SHOT_DIR) copyFileSync(join(dir, "out.png"), join(process.env.OE_SHOT_DIR, `${name}-${process.env.OE_THEME ?? "default"}.png`));
@@ -127,4 +127,45 @@ test("concession in the browser: home token target chosen from the list is sent 
   const { posted, game } = await scenario("home-token", ".concession-target", CHECKS_HOME);
   assert.equal(posted.length, 1);
   assert.deepEqual(posted[0]!.action, game.state.prompt.actions.filter((a: Record<string, unknown>) => a.type === "place_token")[1]);
+});
+
+// #289: the owner's live game hung after "Witzman executes the 1st Concession" (DSJ parred at 60): nothing
+// could be clicked. Recorded over the real API (bin: seed 2, Witzman + 3 bots, see the PR): Witzman holds the
+// 2nd concession too, so the answer to the par is again a Concession prompt for him. Cause: the busy lock of
+// the frame disabled every button while the action was in flight, the panel redrew inside the lock and its
+// fresh buttons were never opened again (no further seq change, because nobody else moves).
+const CHECKS_CHAIN = String.raw`(async () => {
+  ${HEAD}
+  const posted = async () => (await (await fetch("/__posted")).json()).length;
+  q('.concession-card[data-corp="DSJ"]').click();
+  await sleep(50);
+  q('.concession-price[data-price="60"]').click();
+  await sleep(50);
+  q(".kit-main-btn").click();
+  for (let i = 0; i < 60 && ((await posted()) !== 1 || q(".frame[aria-busy]")); i++) await sleep(50);
+  await sleep(200);
+  if (document.querySelectorAll("button[data-busy-lock]").length) fail("buttons still locked after the answer");
+  if (!q(".frame-stall").hidden) fail("stall notice shown although the viewer can act: " + q(".frame-stall").textContent);
+  const cards = [...document.querySelectorAll(".concession-card")];
+  if (cards.length < 2) fail("no offers after the 1st concession");
+  if (cards.some((c) => c.disabled)) fail("offers of the 2nd concession are disabled");
+  q('.concession-card[data-corp="LNWR"]').click();
+  await sleep(50);
+  if (q('.concession-card[data-corp="LNWR"]').getAttribute("aria-pressed") !== "true") fail("card click had no effect");
+  const price = [...document.querySelectorAll(".concession-price")].find((b) => !b.disabled);
+  if (!price) fail("no enabled par value for LNWR");
+  price.click();
+  await sleep(50);
+  if (q(".kit-main-btn").disabled) fail("main button closed after a choice: " + q(".kit-order-sentence")?.textContent);
+  q(".kit-main-btn").click();
+  for (let i = 0; i < 60 && (await posted()) !== 2; i++) await sleep(50);
+  if ((await posted()) !== 2) fail("2nd founding not sent");
+})()`;
+
+test("concession in the browser (#289): after the 1st concession the same viewer's 2nd concession can be founded", { skip: browser ? false : "no headless browser installed" }, async () => {
+  const { posted } = await scenario("concession-chain", ".concession-card", CHECKS_CHAIN, "concession-chain-next");
+  assert.equal(posted.length, 2);
+  const next = fixture("concession-chain-next");
+  assert.equal(posted[1]!.seq, next.seq);
+  assert.equal(posted[1]!.action.corporation, "LNWR");
 });
