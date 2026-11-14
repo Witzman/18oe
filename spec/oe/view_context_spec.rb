@@ -62,10 +62,12 @@ RSpec.describe "Oe::View operating context (#123)" do
       check(:train, label) { check_train(ctx[:train], step, entity, game) } if ctx[:train]
       next unless ctx[:dividend] && action.is_a?(Engine::Action::Dividend)
 
-      before = { cash: entity.cash }
+      before = { cash: entity.cash, holders: (game.players + game.corporations).to_h { |h| [h.id, h.cash] } }
       opt = ctx[:dividend][:options].find { |o| o[:kind] == action.kind }
       check(:dividend, label) { expect(opt).not_to be_nil }
       game.process_action(action)
+      @game_for_check = game
+      @fractional = true if opt[:per_share].to_f != opt[:per_share].to_f.floor
       check(:dividend, label) { check_dividend(opt, entity, before) }
       :processed
     end
@@ -114,6 +116,14 @@ RSpec.describe "Oe::View operating context (#123)" do
   def check_dividend(opt, entity, before)
     expect(opt[:price]).to eq(entity.share_price&.price)
     expect(entity.cash - before[:cash]).to eq(opt[:treasury])
+    # #294: every holder got exactly the announced payout (rounded up per recipient), nobody else got money.
+    paid = opt[:payouts].to_h { |p| [p[:holder], p[:amount]] }
+    before[:holders].each do |id, cash|
+      next if id == entity.id
+
+      holder = @game_for_check.players.find { |x| x.id == id } || @game_for_check.corporation_by_id(id)
+      expect(holder.cash - cash).to eq(paid.fetch(id, 0)), "#{id}: got #{holder.cash - cash}, view said #{paid[id].inspect}"
+    end
   end
 
   def check_train(train, step, entity, game)
@@ -125,6 +135,10 @@ RSpec.describe "Oe::View operating context (#123)" do
     expect(train[:reserved]&.fetch(:price)).to eq(reserved&.price)
     expect(train[:shortfall]).to eq(train[:must_buy] && train[:cheapest_price] ? [train[:cheapest_price] - entity.cash, 0].max : 0)
     @short = true if train[:shortfall].positive?
+  end
+
+  it "saw a fractional dividend rate per share and checked its rounded payouts (#294)" do
+    expect(@fractional).to be(true)
   end
 
   %i[track token dividend train shape acting].each do |family|

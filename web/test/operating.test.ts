@@ -69,6 +69,22 @@ test("dividend: nothing is chosen until the player picks; the order sends exactl
   assert.equal(dividendOrder(g, "nonsense").action, null, "a pick that is not offered is nothing");
 });
 
+// #294: a fractional rate per share (rulebook §11.4 example 2: £70, half pay, 4 shares = £8.75) threw in
+// formatGeld and blanked the whole frame in the owner's game. Shown with decimals, plus what each holder gets.
+test("dividend with a fractional rate per share: shown as £8,75 with the rounded-up payouts, nothing throws", () => {
+  const g = load("operating-dividend-fraction");
+  const o = dividendOptions(g);
+  assert.deepEqual(o.map((x) => [x.kind, x.perShare, x.treasury]), [["withhold", 0, 70], ["half", 8.75, 44], ["payout", 17.5, 18]]);
+  const half = dividendOrder(g, "half");
+  assert.match(half.sentence, /Je Anteil £8,75, Kasse £44/);
+  assert.match(half.sentence, /Auszahlung \(je Empfänger aufgerundet\): p0 £18, p1 £9\./);
+  assert.match(dividendOrder(g, "payout").sentence, /Je Anteil £17,50.*p0 £35, p1 £18/);
+  const text = textOf(DividendPanel(g, "half", noop));
+  assert.match(text, /£8,75/);
+  assert.match(text, /£17,50/);
+  assert.match(textOf(OperatingPanel(g, "half", noop)), /£8,75/);
+});
+
 test("dividend without the view's context (older state): kinds still offered, amounts unknown", () => {
   const g = load("dividend");
   const o = dividendOptions(g);

@@ -676,6 +676,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "div.col_price": e("Kurs danach", "price after", "§11.4"),
   "div.pick": e("Wähle, ob die Einnahme ausgezahlt oder einbehalten wird.", "Choose how to pay out the revenue.", "§11.4"),
   "div.sentence": e("{corp}: {kind}. Je Anteil {share}, Kasse {treasury}{price}.", "{corp}: {kind}. Per share {share}, treasury {treasury}{price}.", "§11.4"),
+  "div.payouts": e("Auszahlung (je Empfänger aufgerundet): {list}.", "Paid (rounded up per recipient): {list}.", "§11.4"),
   "div.sentence_price": e(", Kurs {from} nach {to}", ", price {from} to {to}", "§11.4"),
   "div.change_cash": e("Kasse {corp}", "Treasury {corp}", "§11.4"),
   "div.change_price": e("Kurs {corp}", "Share price {corp}", "§11.4"),
