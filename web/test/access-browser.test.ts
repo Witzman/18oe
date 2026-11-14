@@ -129,9 +129,12 @@ test("login and registration report every step and every failure (#286)", { skip
       child.stderr.on("data", (d) => { err += d; });
       child.on("close", (c) => { if (c) console.error(err); resolve(c ?? 1); });
     });
-    assert.equal(await run(`http://127.0.0.1:${port}/#/login`, CHECKS.replace('location.hash = "#/register";', "")), 0, "login feedback checks failed");
-    assert.equal(await run(`http://127.0.0.1:${port}/#/register`, CHECKS2), 0, "register feedback checks failed");
-    server.closeAllConnections();
-    server.close();
+    try {
+      assert.equal(await run(`http://127.0.0.1:${port}/#/login`, CHECKS.replace('location.hash = "#/register";', "")), 0, "login feedback checks failed");
+      assert.equal(await run(`http://127.0.0.1:${port}/#/register`, CHECKS2), 0, "register feedback checks failed");
+    } finally {
+      server.closeAllConnections();
+      server.close();
+    }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
