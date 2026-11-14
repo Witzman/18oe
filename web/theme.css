@@ -1,7 +1,7 @@
 /* Layout and component styles. Every colour, font and radius comes from the theme tokens in
    themes.css (generated from web/themes/*.json, #95); nothing visual is fixed here. */
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100vh; background: var(--ui-bg); color: var(--ui-ink); font: 16px/1.4 var(--font-body); }
+body { margin: 0; min-height: 100vh; background: var(--ui-bg); color: var(--ui-ink); font: var(--type-md)/1.4 var(--font-body); }
 #app { max-width: 960px; margin: 16px auto; padding: 16px; background: var(--ui-panel); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); }
 h1, h2 { font-family: var(--font-head); font-weight: 700; letter-spacing: .04em; border-bottom: 1px solid var(--ui-rule); padding-bottom: 4px; }
 a { color: inherit; }
@@ -19,7 +19,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .turn { display: inline-block; background: var(--ui-accent); color: var(--ui-accent-ink); font-weight: bold; padding: 2px 12px; border-radius: 99px; }
 
 /* Dev menu: theme and tile style */
-.dev-menu { position: fixed; right: 12px; bottom: 12px; max-width: calc(100vw - 24px); background: var(--ui-bar); color: var(--ui-bar-ink); border-radius: var(--shape-radius); padding: 6px 10px; font: 14px/1.3 var(--font-head); letter-spacing: .04em; }
+.dev-menu { position: fixed; right: 12px; bottom: 12px; max-width: calc(100vw - 24px); background: var(--ui-bar); color: var(--ui-bar-ink); border-radius: var(--shape-radius); padding: 6px 10px; font: var(--type-md)/1.3 var(--font-head); letter-spacing: .04em; }
 .dev-menu summary { cursor: pointer; text-transform: uppercase; }
 .dev-menu button { padding: 2px 8px; }
 .swatch { display: flex; height: 22px; margin-top: 6px; border: 1px solid var(--ui-bar-ink); }
@@ -34,7 +34,7 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 /* Dev page #/map (#44): the map fills the window. */
 .map-dev { position: fixed; inset: 0; background: var(--ui-bg); }
 .map-dev:focus { outline: none; }
-.map-dev-status { position: absolute; left: 16px; top: 16px; margin: 0; color: var(--ui-bar-ink); font: 14px var(--font-head); }
+.map-dev-status { position: absolute; left: 16px; top: 16px; margin: 0; color: var(--ui-bar-ink); font: var(--type-md) var(--font-head); }
 
 /* Server errors and connection loss (issue 162): colours from theme tokens only. */
 .msg { min-height: 1.4em; }
@@ -45,11 +45,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .access { max-width: 26rem; margin: 0 auto; }
 .access .field { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
 .access .field input { width: 100%; box-sizing: border-box; }
-.access small { font-size: 0.8em; }
+.access small { font-size: var(--type-sm); }
 .access input, .access button { min-height: 44px; }
 .access button[type="submit"] { padding-inline: 20px; }
 .access .new-password { font-family: monospace; font-size: 1.3em; letter-spacing: 0.05em; user-select: all; padding: 6px 10px; border: 1px solid currentColor; border-radius: 4px; }
-.access a { display: inline-block; padding: 12px 0; }
+.access a { display: inline-flex; align-items: center; min-height: var(--shape-hit); padding: 12px 0; }
 
 /* Title and login screen (issue 280). Every colour from tokens; run time from motion.runMsPerHex
    (--cycle = 60 hexes of the map run, ~13 s); the form sits above the scene in normal flow. */
@@ -95,7 +95,7 @@ body:has(.access) #app { max-width: none; margin: 0; min-height: 100vh; backgrou
 .lobby .game-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid var(--ui-rule); }
 .lobby .game-link { font-weight: 700; }
 .lobby .game-open { margin-left: auto; }
-.lobby .game-turn { font-size: 0.875rem; }
+.lobby .game-turn { font-size: var(--type-md); }
 .lobby .game-row[data-to-act="true"] { box-shadow: inset 4px 0 0 var(--ui-accent); padding-left: 8px; }
 .lobby .game-link, .lobby .game-open { display: inline-flex; align-items: center; min-height: 44px; }
 .lobby .new-game .field { display: flex; flex-direction: column; gap: 2px; margin: 10px 0; max-width: 16rem; }
@@ -104,9 +104,9 @@ body:has(.access) #app { max-width: none; margin: 0; min-height: 100vh; backgrou
 .lobby .seat input[hidden] { display: none; }
 
 /* Version display (issue 271): colours from theme tokens only. */
-.version-note { margin: 16px 0 0; font-size: 0.8em; text-align: center; }
+.version-note { margin: 16px 0 0; font-size: var(--type-sm); text-align: center; }
 .version-note[data-stale] { color: var(--ui-warn); }
-.version-open { position: absolute; top: 0; right: var(--shape-gap); height: var(--shape-bar-height); z-index: 2; background: transparent; color: var(--ui-bar-ink); border-color: transparent; font: 0.75rem var(--font-head); opacity: .75; }
+.version-open { position: absolute; top: 0; right: var(--shape-gap); height: var(--shape-bar-height); z-index: 2; background: transparent; color: var(--ui-bar-ink); border-color: transparent; font: var(--type-sm) var(--font-head); opacity: .75; }
 .version-open[data-stale] { color: var(--ui-warn); opacity: 1; }
 .version-dialog { background: var(--ui-panel); color: var(--ui-ink); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); max-width: min(26rem, calc(100vw - 32px)); }
 .version-dialog::backdrop { background: color-mix(in srgb, var(--ui-bg) 70%, transparent); }

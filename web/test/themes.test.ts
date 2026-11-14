@@ -8,7 +8,7 @@ import { applyChoice, choiceFromRoot, loadChoice, saveTheme, saveTileStyle, THEM
 import { contrast, hexToNumber } from "../themes/color.ts";
 import { cssVar, themesCss, themeVars } from "../themes/css.ts";
 import { DEFAULT_THEME_ID, themeById, themes } from "../themes/index.ts";
-import { CAMERA_KEYS, COLOR_KEYS, FONT_KEYS, migrateTheme, MOTION_KEYS, NUMBER_RANGES, parseTheme, SHAPE_KEYS, themeProblems, TILE_COLOR_KEYS, TOP_KEYS, TRACK_KEYS, type ColorGroup } from "../themes/schema.ts";
+import { CAMERA_KEYS, COLOR_KEYS, FONT_KEYS, migrateTheme, MOTION_KEYS, NUMBER_RANGES, parseTheme, SHAPE_KEYS, SPACE_SCALE_KEYS, TYPE_SCALE_KEYS, themeProblems, TILE_COLOR_KEYS, TOP_KEYS, TRACK_KEYS, type ColorGroup } from "../themes/schema.ts";
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), "..", "themes");
 const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
@@ -46,6 +46,8 @@ for (const file of files) {
     }
     assert.deepEqual(Object.keys(t.font!).sort(), [...FONT_KEYS].sort());
     assert.deepEqual(Object.keys(t.shape!).sort(), [...SHAPE_KEYS].sort());
+    assert.deepEqual(Object.keys(t.type!).sort(), [...TYPE_SCALE_KEYS].sort());
+    assert.deepEqual(Object.keys(t.space!).sort(), [...SPACE_SCALE_KEYS].sort());
     assert.deepEqual(Object.keys(t.camera!).sort(), [...CAMERA_KEYS].sort());
     assert.deepEqual(Object.keys(t.track!).sort(), [...TRACK_KEYS].sort());
     assert.deepEqual(Object.keys(t.motion!).sort(), [...MOTION_KEYS].sort());
@@ -131,7 +133,7 @@ test("the generated CSS carries every token of every theme", () => {
   for (const t of themes) {
     const vars = themeVars(t);
     const colours = Object.values(COLOR_KEYS).reduce((n, keys) => n + keys.length, 0);
-    const numbers = CAMERA_KEYS.length + TRACK_KEYS.length + MOTION_KEYS.length + SHAPE_KEYS.length - 1; // tileStyle is a data attribute
+    const numbers = CAMERA_KEYS.length + TRACK_KEYS.length + MOTION_KEYS.length + SHAPE_KEYS.length + TYPE_SCALE_KEYS.length + SPACE_SCALE_KEYS.length - 1; // tileStyle is a data attribute
     assert.equal(vars.length, colours + FONT_KEYS.length + numbers);
     for (const [name, value] of vars) assert.ok(css.includes(`  ${name}: ${value};`), `${t.id} ${name}`);
   }
@@ -242,4 +244,32 @@ test("a v1 theme migrates: tilt becomes camera.pitch via acos, tile becomes the 
   // A migrated v1 file is still incomplete: the new tokens must come from the author.
   assert.ok(themeProblems(migrateTheme(v1)).includes("camera.yaw: missing"));
   assert.throws(() => parseTheme(v1));
+});
+
+test("type scale, spacing and panel metrics are tokens with CSS variables (#298)", () => {
+  for (const f of files) {
+    const t = raw(f);
+    assert.equal(t.type!.md, 13, "base size 13 px is an assumption, not an owner decision");
+    assert.deepEqual([t.shape!.panelWidth, t.shape!.topbarHeight, t.shape!.hit, t.shape!.panelRadius], [312, 48, 44, 10]);
+  }
+  const vars = Object.fromEntries(themeVars(themeById("atlas")));
+  assert.equal(vars["--type-md"], "13px");
+  assert.equal(vars["--type-heading"], "18px");
+  assert.equal(vars["--space-xxl"], "20px");
+  assert.equal(vars["--shape-panel-width"], "312px");
+  assert.equal(vars["--shape-topbar-height"], "48px");
+  assert.equal(vars["--shape-panel-radius"], "10px");
+});
+
+test("scale values must be in range, climb, and touch targets stay at 44 px or more (#298)", () => {
+  const t = JSON.parse(readFileSync(join(dir, "brett.json"), "utf8")) as Record<string, Record<string, unknown>>;
+  t.type!.xl = 5;
+  t.space!.xs = 2;
+  t.space!.sm = 1;
+  t.shape!.hit = 40;
+  assert.deepEqual(themeProblems(t), [
+    "type.xl: expected a number from 14 to 26", "space.sm: expected a number from 4 to 16",
+    "type.xl: smaller than lg", "space.xs: smaller than xxs", "space.sm: smaller than xs",
+    "shape.hit: touch targets need at least 44",
+  ]);
 });
