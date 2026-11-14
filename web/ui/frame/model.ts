@@ -15,6 +15,7 @@ export interface RoundBarModel {
   rrPhase: string;
   phase: PhaseInfo;
   round: string;
+  roundShort: string;
   who: WhoInfo;
   bank: number;
   finished: boolean;
@@ -47,6 +48,16 @@ export function roundLabel(g: Game): string {
   return name;
 }
 
+// Short round label for the head bar (#300): "BR 2.1", "AR 3"; types without a short name show the long one.
+export function roundShort(g: Game): string {
+  const r = g.state.meta.round;
+  if (g.state.meta.finished) return txt("frame.over").de;
+  const e = txt(`round.${r.type}_short`);
+  const name = e.de === `round.${r.type}_short` ? txt(`round.${r.type}`).de : e.de;
+  if (r.type === "operating" && r.number !== null) return `${name} ${r.number}.${r.turn}`;
+  return r.number !== null ? `${name} ${r.number}` : name;
+}
+
 export function whoActs(g: Game, theme: Theme): WhoInfo {
   const m = g.state.meta;
   const mine = g.state.prompt.viewer_to_act;
@@ -74,6 +85,7 @@ export function roundBar(g: Game, theme: Theme): RoundBarModel {
     rrPhase: m.rr_phase,
     phase: { label: fillText("frame.train_phase", { name: m.phase.name }), tiles: m.phase.tiles.join(", "), operatingRounds: m.phase.operating_rounds },
     round: roundLabel(g),
+    roundShort: roundShort(g),
     who: whoActs(g, theme),
     bank: g.state.bank.cash,
     finished: m.finished,

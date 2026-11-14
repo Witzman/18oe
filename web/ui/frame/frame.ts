@@ -14,7 +14,7 @@ import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
 import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
-import { OrBandView, orBand } from "./or-band.ts";
+import { OrBandView, OrStripView, orBand } from "./or-band.ts";
 import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
 import { createViews } from "./views.ts";
 import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
@@ -97,7 +97,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const listeners = new Set<(g: Game) => void>();
   const disposers: (() => void)[] = [];
 
-  const roundEl = h("header", { class: "frame-roundbar" });
+  const roundEl = h("div", { class: "frame-roundbar" });
   const playersEl = h("nav", { class: "frame-players", "aria-label": txt("frame.player_bar").de });
   const contextEl = h("aside", { class: "frame-context", "aria-label": txt("frame.context").de });
   const contextSlot = h("div", { class: "frame-context-slot" });
@@ -148,7 +148,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const loadingEl = h("p", { class: "muted frame-loading", role: "status" }, txt("frame.loading").de);
   contextEl.append(loadingEl);
   const body = h("div", { class: "frame-body" }, contextEl, mainEl, outlinerEl);
-  const root = h("div", { class: "frame" }, roundEl, band.el, playersEl, body, drawerEl, barEl, versionButton());
+  const headEl = h("header", { class: "frame-head" }, roundEl, playersEl);
+  const root = h("div", { class: "frame" }, headEl, band.el, body, drawerEl, barEl, versionButton());
 
   const model = () => (game ? genericModel(game, claims) : null);
 
@@ -172,17 +173,19 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (!game) return put(roundEl);
     const t = theme();
     const m = roundBar(game, t);
+    const strip = orBand(game, t);
     const phase = mitTooltip(v("span", { class: "frame-phase" }, m.phase.label),
       { title: m.phase.label, term: "Train phase", rows: [{ label: txt("frame.phase_tiles").de, value: m.phase.tiles }, { label: txt("frame.phase_ors").de, value: String(m.phase.operatingRounds) }], source: txt("frame.phase_tiles").regel });
     put(roundEl,
       v("a", { class: "frame-signet", href: "#/", title: txt("frame.signet_title").de }, "18OE"),
       v("span", { class: "frame-rr", title: txt(`rrphase.${m.rrPhase}`).en }, txt(`rrphase.${m.rrPhase}`).de),
       phase,
-      v("span", { class: "frame-round", "aria-current": "step" }, m.round),
-      v("div", { class: "frame-who", "data-mine": m.who.mine ? "true" : "false", role: "status" },
+      v("span", { class: "frame-round", "aria-current": "step", title: m.round }, m.roundShort),
+      strip ? OrStripView(strip, t) : null,
+      v("div", { class: "frame-who", "data-mine": m.who.mine ? "true" : "false", role: "status", title: m.who.text },
         m.who.corp ? Siegel({ sym: m.who.corp.sym, color: m.who.corp.color }, { theme: t, size: "s" }) : null,
         v("span", {}, m.who.text)),
-      v("span", { class: "frame-bank" }, `${txt("frame.bank").de} `, Geld(m.bank)));
+      );
   }
 
   // ---- player bar ------------------------------------------------------------------------------
@@ -203,7 +206,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   function drawPlayers() {
     if (!game) return put(playersEl);
     const t = theme();
-    put(playersEl, ...playerRows(game).map((p) => playerEntry(p, t)));
+    put(playersEl, ...playerRows(game).map((p) => playerEntry(p, t)),
+      v("span", { class: "frame-bank" }, `${txt("frame.bank").de} `, Geld(game.state.bank.cash)));
   }
 
   // ---- context sheet ---------------------------------------------------------------------------

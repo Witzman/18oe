@@ -4,8 +4,9 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { themes } from "../themes/index.ts";
 import type { Game } from "../types.ts";
+import { roundShort } from "../ui/frame/model.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { OrBandView, orBand } from "../ui/frame/or-band.ts";
+import { OrBandView, OrStripView, orBand } from "../ui/frame/or-band.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
 const theme = themes[0]!;
@@ -39,4 +40,15 @@ test("no band outside an operating round or without an order", () => {
   const g = load("operating-route");
   g.state.meta.operating_order = [];
   assert.equal(orBand(g, theme), null);
+});
+
+test("head bar (#300): short round label and the compact order strip", () => {
+  const g = load("operating-route");
+  assert.match(roundShort(g), /^BR \d+\.\d+$/);
+  const strip = OrStripView(orBand(g, theme)!, theme);
+  const items = find(strip, (n) => n.attrs.class === "head-order-item");
+  assert.deepEqual(items.map((n) => n.attrs["data-state"]), ["done", "current", "next", "next", "next", "next"]);
+  assert.equal(items.filter((n) => n.attrs["aria-current"] === "step").length, 1);
+  g.state.meta.round = { type: "stock", number: 3, turn: 1, description: null };
+  assert.equal(roundShort(g), "AR 3");
 });
