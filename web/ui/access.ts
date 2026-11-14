@@ -26,6 +26,12 @@ export function validate(mode: AccessMode, f: Fields): string | null {
   return null;
 }
 
+// Prüfung der Rücksetzseite (#282). Liefert den Textschlüssel des Fehlers oder null.
+export function validateReset(email: string): string | null {
+  if (!email.trim()) return "access.err_required";
+  return EMAIL_FORM.test(email.trim()) ? null : "access.err_email_form";
+}
+
 // Server-Fehler -> verständlicher Text. Rein: kein DOM.
 export function errorText(err: unknown): string {
   if (!(err instanceof ApiError)) return txt("access.err_other").de.replace("{message}", String(err));
@@ -55,6 +61,45 @@ export function titleStage(): HTMLElement {
     h("div", { class: "track" }, h("i", { class: "rail" }), h("i", { class: "sleepers" })));
   if (still) stage.setAttribute("data-still", "");
   return stage;
+}
+
+// Passwort zurücksetzen, nur POC (#282): E-Mail eingeben, das neue Passwort erscheint auf der Seite.
+// Ersetzt durch den Ablauf mit Mail-Link (#283).
+export function resetPage(api: Api): HTMLElement {
+  const error = h("p", { class: "error", role: "alert" });
+  const email = h("input", { name: "email", type: "email", autocomplete: "email" });
+  const submit = h("button", { type: "submit" }, txt("access.submit_reset").de);
+  const result = h("div", { class: "reset-result", hidden: true });
+  const onsubmit = async (ev: Event) => {
+    ev.preventDefault();
+    error.textContent = "";
+    const bad = validateReset(email.value);
+    if (bad) { error.textContent = txt(bad).de; return; }
+    submit.disabled = true;
+    try {
+      const { password } = await api.resetPassword(email.value.trim());
+      const copy = h("button", { type: "button" }, txt("access.reset_copy").de);
+      copy.onclick = () => { void navigator.clipboard?.writeText(password).then(() => { copy.textContent = txt("access.reset_copied").de; }); };
+      result.replaceChildren(
+        h("p", {}, txt("access.reset_done").de),
+        h("div", { class: "row" }, h("code", { class: "new-password", "data-testid": "new-password" }, password), copy),
+        h("p", { class: "muted" }, txt("access.reset_then").de));
+      result.hidden = false;
+    } catch (e) {
+      error.textContent = errorText(e);
+    }
+    submit.disabled = false;
+  };
+  return h("div", { class: "access" },
+    titleStage(),
+    h("header", { class: "title" }, h("h1", {}, "18OE"), h("p", { class: "game-title" }, txt("access.game_title").de)),
+    h("div", { class: "panel" },
+      h("h2", {}, txt("access.title_reset").de),
+      h("p", { class: "muted" }, txt("access.hint_reset").de),
+      h("form", { onsubmit, novalidate: true }, field(txt("access.email_label").de, email), h("div", { class: "row" }, submit), error),
+      result,
+      h("p", {}, h("a", { href: "#/login" }, txt("access.to_login").de))),
+    versionFooter());
 }
 
 export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => void): HTMLElement {
@@ -115,6 +160,7 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
     h("div", { class: "panel" },
       h("h2", {}, txt(reg ? "access.title_register" : "access.title_login").de),
       h("form", { onsubmit, novalidate: true }, ...fields, h("div", { class: "row" }, submit), status, error),
-      h("p", {}, h("a", { href: reg ? "#/login" : "#/register" }, txt(reg ? "access.to_login" : "access.to_register").de))),
+      h("p", {}, h("a", { href: reg ? "#/login" : "#/register" }, txt(reg ? "access.to_login" : "access.to_register").de)),
+      reg ? null : h("p", {}, h("a", { href: "#/reset" }, txt("access.to_reset").de))),
     versionFooter());
 }

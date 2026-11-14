@@ -87,6 +87,8 @@ end
 # wrong passwords on /login. In memory, one Puma process.
 set :register_limit, Oe::Accounts::RateLimit.new(max: 10, window: 900)
 set :login_limit, Oe::Accounts::RateLimit.new(max: 10, window: 900)
+# POC password reset (#282): every request counts, not only failures.
+set :reset_limit, Oe::Accounts::RateLimit.new(max: 5, window: 900)
 # Naming players by name/e-mail when creating a game (#212), per creator account.
 set :lookup_limit, Oe::Accounts::RateLimit.new(max: 20, window: 900)
 
@@ -131,6 +133,22 @@ post "/login" do
   session.clear
   session[:account] = account["id"]
   json 200, account
+end
+
+# POC password reset (#282): e-mail only, the new password is shown once, no mail.
+# Known risk, accepted for the POC: whoever knows an address can take the account (#283 replaces this).
+post "/reset-password" do
+  limit = settings.reset_limit
+  too_many! if limit.blocked?(request.ip)
+  limit.fail!(request.ip)
+  data = request_params
+  data = {} unless data.is_a?(Hash)
+  email = data["email"]
+  halt api_error(422, "invalid_email", "e-mail address looks invalid") unless email.is_a?(String) && Oe::Accounts.normalize_email(email).match?(Oe::Accounts::EMAIL_FORMAT)
+  password = Oe::Accounts.reset_password(settings.store, email)
+  halt api_error(422, "unknown_email", "no account with this e-mail address") unless password
+  session.clear
+  json 200, password: password
 end
 
 post "/logout" do

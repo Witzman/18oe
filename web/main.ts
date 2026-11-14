@@ -6,7 +6,7 @@ import type { Account } from "./types.ts";
 import { h, mount } from "./ui/dom.ts";
 import { kitPage } from "./ui/kit/page.ts";
 import { mapDevPage } from "./ui/mapdev.ts";
-import { accessPage } from "./ui/access.ts";
+import { accessPage, resetPage } from "./ui/access.ts";
 import { loadGeometry } from "./ui/frame/mapview.ts";
 import { mountConcession } from "./ui/panels/concession.ts";
 import { mountTrain } from "./ui/panels/train.ts";
@@ -46,6 +46,7 @@ async function route() {
       if (e instanceof ApiError && e.status === 401) return null;
       throw e;
     });
+    if (!ctx.me && location.hash === "#/reset") { mount(root, resetPage(api)); return; }
     if (!ctx.me) {
       mount(root, accessPage(api, location.hash === "#/register" ? "register" : "login", (me: Account) => { ctx.me = me; const back = returnTo; returnTo = null; if (back && back !== location.hash) location.hash = back; else if (back) void route(); else { location.hash = "#/"; void route(); } }));
       return;

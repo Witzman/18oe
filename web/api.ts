@@ -50,6 +50,8 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init)) {
     // #208: login is the e-mail or the name; the invite code only ever travels in the POST body.
     register: (r: RegisterRequest) => call<Account>("POST", "/register", r),
     login: (login: string, password: string) => call<Account>("POST", "/login", { login, password }),
+    // #282 (POC): e-mail only; the server answers with the new password once. Replaced by #283.
+    resetPassword: (email: string) => call<{ password: string }>("POST", "/reset-password", { email }),
     logout: () => call<{ ok: boolean }>("POST", "/logout"),
     listGames: () => call<{ games: GameSummary[] }>("GET", "/games"),
     createGame: (seats: SeatRequest[], seed?: number) =>

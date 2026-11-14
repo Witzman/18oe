@@ -215,6 +215,11 @@ module Oe
       @mutex.synchronize { @db.get_first_row("SELECT * FROM accounts WHERE id = ?", [id]) }
     end
 
+    # POC password reset (#282): replaces the hash of one account.
+    def update_password(id, password_hash)
+      transaction { @db.execute("UPDATE accounts SET password_hash = ? WHERE id = ?", [password_hash, id]) }
+    end
+
     # By e-mail (already lower-case) or by name (case-insensitive).
     def account_by_login(email, name)
       @mutex.synchronize do

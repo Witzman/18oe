@@ -73,3 +73,12 @@ test("a failed fetch is reported as a network error", async () => {
   const api = createApi(async () => { throw new TypeError("offline"); });
   await assert.rejects(api.me(), (e: unknown) => e instanceof ApiError && e.status === 0 && e.code === "network");
 });
+
+test("resetPassword sends only the e-mail to POST /reset-password (#282)", async () => {
+  const calls: { path: string; init?: RequestInit }[] = [];
+  const r = await createApi(fake(200, { password: "abc123XYZ789qw" }, calls)).resetPassword("a@b.de");
+  assert.equal(r.password, "abc123XYZ789qw");
+  assert.equal(calls[0]?.path, "/reset-password");
+  assert.equal(calls[0]?.init?.method, "POST");
+  assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { email: "a@b.de" });
+});

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ApiError } from "../api.ts";
-import { errorText, validate } from "../ui/access.ts";
+import { errorText, validate, validateReset } from "../ui/access.ts";
 import { txt } from "../ui/text.ts";
 
 const ok = { name: "Anna", email: "anna@example.de", password: "geheim123", code: "einlass" };
@@ -24,6 +24,7 @@ test("every server code of /register and /login has its own readable text", () =
   const cases: [number, string][] = [
     [401, "invalid_login"], [429, "rate_limited"], [403, "invalid_invite"], [422, "invalid_name"],
     [422, "invalid_email"], [422, "invalid_password"], [409, "name_taken"], [409, "registration_failed"],
+    [422, "unknown_email"],
   ];
   const seen = new Set<string>();
   for (const [status, code] of cases) {
@@ -50,4 +51,10 @@ test("title screen (#280): game title text exists, the scene styles use theme to
   assert.ok(section.includes("prefers-reduced-motion: reduce"));
   assert.deepEqual(section.replace(/\/\*[^]*?\*\//g, "").match(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g) ?? [], [], "no literal colours");
   assert.ok(section.includes("--motion-run-ms-per-hex"), "duration comes from the theme");
+});
+
+test("reset validation (#282): e-mail required and well-formed", () => {
+  assert.equal(validateReset("anna@example.de"), null);
+  assert.equal(validateReset(" "), "access.err_required");
+  assert.equal(validateReset("anna"), "access.err_email_form");
 });
