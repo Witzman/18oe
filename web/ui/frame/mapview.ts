@@ -67,6 +67,16 @@ export function mountMapView(frame: GameFrame, api: Api): () => void {
         if (disposed) { m.destroy(); return null; }
         map = m;
         for (const ev of ["hex", "city", "hover"] as const) unsubs.push(m.on(ev, emit(ev)));
+        // #294: a lost WebGL context (GPU reset, driver, too many contexts) is said on the map, not left as a
+        // frozen or black canvas. Pixi asks the browser to restore it and redraws on restore.
+        const canvas = host.querySelector("canvas");
+        if (canvas) {
+          const lost = () => { if (!disposed) { say("map.context_lost"); host.dataset.state = "lost"; } };
+          const restored = () => { if (!disposed && map) { say(null); host.dataset.state = "ready"; if (game) map.setState(game); } };
+          canvas.addEventListener("webglcontextlost", lost);
+          canvas.addEventListener("webglcontextrestored", restored);
+          unsubs.push(() => { canvas.removeEventListener("webglcontextlost", lost); canvas.removeEventListener("webglcontextrestored", restored); });
+        }
         if (game) m.setState(game);
         fitted = host.isConnected && host.clientWidth >= 64 && host.clientHeight >= 64;
         say(null);

@@ -16,7 +16,7 @@ const TIERS = ["minor", "regional", "major", "national"]; // Regelwerk §6.2, §
 const DIVIDEND_KINDS = ["withhold", "half", "payout"]; // Regelwerk §11.4
 const ERROR_CODES = [
   "bad_request", "login_required", "forbidden", "not_your_turn", "not_found", "conflict",
-  "rejected", "invalid_seats", "game_limit", "internal_error", "network",
+  "rejected", "invalid_seats", "game_limit", "internal_error", "network", "timeout", "bad_response",
   "unknown_player", "invalid_login", "rate_limited", "invalid_invite", "invalid_name", "invalid_email", "invalid_password", "name_taken", "registration_failed",
 ]; // lib/oe/games_api.rb, app.rb, web/api.ts
 const RULE_REFS = [

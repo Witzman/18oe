@@ -143,6 +143,27 @@ test("operating sheet in the browser: dividend needs a choice, then the main but
   assert.deepEqual(posted[0]!.action, game.state.prompt.actions[2]);
 });
 
+// #294: the owner's game blanked on a fractional dividend rate; the sheet must draw it and send the choice.
+const FRACTION = String.raw`(async () => {
+  ${HEAD}
+  if (document.querySelectorAll(".op-opt").length !== 3) fail("options");
+  if (!/£8,75/.test(q('.op-opt[data-kind="half"]').textContent)) fail("half row: " + q('.op-opt[data-kind="half"]').textContent);
+  if (!q(".frame-roundbar").textContent.trim()) fail("frame not drawn");
+  if (q(".frame-stall") && !q(".frame-stall").hidden) fail("stall line: " + q(".frame-stall").textContent);
+  q('.op-opt[data-kind="half"]').click();
+  await sleep(200);
+  if (!/£8,75.*p0 £18, p1 £9/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  q(".kit-main-btn").click();
+  await sleep(600);
+  if ((await (await fetch("/__posted")).json()).length !== 1) fail("not sent once");
+})()`;
+
+test("operating sheet in the browser: a fractional dividend rate (£8,75) is drawn and the choice is sent (#294)", { skip: browser ? false : "no headless browser installed" }, async () => {
+  const { posted, game } = await scenario("operating-dividend-fraction", ".op-opt", FRACTION);
+  assert.equal(posted.length, 1);
+  assert.deepEqual(posted[0]!.action, game.state.prompt.actions[1]);
+});
+
 test("operating order in the browser: acting company card, order list with done, current, own and bot marks", { skip: browser ? false : "no headless browser installed" }, async () => {
   await scenario("operating-route", ".or-item", ORDER);
 });

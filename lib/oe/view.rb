@@ -725,9 +725,12 @@ module Oe
       token.price
     end
 
-    # One entry per dividend option: `per_share` is what each share gets,
-    # `treasury` what the corporation keeps (withheld part plus what its own
-    # shares pay), `price` the share price afterwards (nil without one).
+    # One entry per dividend option: `per_share` is the rate per share (can be
+    # fractional, e.g. 8.75; §11.4), `payouts` what each holder other than the
+    # corporation really receives (rate x shares, rounded up per recipient, the
+    # engine's own dividends_for_entity), `treasury` what the corporation keeps
+    # (withheld part plus what its own shares pay), `price` the share price
+    # afterwards (nil without one).
     def dividend_context(game, step, entity)
       revenue = step.total_revenue
       {
@@ -736,6 +739,7 @@ module Oe
           {
             kind: kind.to_s,
             per_share: opt[:per_share],
+            payouts: dividend_payouts(game, step, entity, opt[:per_share]),
             treasury: opt[:corporation].to_i + opt[:divs_to_corporation].to_i,
             withheld: opt[:corporation].to_i,
             direction: Array(opt[:share_direction]).map(&:to_s),
@@ -744,6 +748,19 @@ module Oe
           }
         end,
       }
+    end
+
+    # Holder -> cash of a dividend option, as Engine::Step::Dividend#payout_shares
+    # pays it (without spending: dividends_for_entity only computes).
+    def dividend_payouts(game, step, entity, per_share)
+      return [] unless per_share.to_f.positive?
+
+      (game.players + game.corporations).filter_map do |holder|
+        next if holder == entity
+
+        amount = step.dividends_for_entity(entity, holder, per_share)
+        { holder: holder.id, amount: amount } if amount.positive?
+      end
     end
 
     # The market cell a corporation lands on after the moves of a dividend option,

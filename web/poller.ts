@@ -9,8 +9,12 @@ export interface PollerOptions {
   onUnauthorized?: () => void;
   // A check or load worked (clears the "no connection" band).
   onOk?: () => void;
-  // The last check failed; the next attempt follows in `ms` (drives the countdown band).
-  onRetryIn?: (ms: number) => void;
+  // The last check failed; the next attempt follows in `ms` (drives the countdown band). `why` is the real
+  // reason (#294): the request, its HTTP status or the network/timeout, the elapsed time, or a display error.
+  onRetryIn?: (ms: number, why: PollFailure) => void;
+  // Drawing a loaded state threw (a client bug, #294). Reported apart from network errors; the state is
+  // loaded again on the next check.
+  onRenderError?: (e: unknown) => void;
   isVisible?: () => boolean;
   // Takt (ui-spec 3.7): sichtbarer Reiter schnell, Hintergrund langsam; wieder sichtbar -> sofort (main.ts ruft tick()).
   activeMs?: number;
@@ -21,6 +25,24 @@ export interface PollerOptions {
 
 export const POLL_ACTIVE_MS = 2000;
 export const POLL_HIDDEN_MS = 10000;
+
+// Why a check failed. kind "render": the state arrived but drawing it threw.
+export interface PollFailure {
+  kind: "network" | "timeout" | "server" | "render";
+  status: number;
+  request: string;
+  elapsedMs: number | null;
+  message: string;
+}
+
+export function failureOf(e: unknown): PollFailure {
+  if (e instanceof ApiError) {
+    const kind = e.code === "timeout" ? "timeout" : e.status === 0 ? "network" : "server";
+    return { kind, status: e.status, request: e.request, elapsedMs: e.elapsedMs, message: e.message };
+  }
+  const message = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+  return { kind: "render", status: 0, request: "", elapsedMs: null, message };
+}
 
 export type PollState = "stopped" | "waiting" | "checking" | "loading";
 
@@ -39,14 +61,14 @@ export function createPoller(opts: PollerOptions) {
   let handle: unknown = null;
   // >0 while the player's own action is in flight (#162: the poller pauses during sending).
   let paused = 0;
-  let failed = false;
+  let failed: PollFailure | null = null;
 
   function schedule() {
     if (is("stopped")) return;
     state = "waiting";
     const ms = nextMs();
     handle = setTimer(() => void tick(), ms);
-    if (failed) opts.onRetryIn?.(ms);
+    if (failed) opts.onRetryIn?.(ms, failed);
   }
 
   // One check; used by the timer, on first start and on "tab visible again".
@@ -66,11 +88,21 @@ export function createPoller(opts: PollerOptions) {
         // A load that started before the player's own action may answer after it (#289): never go back
         // to an older state than the one already shown.
         if (lastSeq === null || game.seq >= lastSeq) {
+          try {
+            opts.onGame(game);
+          } catch (e) {
+            // #294: a display error used to be reported as "no connection" while lastSeq already pointed at
+            // the state, so the next check found nothing new and the band vanished over a half-drawn page.
+            // Now it is named as what it is and the state is loaded (and drawn) again on the next check.
+            lastSeq = null;
+            failed = failureOf(e);
+            opts.onRenderError?.(e);
+            return schedule();
+          }
           lastSeq = game.seq;
-          opts.onGame(game);
         }
       }
-      failed = false;
+      failed = null;
       opts.onOk?.();
     } catch (e) {
       if (is("stopped")) return;
@@ -80,7 +112,9 @@ export function createPoller(opts: PollerOptions) {
         opts.onUnauthorized?.();
         return;
       }
-      failed = err.status === 0;
+      // Network loss, timeout and server errors (5xx) are retried with the countdown band; the band names
+      // the request, the status and the time (#294). Other statuses (404, 4xx) are handled by onError.
+      failed = err.status === 0 || err.status >= 500 ? failureOf(err) : null;
       opts.onError?.(err);
     }
     schedule();
@@ -101,7 +135,14 @@ export function createPoller(opts: PollerOptions) {
   // After the player's own action: show the new state right away.
   function adopt(game: Game) {
     lastSeq = game.seq;
-    opts.onGame(game);
+    try {
+      opts.onGame(game);
+    } catch (e) {
+      lastSeq = null; // drawn again (and reported) by the next check
+      failed = failureOf(e);
+      opts.onRenderError?.(e);
+      opts.onRetryIn?.(nextMs(), failed);
+    }
   }
 
   // Pause/resume around a sent action. A check that is already running finishes; its result is

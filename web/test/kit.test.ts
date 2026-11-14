@@ -51,7 +51,7 @@ test("Wimpel: seat digit always present (never colour alone), 7 distinct slots, 
   assert.ok(find(Wimpel({ seat: 1, name: "A" }, { theme: brett }), (n) => n.attrs.style?.includes("var(--player-p1)") ?? false).length === 1);
 });
 
-test("Geld: pound sign, German grouping, true minus, optional delta sign, integers only", () => {
+test("Geld: pound sign, German grouping, true minus, optional delta sign, fractions with a comma", () => {
   assert.equal(formatGeld(0), "£0");
   assert.equal(formatGeld(1250), "£1.250");
   assert.equal(formatGeld(1234567), "£1.234.567");
@@ -59,7 +59,17 @@ test("Geld: pound sign, German grouping, true minus, optional delta sign, intege
   assert.equal(textOf(Geld(5, { delta: true })), "+£5");
   assert.equal(textOf(Geld(-5, { delta: true })), "−£5");
   assert.ok(classes(Geld(-5)).includes("kit-neg"));
-  assert.throws(() => formatGeld(1.5));
+  // #294: a dividend per share can be fractional (£70 over 8 shares, §11.4); this used to throw and blank the panel.
+  assert.equal(formatGeld(8.75), "£8,75");
+  assert.equal(formatGeld(0.5), "£0,50");
+  assert.equal(formatGeld(1.5), "£1,50");
+  assert.equal(formatGeld(-8.75), "−£8,75");
+  assert.equal(formatGeld(1234.5), "£1.234,50");
+  assert.equal(formatGeld(17.499999999), "£17,50");
+  assert.equal(formatGeld(10 / 3), "£3,33");
+  assert.equal(formatGeld(Number.NaN), "£?");
+  assert.equal(textOf(Geld(8.75, { delta: true })), "+£8,75");
+  assert.equal(textOf(Geld(-0.5, { delta: true })), "−£0,50");
 });
 
 const rows = [{ n: "b", x: 2 }, { n: "a", x: 10 }, { n: "c", x: 2 }];

@@ -83,13 +83,38 @@ test("resetPassword sends only the e-mail to POST /reset-password (#282)", async
   assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { email: "a@b.de" });
 });
 
+// #294: the band names the request, its status and the elapsed time; a hanging GET ends as a timeout.
+test("errors carry the request and the elapsed time; a hanging GET is aborted as a timeout", async () => {
+  let t = 0;
+  const now = () => t;
+  const slow: FetchLike = async () => { t += 1234; return new Response("<html>Bad Gateway</html>", { status: 502, statusText: "Bad Gateway" }); };
+  const e1 = await createApi(slow, { now }).getGame(1).catch((e: unknown) => e) as ApiError;
+  assert.equal(e1.status, 502);
+  assert.equal(e1.request, "GET /games/1");
+  assert.equal(e1.elapsedMs, 1234);
+  assert.match(e1.message, /502 Bad Gateway/);
+
+  const hang: FetchLike = (_p, init) => new Promise((_r, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(new DOMException("The operation was aborted.", "AbortError")));
+  });
+  const e2 = await createApi(hang, { getTimeoutMs: 20 }).getGame(1).catch((e: unknown) => e) as ApiError;
+  assert.equal(e2.status, 0);
+  assert.equal(e2.code, "timeout");
+  assert.equal(e2.request, "GET /games/1");
+});
+
+test("a 200 without JSON (cut-off body, proxy page) is an error, not an empty state", async () => {
+  const e = await createApi(fake(200, "<html>")).getGame(1).catch((x: unknown) => x) as ApiError;
+  assert.equal(e.code, "bad_response");
+});
+
 test("an action whose answer never comes fails as a network error after the timeout (#289)", async () => {
   const hang: FetchLike = (_path, init) => new Promise((_resolve, reject) => {
     init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
   });
   const api = createApi(hang, { postTimeoutMs: 30 });
   await assert.rejects(api.postAction(1, { type: "pass" }, 3), (e: unknown) => e instanceof ApiError && e.status === 0 && e.message === "timeout");
-  // reads are not cut off (the poller has its own rhythm)
+  // reads have their own, longer limit (GET_TIMEOUT_MS, #294)
   let resolved = false;
   const slow: FetchLike = () => new Promise((r) => setTimeout(() => { resolved = true; r(new Response(JSON.stringify({ seq: 1 }), { status: 200 })); }, 60));
   assert.deepEqual(await createApi(slow, { postTimeoutMs: 30 }).version(1), { seq: 1 });

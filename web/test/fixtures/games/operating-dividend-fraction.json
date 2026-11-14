@@ -1,0 +1,2577 @@
+{
+ "id": 1,
+ "status": "active",
+ "seats": [
+  {
+   "seat": 0,
+   "kind": "human",
+   "name": "p0"
+  },
+  {
+   "seat": 1,
+   "kind": "human",
+   "name": "p1"
+  },
+  {
+   "seat": 2,
+   "kind": "human",
+   "name": "p2"
+  },
+  {
+   "seat": 3,
+   "kind": "bot",
+   "name": "p3"
+  }
+ ],
+ "viewer": "p0",
+ "seq": 1446,
+ "state": {
+  "meta": {
+   "seq": 1446,
+   "game_id": 1,
+   "finished": false,
+   "round": {
+    "type": "operating",
+    "number": 2,
+    "turn": 2,
+    "description": "Operating Round 2.2 (of 2)"
+   },
+   "phase": {
+    "name": "2",
+    "tiles": [
+     "yellow"
+    ],
+    "operating_rounds": 2,
+    "status": [
+     "train_obligation"
+    ]
+   },
+   "rr_phase": "regional_minor",
+   "railroads": {
+    "minors": {
+     "floated": 12,
+     "total": 12
+    },
+    "regionals": {
+     "unparred": 10,
+     "parred": 5,
+     "floated": 3,
+     "converted": 0,
+     "removed": 6,
+     "closed": 0,
+     "total": 24,
+     "max_floated": 18,
+     "max_removed": 6
+    },
+    "regional_states": [
+     {
+      "id": "LNWR",
+      "state": "unparred"
+     },
+     {
+      "id": "GWR",
+      "state": "removed"
+     },
+     {
+      "id": "GSWR",
+      "state": "floated"
+     },
+     {
+      "id": "PLM",
+      "state": "floated"
+     },
+     {
+      "id": "MIDI",
+      "state": "unparred"
+     },
+     {
+      "id": "OU",
+      "state": "unparred"
+     },
+     {
+      "id": "BEL",
+      "state": "removed"
+     },
+     {
+      "id": "BHB",
+      "state": "removed"
+     },
+     {
+      "id": "POB",
+      "state": "unparred"
+     },
+     {
+      "id": "KSS",
+      "state": "floated"
+     },
+     {
+      "id": "KBS",
+      "state": "unparred"
+     },
+     {
+      "id": "SB",
+      "state": "unparred"
+     },
+     {
+      "id": "MAV",
+      "state": "unparred"
+     },
+     {
+      "id": "SFAI",
+      "state": "unparred"
+     },
+     {
+      "id": "SFR",
+      "state": "removed"
+     },
+     {
+      "id": "CHN",
+      "state": "removed"
+     },
+     {
+      "id": "MZA",
+      "state": "parred"
+     },
+     {
+      "id": "RCP",
+      "state": "parred"
+     },
+     {
+      "id": "MSP",
+      "state": "unparred"
+     },
+     {
+      "id": "MKV",
+      "state": "parred"
+     },
+     {
+      "id": "LRZD",
+      "state": "removed"
+     },
+     {
+      "id": "WW",
+      "state": "unparred"
+     },
+     {
+      "id": "DSJ",
+      "state": "parred"
+     },
+     {
+      "id": "BJV",
+      "state": "parred"
+     }
+    ]
+   },
+   "current": {
+    "kind": "corporation",
+    "id": "KSS",
+    "owner": "p0"
+   },
+   "active_players": [
+    "p0"
+   ],
+   "standings": [
+    {
+     "player": "p3",
+     "value": 755
+    },
+    {
+     "player": "p0",
+     "value": 600
+    },
+    {
+     "player": "p1",
+     "value": 470
+    },
+    {
+     "player": "p2",
+     "value": 20
+    }
+   ],
+   "winner": null,
+   "operating_order": [
+    {
+     "id": "A",
+     "done": true
+    },
+    {
+     "id": "B",
+     "done": true
+    },
+    {
+     "id": "H",
+     "done": true
+    },
+    {
+     "id": "KSS",
+     "done": false
+    },
+    {
+     "id": "PLM",
+     "done": false
+    },
+    {
+     "id": "M",
+     "done": false
+    }
+   ]
+  },
+  "players": [
+   {
+    "id": "p2",
+    "name": "p2",
+    "order": 0,
+    "cash": 20,
+    "value": 20,
+    "certs": 0,
+    "cert_limit": 36,
+    "shares": [],
+    "companies": [
+     {
+      "id": "PeC",
+      "name": null,
+      "value": null,
+      "face_down": true
+     }
+    ]
+   },
+   {
+    "id": "p3",
+    "name": "p3",
+    "order": 1,
+    "cash": 165,
+    "value": 755,
+    "certs": 5,
+    "cert_limit": 36,
+    "shares": [
+     {
+      "corporation": "A",
+      "percent": 100,
+      "president": true
+     },
+     {
+      "corporation": "D",
+      "percent": 100,
+      "president": true
+     },
+     {
+      "corporation": "M",
+      "percent": 100,
+      "president": true
+     }
+    ],
+    "companies": [
+     {
+      "id": "SHTC",
+      "name": null,
+      "value": null,
+      "face_down": true
+     },
+     {
+      "id": "SML",
+      "name": "Swift Metropolitan Line",
+      "value": 120,
+      "face_down": false
+     },
+     {
+      "id": "WS",
+      "name": "Wien Südbahnhof",
+      "value": 40,
+      "face_down": false
+     }
+    ]
+   },
+   {
+    "id": "p0",
+    "name": "p0",
+    "order": 2,
+    "cash": 140,
+    "value": 600,
+    "certs": 3,
+    "cert_limit": 36,
+    "shares": [
+     {
+      "corporation": "B",
+      "percent": 100,
+      "president": true
+     },
+     {
+      "corporation": "F",
+      "percent": 100,
+      "president": true
+     },
+     {
+      "corporation": "KSS",
+      "percent": 50,
+      "president": true
+     }
+    ],
+    "companies": [
+     {
+      "id": "BBE",
+      "name": "Brandt and Brandau, Engineers",
+      "value": 100,
+      "face_down": true
+     },
+     {
+      "id": "CCTC",
+      "name": "Central Circle Transport Corporation",
+      "value": 60,
+      "face_down": true
+     },
+     {
+      "id": "WCF",
+      "name": "White Cliffs Ferry",
+      "value": 60,
+      "face_down": true
+     }
+    ]
+   },
+   {
+    "id": "p1",
+    "name": "p1",
+    "order": 3,
+    "cash": 30,
+    "value": 470,
+    "certs": 3,
+    "cert_limit": 36,
+    "shares": [
+     {
+      "corporation": "H",
+      "percent": 100,
+      "president": true
+     },
+     {
+      "corporation": "L",
+      "percent": 100,
+      "president": true
+     },
+     {
+      "corporation": "PLM",
+      "percent": 50,
+      "president": true
+     }
+    ],
+    "companies": []
+   }
+  ],
+  "corporations": [
+   {
+    "id": "A",
+    "name": "Silver Banner Line",
+    "type": "minor",
+    "president": "p3",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 75,
+    "share_price": 70,
+    "par_price": 70,
+    "shares": [
+     {
+      "holder": "p3",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-5",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "T81"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 50,
+     "dividend": "half",
+     "routes": [
+      {
+       "train": "2+2-5",
+       "name": "2+2",
+       "revenue": 50,
+       "hexes": [
+        "S78",
+        "T79",
+        "T81",
+        "T81",
+        "U80"
+       ],
+       "segments": [
+        {
+         "hex": "S78",
+         "exits": [
+          5
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "T79",
+         "exits": [
+          2,
+          4
+         ],
+         "nodes": []
+        },
+        {
+         "hex": "T81",
+         "exits": [
+          1
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "T81",
+         "exits": [
+          0
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "U80",
+         "exits": [
+          3
+         ],
+         "nodes": [
+          0
+         ]
+        }
+       ],
+       "stops": [
+        {
+         "hex": "S78",
+         "index": 0,
+         "revenue": 20
+        },
+        {
+         "hex": "T81",
+         "index": 0,
+         "revenue": 20
+        },
+        {
+         "hex": "U80",
+         "index": 0,
+         "revenue": 10
+        }
+       ]
+      }
+     ]
+    },
+    "track_rights": [
+     "RU"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "B",
+    "name": "Orange Scroll Surveyors",
+    "type": "minor",
+    "president": "p0",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 70,
+    "share_price": 90,
+    "par_price": 90,
+    "shares": [
+     {
+      "holder": "p0",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-0",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "H21"
+     },
+     {
+      "used": true,
+      "hex": "G26"
+     }
+    ],
+    "last_run": {
+     "revenue": 60,
+     "dividend": "half",
+     "routes": [
+      {
+       "train": "2+2-0",
+       "name": "2+2",
+       "revenue": 60,
+       "hexes": [
+        "G26",
+        "G24",
+        "G24",
+        "G22",
+        "H21"
+       ],
+       "segments": [
+        {
+         "hex": "G26",
+         "exits": [
+          1
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "G24",
+         "exits": [
+          4
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "G24",
+         "exits": [
+          1
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "G22",
+         "exits": [
+          0,
+          4
+         ],
+         "nodes": []
+        },
+        {
+         "hex": "H21",
+         "exits": [
+          3
+         ],
+         "nodes": [
+          0
+         ]
+        }
+       ],
+       "stops": [
+        {
+         "hex": "G26",
+         "index": 0,
+         "revenue": 30
+        },
+        {
+         "hex": "G24",
+         "index": 0,
+         "revenue": 10
+        },
+        {
+         "hex": "H21",
+         "index": 0,
+         "revenue": 20
+        }
+       ]
+      }
+     ]
+    },
+    "track_rights": [
+     "UK"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "C",
+    "name": "Golden Bell Marketplace",
+    "type": "minor",
+    "president": null,
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 55,
+    "share_price": 60,
+    "par_price": 60,
+    "shares": [
+     {
+      "holder": "market",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-2",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "N31"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "FR"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "D",
+    "name": "Green Junction Mercantile",
+    "type": "minor",
+    "president": "p3",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 0,
+    "share_price": 75,
+    "par_price": 75,
+    "shares": [
+     {
+      "holder": "p3",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-12",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "T69"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "AH"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "E",
+    "name": "Blue Coast Bridge Construction Company",
+    "type": "minor",
+    "president": null,
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 51,
+    "share_price": 65,
+    "par_price": 65,
+    "shares": [
+     {
+      "holder": "market",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-11",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "X45"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "IT"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "F",
+    "name": "White Peak Mountain Railway",
+    "type": "minor",
+    "president": "p0",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 46,
+    "share_price": 75,
+    "par_price": 75,
+    "shares": [
+     {
+      "holder": "p0",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-4",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "S78"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 60,
+     "dividend": "half",
+     "routes": [
+      {
+       "train": "2+2-4",
+       "name": "2+2",
+       "revenue": 60,
+       "hexes": [
+        "T81",
+        "T79",
+        "S78",
+        "S78",
+        "R77",
+        "Q76",
+        "P75",
+        "O76",
+        "P77",
+        "P77"
+       ],
+       "segments": [
+        {
+         "hex": "T81",
+         "exits": [
+          1
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "T79",
+         "exits": [
+          2,
+          4
+         ],
+         "nodes": []
+        },
+        {
+         "hex": "S78",
+         "exits": [
+          5
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "S78",
+         "exits": [
+          2
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "R77",
+         "exits": [
+          5,
+          2
+         ],
+         "nodes": []
+        },
+        {
+         "hex": "Q76",
+         "exits": [
+          2,
+          5
+         ],
+         "nodes": []
+        },
+        {
+         "hex": "P75",
+         "exits": [
+          3,
+          5
+         ],
+         "nodes": []
+        },
+        {
+         "hex": "O76",
+         "exits": [
+          5,
+          0
+         ],
+         "nodes": []
+        },
+        {
+         "hex": "P77",
+         "exits": [
+          2
+         ],
+         "nodes": [
+          2
+         ]
+        },
+        {
+         "hex": "P77",
+         "exits": [],
+         "nodes": [
+          1,
+          2
+         ]
+        }
+       ],
+       "stops": [
+        {
+         "hex": "T81",
+         "index": 0,
+         "revenue": 20
+        },
+        {
+         "hex": "S78",
+         "index": 0,
+         "revenue": 20
+        },
+        {
+         "hex": "P77",
+         "index": 2,
+         "revenue": 10
+        },
+        {
+         "hex": "P77",
+         "index": 1,
+         "revenue": 10
+        }
+       ]
+      }
+     ]
+    },
+    "track_rights": [
+     "RU"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "G",
+    "name": "Indigo Foundry and Iron Works",
+    "type": "minor",
+    "president": null,
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 64,
+    "share_price": 70,
+    "par_price": 70,
+    "shares": [
+     {
+      "holder": "market",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-6",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "AC16"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "SP"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "H",
+    "name": "Great Western Steamship Company",
+    "type": "minor",
+    "president": "p1",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 40,
+    "share_price": 80,
+    "par_price": 80,
+    "shares": [
+     {
+      "holder": "p1",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-8",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "F25"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "UK"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "J",
+    "name": "Grey Locomotive Works",
+    "type": "minor",
+    "president": null,
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 76,
+    "share_price": 75,
+    "par_price": 75,
+    "shares": [
+     {
+      "holder": "market",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-3",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "Y20"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "SP"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "K",
+    "name": "Vermilion Seal Couriers",
+    "type": "minor",
+    "president": null,
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 54,
+    "share_price": 80,
+    "par_price": 80,
+    "shares": [
+     {
+      "holder": "market",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-7",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "V27"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "FR"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "L",
+    "name": "Krasnaya Strela",
+    "type": "minor",
+    "president": "p1",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 85,
+    "share_price": 80,
+    "par_price": 80,
+    "shares": [
+     {
+      "holder": "p1",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-10",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "AC40"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 30,
+     "dividend": "half",
+     "routes": [
+      {
+       "train": "2+2-10",
+       "name": "2+2",
+       "revenue": 30,
+       "hexes": [
+        "AC40",
+        "AB39"
+       ],
+       "segments": [
+        {
+         "hex": "AC40",
+         "exits": [
+          2
+         ],
+         "nodes": [
+          0
+         ]
+        },
+        {
+         "hex": "AB39",
+         "exits": [
+          5
+         ],
+         "nodes": [
+          0
+         ]
+        }
+       ],
+       "stops": [
+        {
+         "hex": "AC40",
+         "index": 0,
+         "revenue": 20
+        },
+        {
+         "hex": "AB39",
+         "index": 0,
+         "revenue": 10
+        }
+       ]
+      }
+     ]
+    },
+    "track_rights": [
+     "IT"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "M",
+    "name": "Compagnie Internationale des Wagons-Lits",
+    "type": "minor",
+    "president": "p3",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 0,
+    "share_price": 70,
+    "par_price": 70,
+    "shares": [
+     {
+      "holder": "p3",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-9",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "D57"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "SC"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": null
+   },
+   {
+    "id": "LNWR",
+    "name": "London and North Western Railway",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "UK"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "GSWR",
+    "name": "Great Southern and Western Railway",
+    "type": "regional",
+    "president": null,
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 75,
+    "share_price": 75,
+    "par_price": 75,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 50
+     },
+     {
+      "holder": "market",
+      "percent": 50
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-1",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "I20"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "UK"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "floated"
+   },
+   {
+    "id": "PLM",
+    "name": "CF Paris a Lyon et a la Mediterranee",
+    "type": "regional",
+    "president": "p1",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 0,
+    "share_price": 60,
+    "par_price": 60,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 50
+     },
+     {
+      "holder": "p1",
+      "percent": 50
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-14",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "U34"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "FR"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "floated"
+   },
+   {
+    "id": "MIDI",
+    "name": "CF du Midi",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "FR"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "OU",
+    "name": "CF de l'Ouest",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "FR"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "POB",
+    "name": "Preußische Ostbahn",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "PHS"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "KSS",
+    "name": "Königlich Sächsische Staatseisenbahnen",
+    "type": "regional",
+    "president": "p0",
+    "ipoed": true,
+    "floated": true,
+    "closed": false,
+    "cash": 0,
+    "share_price": 65,
+    "par_price": 65,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 50
+     },
+     {
+      "holder": "p0",
+      "percent": 50
+     }
+    ],
+    "reserved": null,
+    "trains": [
+     {
+      "id": "2+2-13",
+      "name": "2+2",
+      "price": 100,
+      "distance": [
+       {
+        "nodes": [
+         "town"
+        ],
+        "pay": 2,
+        "visit": 99
+       },
+       {
+        "nodes": [
+         "city",
+         "offboard",
+         "town"
+        ],
+        "pay": 2,
+        "visit": 2
+       }
+      ],
+      "rusts_on": "4",
+      "obsolete_on": null
+     }
+    ],
+    "tokens": [
+     {
+      "used": true,
+      "hex": "N49"
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": {
+     "revenue": 0,
+     "dividend": "withhold",
+     "routes": []
+    },
+    "track_rights": [
+     "PHS"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "floated"
+   },
+   {
+    "id": "KBS",
+    "name": "Königlich Bayerische Staatseisenbahnen",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "PHS"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "SB",
+    "name": "Österreichische Südbahn",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "AH"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "MAV",
+    "name": "Magyar Allamvasutak",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "AH"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "SFAI",
+    "name": "Societa per le Ferrovie dell'Alta Italia",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "IT"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "MZA",
+    "name": "Cia de los Ferrocarriles de Madrid a Zaragoza y Alicante",
+    "type": "regional",
+    "president": null,
+    "ipoed": true,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": 80,
+    "par_price": 80,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "SP"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "parred"
+   },
+   {
+    "id": "RCP",
+    "name": "Companhia Real dos Caminhos de Ferro Portugueses",
+    "type": "regional",
+    "president": null,
+    "ipoed": true,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": 70,
+    "par_price": 70,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "SP"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "parred"
+   },
+   {
+    "id": "MSP",
+    "name": "Petersburgo-Moskovskaya Zheleznaya Doroga",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "RU"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "MKV",
+    "name": "Moskovsko-Kiyevo-Voronezhskaya Zheleznaya Doroga",
+    "type": "regional",
+    "president": null,
+    "ipoed": true,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": 60,
+    "par_price": 60,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "RU"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "parred"
+   },
+   {
+    "id": "WW",
+    "name": "Droga Zelazna Warszawsko-Wiedenska",
+    "type": "regional",
+    "president": null,
+    "ipoed": false,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": null,
+    "par_price": null,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "RU"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "unparred"
+   },
+   {
+    "id": "DSJ",
+    "name": "Det Sjaellandske Jernbaneselskab",
+    "type": "regional",
+    "president": null,
+    "ipoed": true,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": 60,
+    "par_price": 60,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "SC"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "parred"
+   },
+   {
+    "id": "BJV",
+    "name": "Bergslagernas Järnvägar",
+    "type": "regional",
+    "president": null,
+    "ipoed": true,
+    "floated": false,
+    "closed": false,
+    "cash": 0,
+    "share_price": 60,
+    "par_price": 60,
+    "shares": [
+     {
+      "holder": "ipo",
+      "percent": 100
+     }
+    ],
+    "reserved": null,
+    "trains": [],
+    "tokens": [
+     {
+      "used": false,
+      "hex": null
+     },
+     {
+      "used": false,
+      "hex": null
+     }
+    ],
+    "last_run": null,
+    "track_rights": [
+     "SC"
+    ],
+    "orient_express_marker": false,
+    "status": [],
+    "regional_state": "parred"
+   }
+  ],
+  "market": {
+   "rows": []
+  },
+  "depot": {
+   "available": [
+    {
+     "id": "2+2-15",
+     "name": "2+2",
+     "price": 100,
+     "distance": [
+      {
+       "nodes": [
+        "town"
+       ],
+       "pay": 2,
+       "visit": 99
+      },
+      {
+       "nodes": [
+        "city",
+        "offboard",
+        "town"
+       ],
+       "pay": 2,
+       "visit": 2
+      }
+     ],
+     "rusts_on": "4",
+     "obsolete_on": null,
+     "owner": null
+    }
+   ],
+   "upcoming": 81,
+   "next": "2+2",
+   "discarded": []
+  },
+  "bank": {
+   "cash": 52954
+  },
+  "auction": null,
+  "concession": [
+   {
+    "id": "CON1",
+    "name": "1st Concession",
+    "owner": "p0",
+    "status": "done"
+   },
+   {
+    "id": "CON2",
+    "name": "2nd Concession",
+    "owner": "p2",
+    "status": "done"
+   },
+   {
+    "id": "CON3",
+    "name": "3rd Concession",
+    "owner": "p1",
+    "status": "done"
+   },
+   {
+    "id": "CON4",
+    "name": "4th Concession",
+    "owner": "p2",
+    "status": "done"
+   },
+   {
+    "id": "CON5",
+    "name": "5th Concession",
+    "owner": "p2",
+    "status": "done"
+   },
+   {
+    "id": "CON6",
+    "name": "6th Concession",
+    "owner": "p0",
+    "status": "done"
+   },
+   {
+    "id": "CON7",
+    "name": "7th Concession",
+    "owner": "p3",
+    "status": "done"
+   },
+   {
+    "id": "CON8",
+    "name": "8th Concession",
+    "owner": "p0",
+    "status": "done"
+   },
+   {
+    "id": "CON9",
+    "name": "9th Concession",
+    "owner": "p2",
+    "status": "done"
+   },
+   {
+    "id": "CON10",
+    "name": "10th Concession",
+    "owner": "p2",
+    "status": "done"
+   }
+  ],
+  "zones": [
+   {
+    "id": "UK",
+    "price": 40,
+    "chits_left": 0,
+    "free": false,
+    "taken_by": [
+     "B",
+     "H"
+    ],
+    "discount": 0
+   },
+   {
+    "id": "PHS",
+    "price": 40,
+    "chits_left": 0,
+    "free": false,
+    "taken_by": [],
+    "discount": 0
+   },
+   {
+    "id": "FR",
+    "price": 20,
+    "chits_left": 0,
+    "free": false,
+    "taken_by": [
+     "C",
+     "K"
+    ],
+    "discount": 0
+   },
+   {
+    "id": "AH",
+    "price": 20,
+    "chits_left": 1,
+    "free": true,
+    "taken_by": [
+     "D"
+    ],
+    "discount": 0
+   },
+   {
+    "id": "IT",
+    "price": 10,
+    "chits_left": 0,
+    "free": false,
+    "taken_by": [
+     "E",
+     "L"
+    ],
+    "discount": 20
+   },
+   {
+    "id": "SP",
+    "price": 10,
+    "chits_left": 0,
+    "free": false,
+    "taken_by": [
+     "G",
+     "J"
+    ],
+    "discount": 20
+   },
+   {
+    "id": "SC",
+    "price": 10,
+    "chits_left": 1,
+    "free": true,
+    "taken_by": [
+     "M"
+    ],
+    "discount": 20
+   },
+   {
+    "id": "RU",
+    "price": 10,
+    "chits_left": 0,
+    "free": false,
+    "taken_by": [
+     "A",
+     "F"
+    ],
+    "discount": 20
+   }
+  ],
+  "map": [],
+  "log": [
+   {
+    "action": 1444,
+    "text": "KSS lays tile #8 with rotation 4 on K48"
+   },
+   {
+    "action": 1444,
+    "text": "Used 1 tile point(s) to lay tile"
+   },
+   {
+    "action": 1444,
+    "text": "1 point(s) remaining"
+   },
+   {
+    "action": 1445,
+    "text": "KSS lays tile #7 with rotation 3 on N47"
+   },
+   {
+    "action": 1445,
+    "text": "Used 1 tile point(s) to lay tile"
+   },
+   {
+    "action": 1445,
+    "text": "0 point(s) remaining"
+   },
+   {
+    "action": 1445,
+    "text": "KSS skips place a token"
+   },
+   {
+    "action": 1446,
+    "text": "KSS runs a 2+2 train for £30: N49-M48"
+   }
+  ],
+  "prompt": {
+   "step": "Dividend",
+   "types": [
+    "dividend"
+   ],
+   "viewer_to_act": true,
+   "actions": [
+    {
+     "type": "dividend",
+     "entity": "KSS",
+     "entity_type": "corporation",
+     "kind": "withhold"
+    },
+    {
+     "type": "dividend",
+     "entity": "KSS",
+     "entity_type": "corporation",
+     "kind": "half"
+    },
+    {
+     "type": "dividend",
+     "entity": "KSS",
+     "entity_type": "corporation",
+     "kind": "payout"
+    }
+   ],
+   "unsupported": [],
+   "ranges": [],
+   "context": {
+    "track": null,
+    "token": null,
+    "dividend": {
+     "revenue": 70,
+     "options": [
+      {
+       "kind": "withhold",
+       "per_share": 0,
+       "treasury": 70,
+       "withheld": 70,
+       "direction": [
+        "left"
+       ],
+       "times": [
+        1
+       ],
+       "price": 60,
+       "payouts": []
+      },
+      {
+       "kind": "half",
+       "per_share": 8.75,
+       "treasury": 44,
+       "withheld": 35,
+       "direction": [],
+       "times": [],
+       "price": 65,
+       "payouts": [
+        {
+         "holder": "p0",
+         "amount": 18
+        },
+        {
+         "holder": "p1",
+         "amount": 9
+        }
+       ]
+      },
+      {
+       "kind": "payout",
+       "per_share": 17.5,
+       "treasury": 18,
+       "withheld": 0,
+       "direction": [
+        "right"
+       ],
+       "times": [
+        1
+       ],
+       "price": 70,
+       "payouts": [
+        {
+         "holder": "p0",
+         "amount": 35
+        },
+        {
+         "holder": "p1",
+         "amount": 18
+        }
+       ]
+      }
+     ]
+    },
+    "train": null,
+    "stock": null
+   },
+   "description": null,
+   "help": null,
+   "pass_description": null,
+   "choice_name": null,
+   "choices": [],
+   "acting_as": []
+  }
+ }
+}

@@ -99,6 +99,60 @@ test("stop prevents any further request and adopt shows an own move at once", as
   assert.deepEqual(log.games, [1, 7]);
 });
 
+// #294: a state that cannot be drawn was reported as "no connection", and the poller had already taken its
+// seq, so the next check found nothing new, the band vanished and the page kept only the map.
+test("a display error is reported as such, keeps the band up and the state is loaded again", async () => {
+  const timers: (() => void)[] = [];
+  const retry: { ms: number; kind: string; message: string }[] = [];
+  const rendered: unknown[] = [];
+  let throwing = true;
+  let ok = 0;
+  let loads = 0;
+  const poller = createPoller({
+    api: {
+      version: async () => ({ seq: 3, status: "active", round: { type: "OR", number: 1, turn: 1 }, acting: [], viewer_to_act: true }),
+      getGame: async () => { loads++; return game(3); },
+    },
+    gameId: 1,
+    onGame: (g) => { if (throwing) throw new TypeError("x is undefined"); rendered.push(g.seq); },
+    onRenderError: () => {},
+    onOk: () => { ok++; },
+    onRetryIn: (ms, why) => retry.push({ ms, kind: why.kind, message: why.message }),
+    setTimer: (fn) => { timers.push(fn); return timers.length; }, clearTimer: () => {},
+  });
+  const flush = () => new Promise((r) => setImmediate(r));
+  poller.start(); await flush();
+  assert.deepEqual(retry, [{ ms: 2000, kind: "render", message: "TypeError: x is undefined" }]);
+  assert.equal(ok, 0, "no 'ok' after a failed draw");
+  assert.equal(poller.lastSeq, null);
+  timers.shift()!(); await flush();
+  assert.equal(loads, 2, "same seq, but the state is loaded again because it was never drawn");
+  throwing = false;
+  timers.shift()!(); await flush();
+  assert.deepEqual(rendered, [3]);
+  assert.equal(ok, 1);
+  assert.equal(poller.lastSeq, 3);
+});
+
+test("a server error (5xx) on the state is retried with the band and names request, status and time", async () => {
+  const timers: (() => void)[] = [];
+  const retry: { kind: string; status: number; request: string }[] = [];
+  const errors: number[] = [];
+  const poller = createPoller({
+    api: {
+      version: async () => ({ seq: 1, status: "active", round: { type: "OR", number: 1, turn: 1 }, acting: [], viewer_to_act: false }),
+      getGame: async () => { throw new ApiError(502, "http_error", "HTTP 502 Bad Gateway", "GET /games/1", 30012); },
+    },
+    gameId: 1, onGame: () => {}, onError: (e) => errors.push(e.status),
+    onRetryIn: (_ms, why) => retry.push({ kind: why.kind, status: why.status, request: why.request }),
+    setTimer: (fn) => { timers.push(fn); return timers.length; }, clearTimer: () => {},
+  });
+  poller.start(); await new Promise((r) => setImmediate(r));
+  assert.deepEqual(retry, [{ kind: "server", status: 502, request: "GET /games/1" }]);
+  assert.deepEqual(errors, [502]);
+  assert.equal(timers.length, 1);
+});
+
 test("a load that started before the player's own action and answers after it does not go back (#289)", async () => {
   let release: (g: Game) => void = () => {};
   const shown: number[] = [];

@@ -42,7 +42,7 @@ export interface GameFrame {
   setOrder: (spec: OrderSpec) => () => void;
   // Sends an action with the current seq (what the main button of the generic bar does).
   send: (action: Record<string, unknown>) => void;
-  hooks: { onFocusCorporation?: (id: string) => void; map?: import("./mapview.ts").FrameMap };
+  hooks: { onFocusCorporation?: (id: string) => void; map?: import("./mapview.ts").FrameMap; onRenderError?: (e: unknown) => void };
   // Runs the cleanups of mounted views and panels when the page leaves the game (the map frees its WebGL context).
   onDispose: (fn: () => void) => void;
   dispose: () => void;
@@ -143,6 +143,10 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   let panelError: string | null = null;
   const stallTimer = setInterval(() => { if (root.isConnected) drawStall(); }, 3000);
   disposers.push(() => clearInterval(stallTimer));
+  // Until the first state is drawn the context sheet says so (#294): never a bare map without a word. A
+  // failed load shows in the band above (reason and "Jetzt"), this line stays until a state arrives.
+  const loadingEl = h("p", { class: "muted frame-loading", role: "status" }, txt("frame.loading").de);
+  contextEl.append(loadingEl);
   const body = h("div", { class: "frame-body" }, contextEl, mainEl, outlinerEl);
   const root = h("div", { class: "frame" }, roundEl, band.el, playersEl, body, drawerEl, barEl, versionButton());
 
@@ -204,7 +208,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
 
   // ---- context sheet ---------------------------------------------------------------------------
   function drawContext() {
-    if (!game) return put(contextEl);
+    if (!game) { contextEl.replaceChildren(loadingEl); return; }
     const p = game.state.prompt;
     const entry = p.step ? txt(`step.${p.step}`) : null;
     const rule = entry && entry.regel !== "—" ? entry.regel : null;
@@ -392,13 +396,15 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     render(g: Game) {
       // One panel that throws must not stop the others nor the frame (#289): the error is shown in the
       // stall line (with "Neu laden") instead of leaving a half-drawn, unusable screen.
+      // #294: the map is one of these listeners; before, a throw there left a map-only page. The error also
+      // goes to hooks.onRenderError (main.ts sends it to the server log).
       panelError = null;
       for (const fn of listeners) {
-        try { fn(g); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("panel failed to draw", e); }
+        try { fn(g); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("panel failed to draw", e); frame.hooks.onRenderError?.(e); }
       }
       if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; seqSince = Date.now(); }
       game = g;
-      try { drawAll(); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("frame failed to draw", e); applyBusy(); }
+      try { drawAll(); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("frame failed to draw", e); frame.hooks.onRenderError?.(e); applyBusy(); }
       drawStall();
     },
     discardSelection() { selected = null; armed = false; rangeError = null; drawBar(); },

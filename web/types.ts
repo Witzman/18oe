@@ -131,7 +131,8 @@ export interface TokenContext {
 export interface DividendContext {
   revenue: number;
   options: {
-    kind: string; per_share: number; treasury: number; withheld: number;
+    // per_share: the rate (may be fractional, §11.4); payouts: what each holder really gets (rounded up).
+    kind: string; per_share: number; payouts?: { holder: string; amount: number }[]; treasury: number; withheld: number;
     direction: string[]; times: number[]; price: number | null;
   }[];
 }

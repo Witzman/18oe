@@ -5,6 +5,7 @@
 import type { Corporation, DividendContext, Game } from "../../types.ts";
 import { fillText, txt } from "../text.ts";
 import { formatGeld, type Change } from "../kit/index.ts";
+import { playerName } from "../frame/model.ts";
 
 export type Action = Record<string, unknown>;
 export const ROUTE_STEP = "Route";
@@ -59,6 +60,9 @@ export function runSentence(g: Game): string {
 export interface DivOption {
   kind: string; label: string; action: Action; perShare: number | null; treasury: number | null; price: number | null;
   move: "up" | "down" | "same" | null;
+  // What each holder other than the corporation really receives (the rate times shares, rounded up per
+  // recipient, §11.4); empty for withhold or when the server sent none.
+  payouts: { holder: string; amount: number }[];
 }
 
 export function dividendOptions(g: Game): DivOption[] {
@@ -71,6 +75,7 @@ export function dividendOptions(g: Game): DivOption[] {
     const now = corp?.share_price ?? null;
     return {
       kind, label: txt(`dividend.${kind}`).de, action, perShare: o?.per_share ?? null, treasury: o?.treasury ?? null, price,
+      payouts: o?.payouts ?? [],
       move: price === null || now === null ? null : price > now ? "up" : price < now ? "down" : "same",
     };
   });
@@ -89,7 +94,9 @@ export function dividendOrder(g: Game, pick: string | null): { sentence: string;
   const money = (n: number | null) => (n === null ? txt("stock.unknown_value").de : formatGeld(n));
   const now = corp.share_price;
   const price = o.price !== null && now !== null && o.price !== now ? fillText("div.sentence_price", { from: formatGeld(now), to: formatGeld(o.price) }) : "";
-  const sentence = fillText("div.sentence", { corp: corp.id, kind: o.label, share: money(o.perShare), treasury: money(o.treasury), price });
+  const paid = o.payouts.map((p) => `${playerName(g, p.holder)} ${formatGeld(p.amount)}`).join(", ");
+  const sentence = fillText("div.sentence", { corp: corp.id, kind: o.label, share: money(o.perShare), treasury: money(o.treasury), price })
+    + (paid ? ` ${fillText("div.payouts", { list: paid })}` : "");
   const changes: Change[] = [];
   if (o.treasury !== null) changes.push({ label: fillText("div.change_cash", { corp: corp.id }), before: formatGeld(corp.cash), after: formatGeld(corp.cash + o.treasury) });
   if (now !== null && o.price !== null) changes.push({ label: fillText("div.change_price", { corp: corp.id }), before: formatGeld(now), after: formatGeld(o.price) });

@@ -11,6 +11,7 @@ $LOAD_PATH.unshift(File.join(__dir__, "lib")) unless $LOAD_PATH.include?(File.jo
 require "sinatra"
 require "json"
 require "securerandom"
+require "time"
 require_relative "lib/oe/build_id"
 require_relative "lib/oe/version"
 require_relative "lib/oe/accounts"
@@ -180,6 +181,28 @@ get "/map" do
   cache_control :private, :no_cache
   content_type :json
   Oe::MapData.json(rev)
+end
+
+# #294: display errors of the game page (a panel threw while drawing a state) are written to the server
+# log, so a failure in a player's browser is visible without their DevTools. Logged-in only, limited per
+# account, fields cut to size; nothing is stored.
+set :client_error_limit, Oe::Accounts::RateLimit.new(max: 30, window: 900)
+
+post "/client-errors" do
+  account = current_account
+  halt api_error(401, "login_required", "login required") unless account
+  limit = settings.client_error_limit
+  too_many! if limit.blocked?(account["id"])
+  limit.fail!(account["id"])
+  data = request_params
+  data = {} unless data.is_a?(Hash)
+  line = {
+    at: Time.now.utc.iso8601, account: account["id"], game_id: data["game_id"].to_s[0, 20],
+    message: data["message"].to_s[0, 500], agent: data["agent"].to_s[0, 300],
+    stack: data["stack"].to_s[0, 4000],
+  }
+  warn "client-error #{JSON.generate(line)}"
+  json 200, ok: true
 end
 
 # A restart in the middle of a bot chain: pick it up again.
