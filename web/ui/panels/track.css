@@ -5,7 +5,7 @@
 .track-map { min-height: 2.75rem; margin-bottom: var(--shape-gap); }
 .track-hexes, .token-cities { display: flex; flex-direction: column; gap: var(--shape-gap); }
 .track-hex, .token-city { min-height: 2.75rem; text-align: left; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 6px 10px; }
-.track-hex[aria-pressed="true"], .token-city[aria-pressed="true"], .track-tile[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); }
+.track-hex[aria-pressed="true"], .token-city[aria-pressed="true"], .track-tile[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); color: var(--ui-ink); }
 .track-choice { margin-top: var(--shape-gap); }
 .track-choice h4 { margin: 0 0 4px; }
 .track-tiles { display: flex; flex-wrap: wrap; gap: var(--shape-gap); }
