@@ -150,7 +150,7 @@ RSpec.describe "registration with invite code and login (#208)" do
     end
 
     it "rate-limits password guessing" do
-      10.times { post_json("/login", { login: "Anna Lee", password: "wrong-password" }) }
+      Sinatra::Application.settings.login_limit.max.times { post_json("/login", { login: "Anna Lee", password: "wrong-password" }) }
       body = post_json("/login", { login: "Anna Lee", password: "correct-horse" })
       expect([last_response.status, body["error"]]).to eq([429, "rate_limited"])
     end
