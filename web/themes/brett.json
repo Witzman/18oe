@@ -259,8 +259,8 @@
     "body": "Barlow, 'Helvetica Neue', Arial, sans-serif"
   },
   "camera": {
-    "pitch": 38,
-    "yaw": -12,
+    "pitch": 0,
+    "yaw": 0,
     "heightLand": 0.1,
     "heightHill": 0.18,
     "heightMountain": 0.32,

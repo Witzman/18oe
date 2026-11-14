@@ -259,8 +259,8 @@
     "body": "'Source Serif 4', Georgia, serif"
   },
   "camera": {
-    "pitch": 30,
-    "yaw": -6,
+    "pitch": 0,
+    "yaw": 0,
     "heightLand": 0.06,
     "heightHill": 0.12,
     "heightMountain": 0.22,
