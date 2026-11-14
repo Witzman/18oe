@@ -73,7 +73,7 @@ const FRAME_CHECKS = String.raw`(async () => {
 
 for (const [name, loggedIn, hash, waitFor, checks] of [
   ["login page footer matches /healthz", false, "#/login", ".version-note", LOGIN_CHECKS],
-  ["game frame dialog matches /healthz", true, "#/game/1", ".frame-entry", FRAME_CHECKS],
+  ["game frame dialog matches /healthz", true, "#/game/1", ".frame-bar", FRAME_CHECKS],
 ] as const) {
   test(`version display: ${name}`, { skip: browser ? false : "no headless browser installed" }, async () => {
     const dir = mkdtempSync(join(tmpdir(), "oe-version-test-"));

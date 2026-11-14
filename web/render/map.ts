@@ -14,8 +14,9 @@
 // objects layer, revenue shields and token symbols in the labels layer (from Z2).
 // Built here: sea and land plates in theme colours, hex lines, province borders, terrain signs
 // with costs, tile surfaces with per-hex redraw, hover and valid targets, pan/zoom/centre/fly,
-// block culling, redraw on oe:themechange. Stored but drawn by later issues: setPreview (#48),
-// setLayers apart from terrainCost (#151), showRoutes (#155), labels (#149).
+// block culling, redraw on oe:themechange, the preview of a chosen tile or token (setPreview, #48,
+// preview.ts). Stored but drawn by later issues: setLayers apart from terrainCost (#151),
+// showRoutes (#155), labels (#149).
 // Walls (#145): one container per level in the walls layer, drawn in unit screen coordinates
 // (zoom 1, pan 0) and carried by position = pan, scale = zoom; redrawn in build() (theme or tile
 // height change), not on pan or zoom. A laid tile raises its hex by heightTile: when the set of
@@ -38,6 +39,7 @@ import { levelMatrix, mapCenter, pick, project, unproject, worldCorners, type Ve
 import { boxOnScreen, buildScene, COST_AT, terrainMark, type Scene } from "./scene.ts";
 import { currentRenderTheme, type RenderTheme } from "./theme.ts";
 import { changedHexes, signatures, type TileSignatures } from "./tilestate.ts";
+import { buildPreview, type PreviewNode } from "./preview.ts";
 
 export const LAYERS = ["sea", "seaMarks", "land", "walls", "grid", "tiles", "overlay", "routes", "objects", "labels", "ui"] as const;
 export type LayerName = (typeof LAYERS)[number];
@@ -250,6 +252,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     targetG = levelNodes.overlay.map((c) => c.addChild(new Graphics()));
     hoverG = new Graphics();
     drawTargets();
+    previewNode = null;
+    drawPreview();
     hover = null;
     // Terrain costs (screen space, labels layer).
     costs = [];
@@ -448,6 +452,24 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       const h = scene.grid.byId.get(c.hex);
       if (!h) continue;
       drawTargetCity(targetG[scene.levelOf.get(c.hex)!]!, slotsOf(c.hex).filter((s) => s.city === c.city), { x: h.x, y: h.y }, theme);
+    }
+  }
+
+  /** The preview of the chosen action (#48, #174) on top of its hex; see preview.ts. */
+  let previewNode: PreviewNode | null = null;
+  const PREVIEW_TRACK = "\u0000preview";
+  function drawPreview() {
+    if (previewNode && !previewNode.node.destroyed) previewNode.node.destroy({ children: true });
+    trackNodes.delete(PREVIEW_TRACK);
+    previewNode = buildPreview(preview, {
+      scene, theme, frame: frame3, tiles: geometry.tiles, slotsOf, corpColor,
+      tokensIn: (hex, city) => tokensOf(hex).find((t) => t.city === city)?.corporations.filter(Boolean).length ?? 0,
+    });
+    if (!previewNode) return;
+    levelNodes.overlay[previewNode.level]!.addChild(previewNode.node);
+    if (previewNode.track) {
+      setTrackStage(previewNode.track, zoomStage(view.zoom));
+      trackNodes.set(PREVIEW_TRACK, previewNode.track);
     }
   }
 
@@ -812,7 +834,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       void rendered().then(() => { stats.stateMs = performance.now() - t; });
     },
     setTargets(t) { targets = t; drawTargets(); drawHover(); render(); },
-    setPreview(p) { preview = p; },
+    setPreview(p) { preview = p; drawPreview(); render(); },
     setLayers(l) { shownLayers = { ...shownLayers, ...l }; render(); },
     showRoutes(r) { routes = r; },
     flyTo,
