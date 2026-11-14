@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Bot game audit (#306): bin/bot-audit --help
+set -euo pipefail
+source "$(dirname "$0")/_env"
+cd "$ROOT"
+bundler exec ruby -I lib bin/bot_audit.rb "$@"
