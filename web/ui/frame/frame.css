@@ -63,6 +63,8 @@
 .frame-detailline { color: var(--ui-faint); font-size: .9rem; overflow-wrap: anywhere; }
 .frame-bar .msg { flex: 0 1 28rem; }
 .frame-bar .msg:empty { display: none; }
+.frame-stall { flex: 0 1 28rem; margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.frame-stall[hidden] { display: none; }
 .frame-bar-tools { display: flex; gap: 6px; }
 .frame-toggle[aria-expanded="true"] { background: var(--ui-ink); color: var(--ui-panel); }
 

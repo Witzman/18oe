@@ -13,7 +13,7 @@ import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
 import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
-import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stepLabel, type PlayerRow } from "./model.ts";
+import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
 import { createViews } from "./views.ts";
 import { versionButton } from "../version.ts";
 import { endgameModel, Endstand } from "../panels/endgame.ts";
@@ -89,15 +89,39 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   const barEl = h("footer", { class: "frame-bar", "aria-label": txt("frame.action_bar").de });
   const barMain = h("div", { class: "frame-bar-order" });
   const barTools = h("div", { class: "frame-bar-tools" });
-  barEl.append(barMain, message.el, barTools);
+  // #289: "nobody can act" / "the bot does not move" / "no action offered", never a silent hang.
+  const stallEl = h("p", { class: "frame-stall", role: "status", "aria-live": "polite" });
+  stallEl.hidden = true;
+  barEl.append(barMain, stallEl, message.el, barTools);
+  let seqSince = Date.now();
+  function drawStall() {
+    let n: ReturnType<typeof stallNotice> = null;
+    try { n = game ? stallNotice(game, Date.now() - seqSince) : null; } catch (e) { console.warn("stall notice", e); } // a notice never breaks the frame
+    const show = n !== null && n.tone !== "info"; // "waiting for X" is already the bar's sentence
+    stallEl.hidden = !show;
+    stallEl.className = show ? `frame-stall msg-${n!.tone}` : "frame-stall";
+    stallEl.dataset.kind = show ? n!.kind : "";
+    stallEl.textContent = show ? n!.text : "";
+  }
+  const stallTimer = setInterval(() => { if (root.isConnected) drawStall(); }, 5000);
+  disposers.push(() => clearInterval(stallTimer));
   const body = h("div", { class: "frame-body" }, contextEl, mainEl, outlinerEl);
   const root = h("div", { class: "frame" }, roundEl, band.el, playersEl, body, drawerEl, barEl, versionButton());
 
   const model = () => (game ? genericModel(game, claims) : null);
 
+  // While an action is in flight every button is locked. Only the buttons this lock disabled are marked and
+  // opened again afterwards (#289): the panels redraw when the answer arrives, still inside the lock, and
+  // without the mark their fresh buttons stayed disabled until the next seq change. When the same player
+  // acts again (a 2nd concession of the same owner, the next step of a run) no seq change came: the game
+  // looked hung.
   function applyBusy() {
     root.toggleAttribute("aria-busy", busy);
-    if (busy) for (const b of root.querySelectorAll("button")) b.disabled = true;
+    if (busy) {
+      for (const b of root.querySelectorAll("button")) if (!b.disabled) { b.disabled = true; b.dataset.busyLock = ""; }
+    } else {
+      for (const b of root.querySelectorAll<HTMLButtonElement>("button[data-busy-lock]")) { b.disabled = false; delete b.dataset.busyLock; }
+    }
   }
 
   // ---- round bar -------------------------------------------------------------------------------
@@ -318,9 +342,10 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
     subscribe: (fn: (g: Game) => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
     render(g: Game) {
       for (const fn of listeners) fn(g);
-      if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; }
+      if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; seqSince = Date.now(); }
       game = g;
       drawAll();
+      drawStall();
     },
     discardSelection() { selected = null; armed = false; rangeError = null; drawBar(); },
     setBusy(b: boolean) { busy = b; if (game) drawBar(); else applyBusy(); },

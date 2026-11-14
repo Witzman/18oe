@@ -11,7 +11,7 @@ import type { Game } from "../types.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { actionKey, GenericBar, genericModel, rangeAction, rangeValue, type GenericHandlers } from "../ui/frame/generic.ts";
-import { corpColor, outlinerCorps, playerRows, roundBar, whoActs } from "../ui/frame/model.ts";
+import { BOT_STALL_MS, corpColor, outlinerCorps, playerRows, roundBar, stallNotice, whoActs } from "../ui/frame/model.ts";
 import { createViews } from "../ui/frame/views.ts";
 import { fillText, txt } from "../ui/text.ts";
 
@@ -245,4 +245,38 @@ test("order: example panel claims its action type and sets its order; unmounting
   unmount();
   assert.equal(genericModel(g, claims).count, before);
   assert.equal(slot.spec, null);
+});
+
+// #289: a hang is never silent.
+test("stall notice: nothing for the viewer to act on a normal state, errors when nobody or nothing can act", () => {
+  const next = games["concession-chain-next"]!;
+  assert.equal(next.state.prompt.viewer_to_act, true);
+  assert.equal(stallNotice(next, 10 * BOT_STALL_MS), null, "the viewer has offers: no notice");
+  const nobody = structuredClone(next);
+  nobody.state.meta.active_players = [];
+  nobody.state.prompt.viewer_to_act = false;
+  assert.equal(stallNotice(nobody, 0)?.kind, "nobody");
+  assert.equal(stallNotice(nobody, 0)?.tone, "error");
+  const empty = structuredClone(next);
+  empty.state.prompt.actions = [];
+  assert.equal(stallNotice(empty, 0)?.kind, "no_action");
+  const done = Object.values(games).find((g) => g.state.meta.finished)!;
+  assert.equal(stallNotice(done, 10 * BOT_STALL_MS), null);
+});
+
+test("stall notice: a bot on turn is a warning only after BOT_STALL_MS without a change, a human is plain waiting", () => {
+  const g = structuredClone(games["concession-chain-next"]!);
+  const bot = g.seats.find((s) => s.kind === "bot")!;
+  const botId = `p${bot.seat}`; // engine player id of a seat (GameSession.player_id)
+  g.state.meta.active_players = [botId];
+  g.state.prompt.viewer_to_act = false;
+  assert.equal(stallNotice(g, BOT_STALL_MS - 1)?.kind, "waiting");
+  const n = stallNotice(g, BOT_STALL_MS + 2000)!;
+  assert.equal(n.kind, "bot_stall");
+  assert.equal(n.tone, "warn");
+  assert.match(n.text, new RegExp(bot.name));
+  assert.match(n.text, /32 s/);
+  const human = structuredClone(g);
+  human.seats = human.seats.map((s) => ({ ...s, kind: "human" as const }));
+  assert.equal(stallNotice(human, 10 * BOT_STALL_MS)?.kind, "waiting");
 });
