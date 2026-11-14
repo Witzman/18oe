@@ -130,6 +130,8 @@ module Oe
     # In-memory failure counter per key (IP), single Puma process (#34).
     # Used for guessing the invite code and for password guessing.
     class RateLimit
+      attr_reader :max
+
       def initialize(max:, window:)
         @max = max
         @window = window

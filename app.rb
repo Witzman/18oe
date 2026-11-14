@@ -14,6 +14,7 @@ require "securerandom"
 require_relative "lib/oe/build_id"
 require_relative "lib/oe/version"
 require_relative "lib/oe/accounts"
+require_relative "lib/oe/session_cookie"
 require_relative "lib/oe/games_api"
 require_relative "lib/oe/map_data"
 
@@ -34,12 +35,11 @@ unless dev_mode
     abort "#{key} must be set outside test/dev" if ENV[key].to_s.empty?
   end
 end
+# Secure cookie also when the proxy chain does not say https (#286), see
+# lib/oe/session_cookie.rb.
 use Rack::Session::Cookie,
-    key: "oe.session",
     secret: ENV["SESSION_SECRET"].to_s.empty? ? SecureRandom.hex(32) : ENV["SESSION_SECRET"],
-    same_site: :lax,
-    httponly: true,
-    secure: !dev_mode
+    **Oe::SessionCookie.options(production: !dev_mode)
 
 # One SQLite store per process (Puma runs a single process; see #34). Tests
 # use an in-memory database; DATABASE_PATH overrides the default /data volume.
@@ -84,9 +84,17 @@ before "/map" do
 end
 
 # Guessing limits per client address (#208): wrong invite codes on /register,
-# wrong passwords on /login. In memory, one Puma process.
+# wrong passwords on /login. In memory, one Puma process. Only failures count.
+# request.ip (#286): Rack's default. A private/loopback REMOTE_ADDR (the
+# Traefik container) counts as a trusted proxy; then the right-most public
+# entry of X-Forwarded-For is used, i.e. the one a proxy appended, so a client
+# cannot dodge the limit by sending its own header. If the proxy chain sends
+# no X-Forwarded-For (or appends a public proxy address last), all clients
+# share one bucket; that is unverified live, so failed logins get 30 per 15
+# minutes (typos of a whole table of friends), still far too few to guess a
+# password. Invite-code guessing stays at 10.
 set :register_limit, Oe::Accounts::RateLimit.new(max: 10, window: 900)
-set :login_limit, Oe::Accounts::RateLimit.new(max: 10, window: 900)
+set :login_limit, Oe::Accounts::RateLimit.new(max: 30, window: 900)
 # POC password reset (#282): every request counts, not only failures.
 set :reset_limit, Oe::Accounts::RateLimit.new(max: 5, window: 900)
 # Naming players by name/e-mail when creating a game (#212), per creator account.
