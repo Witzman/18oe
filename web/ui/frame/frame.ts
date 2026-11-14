@@ -28,6 +28,8 @@ export interface GameFrame {
   setBusy: (busy: boolean) => void;
   // Set by main once the poller exists; the action bar sends through it.
   session?: ReturnType<typeof createSession>;
+  // Set by main: load the full state again and render it (the "Neu laden" of the stall line, #289).
+  reload?: () => void;
   // Hook points for the following UI issues.
   claims: ReturnType<typeof createClaims>;
   views: ReturnType<typeof createViews>;
@@ -97,13 +99,29 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   function drawStall() {
     let n: ReturnType<typeof stallNotice> = null;
     try { n = game ? stallNotice(game, Date.now() - seqSince) : null; } catch (e) { console.warn("stall notice", e); } // a notice never breaks the frame
+    // Client side (#289): an answer that does not come, a panel that failed to draw, or controls that stay
+    // locked although nothing is in flight. Locked controls are opened again right away (self-healing).
+    if (!busy && root.querySelector("button[data-busy-lock]")) { console.warn("#289: busy lock left over, released"); releaseLock(); }
+    const now = Date.now();
+    if (busy && now - busySince >= SLOW_ANSWER_MS) n = { kind: "slow_answer", tone: "warn", text: fillText("frame.stall_slow", { s: Math.floor((now - busySince) / 1000) }) };
+    else if (panelError) n = { kind: "panel_error", tone: "error", text: fillText("frame.stall_panel", { error: panelError }) };
     const show = n !== null && n.tone !== "info"; // "waiting for X" is already the bar's sentence
     stallEl.hidden = !show;
     stallEl.className = show ? `frame-stall msg-${n!.tone}` : "frame-stall";
     stallEl.dataset.kind = show ? n!.kind : "";
-    stallEl.textContent = show ? n!.text : "";
+    stallEl.replaceChildren();
+    if (!show) return;
+    stallEl.append(n!.text);
+    if (frame.reload && n!.kind !== "slow_answer") {
+      const b = h("button", { type: "button", class: "frame-stall-reload" }, txt("frame.stall_reload").de);
+      b.addEventListener("click", () => frame.reload?.());
+      stallEl.append(" ", b);
+    }
   }
-  const stallTimer = setInterval(() => { if (root.isConnected) drawStall(); }, 5000);
+  const SLOW_ANSWER_MS = 15_000;
+  let busySince = 0;
+  let panelError: string | null = null;
+  const stallTimer = setInterval(() => { if (root.isConnected) drawStall(); }, 3000);
   disposers.push(() => clearInterval(stallTimer));
   const body = h("div", { class: "frame-body" }, contextEl, mainEl, outlinerEl);
   const root = h("div", { class: "frame" }, roundEl, band.el, playersEl, body, drawerEl, barEl, versionButton());
@@ -119,9 +137,10 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
     root.toggleAttribute("aria-busy", busy);
     if (busy) {
       for (const b of root.querySelectorAll("button")) if (!b.disabled) { b.disabled = true; b.dataset.busyLock = ""; }
-    } else {
-      for (const b of root.querySelectorAll<HTMLButtonElement>("button[data-busy-lock]")) { b.disabled = false; delete b.dataset.busyLock; }
-    }
+    } else releaseLock();
+  }
+  function releaseLock() {
+    for (const b of root.querySelectorAll<HTMLButtonElement>("button[data-busy-lock]")) { b.disabled = false; delete b.dataset.busyLock; }
   }
 
   // ---- round bar -------------------------------------------------------------------------------
@@ -341,14 +360,24 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
     dispose: () => { disposers.splice(0).forEach((f) => f()); },
     subscribe: (fn: (g: Game) => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
     render(g: Game) {
-      for (const fn of listeners) fn(g);
+      // One panel that throws must not stop the others nor the frame (#289): the error is shown in the
+      // stall line (with "Neu laden") instead of leaving a half-drawn, unusable screen.
+      panelError = null;
+      for (const fn of listeners) {
+        try { fn(g); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("panel failed to draw", e); }
+      }
       if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; seqSince = Date.now(); }
       game = g;
-      drawAll();
+      try { drawAll(); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("frame failed to draw", e); applyBusy(); }
       drawStall();
     },
     discardSelection() { selected = null; armed = false; rangeError = null; drawBar(); },
-    setBusy(b: boolean) { busy = b; if (game) drawBar(); else applyBusy(); },
+    setBusy(b: boolean) {
+      if (b && !busy) busySince = Date.now();
+      busy = b;
+      // The lock is released even if drawing the bar fails (#289).
+      try { if (game) drawBar(); } finally { applyBusy(); drawStall(); }
+    },
   });
   drawLayout();
   return frame;

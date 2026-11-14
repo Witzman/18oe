@@ -86,6 +86,7 @@ async function route() {
         onUnauthorized: toLogin,
         onNotFound: () => { self.stop(); mount(root, notFoundPage()); },
       });
+      frame.reload = () => { void api.getGame(gameId).then((g) => self.adopt(g), () => {}); };
       poller.start();
     } else {
       mount(root, await gamesPage(ctx));

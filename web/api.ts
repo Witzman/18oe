@@ -16,26 +16,38 @@ export interface RegisterRequest { name: string; email: string; password: string
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
+export const POST_TIMEOUT_MS = 30_000;
+
 // Typed wrapper around the endpoints of #33/#36. The server error format is
 // always {error, message}; anything else is reported as a network/protocol error.
-export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init)) {
+export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init), opts: { postTimeoutMs?: number } = {}) {
+  const postTimeout = opts.postTimeoutMs ?? POST_TIMEOUT_MS;
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const init: RequestInit = { method, credentials: "same-origin", headers: { Accept: "application/json" } };
     if (body !== undefined) {
       init.body = JSON.stringify(body);
       init.headers = { ...init.headers, "Content-Type": "application/json" };
     }
+    // An action whose answer never comes would keep the page locked for good (#289): give up after
+    // POST_TIMEOUT_MS; the poller then shows whatever the server has (the action may have been applied).
+    const ctrl = method === "POST" && typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), postTimeout) : null;
     let res: Response;
-    try {
-      res = await fetchFn(path, init);
-    } catch (e) {
-      throw new ApiError(0, "network", e instanceof Error ? e.message : "network error");
-    }
     let data: unknown = null;
     try {
-      data = await res.json();
-    } catch {
-      /* non-JSON body: handled below */
+      try {
+        res = await fetchFn(path, ctrl ? { ...init, signal: ctrl.signal } : init);
+      } catch (e) {
+        throw new ApiError(0, "network", ctrl?.signal.aborted ? "timeout" : e instanceof Error ? e.message : "network error");
+      }
+      try {
+        data = await res.json();
+      } catch {
+        if (ctrl?.signal.aborted) throw new ApiError(0, "network", "timeout");
+        /* non-JSON body: handled below */
+      }
+    } finally {
+      if (timer !== null) clearTimeout(timer);
     }
     if (!res.ok) {
       const err = (data ?? {}) as { error?: string; message?: string };

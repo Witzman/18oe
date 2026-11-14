@@ -51,5 +51,18 @@ RSpec.describe "concession chain over the server (#289)" do
     expect(prompt[:actions].map { |a| a["type"] }.uniq).to eq(["par"])
     expect(prompt[:actions].map { |a| a["corporation"] }).to include("E", "LNWR")
     expect(store.incidents(id)).to be_empty
+
+    # the owner hung again at the 3rd one after the first fix: the server hands it over just the same
+    %w[LNWR GWR].each_with_index do |corp, i|
+      session = Oe::GameSession.load(store, id)
+      session.append({ "type" => "par", "entity" => "p0", "entity_type" => "player", "corporation" => corp,
+                       "share_price" => price.id, "user" => "p0" }, actor: "acc0", expected_seq: session.seq)
+      runner.drain(id)
+      session = Oe::GameSession.load(store, id)
+      expect(session.game.log.map(&:message)).to include("Witzman executes the #{i == 0 ? '2nd' : '3rd'} Concession")
+      prompt = Oe::View.render(session.game, viewer: "p0", seq: session.seq)[:prompt]
+      expect(prompt).to include(step: "Concession", viewer_to_act: true)
+    end
+    expect(store.incidents(id)).to be_empty
   end
 end

@@ -63,8 +63,12 @@ export function createPoller(opts: PollerOptions) {
         state = "loading";
         const game = await opts.api.getGame(opts.gameId);
         if (is("stopped")) return;
-        lastSeq = game.seq;
-        opts.onGame(game);
+        // A load that started before the player's own action may answer after it (#289): never go back
+        // to an older state than the one already shown.
+        if (lastSeq === null || game.seq >= lastSeq) {
+          lastSeq = game.seq;
+          opts.onGame(game);
+        }
       }
       failed = false;
       opts.onOk?.();
