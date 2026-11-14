@@ -6,6 +6,7 @@ import { lobbyPage } from "./lobby.ts";
 import { mountMapView } from "./frame/mapview.ts";
 import { mountAuction } from "./panels/auction.ts";
 import { mountStock } from "./panels/stock.ts";
+import { mountOperating } from "./panels/operating.ts";
 import { txt } from "./text.ts";
 
 export interface Ctx {
@@ -29,5 +30,6 @@ export function gameFrame(retryNow: () => void = () => {}, api?: Api): GameFrame
   mountAuction(frame);
   if (api) frame.onDispose(mountMapView(frame, api));
   mountStock(frame);
+  frame.onDispose(mountOperating(frame).stop);
   return frame;
 }
