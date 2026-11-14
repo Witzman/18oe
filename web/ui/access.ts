@@ -133,7 +133,9 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
       if (!me || typeof me.id !== "string" || typeof me.name !== "string") throw new Error("unexpected response: " + JSON.stringify(me));
     } catch (e) {
       status.textContent = "";
-      error.textContent = e instanceof Error && e.message.startsWith("unexpected response") ? txt("access.err_unexpected").de : errorText(e);
+      // A 200 without JSON (#294: api.ts reports it as bad_response) is the same "unexpected answer".
+      const unexpected = (e instanceof ApiError && e.code === "bad_response") || (e instanceof Error && e.message.startsWith("unexpected response"));
+      error.textContent = unexpected ? txt("access.err_unexpected").de : errorText(e);
       submit.disabled = false;
       return;
     }
