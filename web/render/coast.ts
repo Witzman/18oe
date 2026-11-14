@@ -198,10 +198,10 @@ export function landShapes(rings: Ring[]): { outer: Ring; holes: Ring[] }[] {
 }
 
 /** Corner points of a hex scaled about its centre and rounded: one soft terrain blob. */
-export function blob(scene: Scene, id: string, scale: number, round: number): Vec[] {
+export function blob(scene: Scene, id: string, scale: number, round: number, rounds = CHAIKIN_ROUNDS): Vec[] {
   const h = scene.grid.byId.get(id)!;
   const pts = worldCorners(scene.grid, h).map((c) => ({ x: h.x + (c.x - h.x) * scale, y: h.y + (c.y - h.y) * scale }));
-  return chaikin(pts, round, CHAIKIN_ROUNDS, true);
+  return chaikin(pts, round, rounds, true);
 }
 
 /** Distance from a point to a closed polyline. */

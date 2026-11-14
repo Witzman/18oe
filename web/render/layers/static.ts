@@ -119,7 +119,7 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
 export { BLOCK };
 
 /** Soft layers of a terrain blob, outer to inner: hex scale and alpha (assumption, see #100). */
-export const BLOB_LAYERS = [{ scale: 1, alpha: 0.3 }, { scale: 0.8, alpha: 0.3 }, { scale: 0.58, alpha: 0.4 }] as const;
+export const BLOB_LAYERS = [{ scale: 0.95, alpha: 0.35 }, { scale: 0.62, alpha: 0.5 }] as const;
 /** Chaikin cut ratio of terrain blobs. */
 const BLOB_ROUND = 0.3;
 
@@ -149,8 +149,7 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
   const rings = landRings(scene, { round: theme.coastRound, noise: theme.coastNoise });
   // Shallow water along the shore (under the land), then the land, then a thin shore line.
   const halo = mix(map.seaShallow, 0xffffff, 0.35);
-  for (const r of rings) land.poly(flat(r.points), true).stroke({ width: 0.5, color: halo, alpha: 0.35, join: "round" });
-  for (const r of rings) land.poly(flat(r.points), true).stroke({ width: 0.24, color: halo, alpha: 0.35, join: "round" });
+  for (const r of rings) land.poly(flat(r.points), true).stroke({ width: 0.4, color: halo, alpha: 0.3, join: "round" });
   const shapes = landShapes(rings);
   for (const { outer, holes } of shapes) {
     land.poly(flat(outer.points), true).fill({ color: map.land });
@@ -162,7 +161,7 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
   for (const kind of ["water", "hill", "mountain"] as const) {
     for (const hex of scene.geometry.hexes) {
       if ((scene.levelOf.get(hex.id) ?? 0) === 0 || terrainMark(hex)?.kind !== kind) continue;
-      for (const l of BLOB_LAYERS) land.poly(flat(blob(scene, hex.id, l.scale, BLOB_ROUND)), true).fill({ color: colorOf[kind], alpha: l.alpha });
+      for (const l of BLOB_LAYERS) land.poly(flat(blob(scene, hex.id, l.scale, BLOB_ROUND, 1)), true).fill({ color: colorOf[kind], alpha: l.alpha });
     }
   }
   return { sea, land };
