@@ -52,6 +52,9 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
   const p = m.hexOnScreen(id);
   const pt = { x: box.left + p.x, y: box.top + p.y };
   await window.oeTouch("start", [pt]); await sleep(30); await window.oeTouch("end", [pt]); await sleep(100);
+  // At this zoom a hex is smaller than a finger: the tap opens the selection list (#259), whose first entry is the nearest hex.
+  const list = document.querySelector(".map-picker");
+  if (list) list.querySelector("button").click();
   if (clicked !== id) fail("touch tap on " + id + " gave " + clicked + " (events " + types + ")");
   if (!types.some((t) => t.startsWith("touch:"))) fail("tap was not a touch pointer: " + types);
 
