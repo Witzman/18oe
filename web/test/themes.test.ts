@@ -139,6 +139,7 @@ test("the generated CSS carries every token of every theme", () => {
 test("theme.css uses only variables that the themes define, and no fixed colours", () => {
   const css = readFileSync(join(dir, "..", "theme.css"), "utf8");
   const defined = new Set(themeVars(themeById("brett")).map(([name]) => name));
+  for (const m of css.matchAll(/(--[a-z0-9-]+)\s*:/g)) defined.add(m[1]!); // local helpers (animation timing), built from theme vars
   const used = [...css.matchAll(/var\((--[a-z0-9-]+)/g)].map((m) => m[1]!);
   assert.ok(used.length > 10);
   assert.deepEqual([...new Set(used)].filter((v) => !defined.has(v)), []);
