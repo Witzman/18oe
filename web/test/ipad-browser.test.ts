@@ -44,6 +44,21 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
   if (document.documentElement.scrollHeight > innerHeight + 1 && getComputedStyle(document.body).overflow !== "hidden") console.warn("note: page scrolls (" + document.documentElement.scrollHeight + " > " + innerHeight + ")");
   if (!(m.stats().visibleBlocks > 0)) fail("no visible blocks");
 
+  // #287: at DPR 2 fit and flyTo must use the whole canvas (CSS px), not its top-left quarter.
+  {
+    const cb = c.getBoundingClientRect();
+    m.fit(false); await m.rendered();
+    const pts = m.scene.grid.hexes.map((h) => m.hexOnScreen(h.id));
+    const xs = pts.map((q) => q.x), ys = pts.map((q) => q.y);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    if (Math.abs(cx - cb.width / 2) > cb.width * 0.1 || Math.abs(cy - cb.height / 2) > cb.height * 0.1) fail("fit centres the map at " + Math.round(cx) + "," + Math.round(cy) + " on a " + Math.round(cb.width) + "x" + Math.round(cb.height) + " canvas");
+    if (Math.max(...xs) > cb.width + 2 || Math.max(...ys) > cb.height + 2 || Math.min(...xs) < -2 || Math.min(...ys) < -2) fail("fit leaves the canvas: x " + Math.round(Math.min(...xs)) + ".." + Math.round(Math.max(...xs)) + ", y " + Math.round(Math.min(...ys)) + ".." + Math.round(Math.max(...ys)));
+    if (!m.flyTo("I86")) fail("flyTo I86");
+    await sleep(900); await m.rendered();
+    const f = m.hexOnScreen("I86");
+    if (Math.abs(f.x - cb.width / 2) > 3 || Math.abs(f.y - cb.height / 2) > 3) fail("flyTo puts I86 at " + Math.round(f.x) + "," + Math.round(f.y) + ", not the centre " + Math.round(cb.width / 2) + "," + Math.round(cb.height / 2));
+  }
+
   const box = c.getBoundingClientRect();
   let clicked = null, types = [];
   m.on("hex", (d) => { clicked = d.hex; });

@@ -4,12 +4,12 @@
 .train-row .train-source, .train-row .train-hint, .train-row .train-reason { grid-column: 1 / -1; }
 .train-row .train-mark { justify-self: end; grid-column: 3; grid-row: 1; font-weight: bold; color: var(--ui-accent-ink); background: var(--ui-accent); border-radius: var(--shape-radius); padding: 0 6px; }
 .train-row[data-reserved="true"] .train-price { grid-column: 2; }
-.train-row[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); }
+.train-row[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); color: var(--ui-ink); }
 .train-row[data-state="invalid"] { opacity: .6; cursor: not-allowed; border-style: dashed; }
 .train-reason { color: var(--ui-faint); }
 .train-prices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--shape-gap); }
 .train-price-btn { min-height: 2.75rem; min-width: 2.75rem; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); }
-.train-price-btn[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); }
+.train-price-btn[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); color: var(--ui-ink); }
 .train-duty { margin: 0 0 var(--shape-gap); font-weight: bold; }
 .train-warn { margin: var(--shape-gap) 0 0; padding: 6px 10px; border: 1px solid var(--ui-warn); border-radius: var(--shape-radius); color: var(--ui-warn); }
 .train-insolvency { margin-top: var(--shape-gap); }

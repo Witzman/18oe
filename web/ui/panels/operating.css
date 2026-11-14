@@ -15,7 +15,7 @@
 .op-opt { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; align-items: baseline; text-align: left; min-height: 2.75rem; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 6px 10px; }
 .op-opt .op-opt-name { grid-column: 1 / -1; }
 .op-opt .op-cell { display: flex; flex-direction: column; }
-.op-opt[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); }
+.op-opt[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); color: var(--ui-ink); }
 .op-opt:disabled { opacity: .7; cursor: default; }
 .op-move[data-move="up"] { color: var(--ui-accent); }
 .op-move[data-move="down"] { color: var(--ui-warn); }
