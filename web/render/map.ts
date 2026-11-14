@@ -176,7 +176,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let printed = new Map<string, string>();
 
   // Session state.
-  const vp = (): Viewport => ({ width: app.renderer.width / app.renderer.resolution, height: app.renderer.height / app.renderer.resolution });
+  const vp = (): Viewport => ({ width: app.renderer.screen.width, height: app.renderer.screen.height })  // CSS px (renderer.width is already CSS px in Pixi v8);
   let view: View = { pitch: theme.camera.pitch, yaw: theme.camera.yaw, zoom: 10, panX: 0, panY: 0, centerX: 0, centerY: 0 };
   let baseZoom = 10;
   let state: GameState | null = null;

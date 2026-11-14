@@ -63,10 +63,14 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
 
   // 2. Selection list at overview: hexes are far smaller than a finger.
   m.fit(); await m.rendered();
-  const o = m.scene.grid.hexes.map((x) => x.id).find((i) => { const p = m.hexOnScreen(i); return p && inside(p); });
+  // At the correct fit (#287) the overview of this map is nearly finger-sized (hex spacing about 26 px > reach 22): zoom out until neighbours lie within reach.
+  for (let n = 0; n < 12 && m.view.zoom * 1.732 > 18; n++) { c.dispatchEvent(new WheelEvent("wheel", { deltaY: 200, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, bubbles: true, cancelable: true })); await m.rendered(); }
+  // The hex nearest the canvas centre: at the correct fit (#287) a hex on the map's edge may have no neighbour within reach.
+  const o = m.scene.grid.hexes.map((x) => x.id).filter((i) => { const p = m.hexOnScreen(i); return p && inside(p); })
+    .sort((a, b) => { const pa = m.hexOnScreen(a), pb = m.hexOnScreen(b); return Math.hypot(pa.x - centre.x, pa.y - centre.y) - Math.hypot(pb.x - centre.x, pb.y - centre.y); })[0];
   events.length = 0;
   await tap(m.hexOnScreen(o));
-  const list = picker() || fail("no selection list at overview");
+  const list = picker() || fail("no selection list at overview (events " + events + ", hovers " + hovers.slice(-2) + ", zoom " + m.view.zoom + ", box " + box.width + "x" + box.height + ", hex " + o + " at " + JSON.stringify(m.hexOnScreen(o)) + ")");
   const entries = [...list.querySelectorAll("button")];
   if (entries.length < 2 || entries.length > 5) fail("list with " + entries.length + " entries");
   for (const b of entries) { const r = b.getBoundingClientRect(); if (r.height < 43.5 || r.width < 43.5) fail("entry " + r.width + "x" + r.height); }
