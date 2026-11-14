@@ -300,6 +300,9 @@
     "sideWidth": 340,
     "gap": 12,
     "hit": 44,
+    "panelWidth": 312,
+    "topbarHeight": 48,
+    "panelRadius": 10,
     "zoneLine": 0.08,
     "focusLine": 0.09,
     "targetAlpha": 0.35,
@@ -313,5 +316,23 @@
     "hitTouchPx": 22,
     "dragPx": 4,
     "dragTouchPx": 10
+  },
+  "type": {
+    "xs": 11,
+    "sm": 12,
+    "md": 13,
+    "lg": 15,
+    "xl": 17,
+    "heading": 18,
+    "display": 20
+  },
+  "space": {
+    "xxs": 4,
+    "xs": 6,
+    "sm": 8,
+    "md": 10,
+    "lg": 12,
+    "xl": 16,
+    "xxl": 20
   }
 }

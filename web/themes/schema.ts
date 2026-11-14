@@ -28,6 +28,10 @@ export type TrackColorMode = (typeof TRACK_COLOR_MODES)[number];
 export type TrackColorPart = (typeof TRACK_COLOR_PARTS)[number];
 
 export const FONT_KEYS = ["head", "body"] as const;
+/** Type scale in px (#298): xs..xl steps, heading for panel titles, display for the top bar. Base size is `md`. */
+export const TYPE_KEYS = ["xs", "sm", "md", "lg", "xl", "heading", "display"] as const;
+/** Spacing scale in px (#298). */
+export const SPACE_KEYS = ["xxs", "xs", "sm", "md", "lg", "xl", "xxl"] as const;
 export const TILE_COLOR_KEYS = ["tileYellow", "tileGreen", "tileBrown", "tileGray", "tileRed"] as const;
 
 /** Where the company colour sits on track (#11: not by builder; neutral is the owner's choice). */
@@ -47,8 +51,12 @@ export const NUMBER_RANGES = {
   motion: { runMsPerHex: [50, 1000], runMaxMs: [500, 20000], queueMaxMs: [500, 30000], flashMs: [100, 2000], flyMs: [0, 3000],
     // Touch (#259): decay time constant of the pan inertia, window of a double tap (ms).
     inertiaMs: [0, 2000], doubleTapMs: [100, 800] },
+  type: { xs: [9, 14], sm: [10, 16], md: [11, 18], lg: [12, 22], xl: [14, 26], heading: [14, 30], display: [16, 36] },
+  space: { xxs: [1, 8], xs: [2, 12], sm: [4, 16], md: [4, 20], lg: [6, 24], xl: [8, 32], xxl: [8, 48] },
   shape: {
     hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24], hit: [32, 64],
+    // Panel metrics in px (#298): floating action panel width, top bar height, panel corner radius.
+    panelWidth: [240, 400], topbarHeight: [40, 64], panelRadius: [0, 24],
     // Map strokes in hex side lengths (they scale with the map like printed lines), alpha 0..1 (#44).
     zoneLine: [0.01, 0.3], focusLine: [0.01, 0.3], targetAlpha: [0, 1],
     // Soft coast (#100): Chaikin cut ratio (0 = hard hex outline) and noise amplitude in side lengths.
@@ -63,8 +71,10 @@ export const NUMBER_RANGES = {
 export const CAMERA_KEYS = Object.keys(NUMBER_RANGES.camera) as (keyof typeof NUMBER_RANGES.camera)[];
 export const TRACK_KEYS = [...Object.keys(NUMBER_RANGES.track), "colorMode", "colorPart"] as const;
 export const MOTION_KEYS = [...Object.keys(NUMBER_RANGES.motion), "enabled"] as const;
+export const TYPE_SCALE_KEYS = Object.keys(NUMBER_RANGES.type) as (keyof typeof NUMBER_RANGES.type)[];
+export const SPACE_SCALE_KEYS = Object.keys(NUMBER_RANGES.space) as (keyof typeof NUMBER_RANGES.space)[];
 export const SHAPE_KEYS = ["tileStyle", "shadow", ...Object.keys(NUMBER_RANGES.shape)] as const;
-export const TOP_KEYS = ["id", "name", "colorScheme", "map", "ui", "company", "companies", "player", "font", "camera", "track", "motion", "shape"] as const;
+export const TOP_KEYS = ["id", "name", "colorScheme", "map", "ui", "company", "companies", "player", "font", "camera", "track", "motion", "shape", "type", "space"] as const;
 
 /** Colours of one company (#99): seal/token background, text on it, edge. Ink is checked for 4.5:1 by the specs. */
 export const COMPANY_COLOR_KEYS = ["bg", "ink", "edge"] as const;
@@ -87,6 +97,10 @@ export interface Theme {
     /** Overridden by prefers-reduced-motion and the player's setting. */
     enabled: boolean;
   };
+  /** Font sizes in px (#298). */
+  type: Record<keyof typeof NUMBER_RANGES.type, number>;
+  /** Spacing in px (#298). */
+  space: Record<keyof typeof NUMBER_RANGES.space, number>;
   shape: Record<keyof typeof NUMBER_RANGES.shape, number> & {
     /** Laid tiles fill the whole hex ("full", like the physical board) or leave a rim ("inner"). */
     tileStyle: TileStyle;
@@ -143,7 +157,7 @@ export function themeProblems(raw: unknown): string[] {
   if (isRecord(raw.font)) {
     for (const k of FONT_KEYS) if (typeof raw.font[k] !== "string" || raw.font[k] === "") problems.push(`font.${k}: expected a font stack`);
   }
-  for (const [group, keys] of [["camera", CAMERA_KEYS], ["track", TRACK_KEYS], ["motion", MOTION_KEYS], ["shape", SHAPE_KEYS]] as const) {
+  for (const [group, keys] of [["camera", CAMERA_KEYS], ["track", TRACK_KEYS], ["motion", MOTION_KEYS], ["shape", SHAPE_KEYS], ["type", TYPE_SCALE_KEYS], ["space", SPACE_SCALE_KEYS]] as const) {
     problems.push(...keyProblems(group, raw[group], keys));
     const values = raw[group];
     if (!isRecord(values)) continue;
@@ -166,7 +180,18 @@ export function themeProblems(raw: unknown): string[] {
     if (typeof m.enabled !== "boolean") problems.push("motion.enabled: expected true or false");
     if (typeof m.runMaxMs === "number" && typeof m.queueMaxMs === "number" && m.queueMaxMs < m.runMaxMs) problems.push("motion.queueMaxMs: shorter than runMaxMs");
   }
+  for (const [group, keys] of [["type", TYPE_SCALE_KEYS], ["space", SPACE_SCALE_KEYS]] as const) {
+    const v = raw[group];
+    if (!isRecord(v)) continue;
+    // Scales climb: a larger step is never smaller than the one before.
+    for (let i = 1; i < keys.length; i++) {
+      const [a, b] = [v[keys[i - 1]!], v[keys[i]!]];
+      if (typeof a === "number" && typeof b === "number" && b < a) problems.push(`${group}.${keys[i]}: smaller than ${keys[i - 1]}`);
+    }
+  }
   if (isRecord(raw.shape)) {
+    // Touch targets on the iPad (CLAUDE.md rule 18): at least 44 px.
+    if (typeof raw.shape.hit === "number" && raw.shape.hit < 44) problems.push("shape.hit: touch targets need at least 44");
     if (!TILE_STYLES.includes(raw.shape.tileStyle as TileStyle)) problems.push("shape.tileStyle: expected full or inner");
     if (typeof raw.shape.shadow !== "string" || raw.shape.shadow === "") problems.push("shape.shadow: expected a CSS box-shadow");
   }
