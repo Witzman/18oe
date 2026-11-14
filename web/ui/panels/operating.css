@@ -19,3 +19,20 @@
 .op-opt:disabled { opacity: .7; cursor: default; }
 .op-move[data-move="up"] { color: var(--ui-accent); }
 .op-move[data-move="down"] { color: var(--ui-warn); }
+
+/* Acting company and operating order (#291). Colours from ui.* tokens; the company colour only on the seal. */
+.or-band { display: flex; flex-direction: column; gap: var(--shape-gap); margin: 0 0 var(--shape-gap); }
+.or-acting { display: flex; align-items: center; gap: 10px; min-height: 2.75rem; padding: 6px 10px; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); background: var(--ui-panel-alt); }
+.or-acting[data-mine="true"] { background: var(--ui-accent); color: var(--ui-accent-ink); border-color: var(--ui-accent); }
+.or-acting[data-mine="true"] .muted { color: inherit; opacity: .85; }
+.or-acting .kit-seal { --k: 40px; flex: none; }
+.or-acting-text { display: flex; flex-direction: column; min-width: 0; }
+.or-title { margin: 0; font-size: .85rem; color: var(--ui-faint); }
+.or-order { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.or-item { display: inline-flex; align-items: center; gap: 6px; min-height: 2.75rem; padding: 2px 10px 2px 6px; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); background: var(--ui-panel-alt); }
+.or-item[data-state="done"] { opacity: .6; }
+.or-item[data-state="current"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); font-weight: 700; }
+.or-item[data-mine="true"] .or-owner { color: var(--ui-ink); font-weight: 700; text-decoration: underline; }
+.or-mark { width: 1.1em; text-align: center; }
+.or-owner { font-size: .85rem; color: var(--ui-faint); }
+.or-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

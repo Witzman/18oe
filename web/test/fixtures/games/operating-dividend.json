@@ -188,7 +188,33 @@
      "value": 20
     }
    ],
-   "winner": null
+   "winner": null,
+   "operating_order": [
+    {
+     "id": "A",
+     "done": true
+    },
+    {
+     "id": "B",
+     "done": true
+    },
+    {
+     "id": "H",
+     "done": true
+    },
+    {
+     "id": "KSS",
+     "done": false
+    },
+    {
+     "id": "PLM",
+     "done": false
+    },
+    {
+     "id": "M",
+     "done": false
+    }
+   ]
   },
   "players": [
    {

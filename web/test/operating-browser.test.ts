@@ -57,7 +57,7 @@ function stub(dir: string, start: { seq: number }) {
 async function run(dir: string, port: number, waitFor: string, checks: string): Promise<number> {
   const { spawn } = await import("node:child_process");
   return new Promise<number>((resolve) => {
-    const child = spawn(process.execPath, [shot, `http://127.0.0.1:${port}/#/game/1`, join(dir, "out.png"), "--width", "1440", "--height", "900", "--wait-for", waitFor, ...(process.env.OE_THEME ? ["--theme", process.env.OE_THEME] : []), "--eval", checks], { stdio: "pipe" });
+    const child = spawn(process.execPath, [shot, `http://127.0.0.1:${port}/#/game/1`, join(dir, "out.png"), "--width", process.env.OE_W ?? "1440", "--height", process.env.OE_H ?? "900", "--wait-for", waitFor, ...(process.env.OE_THEME ? ["--theme", process.env.OE_THEME] : []), "--eval", checks], { stdio: "pipe" });
     let err = "";
     child.stderr.on("data", (d) => { err += d; });
     child.on("close", (c) => { if (c) console.error(err); resolve(c ?? 1); });
@@ -82,6 +82,18 @@ const ROUTE = String.raw`(async () => {
   q(".kit-main-btn").click();
   await sleep(600);
   if ((await (await fetch("/__posted")).json()).length !== 1) fail("not sent once");
+})()`;
+
+const ORDER = String.raw`(async () => {
+  ${HEAD}
+  const items = [...document.querySelectorAll(".or-item")];
+  if (items.map((i) => i.dataset.id).join() !== "A,B,D,F,H,M") fail("order " + items.map((i) => i.dataset.id));
+  if (items.map((i) => i.dataset.state).join() !== "done,current,next,next,next,next") fail("states");
+  if (document.querySelectorAll('.or-item[data-mine="true"]').length !== 2) fail("own marks");
+  if (!q('.or-item[data-id="A"]').dataset.bot || q('.or-item[data-id="A"]').dataset.bot !== "true") fail("bot mark");
+  if (!/du bist am Zug/.test(q(".or-acting").textContent) || q(".or-acting").dataset.mine !== "true") fail("acting card: " + q(".or-acting").textContent);
+  small(".or-item"); small(".or-acting");
+  const w = document.documentElement.scrollWidth; if (w > window.innerWidth + 1) fail("horizontal overflow " + w);
 })()`;
 
 const DIVIDEND = String.raw`(async () => {
@@ -129,4 +141,8 @@ test("operating sheet in the browser: dividend needs a choice, then the main but
   const { posted, game } = await scenario("operating-dividend", ".op-opt", DIVIDEND);
   assert.equal(posted.length, 1);
   assert.deepEqual(posted[0]!.action, game.state.prompt.actions[2]);
+});
+
+test("operating order in the browser: acting company card, order list with done, current, own and bot marks", { skip: browser ? false : "no headless browser installed" }, async () => {
+  await scenario("operating-route", ".or-item", ORDER);
 });
