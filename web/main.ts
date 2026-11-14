@@ -10,6 +10,8 @@ import { accessPage, resetPage } from "./ui/access.ts";
 import { loadGeometry } from "./ui/frame/mapview.ts";
 import { mountConcession } from "./ui/panels/concession.ts";
 import { mountTrain } from "./ui/panels/train.ts";
+import { mountTrack } from "./ui/panels/track.ts";
+import { mountToken } from "./ui/panels/token.ts";
 import { gameFrame, gamesPage, notFoundPage, type Ctx } from "./ui/pages.ts";
 import { applyAttention, watchTheme } from "./ui/attention.ts";
 import { initTheme, themeSwitch } from "./ui/theme-switch.ts";
@@ -61,8 +63,10 @@ async function route() {
       let mapGeometry: MapGeometry | null = null;
       const concession = mountConcession(frame, { map: () => mapGeometry });
       mountTrain(frame);
+      const track = mountTrack(frame, { map: () => mapGeometry });
+      mountToken(frame);
       // Hex names and zones for the home token step; the panel works without them (hex ids only).
-      void loadGeometry(api).then((m) => { mapGeometry = m; concession.refresh(); }, () => {});
+      void loadGeometry(api).then((m) => { mapGeometry = m; concession.refresh(); track.refresh(); }, () => {});
       self = poller = createPoller({
         api, gameId,
         onGame: (g) => { frame.render(g); applyAttention(g.state.prompt.viewer_to_act, gameId); },

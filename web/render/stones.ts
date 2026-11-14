@@ -68,6 +68,18 @@ export function hitSlot(slots: readonly Slot[], p: Vec, r: number, minHit = 0): 
   return best;
 }
 
+/**
+ * Every slot within `reach` of the point (hex coordinates), nearest first. A slot counts when the point is
+ * inside its circle (`r`) or within `reach`; with a finger the list can hold several (selection list, #259).
+ */
+export function slotsNear(slots: readonly Slot[], p: Vec, reach: number): Slot[] {
+  return slots
+    .map((s) => ({ s, d: Math.hypot(p.x - s.pos.x, p.y - s.pos.y) }))
+    .filter((x) => x.d <= reach)
+    .sort((a, b) => a.d - b.d)
+    .map((x) => x.s);
+}
+
 /** Four corners (flat x, y) of a bar across `tangent` at `pos`. */
 export function townBar(pos: Vec, tangent: Vec | null, length: number, width: number): number[] {
   const t = tangent && norm(tangent) > 0 ? { x: tangent.x / norm(tangent), y: tangent.y / norm(tangent) } : { x: 1, y: 0 };

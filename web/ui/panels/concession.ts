@@ -251,11 +251,14 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
     if (active) releases.push(frame.claims.claim("Concession", "par"), frame.claims.claim("HomeToken", "place_token"));
   }
 
+  let owns = false;
   function draw() {
     const g = game;
     releaseOrder?.();
     releaseOrder = null;
-    if (!g || !isConcessionRound(g)) { claim(false); frame.slots.context.replaceChildren(); return; }
+    // Only clear what this panel drew; the context slot is shared with the other round panels (#49).
+    if (!g || !isConcessionRound(g)) { claim(false); if (owns) { frame.slots.context.replaceChildren(); owns = false; } return; }
+    owns = true;
     // The claims only hold while this panel owns the step: HomeToken also occurs in other rounds.
     claim(isFounding(g) || isHomeToken(g));
     frame.slots.context.replaceChildren(toDom(ConcessionPanel(g, sel, map(), handlers, choiceFromRoot(document.documentElement).theme)));
@@ -272,6 +275,6 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
     selectCity: (city) => { if (game && homeTargets(game, map()).some((t) => t.city === city)) handlers.onCity(city); },
     targets: () => (game ? homeTargets(game, map()) : []),
     refresh: draw,
-    stop: () => { off(); releaseOrder?.(); claim(false); frame.slots.context.replaceChildren(); },
+    stop: () => { off(); releaseOrder?.(); claim(false); if (owns) frame.slots.context.replaceChildren(); },
   };
 }

@@ -27,6 +27,7 @@ async function bundle(dir: string) {
   writeFileSync(join(dir, "themes.css"), themesCss(themes, DEFAULT_THEME_ID));
 }
 
+const GENERIC = "merge-minor";
 const fixture = (name: string) => JSON.parse(readFileSync(join(web, "test", "fixtures", "games", `${name}.json`), "utf8"));
 
 function stub(dir: string, start: { seq: number }, failWith?: { status: number; body: unknown }) {
@@ -101,7 +102,8 @@ test("frame in the browser: bars drawn, selecting does not send, the main button
   const dir = mkdtempSync(join(tmpdir(), "oe-frame-test-"));
   try {
     await bundle(dir);
-    const { server, posted } = stub(dir, fixture("track"));
+    // A step no panel claims (#48/#174 took Track and Token off the generic bar), so generic entries show.
+    const { server, posted } = stub(dir, fixture(GENERIC));
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     const port = (server.address() as { port: number }).port;
     const code = await run(dir, port, CHECKS);
@@ -109,9 +111,9 @@ test("frame in the browser: bars drawn, selecting does not send, the main button
     server.close();
     assert.equal(code, 0, "page checks failed (see stderr)");
     assert.equal(posted.length, 1);
-    const first = fixture("track").state.prompt.actions;
+    const first = fixture(GENERIC).state.prompt.actions;
     assert.ok(first.some((a: Record<string, unknown>) => JSON.stringify(a) === JSON.stringify(posted[0]!.action)), "sent action is one of the offered actions, unchanged");
-    assert.equal(posted[0]!.seq, fixture("track").seq);
+    assert.equal(posted[0]!.seq, fixture(GENERIC).seq);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -142,7 +144,7 @@ test("frame in the browser: dangerous action needs a second click; 422 shows the
   const dir = mkdtempSync(join(tmpdir(), "oe-frame-test-"));
   try {
     await bundle(dir);
-    const game = fixture("track");
+    const game = fixture(GENERIC);
     game.state.prompt.actions.unshift({ type: "bankrupt", entity: game.state.prompt.actions[0].entity, entity_type: "corporation" });
     const { server, posted } = stub(dir, game, { status: 422, body: { error: "rejected", message: "nope" } });
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));

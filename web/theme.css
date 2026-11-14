@@ -12,6 +12,8 @@ button[aria-pressed="true"] { background: var(--ui-ink); color: var(--ui-panel);
 button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 .panel { background: var(--ui-panel); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 12px; margin: 12px 0; }
 .error { color: var(--ui-error); }
+.status { color: var(--ui-ink); }
+.access .error, .access .status { min-height: 1.4em; margin: 8px 0 0; font-weight: 600; }
 .muted { color: var(--ui-faint); }
 .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
 .turn { display: inline-block; background: var(--ui-accent); color: var(--ui-accent-ink); font-weight: bold; padding: 2px 12px; border-radius: 99px; }
@@ -111,3 +113,8 @@ body:has(.access) #app { max-width: none; margin: 0; min-height: 100vh; backgrou
 .version-dialog dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 8px; }
 .version-dialog dt { color: var(--ui-faint); }
 .version-dialog dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+/* Touch targets (issue 259, Apple guideline): 44 px on coarse pointers (iPad); mouse layout unchanged. */
+@media (pointer: coarse) {
+  button, select, input, summary { min-height: 44px; min-width: 44px; }
+}

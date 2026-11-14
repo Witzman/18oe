@@ -1,0 +1,21 @@
+/* Operating sheet panel (#49). Colours from ui.* tokens, sizes from shape.* tokens only. */
+.op-panel { display: flex; flex-direction: column; gap: var(--shape-gap); }
+.op-head h4 { margin: 0 0 4px; }
+.op-facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
+.op-facts div { display: flex; gap: 6px; }
+.op-facts dt { color: var(--ui-faint); }
+.op-facts dd { margin: 0; }
+.op-table { width: 100%; border-collapse: collapse; }
+.op-table th, .op-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--ui-rule); min-height: 2.75rem; }
+.op-table .op-num { text-align: right; font-variant-numeric: tabular-nums; }
+.op-table tfoot td { font-weight: bold; border-bottom: 0; }
+.op-note { margin: 4px 0 0; font-size: .85rem; }
+.op-revenue { margin: 0 0 var(--shape-gap); font-weight: bold; }
+.op-opts { display: flex; flex-direction: column; gap: var(--shape-gap); }
+.op-opt { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; align-items: baseline; text-align: left; min-height: 2.75rem; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 6px 10px; }
+.op-opt .op-opt-name { grid-column: 1 / -1; }
+.op-opt .op-cell { display: flex; flex-direction: column; }
+.op-opt[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); color: var(--ui-ink); }
+.op-opt:disabled { opacity: .7; cursor: default; }
+.op-move[data-move="up"] { color: var(--ui-accent); }
+.op-move[data-move="down"] { color: var(--ui-warn); }
