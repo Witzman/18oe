@@ -1,5 +1,5 @@
 import type { MapGeometry } from "./render/mapdata.ts";
-import type { Account, Game, GameSummary, SeatRequest, Version } from "./types.ts";
+import type { Account, Game, GameSummary, LogPage, SeatRequest, Version } from "./types.ts";
 
 export class ApiError extends Error {
   status: number;
@@ -57,6 +57,7 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init)) {
     createGame: (seats: SeatRequest[], seed?: number) =>
       call<Game>("POST", "/games", seed === undefined ? { seats } : { seats, seed }),
     getGame: (id: number, log = 40) => call<Game>("GET", `/games/${id}?log=${log}`),
+    log: (id: number, from = 0, limit = 500) => call<LogPage>("GET", `/games/${id}/log?from=${from}&limit=${limit}`),
     version: (id: number) => call<Version>("GET", `/games/${id}/version`),
     postAction: (id: number, action: Record<string, unknown>, seq: number) =>
       call<Game>("POST", `/games/${id}/actions`, { action, seq }),

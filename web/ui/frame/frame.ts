@@ -3,6 +3,7 @@
 // `claims` (which action types they handle), `views` (main area) and `slots` (containers).
 import { choiceFromRoot } from "../../themes/choice.ts";
 import type { Theme } from "../../themes/schema.ts";
+import type { Api } from "../../api.ts";
 import type { createSession } from "../../session.ts";
 import type { Corporation, Game } from "../../types.ts";
 import { connectionBand, messageArea } from "../connection.ts";
@@ -16,6 +17,7 @@ import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Acti
 import { OrBandView, orBand } from "./or-band.ts";
 import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
 import { createViews } from "./views.ts";
+import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
 import { versionButton } from "../version.ts";
 import { endgameModel, Endstand } from "../panels/endgame.ts";
 
@@ -52,7 +54,7 @@ const theme = (): Theme => choiceFromRoot(document.documentElement).theme;
 const put = (el: Element, ...nodes: (VNode | string | null)[]) =>
   el.replaceChildren(...nodes.filter((n): n is VNode | string => n !== null).map((n) => toDom(n)));
 
-export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
+export function createGameFrame(retryNow: () => void = () => {}, api?: Api): GameFrame {
   const claims = createClaims();
   const orderSlot: OrderSlot = createOrderSlot(() => { if (game) drawBar(); });
   const views = createViews([{
@@ -71,6 +73,23 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   let outlinerOpen = true;
   let genericOpen: boolean | null = null; // null = automatic (open while there is something to choose)
   let logOpen = false;
+  // The full log (#292): fetched from /games/:id/log while the sheet is open; the sheet element lives on
+  // between redraws so the reader's scroll position survives.
+  let fullLog: LogLine[] = [];
+  let fullLogSeq = -1;
+  let fullLogLoading = false;
+  const logList = h("div", { class: "frame-log-scroll", tabindex: "0" });
+  let logScroll = { top: 0, atBottom: true };
+  logList.addEventListener("scroll", () => { logScroll = { top: logList.scrollTop, atBottom: isAtBottom(logList.scrollTop, logList.scrollHeight, logList.clientHeight) }; });
+  function syncFullLog(g: Game) {
+    if (!api || !logOpen || fullLogLoading || fullLogSeq === g.seq) return;
+    fullLogLoading = true;
+    const seq = g.seq;
+    const id = Number(g.state.meta.game_id);
+    fetchLogFrom((from) => api.log(id, from), resumeFrom(fullLog))
+      .then((lines) => { fullLog = mergeLog(fullLog, lines); fullLogSeq = seq; }, () => {})
+      .finally(() => { fullLogLoading = false; if (logOpen && game) { if (fullLogSeq !== game.seq && fullLogSeq === seq) fullLogSeq = -1; drawBar(); } });
+  }
   let endOpen = true;
   const frame: GameFrame = {} as GameFrame;
   const listeners = new Set<(g: Game) => void>();
@@ -311,14 +330,23 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
         v("h3", {}, txt("frame.generic_title").de),
         GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError })));
     }
+    let logSheet: HTMLElement | null = null;
     if (logOpen) {
-      const lines = g.state.log;
-      drawerNodes.push(v("section", { class: "frame-drawer-sheet frame-log", "aria-label": txt("frame.log").de },
+      // Until the full log has arrived, show the tail the state carries.
+      const lines: LogLine[] = fullLog.length > 0 ? fullLog : g.state.log;
+      const sheet = toDom(v("section", { class: "frame-drawer-sheet frame-log", "aria-label": txt("frame.log").de },
         v("h3", {}, txt("frame.log").de),
-        lines.length === 0 ? v("p", { class: "muted" }, txt("frame.log_empty").de) : v("ol", {}, ...lines.map((l) => v("li", {}, l.text)))));
+        lines.length === 0 ? v("p", { class: "muted" }, txt("frame.log_empty").de) : null));
+      logList.replaceChildren(...(lines.length === 0 ? [] : [toDom(v("ol", {}, ...lines.map((l) => v("li", {}, l.text))))]));
+      (sheet as HTMLElement).append(logList);
+      logSheet = sheet as HTMLElement;
+      syncFullLog(g);
     }
+    const keep = { ...logScroll };
     put(drawerEl, ...drawerNodes);
-    drawerEl.hidden = drawerNodes.length === 0;
+    if (logSheet) drawerEl.append(logSheet);
+    drawerEl.hidden = drawerNodes.length === 0 && !logSheet;
+    if (logSheet) { logList.scrollTop = nextScrollTop(keep, logList.scrollHeight, logList.clientHeight); }
     applyBusy();
   }
   const genericDetail = (g: Game, a: Action) => {
