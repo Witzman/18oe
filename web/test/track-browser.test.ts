@@ -60,6 +60,15 @@ const HEAD = String.raw`const fail = (m) => { throw new Error(m); };
     const ev = (t) => c.dispatchEvent(new PointerEvent(t, { clientX: cb.left + p.x, clientY: cb.top + p.y, pointerId: 7, pointerType: type, button: 0, bubbles: true }));
     ev("pointerdown"); ev("pointerup");
     await sleep(150);
+    // #259: a touch tap on hexes smaller than a finger opens a selection list (hexes, then city slots); pick from it.
+    for (let i = 0; i < 2; i++) {
+      const items = [...document.querySelectorAll(".map-picker button")];
+      if (!items.length) break;
+      if (type !== "touch") fail("selection list after a mouse click");
+      small(".map-picker button");
+      (items.find((b) => b.textContent.includes(hex)) || items[0]).click();
+      await sleep(150);
+    }
     await m.rendered();
   };
   const tab = () => q('.frame-tabs [aria-selected="true"]')?.textContent;`;

@@ -144,7 +144,7 @@ test("frame in the browser: dangerous action needs a second click; 422 shows the
   const dir = mkdtempSync(join(tmpdir(), "oe-frame-test-"));
   try {
     await bundle(dir);
-    const game = fixture("track");
+    const game = fixture(GENERIC);
     game.state.prompt.actions.unshift({ type: "bankrupt", entity: game.state.prompt.actions[0].entity, entity_type: "corporation" });
     const { server, posted } = stub(dir, game, { status: 422, body: { error: "rejected", message: "nope" } });
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
