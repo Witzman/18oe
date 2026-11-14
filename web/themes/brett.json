@@ -303,6 +303,8 @@
     "zoneLine": 0.08,
     "focusLine": 0.09,
     "targetAlpha": 0.35,
+    "coastRound": 0.35,
+    "coastNoise": 0.25,
     "slotRadius": 0.2,
     "tokenRadius": 0.165,
     "townLength": 0.34,

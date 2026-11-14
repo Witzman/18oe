@@ -24,6 +24,9 @@ export interface RenderTheme {
   zoneLine: number;
   focusLine: number;
   targetAlpha: number;
+  /** Soft coast (#100): Chaikin cut ratio and noise amplitude in side lengths. */
+  coastRound: number;
+  coastNoise: number;
   /** Cities, towns and tokens in side lengths (#147). */
   slotRadius: number;
   tokenRadius: number;
@@ -64,6 +67,8 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     zoneLine: t.shape.zoneLine,
     focusLine: t.shape.focusLine,
     targetAlpha: t.shape.targetAlpha,
+    coastRound: t.shape.coastRound,
+    coastNoise: t.shape.coastNoise,
     slotRadius: t.shape.slotRadius,
     tokenRadius: t.shape.tokenRadius,
     townLength: t.shape.townLength,
