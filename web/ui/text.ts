@@ -208,6 +208,11 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "version.stale": e("Seite und Server haben verschiedene Versionen: bitte neu laden (Strg+F5).", "Page and server versions differ", "—"),
   "version.report": e("Bei Rückmeldungen bitte diese Zeile mitschicken.", "Include this line in feedback", "—"),
   "version.close": e("Schließen", "Close", "—"),
+  "access.busy_register": e("Konto wird angelegt …", "Creating account", "—"),
+  "access.busy_login": e("Anmeldung läuft …", "Logging in", "—"),
+  "access.ok_register": e("Konto \"{name}\" angelegt. Du bist angemeldet, die Partieliste öffnet sich.", "Account created, logged in", "—"),
+  "access.ok_login": e("Angemeldet als \"{name}\". Die Partieliste öffnet sich.", "Logged in", "—"),
+  "access.err_unexpected": e("Der Server hat unerwartet geantwortet. Bitte Seite neu laden (Strg+F5) und noch einmal versuchen.", "Unexpected server response", "—"),
   "access.busy": e("Einen Moment …", "Please wait", "—"),
   // Fehlermeldungen je Server-Code oder Client-Prüfung
   "access.err_required": e("Bitte alle Felder ausfüllen.", "All fields are required", "—"),
