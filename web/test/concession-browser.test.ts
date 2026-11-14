@@ -29,20 +29,29 @@ async function bundle(dir: string) {
 
 const fixture = (name: string) => JSON.parse(readFileSync(join(web, "test", "fixtures", "games", `${name}.json`), "utf8"));
 
-function stub(dir: string, start: { seq: number }, next?: { seq: number }) {
+// `next`: the states the server answers with, one per posted action (the last one repeats). `delays`
+// (#289): the action's answer and every full load come late, so that a poll that started before an action
+// answers after it, as on the live server.
+function stub(dir: string, start: { seq: number }, next: { seq: number }[] = [], delays = { postMs: 0, getMs: 0 }) {
   let game: { seq: number } = start;
+  let step = 0;
   const posted: { action: Record<string, unknown>; seq: number }[] = [];
   const server: Server = createServer((req, res) => {
     const p = new URL(req.url!, "http://x").pathname;
     const json = (o: unknown, status = 200) => { res.writeHead(status, { "Content-Type": "application/json" }); res.end(JSON.stringify(o)); };
     if (p === "/me") return json({ id: "p0", name: "p0" });
-    if (p === "/games/1") return json(game);
+    if (p === "/games/1") { const g = game; setTimeout(() => json(g), delays.getMs); return; }
     if (p === "/games/1/version") return json({ seq: game.seq, status: "active" });
     if (p === "/__posted") return json(posted);
     if (p === "/games/1/actions" && req.method === "POST") {
       let b = "";
       req.on("data", (c) => { b += c; });
-      req.on("end", () => { posted.push(JSON.parse(b)); game = next ?? { ...game, seq: game.seq + 1 }; json(game); });
+      req.on("end", () => {
+        posted.push(JSON.parse(b));
+        game = next.length > 0 ? next[Math.min(step++, next.length - 1)]! : { ...game, seq: game.seq + 1 };
+        const g = game;
+        setTimeout(() => json(g), delays.postMs);
+      });
       return;
     }
     const f = join(dir, p === "/" ? "index.html" : p);
@@ -100,12 +109,12 @@ const CHECKS_HOME = String.raw`(async () => {
   if ((await (await fetch("/__posted")).json()).length !== 1) fail("not sent once");
 })()`;
 
-async function scenario(name: string, waitFor: string, checks: string, nextName?: string) {
+async function scenario(name: string, waitFor: string, checks: string, nextNames: string[] = [], delays = { postMs: 0, getMs: 0 }) {
   const dir = mkdtempSync(join(tmpdir(), "oe-concession-test-"));
   try {
     await bundle(dir);
     const game = fixture(name);
-    const { server, posted } = stub(dir, game, nextName ? fixture(nextName) : undefined);
+    const { server, posted } = stub(dir, game, nextNames.map(fixture), delays);
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     const code = await run(dir, (server.address() as { port: number }).port, waitFor, checks);
     if (process.env.OE_SHOT_DIR) copyFileSync(join(dir, "out.png"), join(process.env.OE_SHOT_DIR, `${name}-${process.env.OE_THEME ?? "default"}.png`));
@@ -130,42 +139,79 @@ test("concession in the browser: home token target chosen from the list is sent 
 });
 
 // #289: the owner's live game hung after "Witzman executes the 1st Concession" (DSJ parred at 60): nothing
-// could be clicked. Recorded over the real API (bin: seed 2, Witzman + 3 bots, see the PR): Witzman holds the
-// 2nd concession too, so the answer to the par is again a Concession prompt for him. Cause: the busy lock of
-// the frame disabled every button while the action was in flight, the panel redrew inside the lock and its
-// fresh buttons were never opened again (no further seq change, because nobody else moves).
+// could be clicked; after the first fix the same with the 3rd concession. Recorded over the real API (seed 2,
+// Witzman + 3 bots, spec/oe/concession_chain_spec.rb): Witzman holds the 1st, 2nd and 3rd concession, so
+// every answer is again a Concession prompt for him. The answers and the full loads come late, as on the
+// live server (a poll that started before an action answers after it). Every concession must be clickable.
 const CHECKS_CHAIN = String.raw`(async () => {
   ${HEAD}
+  const errs = [];
+  addEventListener("error", (e) => errs.push(String(e.message)));
+  addEventListener("unhandledrejection", (e) => errs.push(String(e.reason)));
   const posted = async () => (await (await fetch("/__posted")).json()).length;
-  q('.concession-card[data-corp="DSJ"]').click();
-  await sleep(50);
-  q('.concession-price[data-price="60"]').click();
-  await sleep(50);
-  q(".kit-main-btn").click();
-  for (let i = 0; i < 60 && ((await posted()) !== 1 || q(".frame[aria-busy]")); i++) await sleep(50);
-  await sleep(200);
-  if (document.querySelectorAll("button[data-busy-lock]").length) fail("buttons still locked after the answer");
-  if (!q(".frame-stall").hidden) fail("stall notice shown although the viewer can act: " + q(".frame-stall").textContent);
-  const cards = [...document.querySelectorAll(".concession-card")];
-  if (cards.length < 2) fail("no offers after the 1st concession");
-  if (cards.some((c) => c.disabled)) fail("offers of the 2nd concession are disabled");
-  q('.concession-card[data-corp="LNWR"]').click();
-  await sleep(50);
-  if (q('.concession-card[data-corp="LNWR"]').getAttribute("aria-pressed") !== "true") fail("card click had no effect");
-  const price = [...document.querySelectorAll(".concession-price")].find((b) => !b.disabled);
-  if (!price) fail("no enabled par value for LNWR");
-  price.click();
-  await sleep(50);
-  if (q(".kit-main-btn").disabled) fail("main button closed after a choice: " + q(".kit-order-sentence")?.textContent);
-  q(".kit-main-btn").click();
-  for (let i = 0; i < 60 && (await posted()) !== 2; i++) await sleep(50);
-  if ((await posted()) !== 2) fail("2nd founding not sent");
+  const corps = ["DSJ", "LNWR", "GWR"];
+  for (let n = 0; n < corps.length; n++) {
+    let card = null;
+    for (let i = 0; i < 100; i++) {
+      card = q('.concession-card[data-corp="' + corps[n] + '"]');
+      if (card && !card.disabled && !q(".frame[aria-busy]")) break;
+      await sleep(50);
+    }
+    if (!card || card.disabled) fail("concession " + (n + 1) + ": " + corps[n] + " not clickable");
+    if (document.querySelectorAll("button[data-busy-lock]").length) fail("concession " + (n + 1) + ": buttons still locked");
+    if (!q(".frame-stall").hidden) fail("stall notice although the viewer can act: " + q(".frame-stall").textContent);
+    card.click();
+    await sleep(50);
+    if (q('.concession-card[data-corp="' + corps[n] + '"]').getAttribute("aria-pressed") !== "true") fail("concession " + (n + 1) + ": card click had no effect");
+    small(".concession-price");
+    q('.concession-price[data-price="60"]').click();
+    await sleep(50);
+    if (q(".kit-main-btn").disabled) fail("concession " + (n + 1) + ": main button closed: " + q(".kit-order-sentence")?.textContent);
+    q(".kit-main-btn").click();
+    for (let i = 0; i < 100 && (await posted()) !== n + 1; i++) await sleep(50);
+    if ((await posted()) !== n + 1) fail("concession " + (n + 1) + " not sent");
+  }
+  // after the 3rd: Bot 4 ran the 4th, the 5th is Witzman's again
+  for (let i = 0; i < 100 && (!q(".concession-card") || q(".frame[aria-busy]")); i++) await sleep(50);
+  if ([...document.querySelectorAll(".concession-card")].some((c) => c.disabled)) fail("5th concession not clickable");
+  if (errs.length) fail("page errors: " + errs.join(" | "));
 })()`;
 
-test("concession in the browser (#289): after the 1st concession the same viewer's 2nd concession can be founded", { skip: browser ? false : "no headless browser installed" }, async () => {
-  const { posted } = await scenario("concession-chain", ".concession-card", CHECKS_CHAIN, "concession-chain-next");
-  assert.equal(posted.length, 2);
-  const next = fixture("concession-chain-next");
-  assert.equal(posted[1]!.seq, next.seq);
-  assert.equal(posted[1]!.action.corporation, "LNWR");
+test("concession in the browser (#289): 1st, 2nd and 3rd concession of the same viewer in a row, slow answers", { skip: browser ? false : "no headless browser installed" }, async () => {
+  const states = ["concession-chain-next", "concession-chain-3", "concession-chain-4"];
+  const { posted } = await scenario("concession-chain", ".concession-card", CHECKS_CHAIN, states, { postMs: 700, getMs: 900 });
+  assert.equal(posted.length, 3);
+  assert.deepEqual(posted.map((p) => p.action.corporation), ["DSJ", "LNWR", "GWR"]);
+  assert.deepEqual(posted.map((p) => p.seq), ["concession-chain", ...states.slice(0, 2)].map((n) => fixture(n).seq));
+});
+
+test("stall line in the browser (#289): nobody to act is said, with a reload button that loads the state again", { skip: browser ? false : "no headless browser installed" }, async () => {
+  const stuck = fixture("concession-chain-next");
+  stuck.state.meta.active_players = [];
+  stuck.state.prompt.viewer_to_act = false;
+  stuck.state.prompt.actions = [];
+  const dir = mkdtempSync(join(tmpdir(), "oe-concession-test-"));
+  try {
+    await bundle(dir);
+    const { server } = stub(dir, stuck);
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const code = await run(dir, (server.address() as { port: number }).port, ".frame-stall:not([hidden])", String.raw`(async () => {
+      ${HEAD}
+      const el = q(".frame-stall");
+      if (el.dataset.kind !== "nobody" || !/Niemand kann ziehen/.test(el.textContent)) fail("stall: " + el.dataset.kind + " " + el.textContent);
+      const b = q(".frame-stall-reload");
+      if (!b || b.disabled) fail("no reload button");
+      small(".frame-stall-reload");
+      let loads = 0;
+      const orig = window.fetch;
+      window.fetch = (u, i) => { if (/^\/games\/1(\?|$)/.test(String(u))) loads++; return orig(u, i); };
+      b.click();
+      await sleep(400);
+      if (loads !== 1) fail("reload did not load the state: " + loads);
+    })()`);
+    if (process.env.OE_SHOT_DIR) copyFileSync(join(dir, "out.png"), join(process.env.OE_SHOT_DIR, "stall-nobody.png"));
+    server.closeAllConnections();
+    server.close();
+    assert.equal(code, 0, "page checks failed (see stderr)");
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

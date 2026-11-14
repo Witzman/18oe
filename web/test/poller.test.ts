@@ -98,3 +98,25 @@ test("stop prevents any further request and adopt shows an own move at once", as
   assert.equal(log.versions, 1);
   assert.deepEqual(log.games, [1, 7]);
 });
+
+test("a load that started before the player's own action and answers after it does not go back (#289)", async () => {
+  let release: (g: Game) => void = () => {};
+  const shown: number[] = [];
+  const poller = createPoller({
+    api: {
+      version: async () => ({ seq: 5, status: "active", round: { type: "concession", number: 1, turn: 1 }, acting: [], viewer_to_act: true }),
+      getGame: () => new Promise<Game>((r) => { release = r; }),
+    },
+    gameId: 1,
+    onGame: (g) => shown.push(g.seq),
+    setTimer: () => 1,
+    clearTimer: () => {},
+  });
+  poller.start();
+  await new Promise((r) => setImmediate(r)); // the check runs, the full load (seq 5) is in flight
+  poller.adopt(game(6)); // the answer of the player's own action
+  release(game(5)); // the old load answers late
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(shown, [6]);
+  assert.equal(poller.lastSeq, 6);
+});

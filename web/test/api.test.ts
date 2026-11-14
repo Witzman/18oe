@@ -82,3 +82,16 @@ test("resetPassword sends only the e-mail to POST /reset-password (#282)", async
   assert.equal(calls[0]?.init?.method, "POST");
   assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { email: "a@b.de" });
 });
+
+test("an action whose answer never comes fails as a network error after the timeout (#289)", async () => {
+  const hang: FetchLike = (_path, init) => new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+  });
+  const api = createApi(hang, { postTimeoutMs: 30 });
+  await assert.rejects(api.postAction(1, { type: "pass" }, 3), (e: unknown) => e instanceof ApiError && e.status === 0 && e.message === "timeout");
+  // reads are not cut off (the poller has its own rhythm)
+  let resolved = false;
+  const slow: FetchLike = () => new Promise((r) => setTimeout(() => { resolved = true; r(new Response(JSON.stringify({ seq: 1 }), { status: 200 })); }, 60));
+  assert.deepEqual(await createApi(slow, { postTimeoutMs: 30 }).version(1), { seq: 1 });
+  assert.ok(resolved);
+});
