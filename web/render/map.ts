@@ -29,7 +29,10 @@ import { drawGrid, drawPlate, drawWalls, type Block } from "./layers/static.ts";
 import { drawTileSurface } from "./layers/tiles.ts";
 import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
 import { drawNodes, drawTargetCity, inkOn, makeToken, type Ring } from "./layers/nodes.ts";
-import { citySlots, companyIndex, hitSlot, labelAt, revenueAll, revenueNow, shieldAt, medallionExtent, type Slot } from "./stones.ts";
+import { citySlots, companyIndex, labelAt, revenueAll, revenueNow, shieldAt, medallionExtent, slotsNear, type Slot } from "./stones.ts";
+import { hexesNear, hexIsFingerSized, inertiaStep, INERTIA_STOP, pushSample, releaseVelocity, type Sample } from "./touch.ts";
+import { h as el_ } from "../ui/dom.ts";
+import { txt } from "../ui/text.ts";
 import { hexFrame, tileGeometry, type TileGeometry, type TileParts } from "./track-axes.ts";
 import type { MapGeometry } from "./mapdata.ts";
 import { levelMatrix, mapCenter, pick, project, unproject, worldCorners, type Vec, type View } from "./projection.ts";
@@ -114,9 +117,7 @@ function reducedMotion(theme: RenderTheme): boolean {
   try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; }
 }
 
-const DRAG_PX = 4;
-/** A slot is hit within at least this many px, so a finger finds a small token (ui-spec 6). */
-const MIN_HIT_PX = 12;
+/** Drag threshold, hit radius and touch gesture values are theme tokens (shape.dragPx, hitPx, hitTouchPx, dragTouchPx; motion.inertiaMs, doubleTapMs). */
 /** Below this element size in px the map keeps its last size (hidden or collapsed element). */
 const MIN_SIZE = 64;
 
@@ -128,7 +129,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   };
   let theme = readTheme();
   const app = new Application();
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  // Resolution capped at 2: a 3x iPad canvas costs 2.25x the fill rate for no visible gain (#259, #159).
+  const dpr = Math.min(2, Math.max(1, window.devicePixelRatio || 1));
   await app.init({
     background: theme.ui.bg, antialias: true, autoStart: false, sharedTicker: false,
     resolution: dpr, autoDensity: true, width: el.clientWidth >= MIN_SIZE ? el.clientWidth : 800, height: el.clientHeight >= MIN_SIZE ? el.clientHeight : 600, preference: "webgl",
@@ -136,7 +138,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   app.ticker.stop();
   const canvas = app.canvas;
   // The canvas follows the element's size and never sets it (no feedback through layout).
-  canvas.style.cssText = "position:absolute;left:0;top:0;display:block;touch-action:none";
+  // Not cssText: that would wipe the CSS width/height autoDensity set, and a 2x canvas would be 2x the element on a retina iPad.
+  Object.assign(canvas.style, { position: "absolute", left: "0", top: "0", display: "block", touchAction: "none" });
   if (getComputedStyle(el).position === "static") el.style.position = "relative";
   el.style.overflow = "hidden";
   el.append(canvas);
@@ -614,7 +617,10 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   };
   const pickId = (p: Vec) => pick(scene.grid, view, p)?.id ?? null;
   const pointers = new Map<number, Vec>();
-  let drag: { start: Vec; moved: boolean } | null = null;
+  let drag: { start: Vec; moved: boolean; touch: boolean } | null = null;
+  let lastType = "mouse";
+  let samples: Sample[] = [];
+  let lastTap: { t: number; p: Vec } | null = null;
 
   function setHover(id: string | null) {
     if (id === hover) return;
@@ -624,22 +630,80 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     emit("hover", { hex: id });
   }
 
+  // ---- selection list for ambiguous taps (#259): small DOM menu, every entry at least 44 px high.
+  let picker: HTMLElement | null = null;
+  function closePicker() { picker?.remove(); picker = null; }
+  function openPicker(at: Vec, items: { label: string; run: () => void }[]) {
+    closePicker();
+    const box = el_("div", { class: "map-picker", role: "menu", "aria-label": txt("map.pick.title").de },
+      ...items.map((it) => el_("button", { type: "button", role: "menuitem", onclick: (e: Event) => { e.stopPropagation(); closePicker(); it.run(); } }, it.label)));
+    const st = box.style;
+    st.cssText = "position:absolute;z-index:5;display:flex;flex-direction:column;min-width:9rem;background:var(--ui-panel);color:var(--ui-ink);border:1px solid var(--ui-accent);border-radius:var(--shape-radius,4px);box-shadow:var(--shape-shadow,none);touch-action:manipulation";
+    box.querySelectorAll("button").forEach((b) => { b.style.cssText = "min-height:44px;min-width:44px;padding:0 0.9rem;text-align:left;background:none;border:0;border-bottom:1px solid var(--ui-faint);color:inherit;font:inherit"; });
+    const { width, height } = vp();
+    const rowH = 44, w = 160, hgt = items.length * rowH;
+    st.left = `${Math.max(4, Math.min(at.x + 12, width - w - 4))}px`;
+    st.top = `${Math.max(4, Math.min(at.y - hgt / 2, height - hgt - 4))}px`;
+    el.append(box);
+    picker = box;
+  }
+
+  /** A tap or click settled on hex id at screen point p: the "city" and "hex" events of the facade. */
+  function activate(id: string, p: Vec, touch: boolean) {
+    const h = scene.grid.byId.get(id)!;
+    const w = unproject(view, p, h.z);
+    const local = { x: w.x - h.x, y: w.y - h.y };
+    const slots = slotsOf(id);
+    const fire = (s: Slot | null) => {
+      if (touch) setHover(id); // a tap selects and shows the info (nothing here needs a hover)
+      if (s) emit("city", { hex: id, city: s.city, slot: s.slot });
+      emit("hex", { hex: id });
+    };
+    const reach = (touch ? theme.hitTouchPx : theme.hitPx) / view.zoom;
+    if (!touch) { fire(slotsNear(slots, local, Math.max(theme.slotRadius, reach))[0] ?? null); return; }
+    const exact = slotsNear(slots, local, theme.slotRadius);
+    const near = exact.length ? exact : slotsNear(slots, local, reach);
+    if (near.length <= 1 || exact.length === 1) { fire(near[0] ?? null); return; }
+    openPicker(p, near.map((s) => ({
+      label: txt("map.pick.slot").de.replace("{city}", String(s.city + 1)).replace("{slot}", String(s.slot + 1)),
+      run: () => fire(s),
+    })));
+  }
+
+  function tap(p: Vec, touch: boolean) {
+    const id = pickId(p);
+    if (!touch) { if (id) activate(id, p, false); return; }
+    if (!id) { setHover(null); return; }
+    if (!hexIsFingerSized(view.zoom, theme.hitTouchPx)) {
+      const near = hexesNear(scene.grid, view, p, theme.hitTouchPx);
+      if (!near.includes(id)) near.unshift(id);
+      if (near.length > 1) {
+        openPicker(p, near.map((n) => ({ label: txt("map.pick.hex").de.replace("{hex}", n), run: () => activate(n, project(view, { x: scene.grid.byId.get(n)!.x, y: scene.grid.byId.get(n)!.y }, scene.grid.byId.get(n)!.z), true) })));
+        return;
+      }
+    }
+    activate(id, p, true);
+  }
+
   const onDown = (e: PointerEvent) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (picker && !picker.contains(e.target as Node)) closePicker();
+    lastType = e.pointerType;
     try { canvas.setPointerCapture(e.pointerId); } catch { /* synthetic or already released pointer */ }
     const p = pos(e);
     pointers.set(e.pointerId, p);
-    drag = pointers.size === 1 ? { start: p, moved: false } : drag && { ...drag, moved: true };
+    drag = pointers.size === 1 ? { start: p, moved: false, touch: e.pointerType !== "mouse" } : drag && { ...drag, moved: true };
+    samples = [{ t: e.timeStamp, p }];
     cancelAnimationFrame(flight);
   };
   const onMove = (e: PointerEvent) => {
     const p = pos(e);
     const prev = pointers.get(e.pointerId);
-    if (!prev) { setHover(pickId(p)); return; }
+    if (!prev) { if (e.pointerType === "mouse") setHover(pickId(p)); return; }
     if (pointers.size === 1 && drag) {
-      if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > DRAG_PX) drag.moved = true;
+      if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > (drag.touch ? theme.dragTouchPx : theme.dragPx)) { drag.moved = true; closePicker(); }
       pointers.set(e.pointerId, p);
-      if (drag.moved) setView(panBy(view, p.x - prev.x, p.y - prev.y));
+      if (drag.moved) { setView(panBy(view, p.x - prev.x, p.y - prev.y)); samples = pushSample(samples, { t: e.timeStamp, p }); }
     } else if (pointers.size === 2) {
       const [a, b] = [...pointers.entries()].map(([id, q]) => [id, q] as const);
       const other = (a![0] === e.pointerId ? b! : a!)[1];
@@ -650,29 +714,49 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       if (d0 > 0) setView(panBy(zoomAt(view, mid0, d1 / d0, baseZoom), mid1.x - mid0.x, mid1.y - mid0.y));
     }
   };
+  /** Pan inertia after a touch drag: exponential decay, stopped by any new touch. */
+  function glide(v: { x: number; y: number }) {
+    if (reducedMotion(theme) || theme.motion.inertiaMs <= 0 || Math.hypot(v.x, v.y) < INERTIA_STOP * 4) return;
+    let vel = v, last = performance.now();
+    const step = () => {
+      const now = performance.now(), dt = Math.min(64, now - last);
+      last = now;
+      const [d, next] = inertiaStep(vel, dt, theme.motion.inertiaMs);
+      vel = next;
+      setView(panBy(view, d.x, d.y));
+      if (Math.hypot(vel.x, vel.y) > INERTIA_STOP) flight = requestAnimationFrame(step);
+    };
+    flight = requestAnimationFrame(step);
+  }
   const onUp = (e: PointerEvent) => {
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
+    const touch = e.pointerType !== "mouse";
     if (e.type === "pointerup" && drag && !drag.moved && pointers.size === 0) {
       const p = pos(e);
-      const id = pickId(p);
-      if (id) {
-        const h = scene.grid.byId.get(id)!;
-        const w = unproject(view, p, h.z);
-        const hit = hitSlot(slotsOf(id), { x: w.x - h.x, y: w.y - h.y }, theme.slotRadius, MIN_HIT_PX / view.zoom);
-        if (hit) emit("city", { hex: id, city: hit.city, slot: hit.slot });
-        emit("hex", { hex: id });
+      const prevTap = lastTap;
+      if (touch && prevTap && e.timeStamp - prevTap.t <= theme.motion.doubleTapMs && Math.hypot(p.x - prevTap.p.x, p.y - prevTap.p.y) <= theme.hitTouchPx) {
+        // Double tap zooms in about the finger (the first tap already selected).
+        lastTap = null;
+        closePicker();
+        animateTo(zoomAt(view, p, 2, baseZoom));
+      } else {
+        lastTap = touch ? { t: e.timeStamp, p } : null;
+        tap(p, touch);
       }
+    } else if (e.type === "pointerup" && drag?.moved && pointers.size === 0 && touch) {
+      glide(releaseVelocity(samples, e.timeStamp));
     }
     if (pointers.size === 0) drag = null;
   };
-  const onLeave = () => { if (pointers.size === 0) setHover(null); };
+  const onLeave = (e: PointerEvent) => { if (pointers.size === 0 && e.pointerType !== "touch" && e.pointerType !== "pen") setHover(null); };
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     const step = e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 1 : 0.0015;
     setView(zoomAt(view, pos(e), Math.exp(-e.deltaY * step), baseZoom));
   };
   const onDbl = (e: MouseEvent) => {
+    if (lastType !== "mouse") return; // touch has its own double tap
     const id = pickId(pos(e));
     const c = id ? hexCenter(id) : null;
     if (c) animateTo(centerOn(view, c.p, c.z, vp()));
@@ -776,6 +860,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       resize.disconnect();
       document.removeEventListener(THEME_CHANGED, onTheme);
       el.removeEventListener("keydown", onKey);
+      closePicker();
       clearLayers();
       app.destroy(true, { children: true });
     },

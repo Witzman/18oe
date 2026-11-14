@@ -36,6 +36,24 @@ function field(label: string, input: HTMLInputElement, hint?: string): HTMLEleme
   return h("label", { class: "field" }, h("span", {}, label), input, hint ? h("small", { class: "muted" }, hint) : null);
 }
 
+// Hintergrund des Titelbilds (#280): reine CSS-Animation, rein dekorativ. Stilisierter Zug mit Dampf auf
+// Schienen vor Abendhimmel; Farben, Dauer und Takt kommen aus den Theme-Tokens (theme.css). Die Seite
+// hängt nicht davon ab: das Formular steht im normalen Fluss darüber. Steht das Theme-Token
+// motion.enabled auf 0, bleibt das Bild statisch (data-still); prefers-reduced-motion regelt das CSS.
+export function titleStage(): HTMLElement {
+  const still = getComputedStyle(document.documentElement).getPropertyValue("--motion-enabled").trim() === "0";
+  const puffs = [0, 1, 2, 3].map(() => h("i", { class: "puff" }));
+  const wheels = [0, 1, 2].map(() => h("i", { class: "wheel" }));
+  const train = h("div", { class: "train" },
+    h("div", { class: "loco" }, h("i", { class: "chimney" }), h("div", { class: "steam" }, ...puffs), ...wheels),
+    h("div", { class: "car" }), h("div", { class: "car" }));
+  const stage = h("div", { class: "title-stage", "aria-hidden": "true" },
+    h("i", { class: "sun" }), h("div", { class: "hills" }), train,
+    h("div", { class: "track" }, h("i", { class: "rail" }), h("i", { class: "sleepers" })));
+  if (still) stage.setAttribute("data-still", "");
+  return stage;
+}
+
 export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => void): HTMLElement {
   const reg = mode === "register";
   const error = h("p", { class: "error", role: "alert" });
@@ -74,7 +92,8 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
     : [field(txt("access.login_label").de, login), field(txt("access.password_label").de, password)];
 
   return h("div", { class: "access" },
-    h("h1", {}, "18OE"),
+    titleStage(),
+    h("header", { class: "title" }, h("h1", {}, "18OE"), h("p", { class: "game-title" }, txt("access.game_title").de)),
     h("div", { class: "panel" },
       h("h2", {}, txt(reg ? "access.title_register" : "access.title_login").de),
       h("form", { onsubmit, novalidate: true }, ...fields, h("div", { class: "row" }, submit), error),

@@ -27,7 +27,17 @@ function show(value: unknown): string {
   return String(value);
 }
 
+/** The engine's label of a `choose` action (#124, `prompt.choices`); null when the view lists none for it. */
+export function choiceLabel(g: Game, a: Action): string | null {
+  if (a.type !== "choose") return null;
+  const c = g.state.prompt.choices?.find((x) => x.choice === String(a.choice) && x.entity === a.entity && (x.target ?? null) === (a.target ?? null));
+  if (!c || c.label === "") return null;
+  return c.target ? `${c.label} · ${fillText("frame.choice_for", { target: c.target })}` : c.label;
+}
+
 export function actionDetail(g: Game, a: Action): string {
+  const labelled = choiceLabel(g, a);
+  if (labelled !== null) return labelled;
   const parts = Object.entries(a).filter(([k]) => !META_KEYS.has(k)).map(([k, val]) => {
     // Dividend kinds (Rulebook 11.4) have German names; every other parameter is shown as sent.
     const kind = k === "kind" && typeof val === "string" ? txt(`dividend.${val}`) : null;
@@ -48,7 +58,9 @@ export function genericModel(g: Game, claims: Claims): GenericModel {
     list.push({ key: actionKey(a), action: a, label: txt(`action.${type}`).de, detail: actionDetail(g, a), danger: DANGEROUS.has(type) });
     byType.set(type, list);
   }
-  const groups: Group[] = [...byType].map(([type, entries]) => ({ type, label: txt(`action.${type}`).de, entries }));
+  // A `choose` group carries the step's question (`choice_name`, #124) next to its name.
+  const groupLabel = (type: string) => type === "choose" && p.choice_name ? `${txt("action.choose").de}: ${p.choice_name}` : txt(`action.${type}`).de;
+  const groups: Group[] = [...byType].map(([type, entries]) => ({ type, label: groupLabel(type), entries }));
   const ranges: RangeEntry[] = p.ranges.filter((r) => open(r.type)).map((r) => ({
     key: `range:${r.type}:${r.entity}:${r.company}`, range: r, label: txt(`action.${r.type}`).de,
     detail: `${r.company} · ${fillText("frame.range_bounds", { min: r.min, max: r.max, step: r.step })}`,

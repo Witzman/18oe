@@ -92,6 +92,12 @@ body:has(.frame) .dev-menu { top: 8px; bottom: auto; right: 12px; z-index: 20; }
   .frame-main { min-height: 40vh; order: -1; }
   .frame-bar { position: sticky; bottom: 0; flex-wrap: wrap; z-index: 6; }
   .frame-drawer { position: fixed; }
+}
+/* Portrait: the drawer stays below the map (top 40vh) instead of covering it (issue 259). */
+@media (max-width: 960px) and (orientation: portrait) {
+  .frame-drawer-sheet { max-height: 30vh; }
+}
+@media (max-width: 960px) {
   .frame-roundbar { padding-right: var(--shape-gap); padding-top: 28px; }
 }
 .frame-order-panel { display: flex; gap: var(--shape-gap); align-items: center; flex-wrap: wrap; }
