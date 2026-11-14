@@ -95,7 +95,8 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   barEl.append(barMain, stallEl, message.el, barTools);
   let seqSince = Date.now();
   function drawStall() {
-    const n = game ? stallNotice(game, Date.now() - seqSince) : null;
+    let n: ReturnType<typeof stallNotice> = null;
+    try { n = game ? stallNotice(game, Date.now() - seqSince) : null; } catch (e) { console.warn("stall notice", e); } // a notice never breaks the frame
     const show = n !== null && n.tone !== "info"; // "waiting for X" is already the bar's sentence
     stallEl.hidden = !show;
     stallEl.className = show ? `frame-stall msg-${n!.tone}` : "frame-stall";

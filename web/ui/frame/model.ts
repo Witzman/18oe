@@ -103,7 +103,8 @@ export function stallNotice(g: Game, waitedMs: number): StallNotice | null {
   const acting = g.state.meta.active_players;
   if (acting.length === 0) return { kind: "nobody", tone: "error", text: txt("frame.stall_nobody").de };
   if (p.viewer_to_act) {
-    const offered = p.actions.length + p.ranges.length + p.choices.length;
+    // Older states (recorded before #124) lack ranges or choices.
+    const offered = (p.actions?.length ?? 0) + (p.ranges?.length ?? 0) + (p.choices?.length ?? 0);
     return offered === 0 ? { kind: "no_action", tone: "error", text: txt("frame.stall_no_action").de } : null;
   }
   const rows = playerRows(g).filter((r) => r.toAct);
