@@ -117,12 +117,15 @@ test("login and registration report every step and every failure (#286)", { skip
     const { themesCss } = await import("../themes/css.ts");
     const { DEFAULT_THEME_ID, themes } = await import("../themes/index.ts");
     writeFileSync(join(dir, "themes.css"), themesCss(themes, DEFAULT_THEME_ID));
-    const server = stub(dir);
-    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
-    const port = (server.address() as { port: number }).port;
+    const servers: ReturnType<typeof stub>[] = [];
+    const start = async () => {
+      const server = stub(dir);
+      servers.push(server);
+      await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+      return (server.address() as { port: number }).port;
+    };
     const { spawn } = await import("node:child_process");
-    // Login flow ends in the lobby; then the same browser session cannot register (already logged in), so the
-    // registration flow runs in its own page load against a fresh stub state.
+    // Each flow gets a fresh stub (the login flow ends logged in).
     const run = (url: string, js: string) => new Promise<number>((resolve) => {
       const child = spawn(process.execPath, [shot, url, join(dir, "out.png"), "--width", "1280", "--height", "800", "--wait-for", ".version-note", "--eval", js], { stdio: "pipe" });
       let err = "";
@@ -130,11 +133,10 @@ test("login and registration report every step and every failure (#286)", { skip
       child.on("close", (c) => { if (c) console.error(err); resolve(c ?? 1); });
     });
     try {
-      assert.equal(await run(`http://127.0.0.1:${port}/#/login`, CHECKS.replace('location.hash = "#/register";', "")), 0, "login feedback checks failed");
-      assert.equal(await run(`http://127.0.0.1:${port}/#/register`, CHECKS2), 0, "register feedback checks failed");
+      assert.equal(await run(`http://127.0.0.1:${await start()}/#/login`, CHECKS.replace('location.hash = "#/register";', "")), 0, "login feedback checks failed");
+      assert.equal(await run(`http://127.0.0.1:${await start()}/#/register`, CHECKS2), 0, "register feedback checks failed");
     } finally {
-      server.closeAllConnections();
-      server.close();
+      for (const server of servers) { server.closeAllConnections(); server.close(); }
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
