@@ -18,7 +18,7 @@ module Oe
     CORPORATION_TYPES = %i[minor regional major national].freeze
 
     Result = Struct.new(:players, :seed, :mix, :kinds, :status, :actions, :turn, :phase, :values, :floated,
-                        :closed, :passes, :moves, :detail, :seconds, keyword_init: true) do
+                        :closed, :passes, :moves, :detail, :seconds, :operating, :bot_move, keyword_init: true) do
       def to_h
         super.transform_keys(&:to_s)
       end
@@ -63,6 +63,8 @@ module Oe
       @strategist = Oe::StrategyPlayer.new(game, rng: rng)
       passes = Hash.new(0)
       moves = Hash.new(0)
+      operating = Hash.new(0)
+      timings = []
       started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
       count = 0
       status = :limit
@@ -79,7 +81,7 @@ module Oe
         end
 
         action = case kinds[pid]
-                 when :bot then bot.choose(player_id: pid)
+                 when :bot then timed(timings) { bot.choose(player_id: pid) }
                  when :strategy then @strategist.choose(bot.legal_actions(pid))
                  else random_action(bot, pid, rng)
                  end
@@ -89,6 +91,7 @@ module Oe
           detail = "#{kinds[pid]} #{action.class.name.split('::').last}: #{game.exception.message[0, 120]}"
           break
         end
+        count_operating(operating, action)
         moves[kinds[pid]] += 1
         passes[kinds[pid]] += 1 if action.type == "pass"
         count += 1
@@ -99,11 +102,50 @@ module Oe
         phase: game.phase.name.to_s, values: game.result,
         floated: CORPORATION_TYPES.to_h { |t| [t.to_s, game.corporations.count { |c| c.type == t && c.floated? }] },
         closed: game.corporations.count(&:closed?), passes: passes, moves: moves, detail: detail,
-        seconds: Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+        seconds: Process.clock_gettime(Process::CLOCK_MONOTONIC) - started,
+        operating: operating.merge(share_prices(game)), bot_move: move_times(timings)
       )
     end
 
     private
+
+    def timed(timings)
+      t0 = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      yield
+    ensure
+      timings << Process.clock_gettime(Process::CLOCK_MONOTONIC) - t0
+    end
+
+    # Operating figures (#293): tiles laid, tokens placed, routes run with
+    # revenue, the summed revenue, dividends paid out.
+    def count_operating(operating, action)
+      case action
+      when Engine::Action::LayTile then operating["tiles"] += 1
+      when Engine::Action::PlaceToken then operating["tokens"] += 1
+      when Engine::Action::RunRoutes
+        revenue = action.routes.sum(&:revenue)
+        operating["runs"] += 1 if revenue.positive?
+        operating["revenue"] += revenue
+      when Engine::Action::Dividend then operating["payouts"] += 1 if action.kind == "payout"
+      end
+    end
+
+    # Share prices of the par-priced companies at the end: how many stand above their par.
+    def share_prices(game)
+      priced = game.corporations.select { |c| c.par_price && c.share_price && !c.closed? }
+      { "above_par" => priced.count { |c| c.share_price.price > c.par_price.price },
+        "below_par" => priced.count { |c| c.share_price.price < c.par_price.price },
+        "max_price" => priced.map { |c| c.share_price.price }.max || 0 }
+    end
+
+    # Seconds per bot move: mean, 99th percentile, max.
+    def move_times(timings)
+      return {} if timings.empty?
+
+      sorted = timings.sort
+      { "n" => sorted.size, "mean" => (sorted.sum / sorted.size).round(4),
+        "p99" => sorted[(sorted.size * 0.99).floor.clamp(0, sorted.size - 1)].round(4), "max" => sorted.last.round(4) }
+    end
 
     def random_action(bot, pid, rng)
       actions = bot.legal_actions(pid)

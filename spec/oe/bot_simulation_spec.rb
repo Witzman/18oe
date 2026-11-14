@@ -30,6 +30,14 @@ RSpec.describe Oe::BotSimulation do
     expect(result.to_h.keys).to include("players", "values", "passes")
   end
 
+  it "reports operating figures and bot move times (#293)" do
+    result = sim(mix: :bots, max_actions: 400).run
+    expect(result.operating.keys).to include("tiles", "runs", "revenue", "above_par", "max_price")
+    expect(result.operating["tiles"]).to be_positive
+    expect(result.bot_move.keys).to eq(%w[n mean p99 max])
+    expect(result.bot_move["max"]).to be < 2.0
+  end
+
   it "is reproducible for a seed" do
     a = sim(seed: 3).run
     b = sim(seed: 3).run

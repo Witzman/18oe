@@ -77,17 +77,79 @@ RSpec.describe Oe::Bot do
   describe Oe::Bot::Track do
     let(:track) { described_class.new(Struct.new(:x).new(0), Random.new(1)) }
     LayTile = Struct.new(:entity, :tile, :hex)
-    Corp = Struct.new(:trains, :cash)
+    Corp = Struct.new(:trains, :cash, :owner)
+    Depot = Struct.new(:min_depot_price)
 
-    it "passes instead of spending the treasury on track before the first train" do
-      corp = Corp.new([], 100)
-      expect(track.choose({ "LayTile" => [LayTile.new(corp)], "Pass" => [Pass.new(corp)] })).to be_a(Pass)
+    it "keeps the cheapest train back while trainless, less half the president's cash (#293)" do
+      game = Struct.new(:depot).new(Depot.new(100))
+      track = described_class.new(game, Random.new(1))
+      president = Player.new(60, "p0")
+      expect(track.reserve(Corp.new([], 100, president))).to eq(70)
+      expect(track.reserve(Corp.new([], 100, Player.new(400, "p0")))).to eq(0)
+      expect(track.reserve(Corp.new([:train], 100, president))).to eq(0)
+    end
+  end
+
+  # Operating round 1.1 / 1.2 of a real 4-bot game (#293): before #293 every
+  # company passed its track points and its token in OR 1.1.
+  describe "operating" do
+    def play_until(seed)
+      game = Engine::Game::G18OE::Game.new(%w[p0 p1 p2 p3], id: seed, seed: seed)
+      bot = described_class.new(game, rng: Random.new(seed))
+      log = []
+      20_000.times do
+        break if yield(game)
+
+        action = bot.choose
+        step = game.round.active_step
+        log << [game.round.operating? ? "#{game.turn}.#{game.round.round_num}" : nil, step.class.name.split("::").last, action]
+        game.process_action(action)
+        raise game.exception if game.exception
+      end
+      [game, log]
     end
 
-    it "must lay a tile when passing is not allowed" do
-      corp = Corp.new([], 100)
-      tile = LayTile.new(corp)
-      expect(track.choose({ "LayTile" => [tile] })).to equal(tile)
+    def in_or(log, round, step)
+      log.select { |r, s, _| r == round && s == step }.map(&:last)
+    end
+
+    let(:until_or12_done) { ->(g) { g.round.operating? && g.turn == 2 } }
+
+    it "lays track in OR 1.1 with most companies" do
+      _, log = play_until(1, &until_or12_done)
+      lays = in_or(log, "1.1", "Track")
+      laying = lays.grep(Engine::Action::LayTile).map(&:entity).uniq
+      everyone = lays.map(&:entity).uniq
+      expect(laying.size).to be >= everyone.size * 3 / 4
+    end
+
+    it "places tokens in OR 1.1 when affordable" do
+      tokens = in_or(play_until(1, &until_or12_done).last, "1.1", "Token")
+      expect(tokens.grep(Engine::Action::PlaceToken)).not_to be_empty
+    end
+
+    it "runs a route with revenue for almost every company with a train in OR 1.2" do
+      game, log = play_until(1, &until_or12_done)
+      runs = in_or(log, "1.2", "Route").select { |a| a.is_a?(Engine::Action::RunRoutes) }
+      with_train = game.corporations.select { |c| c.floated? && !c.trains.empty? }
+      expect(runs.map { |a| a.routes.sum(&:revenue) }).to all(be_positive)
+      expect(runs.size).to be >= with_train.size - 2
+    end
+
+    it "lays a tile on the company's network that reaches out (new stop or closer to one)" do
+      game, = play_until(2) { |g| g.round.operating? && g.round.active_step.is_a?(Engine::Step::Track) }
+      bot = described_class.new(game, rng: Random.new(2))
+      entity = game.round.active_step.current_entity
+      graph = game.graph_for_entity(entity)
+      before = [graph.connected_nodes(entity).size, graph.connected_hexes(entity).size]
+      action = bot.choose
+      expect(action).to be_a(Engine::Action::LayTile)
+      game.process_action(action)
+      expect(game.exception).to be_nil
+      game.clear_graph
+      graph = game.graph_for_entity(entity)
+      after = [graph.connected_nodes(entity).size, graph.connected_hexes(entity).size]
+      expect(after[0] > before[0] || after[1] > before[1]).to be(true), "network did not grow: #{before} -> #{after}"
     end
   end
 
