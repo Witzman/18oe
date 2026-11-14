@@ -67,14 +67,24 @@ async function route() {
       mountToken(frame);
       // Hex names and zones for the home token step; the panel works without them (hex ids only).
       void loadGeometry(api).then((m) => { mapGeometry = m; concession.refresh(); track.refresh(); }, () => {});
+      // #294: display errors (a panel, the map or the frame threw on a state) go to the server log once per
+      // message, so a failure in a player's browser is visible without their DevTools.
+      const reported = new Set<string>();
+      const report = (e: unknown) => {
+        const key = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        if (reported.has(key) || reported.size >= 10) return;
+        reported.add(key);
+        void api.clientError(gameId, e).catch(() => {});
+      };
+      frame.hooks.onRenderError = report;
       self = poller = createPoller({
         api, gameId,
         onGame: (g) => { frame.render(g); applyAttention(g.state.prompt.viewer_to_act, gameId); },
         onUnauthorized: toLogin,
         onOk: () => frame.band.ok(),
         onRetryIn: (ms, why) => frame.band.failed(ms, why),
-        // #294: a display error is a client bug; the band names it, the console has the stack, the server log a line.
-        onRenderError: (e) => { console.error("game state could not be drawn", e); void api.clientError(gameId, e).catch(() => {}); },
+        // #294: a display error outside the panels; the band names it, the console has the stack, the server log a line.
+        onRenderError: (e) => { console.error("game state could not be drawn", e); report(e); },
         onError: (e) => {
           if (e.status === 404) { self.stop(); mount(root, notFoundPage()); }
           else if (e.status !== 0 && e.status < 500) frame.message.say(e.message, "error");
@@ -88,6 +98,7 @@ async function route() {
         onUnauthorized: toLogin,
         onNotFound: () => { self.stop(); mount(root, notFoundPage()); },
       });
+      frame.reload = () => { void api.getGame(gameId).then((g) => self.adopt(g), () => {}); };
       poller.start();
     } else {
       mount(root, await gamesPage(ctx));

@@ -1,5 +1,5 @@
 import type { MapGeometry } from "./render/mapdata.ts";
-import type { Account, Game, GameSummary, SeatRequest, Version } from "./types.ts";
+import type { Account, Game, GameSummary, LogPage, SeatRequest, Version } from "./types.ts";
 
 export class ApiError extends Error {
   status: number;
@@ -19,17 +19,20 @@ export class ApiError extends Error {
 }
 
 // A GET that has not answered after this long is aborted and reported as a timeout (#294); the poller
-// retries. Actions (POST) are never aborted: whether the server applied one would be unknown.
+// retries. Actions (POST) have their own limit (POST_TIMEOUT_MS, #289).
 export const GET_TIMEOUT_MS = 30000;
 
 export interface RegisterRequest { name: string; email: string; password: string; code: string }
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
+export const POST_TIMEOUT_MS = 30_000;
+
 // Typed wrapper around the endpoints of #33/#36. The server error format is
 // always {error, message}; anything else is reported as a network/protocol error.
-export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init), opts: { getTimeoutMs?: number; now?: () => number } = {}) {
-  const timeoutMs = opts.getTimeoutMs ?? GET_TIMEOUT_MS;
+export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init), opts: { getTimeoutMs?: number; postTimeoutMs?: number; now?: () => number } = {}) {
+  const getTimeout = opts.getTimeoutMs ?? GET_TIMEOUT_MS;
+  const postTimeout = opts.postTimeoutMs ?? POST_TIMEOUT_MS;
   const now = opts.now ?? (() => performance.now());
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const init: RequestInit = { method, credentials: "same-origin", headers: { Accept: "application/json" } };
@@ -40,19 +43,21 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init), opts
     const request = `${method} ${path.split("?")[0]}`;
     const t0 = now();
     const elapsed = () => Math.round(now() - t0);
-    let timedOut = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    if (method === "GET" && timeoutMs > 0 && typeof AbortController !== "undefined") {
-      const ctl = new AbortController();
-      init.signal = ctl.signal;
-      timer = setTimeout(() => { timedOut = true; ctl.abort(); }, timeoutMs);
-    }
+    // A read that hangs is aborted and named as a timeout (#294); the poller retries. An action whose answer
+    // never comes would keep the page locked for good (#289): give up after POST_TIMEOUT_MS; the poller then
+    // shows whatever the server has (the action may have been applied).
+    const timeoutMs = method === "GET" ? getTimeout : method === "POST" ? postTimeout : 0;
+    const ctrl = timeoutMs > 0 && typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
+    const timeout = () => method === "GET"
+      ? new ApiError(0, "timeout", `no answer after ${Math.round(timeoutMs / 1000)} s`, request, elapsed())
+      : new ApiError(0, "network", "timeout", request, elapsed());
     try {
       let res: Response;
       try {
-        res = await fetchFn(path, init);
+        res = await fetchFn(path, ctrl ? { ...init, signal: ctrl.signal } : init);
       } catch (e) {
-        if (timedOut) throw new ApiError(0, "timeout", `no answer after ${Math.round(timeoutMs / 1000)} s`, request, elapsed());
+        if (ctrl?.signal.aborted) throw timeout();
         throw new ApiError(0, "network", e instanceof Error ? e.message : "network error", request, elapsed());
       }
       let data: unknown = null;
@@ -60,7 +65,7 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init), opts
         data = await res.json();
       } catch {
         /* non-JSON body (or the body was cut off): handled below */
-        if (timedOut) throw new ApiError(0, "timeout", `no answer after ${Math.round(timeoutMs / 1000)} s`, request, elapsed());
+        if (ctrl?.signal.aborted) throw timeout();
         if (res.ok && res.status !== 204) throw new ApiError(res.status, "bad_response", `HTTP ${res.status}: no JSON in the answer`, request, elapsed());
       }
       if (!res.ok) {
@@ -86,6 +91,7 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init), opts
     createGame: (seats: SeatRequest[], seed?: number) =>
       call<Game>("POST", "/games", seed === undefined ? { seats } : { seats, seed }),
     getGame: (id: number, log = 40) => call<Game>("GET", `/games/${id}?log=${log}`),
+    log: (id: number, from = 0, limit = 500) => call<LogPage>("GET", `/games/${id}/log?from=${from}&limit=${limit}`),
     version: (id: number) => call<Version>("GET", `/games/${id}/version`),
     // #294: a client-side display error goes to the server log (message, stack, browser), so it is not
     // only in the player's console. Best effort; the caller ignores failures.

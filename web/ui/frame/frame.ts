@@ -3,6 +3,7 @@
 // `claims` (which action types they handle), `views` (main area) and `slots` (containers).
 import { choiceFromRoot } from "../../themes/choice.ts";
 import type { Theme } from "../../themes/schema.ts";
+import type { Api } from "../../api.ts";
 import type { createSession } from "../../session.ts";
 import type { Corporation, Game } from "../../types.ts";
 import { connectionBand, messageArea } from "../connection.ts";
@@ -16,6 +17,7 @@ import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Acti
 import { OrBandView, orBand } from "./or-band.ts";
 import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
 import { createViews } from "./views.ts";
+import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
 import { versionButton } from "../version.ts";
 import { endgameModel, Endstand } from "../panels/endgame.ts";
 
@@ -29,6 +31,8 @@ export interface GameFrame {
   setBusy: (busy: boolean) => void;
   // Set by main once the poller exists; the action bar sends through it.
   session?: ReturnType<typeof createSession>;
+  // Set by main: load the full state again and render it (the "Neu laden" of the stall line, #289).
+  reload?: () => void;
   // Hook points for the following UI issues.
   claims: ReturnType<typeof createClaims>;
   views: ReturnType<typeof createViews>;
@@ -38,7 +42,7 @@ export interface GameFrame {
   setOrder: (spec: OrderSpec) => () => void;
   // Sends an action with the current seq (what the main button of the generic bar does).
   send: (action: Record<string, unknown>) => void;
-  hooks: { onFocusCorporation?: (id: string) => void; map?: import("./mapview.ts").FrameMap };
+  hooks: { onFocusCorporation?: (id: string) => void; map?: import("./mapview.ts").FrameMap; onRenderError?: (e: unknown) => void };
   // Runs the cleanups of mounted views and panels when the page leaves the game (the map frees its WebGL context).
   onDispose: (fn: () => void) => void;
   dispose: () => void;
@@ -52,7 +56,7 @@ const theme = (): Theme => choiceFromRoot(document.documentElement).theme;
 const put = (el: Element, ...nodes: (VNode | string | null)[]) =>
   el.replaceChildren(...nodes.filter((n): n is VNode | string => n !== null).map((n) => toDom(n)));
 
-export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
+export function createGameFrame(retryNow: () => void = () => {}, api?: Api): GameFrame {
   const claims = createClaims();
   const orderSlot: OrderSlot = createOrderSlot(() => { if (game) drawBar(); });
   const views = createViews([{
@@ -71,6 +75,23 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   let outlinerOpen = true;
   let genericOpen: boolean | null = null; // null = automatic (open while there is something to choose)
   let logOpen = false;
+  // The full log (#292): fetched from /games/:id/log while the sheet is open; the sheet element lives on
+  // between redraws so the reader's scroll position survives.
+  let fullLog: LogLine[] = [];
+  let fullLogSeq = -1;
+  let fullLogLoading = false;
+  const logList = h("div", { class: "frame-log-scroll", tabindex: "0" });
+  let logScroll = { top: 0, atBottom: true };
+  logList.addEventListener("scroll", () => { logScroll = { top: logList.scrollTop, atBottom: isAtBottom(logList.scrollTop, logList.scrollHeight, logList.clientHeight) }; });
+  function syncFullLog(g: Game) {
+    if (!api || !logOpen || fullLogLoading || fullLogSeq === g.seq) return;
+    fullLogLoading = true;
+    const seq = g.seq;
+    const id = Number(g.state.meta.game_id);
+    fetchLogFrom((from) => api.log(id, from), resumeFrom(fullLog))
+      .then((lines) => { fullLog = mergeLog(fullLog, lines); fullLogSeq = seq; }, () => {})
+      .finally(() => { fullLogLoading = false; if (logOpen && game) { if (fullLogSeq !== game.seq && fullLogSeq === seq) fullLogSeq = -1; drawBar(); } });
+  }
   let endOpen = true;
   const frame: GameFrame = {} as GameFrame;
   const listeners = new Set<(g: Game) => void>();
@@ -98,13 +119,29 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   function drawStall() {
     let n: ReturnType<typeof stallNotice> = null;
     try { n = game ? stallNotice(game, Date.now() - seqSince) : null; } catch (e) { console.warn("stall notice", e); } // a notice never breaks the frame
+    // Client side (#289): an answer that does not come, a panel that failed to draw, or controls that stay
+    // locked although nothing is in flight. Locked controls are opened again right away (self-healing).
+    if (!busy && root.querySelector("button[data-busy-lock]")) { console.warn("#289: busy lock left over, released"); releaseLock(); }
+    const now = Date.now();
+    if (busy && now - busySince >= SLOW_ANSWER_MS) n = { kind: "slow_answer", tone: "warn", text: fillText("frame.stall_slow", { s: Math.floor((now - busySince) / 1000) }) };
+    else if (panelError) n = { kind: "panel_error", tone: "error", text: fillText("frame.stall_panel", { error: panelError }) };
     const show = n !== null && n.tone !== "info"; // "waiting for X" is already the bar's sentence
     stallEl.hidden = !show;
     stallEl.className = show ? `frame-stall msg-${n!.tone}` : "frame-stall";
     stallEl.dataset.kind = show ? n!.kind : "";
-    stallEl.textContent = show ? n!.text : "";
+    stallEl.replaceChildren();
+    if (!show) return;
+    stallEl.append(n!.text);
+    if (frame.reload && n!.kind !== "slow_answer") {
+      const b = h("button", { type: "button", class: "frame-stall-reload" }, txt("frame.stall_reload").de);
+      b.addEventListener("click", () => frame.reload?.());
+      stallEl.append(" ", b);
+    }
   }
-  const stallTimer = setInterval(() => { if (root.isConnected) drawStall(); }, 5000);
+  const SLOW_ANSWER_MS = 15_000;
+  let busySince = 0;
+  let panelError: string | null = null;
+  const stallTimer = setInterval(() => { if (root.isConnected) drawStall(); }, 3000);
   disposers.push(() => clearInterval(stallTimer));
   // Until the first state is drawn the context sheet says so (#294): never a bare map without a word. A
   // failed load shows in the band above (reason and "Jetzt"), this line stays until a state arrives.
@@ -124,9 +161,10 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
     root.toggleAttribute("aria-busy", busy);
     if (busy) {
       for (const b of root.querySelectorAll("button")) if (!b.disabled) { b.disabled = true; b.dataset.busyLock = ""; }
-    } else {
-      for (const b of root.querySelectorAll<HTMLButtonElement>("button[data-busy-lock]")) { b.disabled = false; delete b.dataset.busyLock; }
-    }
+    } else releaseLock();
+  }
+  function releaseLock() {
+    for (const b of root.querySelectorAll<HTMLButtonElement>("button[data-busy-lock]")) { b.disabled = false; delete b.dataset.busyLock; }
   }
 
   // ---- round bar -------------------------------------------------------------------------------
@@ -315,14 +353,23 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
         v("h3", {}, txt("frame.generic_title").de),
         GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError })));
     }
+    let logSheet: HTMLElement | null = null;
     if (logOpen) {
-      const lines = g.state.log;
-      drawerNodes.push(v("section", { class: "frame-drawer-sheet frame-log", "aria-label": txt("frame.log").de },
+      // Until the full log has arrived, show the tail the state carries.
+      const lines: LogLine[] = fullLog.length > 0 ? fullLog : g.state.log;
+      const sheet = toDom(v("section", { class: "frame-drawer-sheet frame-log", "aria-label": txt("frame.log").de },
         v("h3", {}, txt("frame.log").de),
-        lines.length === 0 ? v("p", { class: "muted" }, txt("frame.log_empty").de) : v("ol", {}, ...lines.map((l) => v("li", {}, l.text)))));
+        lines.length === 0 ? v("p", { class: "muted" }, txt("frame.log_empty").de) : null));
+      logList.replaceChildren(...(lines.length === 0 ? [] : [toDom(v("ol", {}, ...lines.map((l) => v("li", {}, l.text))))]));
+      (sheet as HTMLElement).append(logList);
+      logSheet = sheet as HTMLElement;
+      syncFullLog(g);
     }
+    const keep = { ...logScroll };
     put(drawerEl, ...drawerNodes);
-    drawerEl.hidden = drawerNodes.length === 0;
+    if (logSheet) drawerEl.append(logSheet);
+    drawerEl.hidden = drawerNodes.length === 0 && !logSheet;
+    if (logSheet) { logList.scrollTop = nextScrollTop(keep, logList.scrollHeight, logList.clientHeight); }
     applyBusy();
   }
   const genericDetail = (g: Game, a: Action) => {
@@ -347,22 +394,26 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
     dispose: () => { disposers.splice(0).forEach((f) => f()); },
     subscribe: (fn: (g: Game) => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
     render(g: Game) {
-      // #294: one panel (or the map) that throws must not keep the rest of the frame from drawing. Before,
-      // the first throwing listener stopped the loop before `game` was set: the page kept only the map and
-      // the poller called it "no connection". Every listener and the frame itself now run; the first error
-      // is rethrown afterwards so the poller shows it in the band (with the retry button).
-      const errors: unknown[] = [];
+      // One panel that throws must not stop the others nor the frame (#289): the error is shown in the
+      // stall line (with "Neu laden") instead of leaving a half-drawn, unusable screen.
+      // #294: the map is one of these listeners; before, a throw there left a map-only page. The error also
+      // goes to hooks.onRenderError (main.ts sends it to the server log).
+      panelError = null;
       for (const fn of listeners) {
-        try { fn(g); } catch (e) { errors.push(e); console.error("frame: a panel failed to draw the state", e); }
+        try { fn(g); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("panel failed to draw", e); frame.hooks.onRenderError?.(e); }
       }
       if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; seqSince = Date.now(); }
       game = g;
-      try { drawAll(); } catch (e) { errors.push(e); console.error("frame: drawing the frame failed", e); }
+      try { drawAll(); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("frame failed to draw", e); frame.hooks.onRenderError?.(e); applyBusy(); }
       drawStall();
-      if (errors.length > 0) throw errors[0];
     },
     discardSelection() { selected = null; armed = false; rangeError = null; drawBar(); },
-    setBusy(b: boolean) { busy = b; if (game) drawBar(); else applyBusy(); },
+    setBusy(b: boolean) {
+      if (b && !busy) busySince = Date.now();
+      busy = b;
+      // The lock is released even if drawing the bar fails (#289).
+      try { if (game) drawBar(); } finally { applyBusy(); drawStall(); }
+    },
   });
   drawLayout();
   return frame;

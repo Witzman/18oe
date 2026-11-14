@@ -95,7 +95,7 @@ export function playerRows(g: Game): PlayerRow[] {
 //  - only bots to act and nothing happened for BOT_STALL_MS: warning (a bot that does not move);
 //  - another human to act: the plain "waiting for X" (always, so the viewer knows why nothing moves).
 export const BOT_STALL_MS = 30_000;
-export interface StallNotice { kind: "nobody" | "no_action" | "bot_stall" | "waiting"; tone: "error" | "warn" | "info"; text: string }
+export interface StallNotice { kind: "nobody" | "no_action" | "bot_stall" | "waiting" | "slow_answer" | "panel_error"; tone: "error" | "warn" | "info"; text: string }
 
 export function stallNotice(g: Game, waitedMs: number): StallNotice | null {
   if (g.state.meta.finished) return null;

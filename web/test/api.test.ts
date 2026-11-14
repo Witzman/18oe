@@ -101,14 +101,22 @@ test("errors carry the request and the elapsed time; a hanging GET is aborted as
   assert.equal(e2.status, 0);
   assert.equal(e2.code, "timeout");
   assert.equal(e2.request, "GET /games/1");
-
-  // A POST (an action) is never aborted.
-  const calls: { path: string; init?: RequestInit }[] = [];
-  await createApi(fake(200, {}, calls), { getTimeoutMs: 20 }).postAction(1, { type: "pass" }, 1);
-  assert.equal(calls[0]?.init?.signal, undefined);
 });
 
 test("a 200 without JSON (cut-off body, proxy page) is an error, not an empty state", async () => {
   const e = await createApi(fake(200, "<html>")).getGame(1).catch((x: unknown) => x) as ApiError;
   assert.equal(e.code, "bad_response");
+});
+
+test("an action whose answer never comes fails as a network error after the timeout (#289)", async () => {
+  const hang: FetchLike = (_path, init) => new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+  });
+  const api = createApi(hang, { postTimeoutMs: 30 });
+  await assert.rejects(api.postAction(1, { type: "pass" }, 3), (e: unknown) => e instanceof ApiError && e.status === 0 && e.message === "timeout");
+  // reads have their own, longer limit (GET_TIMEOUT_MS, #294)
+  let resolved = false;
+  const slow: FetchLike = () => new Promise((r) => setTimeout(() => { resolved = true; r(new Response(JSON.stringify({ seq: 1 }), { status: 200 })); }, 60));
+  assert.deepEqual(await createApi(slow, { postTimeoutMs: 30 }).version(1), { seq: 1 });
+  assert.ok(resolved);
 });

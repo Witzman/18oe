@@ -85,18 +85,22 @@ export function createPoller(opts: PollerOptions) {
         state = "loading";
         const game = await opts.api.getGame(opts.gameId);
         if (is("stopped")) return;
-        try {
-          opts.onGame(game);
-        } catch (e) {
-          // #294: a display error used to be reported as "no connection" while lastSeq already pointed at
-          // the state, so the next check found nothing new and the band vanished over a half-drawn page.
-          // Now it is named as what it is and the state is loaded (and drawn) again on the next check.
-          lastSeq = null;
-          failed = failureOf(e);
-          opts.onRenderError?.(e);
-          return schedule();
+        // A load that started before the player's own action may answer after it (#289): never go back
+        // to an older state than the one already shown.
+        if (lastSeq === null || game.seq >= lastSeq) {
+          try {
+            opts.onGame(game);
+          } catch (e) {
+            // #294: a display error used to be reported as "no connection" while lastSeq already pointed at
+            // the state, so the next check found nothing new and the band vanished over a half-drawn page.
+            // Now it is named as what it is and the state is loaded (and drawn) again on the next check.
+            lastSeq = null;
+            failed = failureOf(e);
+            opts.onRenderError?.(e);
+            return schedule();
+          }
+          lastSeq = game.seq;
         }
-        lastSeq = game.seq;
       }
       failed = null;
       opts.onOk?.();

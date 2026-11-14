@@ -1,7 +1,8 @@
 // #294: opening a game whose first state fails. Before, a state that could not be drawn (or a failed load)
-// left "Keine Verbindung, neuer Versuch" for a moment and then a page with only the map. Now the band names
-// the real reason (HTTP status, request, time, or the display error), keeps its retry button until a state
-// is drawn, and the context sheet says the state is still loading. Real page (main.ts bundle) against a stub
+// left "Keine Verbindung, neuer Versuch" for a moment and then a page with only the map. Now a failed load is
+// named in the band (HTTP status, request, time) with its retry button, the context sheet says the state is
+// still loading, a panel that cannot draw the state is named in the stall line with "Neu laden" while the
+// rest of the frame is drawn, and the error reaches the server log (POST /client-errors). Real page (main.ts bundle) against a stub
 // server; skipped without a headless browser.
 import assert from "node:assert/strict";
 import { copyFileSync, cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -83,21 +84,23 @@ const CHECKS = String.raw`(async () => {
   if (!/boom/.test(band().textContent)) fail("band does not carry the server message: " + band().textContent);
   if (!band().querySelector("button")) fail("no retry button");
   if (!q(".frame-loading")) fail("no loading line while no state is drawn");
-  // 2) A state that cannot be drawn: named as a display error, the band stays (no silent map-only page).
+  // 2) A state a panel cannot draw: the rest of the frame is drawn, the error is named in the stall line with
+  // "Neu laden" (#289), and it stays (the bug: the band vanished over a map-only page).
   await fetch("/__mode/broken");
   band().querySelector("button").click();
-  await until("display error band", () => !band().hidden && /Anzeigefehler/.test(band().textContent));
-  await sleep(2500); // the next regular check must not clear it (the bug: seq taken, band hidden)
-  if (band().hidden || !/Anzeigefehler/.test(band().textContent)) fail("display error band vanished: " + band().textContent);
-  if (!band().querySelector("button")) fail("no retry button on the display error");
+  const stall = () => q(".frame-stall");
+  await until("panel error line", () => band().hidden && stall() && !stall().hidden && stall().dataset.kind === "panel_error");
+  await sleep(2500);
+  if (stall().hidden || stall().dataset.kind !== "panel_error") fail("panel error line vanished");
+  if (!stall().querySelector("button")) fail("no reload button on the panel error");
   // 3) A good state: the frame is drawn and the band goes away.
   await fetch("/__mode/ok");
-  band().querySelector("button").click();
+  stall().querySelector("button").click();
   await until("frame drawn", () => band().hidden && q(".frame-roundbar").textContent.trim() !== "" && document.querySelectorAll(".frame-player").length >= 3);
   if (q(".frame-loading")) fail("loading line stays after the state is drawn");
 })()`;
 
-test("opening a game: a failing first state is named in the band with a retry, never a silent map-only page (#294)", { skip: browser ? false : "no headless browser installed" }, async () => {
+test("opening a game: a failing first state is named in the band with a retry, a failing panel is named, never a silent map-only page (#294)", { skip: browser ? false : "no headless browser installed" }, async () => {
   const dir = mkdtempSync(join(tmpdir(), "oe-open-game-test-"));
   try {
     await bundle(dir);

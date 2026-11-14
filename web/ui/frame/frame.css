@@ -65,6 +65,7 @@
 .frame-bar .msg:empty { display: none; }
 .frame-stall { flex: 0 1 28rem; margin: 0; font-weight: 700; overflow-wrap: anywhere; }
 .frame-stall[hidden] { display: none; }
+.frame-stall-reload { min-height: 44px; min-width: 44px; margin-left: 6px; }
 .frame-bar-tools { display: flex; gap: 6px; }
 .frame-toggle[aria-expanded="true"] { background: var(--ui-ink); color: var(--ui-panel); }
 
@@ -73,7 +74,10 @@
 .frame-drawer[hidden] { display: none; }
 .frame-drawer-sheet { pointer-events: auto; flex: 1; max-height: 45vh; overflow: auto; background: var(--ui-panel); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); box-shadow: var(--shape-shadow); padding: 10px 14px; }
 .frame-drawer-sheet h3 { margin-top: 0; }
-.frame-log ol { list-style: decimal; font-size: .9rem; }
+.frame-log { display: flex; flex-direction: column; overflow: hidden; }
+.frame-log-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+.frame-log ol { list-style: decimal; font-size: .9rem; margin: 0; padding-left: 2.2em; }
+.frame-log li { padding: 2px 0; }
 .frame-generic { display: flex; flex-direction: column; gap: 6px; }
 .frame-group summary { cursor: pointer; font-weight: 700; }
 .frame-entries { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
