@@ -51,6 +51,8 @@ export const NUMBER_RANGES = {
     hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24], hit: [32, 64],
     // Map strokes in hex side lengths (they scale with the map like printed lines), alpha 0..1 (#44).
     zoneLine: [0.01, 0.3], focusLine: [0.01, 0.3], targetAlpha: [0, 1],
+    // Soft coast (#100): Chaikin cut ratio (0 = hard hex outline) and noise amplitude in side lengths.
+    coastRound: [0, 0.5], coastNoise: [0, 0.3],
     // Cities, towns and tokens (#147), in side lengths: slot circle, token cylinder, town bar.
     slotRadius: [0.05, 0.35], tokenRadius: [0.04, 0.3], townLength: [0.1, 0.6], townWidth: [0.02, 0.2],
     // Hit radius and drag threshold in px (#259): mouse and touch. 22 px radius = Apple's 44 px minimum target.

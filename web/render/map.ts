@@ -25,7 +25,7 @@ import { Application, Container, Graphics, Matrix, RenderLayer, Text } from "pix
 import type { Game, GameState, HexChange } from "../types.ts";
 import { THEME_CHANGED } from "../ui/theme-switch.ts";
 import { between, centerOn, clampPan, fit, frame, panBy, zoomAt, zoomStage, Z1_FROM, Z2_FROM, type Viewport } from "./camera.ts";
-import { drawGrid, drawPlate, drawWalls, type Block } from "./layers/static.ts";
+import { drawCoast, drawGrid, drawPlate, drawWalls, type Block } from "./layers/static.ts";
 import { drawTileSurface } from "./layers/tiles.ts";
 import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
 import { drawNodes, drawTargetCity, inkOn, makeToken, type Ring } from "./layers/nodes.ts";
@@ -230,10 +230,17 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       }
     });
     blocks = [];
-    for (const plate of scene.plates) {
-      const b = drawPlate(scene, plate, theme);
-      (plate.level === 0 ? seaLevel : levelNodes.land[plate.level]!).addChild(b.node);
-      blocks.push(b);
+    if (theme.camera.pitch === 0) {
+      // Flat map (#100): one sea surface and one soft land surface instead of hex plates.
+      const coast = drawCoast(scene, theme);
+      seaLevel.addChild(coast.sea);
+      levelNodes.land[Math.min(1, scene.levels.length - 1)]!.addChild(coast.land);
+    } else {
+      for (const plate of scene.plates) {
+        const b = drawPlate(scene, plate, theme);
+        (plate.level === 0 ? seaLevel : levelNodes.land[plate.level]!).addChild(b.node);
+        blocks.push(b);
+      }
     }
     for (const b of drawGrid(scene, theme)) {
       levelNodes.grid[b.level]!.addChild(b.node);

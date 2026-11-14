@@ -36,7 +36,7 @@ const CHECKS = String.raw`(async () => {
   const box = c.getBoundingClientRect();
   const ev = (type, p, extra = {}) => c.dispatchEvent(new PointerEvent(type, { clientX: box.left + p.x, clientY: box.top + p.y, pointerId: 1, pointerType: "mouse", button: 0, bubbles: true, ...extra }));
   const st = m.stats();
-  if (!(st.blocks > 100 && st.visibleBlocks > 0 && st.buildMs > 0)) fail("stats " + JSON.stringify(st));
+  if (!(st.blocks > 50 && st.visibleBlocks > 0 && st.buildMs > 0)) fail("stats " + JSON.stringify(st));
   if (m.layer("tiles").children.length === 0) fail("no level containers");
 
   // Clicks at pitch 0: the centre of every visible hex reports that hex.
