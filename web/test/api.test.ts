@@ -82,3 +82,33 @@ test("resetPassword sends only the e-mail to POST /reset-password (#282)", async
   assert.equal(calls[0]?.init?.method, "POST");
   assert.deepEqual(JSON.parse(String(calls[0]?.init?.body)), { email: "a@b.de" });
 });
+
+// #294: the band names the request, its status and the elapsed time; a hanging GET ends as a timeout.
+test("errors carry the request and the elapsed time; a hanging GET is aborted as a timeout", async () => {
+  let t = 0;
+  const now = () => t;
+  const slow: FetchLike = async () => { t += 1234; return new Response("<html>Bad Gateway</html>", { status: 502, statusText: "Bad Gateway" }); };
+  const e1 = await createApi(slow, { now }).getGame(1).catch((e: unknown) => e) as ApiError;
+  assert.equal(e1.status, 502);
+  assert.equal(e1.request, "GET /games/1");
+  assert.equal(e1.elapsedMs, 1234);
+  assert.match(e1.message, /502 Bad Gateway/);
+
+  const hang: FetchLike = (_p, init) => new Promise((_r, reject) => {
+    init?.signal?.addEventListener("abort", () => reject(new DOMException("The operation was aborted.", "AbortError")));
+  });
+  const e2 = await createApi(hang, { getTimeoutMs: 20 }).getGame(1).catch((e: unknown) => e) as ApiError;
+  assert.equal(e2.status, 0);
+  assert.equal(e2.code, "timeout");
+  assert.equal(e2.request, "GET /games/1");
+
+  // A POST (an action) is never aborted.
+  const calls: { path: string; init?: RequestInit }[] = [];
+  await createApi(fake(200, {}, calls), { getTimeoutMs: 20 }).postAction(1, { type: "pass" }, 1);
+  assert.equal(calls[0]?.init?.signal, undefined);
+});
+
+test("a 200 without JSON (cut-off body, proxy page) is an error, not an empty state", async () => {
+  const e = await createApi(fake(200, "<html>")).getGame(1).catch((x: unknown) => x) as ApiError;
+  assert.equal(e.code, "bad_response");
+});

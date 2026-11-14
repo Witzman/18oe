@@ -106,6 +106,10 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
   }
   const stallTimer = setInterval(() => { if (root.isConnected) drawStall(); }, 5000);
   disposers.push(() => clearInterval(stallTimer));
+  // Until the first state is drawn the context sheet says so (#294): never a bare map without a word. A
+  // failed load shows in the band above (reason and "Jetzt"), this line stays until a state arrives.
+  const loadingEl = h("p", { class: "muted frame-loading", role: "status" }, txt("frame.loading").de);
+  contextEl.append(loadingEl);
   const body = h("div", { class: "frame-body" }, contextEl, mainEl, outlinerEl);
   const root = h("div", { class: "frame" }, roundEl, band.el, playersEl, body, drawerEl, barEl, versionButton());
 
@@ -166,7 +170,7 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
 
   // ---- context sheet ---------------------------------------------------------------------------
   function drawContext() {
-    if (!game) return put(contextEl);
+    if (!game) { contextEl.replaceChildren(loadingEl); return; }
     const p = game.state.prompt;
     const entry = p.step ? txt(`step.${p.step}`) : null;
     const rule = entry && entry.regel !== "—" ? entry.regel : null;
@@ -343,11 +347,19 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
     dispose: () => { disposers.splice(0).forEach((f) => f()); },
     subscribe: (fn: (g: Game) => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },
     render(g: Game) {
-      for (const fn of listeners) fn(g);
+      // #294: one panel (or the map) that throws must not keep the rest of the frame from drawing. Before,
+      // the first throwing listener stopped the loop before `game` was set: the page kept only the map and
+      // the poller called it "no connection". Every listener and the frame itself now run; the first error
+      // is rethrown afterwards so the poller shows it in the band (with the retry button).
+      const errors: unknown[] = [];
+      for (const fn of listeners) {
+        try { fn(g); } catch (e) { errors.push(e); console.error("frame: a panel failed to draw the state", e); }
+      }
       if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; seqSince = Date.now(); }
       game = g;
-      drawAll();
+      try { drawAll(); } catch (e) { errors.push(e); console.error("frame: drawing the frame failed", e); }
       drawStall();
+      if (errors.length > 0) throw errors[0];
     },
     discardSelection() { selected = null; armed = false; rangeError = null; drawBar(); },
     setBusy(b: boolean) { busy = b; if (game) drawBar(); else applyBusy(); },

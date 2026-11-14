@@ -72,10 +72,12 @@ async function route() {
         onGame: (g) => { frame.render(g); applyAttention(g.state.prompt.viewer_to_act, gameId); },
         onUnauthorized: toLogin,
         onOk: () => frame.band.ok(),
-        onRetryIn: (ms) => frame.band.failed(ms),
+        onRetryIn: (ms, why) => frame.band.failed(ms, why),
+        // #294: a display error is a client bug; the band names it, the console has the stack, the server log a line.
+        onRenderError: (e) => { console.error("game state could not be drawn", e); void api.clientError(gameId, e).catch(() => {}); },
         onError: (e) => {
           if (e.status === 404) { self.stop(); mount(root, notFoundPage()); }
-          else if (e.status !== 0) frame.message.say(e.message, "error");
+          else if (e.status !== 0 && e.status < 500) frame.message.say(e.message, "error");
         },
         isVisible: () => !document.hidden,
       });

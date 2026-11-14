@@ -46,6 +46,7 @@ RSpec.configure do |config|
     Sinatra::Application.settings.register_limit.reset!
     Sinatra::Application.settings.login_limit.reset!
     Sinatra::Application.settings.lookup_limit.reset!
+    Sinatra::Application.settings.client_error_limit.reset!
   end
   config.include AppHelper
 end
