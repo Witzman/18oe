@@ -186,4 +186,22 @@ RSpec.describe "registration with invite code and login (#208)" do
       expect(last_response.status).to eq(401)
     end
   end
+
+  describe "two accounts, then login (#286)" do
+    it "logs each in by name and by e-mail in case and whitespace variants, in one browser" do
+      register
+      post "/logout", "", host
+      bob = register(name: "Bob", email: "bob@example.test", password: "another-secret")
+      expect(last_response.status).to eq(201)
+      post "/logout", "", host
+      [["anna lee", "correct-horse"], ["  Anna   LEE ", "correct-horse"], ["anna@example.test", "correct-horse"],
+       [" ANNA@EXAMPLE.TEST ", "correct-horse"], ["bob", "another-secret"], ["Bob@Example.test", "another-secret"]].each do |login, pw|
+        post_json("/login", { login: login, password: pw })
+        expect(last_response.status).to eq(200), "#{login.inspect} should log in"
+      end
+      expect(bob["name"]).to eq("Bob")
+      post_json("/login", { login: "Bob", password: "correct-horse" })
+      expect(last_response.status).to eq(401)
+    end
+  end
 end

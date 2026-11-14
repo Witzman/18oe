@@ -7,6 +7,9 @@ import { h } from "./dom.ts";
 import { txt } from "./text.ts";
 import { versionFooter } from "./version.ts";
 
+// How long the success message stays before the lobby opens.
+export const SUCCESS_MS = 900;
+
 export type AccessMode = "login" | "register";
 
 export const MIN_PASSWORD = 8; // wie lib/oe/accounts.rb (PASSWORD_RANGE)
@@ -57,6 +60,8 @@ export function titleStage(): HTMLElement {
 export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => void): HTMLElement {
   const reg = mode === "register";
   const error = h("p", { class: "error", role: "alert" });
+  // Status line (#286): shows which step runs or succeeded, so a failure is never silent.
+  const status = h("p", { class: "status", role: "status" });
   const input = (name: string, type: string, auto: string) => h("input", { name, type, autocomplete: auto });
   const login = input("login", "text", "username");
   const name = input("name", "text", "username");
@@ -68,20 +73,33 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
   const onsubmit = async (ev: Event) => {
     ev.preventDefault();
     error.textContent = "";
+    status.textContent = "";
     const bad = validate(mode, {
       login: login.value, name: name.value, email: email.value, password: password.value, code: code.value,
     });
     if (bad) { error.textContent = txt(bad).de; return; }
     submit.disabled = true;
+    status.textContent = txt(reg ? "access.busy_register" : "access.busy_login").de;
+    let me: Account;
     try {
-      const me = reg
+      me = reg
         ? await api.register({ name: name.value.trim(), email: email.value.trim(), password: password.value, code: code.value.trim() })
         : await api.login(login.value.trim(), password.value);
-      done(me);
+      if (!me || typeof me.id !== "string" || typeof me.name !== "string") throw new Error("unexpected response: " + JSON.stringify(me));
     } catch (e) {
-      error.textContent = errorText(e);
+      status.textContent = "";
+      error.textContent = e instanceof Error && e.message.startsWith("unexpected response") ? txt("access.err_unexpected").de : errorText(e);
       submit.disabled = false;
+      return;
     }
+    status.textContent = txt(reg ? "access.ok_register" : "access.ok_login").de.replace("{name}", me.name);
+    setTimeout(() => {
+      try { done(me); } catch (e) {
+        status.textContent = "";
+        error.textContent = errorText(e);
+        submit.disabled = false;
+      }
+    }, SUCCESS_MS);
   };
 
   const fields = reg
@@ -96,7 +114,7 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
     h("header", { class: "title" }, h("h1", {}, "18OE"), h("p", { class: "game-title" }, txt("access.game_title").de)),
     h("div", { class: "panel" },
       h("h2", {}, txt(reg ? "access.title_register" : "access.title_login").de),
-      h("form", { onsubmit, novalidate: true }, ...fields, h("div", { class: "row" }, submit), error),
+      h("form", { onsubmit, novalidate: true }, ...fields, h("div", { class: "row" }, submit), status, error),
       h("p", {}, h("a", { href: reg ? "#/login" : "#/register" }, txt(reg ? "access.to_login" : "access.to_register").de))),
     versionFooter());
 }
