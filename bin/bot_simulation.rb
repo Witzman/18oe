@@ -76,6 +76,13 @@ until queue.empty? && running.empty?
   puts format("%dp seed %-3d %-8s %5d actions turn %-3s phase %-3s winner %s(%s) %5.1fs %s",
               r["players"], r["seed"], r["status"], r["actions"], r["turn"], r["phase"], w&.first,
               r["kinds"][w&.first], r["seconds"], r["detail"])
+  if (op = r["operating"]) && !op.empty?
+    bm = r["bot_move"] || {}
+    puts format("    operating: tiles %d, tokens %d, runs %d, revenue %d, payouts %d; above par %d, below par %d, max price %d; " \
+                "bot move s: mean %.3f p99 %.3f max %.3f",
+                op["tiles"].to_i, op["tokens"].to_i, op["runs"].to_i, op["revenue"].to_i, op["payouts"].to_i,
+                op["above_par"].to_i, op["below_par"].to_i, op["max_price"].to_i, bm["mean"].to_f, bm["p99"].to_f, bm["max"].to_f)
+  end
   $stdout.flush
 end
 

@@ -6,6 +6,7 @@ require_relative "bot/pick"
 require_relative "bot/auction"
 require_relative "bot/stock"
 require_relative "bot/track"
+require_relative "bot/token"
 
 module Oe
   # Bot v1 (#37): rule-based heuristics with seeded randomness. Local only —
@@ -19,8 +20,8 @@ module Oe
   # over — and picks one. It can only return legal actions.
   #
   # Heuristics per action family, one small class each (Bot::Auction,
-  # Bot::Stock, Bot::Track). Everything else — dividends, train purchases,
-  # routes, tokens, merges, discards — falls back to the rules of
+  # Bot::Stock, Bot::Track, Bot::Token). Everything else — dividends, train purchases,
+  # routes, merges, discards — falls back to the rules of
   # Oe::StrategyPlayer (#32), which already carries whole games to the end.
   #
   # Keep one Bot per game: StrategyPlayer remembers how often a corporation has
@@ -45,7 +46,7 @@ module Oe
     end
 
     # Families handled here. Anything not listed goes to the fallback.
-    SPECIAL = %w[Bid Par BuyShares SellShares LayTile].freeze
+    SPECIAL = %w[Bid Par BuyShares SellShares LayTile PlaceToken].freeze
     # If one of these is on offer, the fallback decides (same order of
     # precedence as StrategyPlayer: train purchase and dividend come first).
     FALLBACK_FIRST = %w[BuyTrain Dividend RunRoutes].freeze
@@ -64,6 +65,7 @@ module Oe
       @auction = Auction.new(game, @rng)
       @stock = Stock.new(game, @rng, @fallback)
       @track = Track.new(game, @rng)
+      @token = Token.new(game, @rng, @track)
     end
 
     # Replace the random stream (see Rng); the same seed gives the same choice for the same state.
@@ -100,6 +102,7 @@ module Oe
       return @auction.choose(by_class) if by_class["Bid"]
       return @stock.choose(by_class) if by_class.key?("Par") || by_class.key?("BuyShares") || by_class.key?("SellShares")
       return @track.choose(by_class) if by_class["LayTile"]
+      return @token.choose(by_class) if by_class["PlaceToken"]
 
       nil
     end
