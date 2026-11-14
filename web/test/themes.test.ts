@@ -65,11 +65,12 @@ test("a theme with a missing, an unknown or a malformed token is rejected", () =
   assert.ok(themeProblems(null).length > 0);
 });
 
-// Owner decisions (#11): half-3D camera, full-hex tiles, track neutral (company colour only on
+// Owner decisions (#11, camera revoked in #299): top view by default (pitch 0, yaw 0), full-hex tiles, track neutral (company colour only on
 // tokens, trains, runs and seals).
 for (const t of themes) {
-  test(`${t.id}: half-3D camera, neutral track and full-hex tiles by default`, () => {
-    assert.ok(t.camera.pitch > 0 && t.camera.pitch <= 65);
+  test(`${t.id}: top-view camera, neutral track and full-hex tiles by default`, () => {
+    assert.equal(t.camera.pitch, 0);
+    assert.equal(t.camera.yaw, 0);
     assert.equal(t.track.colorMode, "neutral");
     assert.equal(t.shape.tileStyle, "full");
   });
@@ -201,7 +202,7 @@ test("the choice goes onto the root element and the renderer reads it back from 
 
 test("the CSS carries camera, track, motion and panel metrics with their units", () => {
   const vars = Object.fromEntries(themeVars(themeById("brett")));
-  assert.equal(vars["--camera-pitch"], "38");
+  assert.equal(vars["--camera-pitch"], "0");
   assert.equal(vars["--camera-light-azimuth"], "315");
   assert.equal(vars["--track-color-mode"], "neutral");
   assert.equal(vars["--motion-enabled"], "1");

@@ -281,3 +281,21 @@ test("both themes give a valid grid", () => {
     assert.ok(g.maxZ > 0);
   }
 });
+
+test("theme default camera is the top view (#299): height has no screen effect, no walls, picking hits the hex centre", () => {
+  for (const th of themes) {
+    const g = grid((id) => hexHeight(hexById.get(id)!, th.camera, true));
+    const v = view(th.camera.pitch, th.camera.yaw, 17);
+    assert.equal(v.pitch, 0);
+    assert.equal(v.yaw, 0);
+    for (const h of g.hexes) {
+      const s0 = project(v, h, 0);
+      const sz = project(v, h, h.z);
+      assert.ok(Math.abs(s0.x - sz.x) < 1e-9 && Math.abs(s0.y - sz.y) < 1e-9, `${th.id} ${h.id}: z moves the point`);
+      assert.deepEqual(walls(g, v, h), [], `${th.id} ${h.id}: wall at pitch 0`);
+      assert.equal(pick(g, v, s0)?.id, h.id, `${th.id} ${h.id}: pick`);
+      const back = unproject(v, s0, 0);
+      assert.ok(Math.hypot(back.x - h.x, back.y - h.y) < 1e-9);
+    }
+  }
+});
