@@ -13,6 +13,7 @@ import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
 import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
+import { OrBandView, orBand } from "./or-band.ts";
 import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
 import { createViews } from "./views.ts";
 import { versionButton } from "../version.ts";
@@ -171,6 +172,7 @@ export function createGameFrame(retryNow: () => void = () => {}): GameFrame {
     const rule = entry && entry.regel !== "—" ? entry.regel : null;
     put(contextEl,
       v("h2", {}, roundBar(game, theme()).round),
+      (() => { const b = orBand(game, theme()); return b ? OrBandView(b, theme()) : null; })(),
       v("p", { class: "frame-step" }, v("strong", {}, `${txt("frame.step").de}: `), stepLabel(p.step)),
       rule ? v("p", { class: "muted", title: entry?.en }, fillText("frame.rule", { ref: rule })) : null,
       p.types.length > 0 ? v("div", {}, v("strong", {}, txt("frame.allowed").de), v("ul", {}, ...p.types.map((ty) => v("li", { title: txt(`action.${ty}`).en }, txt(`action.${ty}`).de)))) : null);
