@@ -1,0 +1,241 @@
+{
+  "games": {
+    "strategy-4p-1": {
+      "file": "strategy-4p-1.json",
+      "players": 4,
+      "seed": 1,
+      "actions": 2976
+    },
+    "random-4p-1": {
+      "file": "random-4p-1.json",
+      "players": 4,
+      "seed": 1,
+      "actions": 1959
+    }
+  },
+  "entries": [
+    {
+      "name": "auction-start",
+      "surface": "§6/§7 Auktion (Waterfall), Aufbau §3",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "note": "Erster Zustand: nichts geboten.",
+      "position": 0,
+      "expect": {
+        "round": "Auction",
+        "step": "WaterfallAuction"
+      }
+    },
+    {
+      "name": "auction-running",
+      "surface": "§6/§7 Auktion: Gebote liegen",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "note": "Mitten in der Auktion.",
+      "position": 200,
+      "expect": {
+        "round": "Auction",
+        "step": "WaterfallAuction"
+      }
+    },
+    {
+      "name": "concession-first",
+      "surface": "§8.1 Concession-Runde",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2356,
+      "expect": {
+        "round": "Concession",
+        "step": "Concession"
+      }
+    },
+    {
+      "name": "concession-home-token",
+      "surface": "§8.1 Concession-Runde, Heimat-Token",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2357,
+      "expect": {
+        "round": "Concession",
+        "step": "HomeToken"
+      }
+    },
+    {
+      "name": "stock-first",
+      "surface": "§8.2 erste Aktienrunde (kaufen, parren, floaten)",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2373,
+      "expect": {
+        "round": "Stock",
+        "step": "BuySellParShares"
+      }
+    },
+    {
+      "name": "stock-home-token",
+      "surface": "§8.2 Aktienrunde, Heimat-Token nach Float",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2376,
+      "expect": {
+        "round": "Stock",
+        "step": "HomeToken"
+      }
+    },
+    {
+      "name": "operating-track",
+      "surface": "§11.1 erste Betriebsrunde, Gleisbau",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2434,
+      "expect": {
+        "round": "Operating",
+        "step": "Track"
+      }
+    },
+    {
+      "name": "operating-buy-train",
+      "surface": "§11.6 Zugkauf (Reservierung, Pflicht)",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2436,
+      "expect": {
+        "round": "Operating",
+        "step": "BuyTrain"
+      }
+    },
+    {
+      "name": "operating-route",
+      "surface": "§11.3 Routen (2+2)",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2485,
+      "expect": {
+        "round": "Operating",
+        "step": "Route"
+      }
+    },
+    {
+      "name": "operating-dividend",
+      "surface": "§11.4 Dividende",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2500,
+      "expect": {
+        "round": "Operating",
+        "step": "Dividend"
+      }
+    },
+    {
+      "name": "operating-home-token",
+      "surface": "§11.2 Heimat-Token einer Regional/Minor im Betrieb",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2515,
+      "expect": {
+        "round": "Operating",
+        "step": "HomeToken"
+      }
+    },
+    {
+      "name": "operating-token",
+      "surface": "§11.2 Token setzen",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2570,
+      "expect": {
+        "round": "Operating",
+        "step": "Token"
+      }
+    },
+    {
+      "name": "operating-issue-shares",
+      "surface": "§11.7 Issue-Step",
+      "slice": "S1",
+      "game": "strategy-4p-1",
+      "position": 2976,
+      "expect": {
+        "round": "Operating",
+        "step": "IssueShares"
+      }
+    },
+    {
+      "name": "stock-par",
+      "surface": "§8.1 Regional parren (Kursstufe waehlen)",
+      "slice": "S1",
+      "game": "random-4p-1",
+      "position": 638,
+      "expect": {
+        "round": "Concession",
+        "step": "Concession"
+      }
+    },
+    {
+      "name": "stock-sell",
+      "surface": "§10.1 Anteile verkaufen",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1696,
+      "expect": {
+        "round": "Stock",
+        "step": "BuySellParShares"
+      }
+    },
+    {
+      "name": "stock-convert",
+      "surface": "§9.3 Regional zum Major konvertieren",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1678,
+      "expect": {
+        "round": "Stock",
+        "step": "BuySellParShares"
+      }
+    },
+    {
+      "name": "merge-minor",
+      "surface": "§10.5 Minor-Merge in den eigenen Major (Angebot)",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1957,
+      "expect": {
+        "round": "Stock",
+        "step": "MergeMinor"
+      }
+    },
+    {
+      "name": "merge-token",
+      "surface": "§10.5 Minor-Merge, Token-Wahl",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1958,
+      "expect": {
+        "round": "Stock",
+        "step": "MergeToken"
+      }
+    },
+    {
+      "name": "merge-discard-train",
+      "surface": "§10.5/§11.6 Minor-Merge, Zug abwerfen (Zuglimit)",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1959,
+      "expect": {
+        "round": "Stock",
+        "step": "MergeDiscardTrain"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "surface": "§13 Spielende durch gesprengte Bank",
+      "slice": "S1",
+      "reason": "Ganzpartie (etwa 7 min, Regel 22); folgt als eigener Schnitt des Katalogs."
+    },
+    {
+      "surface": "§8.4 Reserved Shares, §10.4 Spielerhandel, geparrtes Regional ohne Käufer",
+      "slice": "S1",
+      "reason": "In Strategie- und Zufallspartien nicht vorgekommen; von Hand zu spielen, Eingabe offen."
+    }
+  ]
+}
