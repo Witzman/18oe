@@ -5,6 +5,12 @@
       "players": 4,
       "seed": 1,
       "actions": 2976
+    },
+    "random-4p-1": {
+      "file": "random-4p-1.json",
+      "players": 4,
+      "seed": 1,
+      "actions": 1959
     }
   },
   "entries": [
@@ -151,6 +157,72 @@
       "expect": {
         "round": "Operating",
         "step": "IssueShares"
+      }
+    },
+    {
+      "name": "stock-par",
+      "surface": "§8.1 Regional parren (Kursstufe waehlen)",
+      "slice": "S1",
+      "game": "random-4p-1",
+      "position": 638,
+      "expect": {
+        "round": "Concession",
+        "step": "Concession"
+      }
+    },
+    {
+      "name": "stock-sell",
+      "surface": "§10.1 Anteile verkaufen",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1696,
+      "expect": {
+        "round": "Stock",
+        "step": "BuySellParShares"
+      }
+    },
+    {
+      "name": "stock-convert",
+      "surface": "§9.3 Regional zum Major konvertieren",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1678,
+      "expect": {
+        "round": "Stock",
+        "step": "BuySellParShares"
+      }
+    },
+    {
+      "name": "merge-minor",
+      "surface": "§10.5 Minor-Merge in den eigenen Major (Angebot)",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1957,
+      "expect": {
+        "round": "Stock",
+        "step": "MergeMinor"
+      }
+    },
+    {
+      "name": "merge-token",
+      "surface": "§10.5 Minor-Merge, Token-Wahl",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1958,
+      "expect": {
+        "round": "Stock",
+        "step": "MergeToken"
+      }
+    },
+    {
+      "name": "merge-discard-train",
+      "surface": "§10.5/§11.6 Minor-Merge, Zug abwerfen (Zuglimit)",
+      "slice": "S2",
+      "game": "random-4p-1",
+      "position": 1959,
+      "expect": {
+        "round": "Stock",
+        "step": "MergeDiscardTrain"
       }
     }
   ],

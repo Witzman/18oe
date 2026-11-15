@@ -15,12 +15,15 @@ module Oe
   # Finder kinds of an entry:
   #   at:    N                                 a fixed position
   #   first: { round:, step: }                 first state in that round class / active step
+  #   before: { type: }                        the state just before the first logged action of that
+  #                                            type (that action is then among the legal ones)
   module FixtureBuilder
     # games: name => { players:, seed:, player: :strategy|:random, max_actions: }
     # entries: name, surface (rulebook §), slice, game, finder (at/first), note
     DEFINITION = {
       'games' => {
         'strategy-4p-1' => { 'players' => 4, 'seed' => 1, 'player' => 'strategy', 'max_actions' => 3000 },
+        'random-4p-1' => { 'players' => 4, 'seed' => 1, 'player' => 'random', 'max_actions' => 2000 },
       },
       'entries' => [
         { 'name' => 'auction-start', 'surface' => '§6/§7 Auktion (Waterfall), Aufbau §3', 'slice' => 'S1',
@@ -49,6 +52,18 @@ module Oe
           'game' => 'strategy-4p-1', 'first' => { 'round' => 'Operating', 'step' => 'Token' } },
         { 'name' => 'operating-issue-shares', 'surface' => '§11.7 Issue-Step', 'slice' => 'S1',
           'game' => 'strategy-4p-1', 'first' => { 'round' => 'Operating', 'step' => 'IssueShares' } },
+        { 'name' => 'stock-par', 'surface' => '§8.1 Regional parren (Kursstufe waehlen)', 'slice' => 'S1',
+          'game' => 'random-4p-1', 'before' => { 'type' => 'par' } },
+        { 'name' => 'stock-sell', 'surface' => '§10.1 Anteile verkaufen', 'slice' => 'S2',
+          'game' => 'random-4p-1', 'before' => { 'type' => 'sell_shares' } },
+        { 'name' => 'stock-convert', 'surface' => '§9.3 Regional zum Major konvertieren', 'slice' => 'S2',
+          'game' => 'random-4p-1', 'before' => { 'type' => 'convert' } },
+        { 'name' => 'merge-minor', 'surface' => '§10.5 Minor-Merge in den eigenen Major (Angebot)', 'slice' => 'S2',
+          'game' => 'random-4p-1', 'first' => { 'round' => 'Stock', 'step' => 'MergeMinor' } },
+        { 'name' => 'merge-token', 'surface' => '§10.5 Minor-Merge, Token-Wahl', 'slice' => 'S2',
+          'game' => 'random-4p-1', 'first' => { 'round' => 'Stock', 'step' => 'MergeToken' } },
+        { 'name' => 'merge-discard-train', 'surface' => '§10.5/§11.6 Minor-Merge, Zug abwerfen (Zuglimit)', 'slice' => 'S2',
+          'game' => 'random-4p-1', 'first' => { 'round' => 'Stock', 'step' => 'MergeDiscardTrain' } },
       ],
       # Surfaces of the slice that no entry covers yet, with the reason (#117 verification).
       'gaps' => [
@@ -94,10 +109,14 @@ module Oe
     def scan(_name, spec, log, entries, positions)
       pending = entries.dup
       game = Engine::Game::G18OE::Game.new(("A".."Z").first(spec['players']), id: spec['seed'], seed: spec['seed'])
+      next_type = log.first && log.first['type']
       step_state = lambda do |count|
         state = FixtureCatalog.describe(game)
         pending.dup.each do |e|
-          hit = e.key?('at') ? e['at'] == count : e['first'].all? { |key, want| state[key] == want }
+          hit = if e.key?('at') then e['at'] == count
+                elsif e.key?('first') then e['first'].all? { |key, want| state[key] == want }
+                else next_type == e['before']['type']
+                end
           next unless hit
 
           positions[e['game']][e['name']] = { position: count, expect: e['first'] || state.slice('round', 'step') }
@@ -109,6 +128,7 @@ module Oe
         game.process_action(action)
         raise "replay failed at #{i + 1}: #{game.exception.message}" if game.exception
 
+        next_type = log[i + 1] && log[i + 1]['type']
         step_state.call(i + 1)
         break if pending.empty?
       end
