@@ -18,8 +18,22 @@ const MIME = { ".html": "text/html", ".css": "text/css", ".js": "text/javascript
 if (!OUT) { console.error("usage: node test/ci-shots.mjs <outDir> [scenes]"); process.exit(2); }
 mkdirSync(OUT, { recursive: true });
 
+// GET /map as the frame's board view needs it: geometry + zones + printed track + tile catalog (fixtures of #144).
+function fixtureMap() {
+  const read = (f) => JSON.parse(readFileSync(join(web, "test", "fixtures", f), "utf8"));
+  const geometry = read("map-geometry.json");
+  const zones = new Map(read("map-zones.json").hexes.map((h) => [h.id, h]));
+  const tracks = read("map-tiles.json");
+  const printed = new Map(tracks.hexes.map((h) => [h.id, h]));
+  const parts = ({ paths, cities, towns, double_towns, offboards, junction } = {}) => ({ paths, cities, towns, double_towns, offboards, junction });
+  geometry.hexes = geometry.hexes.map((h) => ({ ...h, ...zones.get(h.id), ...parts(printed.get(h.id)) }));
+  geometry.tiles = tracks.tiles;
+  return JSON.stringify(geometry);
+}
+const MAP = fixtureMap();
+
 function startServer() {
-  const st = { game: null, report: null };
+  const st = { game: null, report: null, missing: [] };
   const server = createServer((req, res) => {
     const p = new URL(req.url, "http://x").pathname;
     const json = (o, code = 200) => { res.writeHead(code, { "Content-Type": "application/json" }); res.end(JSON.stringify(o)); };
@@ -27,10 +41,11 @@ function startServer() {
     if (p === "/games/1") return json(st.game);
     if (p === "/games/1/version") return json({ seq: st.game.seq, status: "active" });
     if (p === "/games/1/actions") return json(st.game);
+    if (p === "/map") { res.writeHead(200, { "Content-Type": "application/json" }); res.end(MAP); return; }
     if (p === "/__report") { let b = ""; req.on("data", (c) => { b += c; }); req.on("end", () => { st.report = b; json({}); }); return; }
     const f = join(dist, p === "/" ? "index.html" : p);
     if (existsSync(f) && f.startsWith(dist)) { res.writeHead(200, { "Content-Type": MIME[extname(f)] ?? "application/octet-stream" }); res.end(readFileSync(f)); }
-    else { res.writeHead(404); res.end(); }
+    else { st.missing.push(p); res.writeHead(404); res.end(); }
   });
   return new Promise((ok) => server.listen(0, "127.0.0.1", () => ok({ server, st, port: server.address().port })));
 }
@@ -92,6 +107,7 @@ async function worker() {
     const base = ["--device", "ipad-10.2", "--orientation", orient, "--engine", "chromium", "--wait-for", "body", "--delay", "2500"];
     const png = join(OUT, `${name}-${orient}-${mode}.png`);
     const row = { name, orient, mode };
+    st.missing = [];
     st.game = JSON.parse(readFileSync(join(web, `test/fixtures/games/${name}.json`), "utf8"));
     if (mode === "open") {
       const a = await run([url, png, ...base], TIMEOUT);
@@ -105,6 +121,7 @@ async function worker() {
     if (b.code !== 0 && !b.timedOut) row.measure.stderr = b.err.slice(-300);
     if (st.report) { try { Object.assign(row.measure, JSON.parse(st.report)); } catch (e) { row.measure.reportParse = String(e); } } else row.measure.noReport = true;
     if (mode === "open") rmSync(mpng, { force: true });
+    row.missing404 = [...new Set(st.missing)];
     rows.push(row);
     console.log(JSON.stringify(row).slice(0, 600));
     writeFileSync(join(OUT, "report.json"), JSON.stringify(rows, null, 1));
