@@ -1,5 +1,5 @@
 // iPad-10.2 acceptance shots in CI (#304). Not a test: run by .github/workflows/shots.yml after `npm run build`.
-// Per scene (= game fixture), orientation and panel mode: one plain screenshot first (wait for body only), then a
+// Per scene (= game fixture), orientation and panel mode: one plain screenshot first (wait for the loaded panel step, #333), then a
 // separate measurement run with its own timeout. Every browser run has a hard timeout; a failing run is noted in
 // report.json and the loop goes on. Usage: node test/ci-shots.mjs <outDir> [scene,scene,...]
 // Env: OE_BROWSER (headless Chrome wrapper), SHOT_TIMEOUT_MS (default 60000), ORIENTS, MODES, WORKERS (default 3).
@@ -104,7 +104,7 @@ async function worker() {
   const url = `http://127.0.0.1:${port}/#/game/1`;
   for (let j; (j = jobs.shift());) {
     const { name, orient, mode } = j;
-    const base = ["--device", "ipad-10.2", "--orientation", orient, "--engine", "chromium", "--wait-for", "body", "--delay", "2500"];
+    const base = ["--device", "ipad-10.2", "--orientation", orient, "--engine", "chromium", "--wait-for", ".frame-panel-step:not(:empty)", "--delay", "2500"];
     const png = join(OUT, `${name}-${orient}-${mode}.png`);
     const row = { name, orient, mode };
     st.missing = [];
