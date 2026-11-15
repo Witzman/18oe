@@ -198,7 +198,7 @@ RSpec.describe Oe::Bot do
       best = Act.new(corp, city(3, 1, 20, "METRO"))
       worse = Act.new(corp, city(4, 3, 10))
       allow_any_instance_of(described_class).to receive(:price).and_return(0)
-      picks = Array.new(200) { |i| described_class.new(game, Random.new(i), nil).choose({ "PlaceToken" => [worse, best], "Pass" => [Pass.new(corp)] }) }
+      picks = Array.new(200) { |i| described_class.new(game, Random.new(i), double("track", reserve: 0)).choose({ "PlaceToken" => [worse, best], "Pass" => [Pass.new(corp)] }) }
       expect(picks.count(best)).to be > picks.count(worse)
     end
   end
