@@ -66,7 +66,7 @@ module Oe
     def self.turn_for(store, row)
       return row["turn"] if row["turn"]
 
-      turn = turn_of(load(store, row["id"]).game)
+      turn = with(store, row["id"]) { |session| turn_of(session.game) }
       store.set_turn(row["id"], turn)
       turn
     end
@@ -90,6 +90,14 @@ module Oe
         store.sessions[id] = { seq: seq, game: game }
       end
       new(store, row, game, seq)
+    end
+
+    # Loads the session and yields it while holding the game lock (#339): the
+    # cache hands one game object to every loader, so whoever reads it (views,
+    # Oe::LegalActions, bots) must keep appends of other threads out meanwhile.
+    # Re-entrant: an append inside the block is fine.
+    def self.with(store, id)
+      store.game_lock(id).synchronize { yield load(store, id) }
     end
 
     def self.replay(store, row, id)
@@ -135,25 +143,29 @@ module Oe
       type = action["type"]
       raise Rejected, "#{type} cannot be appended" if FORBIDDEN.include?(type.to_s)
 
-      @store.transaction do
-        db_seq = @store.last_seq(@id)
-        raise Conflict, "expected seq #{expected_seq}, log is at #{db_seq}" if expected_seq && expected_seq != db_seq
+      # The game lock (#339) keeps readers of the shared cached game (GameSession.with)
+      # out while process_action changes it; taken before the store mutex.
+      @store.game_lock(@id).synchronize do
+        @store.transaction do
+          db_seq = @store.last_seq(@id)
+          raise Conflict, "expected seq #{expected_seq}, log is at #{db_seq}" if expected_seq && expected_seq != db_seq
 
-        # Our game object must match the log; otherwise the action may refer to
-        # a stale state (objects of an old game instance) — reload.
-        refresh!(db_seq)
-        raise Rejected, "game #{@id} is finished" if @game.finished
+          # Our game object must match the log; otherwise the action may refer to
+          # a stale state (objects of an old game instance) — reload.
+          refresh!(db_seq)
+          raise Rejected, "game #{@id} is finished" if @game.finished
 
-        yield @game if block_given?
+          yield @game if block_given?
 
-        apply(action, db_seq)
-        payload = @game.raw_actions.last
-        @store.insert_action(game_id: @id, seq: db_seq + 1, actor: actor.to_s, payload: payload)
-        @store.set_status(@id, "finished") if @game.finished
-        @store.set_turn(@id, self.class.turn_of(@game))
-        @seq = db_seq + 1
-        @store.sessions[@id] = { seq: @seq, game: @game }
-        @seq
+          apply(action, db_seq)
+          payload = @game.raw_actions.last
+          @store.insert_action(game_id: @id, seq: db_seq + 1, actor: actor.to_s, payload: payload)
+          @store.set_status(@id, "finished") if @game.finished
+          @store.set_turn(@id, self.class.turn_of(@game))
+          @seq = db_seq + 1
+          @store.sessions[@id] = { seq: @seq, game: @game }
+          @seq
+        end
       end
     rescue Conflict, Forbidden
       raise # raised before the game was touched: the cache is still good

@@ -61,6 +61,17 @@ module Oe
         halt api_error(404, "not_found", "no such game")
       end
 
+      # Yields the session under the game lock (#339) for everything that reads
+      # session.game: a bot thread may append to the same cached game meanwhile.
+      def with_session(id, &block)
+        game_id = Integer(id, exception: false) or halt api_error(404, "not_found", "no such game")
+        begin
+          GameSession.with(store, game_id, &block)
+        rescue GameSession::NotFound
+          halt api_error(404, "not_found", "no such game")
+        end
+      end
+
       def envelope(session)
         viewer = viewer_player_id(session.seats)
         {
@@ -207,11 +218,11 @@ module Oe
         seed = data["seed"].is_a?(Integer) ? data["seed"] : SecureRandom.random_number(2**31)
         session = GameSession.create(store, seats: seats, seed: seed)
         kick_bots(session.id)
-        json 201, envelope(GameSession.load(store, session.id))
+        json 201, GameSession.with(store, session.id) { |s| envelope(s) }
       end
 
       app.get "/games/:id" do
-        json 200, envelope(load_session(params[:id]))
+        json 200, with_session(params[:id]) { |s| envelope(s) }
       end
 
       # Cheap: no replay, just the log position (polling, #8).
@@ -227,16 +238,18 @@ module Oe
       # (default 100, max 500), oldest first (#152). `next` is the id to pass as
       # `from` for the following page, nil when there is nothing more.
       app.get "/games/:id/log" do
-        session = load_session(params[:id])
         from = Integer(params["from"] || 0, exception: false)
         limit = Integer(params["limit"] || 100, exception: false)
         halt api_error(400, "bad_request", "from must be an integer >= 0") unless from && from >= 0
         halt api_error(400, "bad_request", "limit must be an integer 1..500") unless limit && (1..500).cover?(limit)
 
-        lines = session.game.log.select { |e| e.action_id > from }
-        page = lines.first(limit)
-        json 200, lines: page.map { |e| { action: e.action_id, text: e.message.to_s } },
-                  next: lines.size > limit ? page.last.action_id : nil, seq: session.seq
+        body = with_session(params[:id]) do |session|
+          lines = session.game.log.select { |e| e.action_id > from }
+          page = lines.first(limit)
+          { lines: page.map { |e| { action: e.action_id, text: e.message.to_s } },
+            next: lines.size > limit ? page.last.action_id : nil, seq: session.seq }
+        end
+        json 200, body
       end
 
       # Time series (#115): share price per corporation, player value and
@@ -271,7 +284,7 @@ module Oe
           halt api_error(422, "rejected", e.message)
         end
         kick_bots(session.id)
-        json 200, envelope(GameSession.load(store, session.id))
+        json 200, GameSession.with(store, session.id) { |s| envelope(s) }
       end
     end
   end
