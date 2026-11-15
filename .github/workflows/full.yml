@@ -48,10 +48,21 @@ jobs:
           # time-balanced shard (.github/scripts/shard.rb); complete suite across the shards
           files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 '')
           echo "$files"
-          bundle exec rspec $files --format json --out "$RUNNER_TEMP/rspec.json"
+          bundle exec rspec $files --format progress --format json --out "$RUNNER_TEMP/rspec.json"
       - name: per-file timings
         if: always()
         run: ruby .github/scripts/shard.rb --report "$RUNNER_TEMP/rspec.json"
+      - name: failed examples
+        if: always()
+        run: ruby .github/scripts/rspec-failures.rb "$RUNNER_TEMP/rspec.json"
+      - name: rspec.json
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rspec-json-${{ github.job }}-${{ matrix.shard }}
+          path: ${{ runner.temp }}/rspec.json
+          if-no-files-found: ignore
+          retention-days: 14
 
   # Long whole-game specs (#314, #335): run here with the caps lifted (OE_FULL_GAME=1, 30000 actions, the game
   # plays to its end, phase 8 included). The pull-request stage runs the same specs with GAME_CAP/STRATEGY_CAP
