@@ -37,7 +37,9 @@ RSpec.describe Oe::View do
     count = 0
     snapshot = lambda do |label|
       viewer = @game.finished ? nil : @game.active_players.first&.id
-      @samples << [label, Oe::View.render(@game, viewer: viewer), Oe::View.render(@game, viewer: nil)]
+      # the phase-8 event adds REMAINDER_CASH to the bank (rule, game.rb event_remainder_cash_added!)
+      injected = @game.instance_variable_get(:@remainder_cash_added) ? @game.class::REMAINDER_CASH : 0
+      @samples << [label, Oe::View.render(@game, viewer: viewer), Oe::View.render(@game, viewer: nil), injected]
     end
     until @game.finished || count > STRATEGY_CAP
       type = Oe::View.round_type(@game.round)
@@ -92,7 +94,7 @@ RSpec.describe Oe::View do
   end
 
   it "keeps the money in the game constant (players + corporations + bank)" do
-    totals = @samples.map { |_, view, _| total_money(view) }.uniq
+    totals = @samples.map { |_, view, _, injected| total_money(view) - injected }.uniq
     expect(totals.size).to eq(1), "money totals differ: #{totals.first(5)}"
   end
 
