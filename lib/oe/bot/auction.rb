@@ -67,7 +67,7 @@ module Oe
       def lowest_bids(bids, step, player)
         lower_bid_open = open_lower_bid?(step, player)
         bids.group_by(&:company).filter_map do |company, list|
-          high = step.respond_to?(:highest_bid) ? step.highest_bid(company) : nil
+          high = step.respond_to?(:highest_bid, true) ? step.send(:highest_bid, company) : nil
           next if high && high.entity == player
           next if lower_bid_open && !top_row?(step, company)
 
@@ -84,9 +84,9 @@ module Oe
       end
 
       def open_lower_bid?(step, player)
-        return false unless step.respond_to?(:bids_for_player)
+        return false unless step.respond_to?(:bids_for_player, true) # protected in Engine::Step::Auctioner
 
-        step.bids_for_player(player).any? { |bid| !top_row?(step, bid.company) }
+        step.send(:bids_for_player, player).any? { |bid| !top_row?(step, bid.company) }
       end
 
       # ---- face value (before #313) -----------------------------------------
