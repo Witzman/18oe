@@ -164,5 +164,5 @@ test("operating sheet in the browser: a fractional dividend rate (£8,75) is dra
 });
 
 test("operating order in the browser: acting company card, order list with done, current, own and bot marks", { skip: browser ? false : "no headless browser installed" }, async () => {
-  await scenario("operating-route", ".or-item", ORDER);
+  await scenario("operating-route", ".head-order-item", ORDER);
 });
