@@ -14,7 +14,8 @@ module Oe
   #
   # Finder kinds of an entry:
   #   at:    N                                 a fixed position
-  #   first: { round:, step: }                 first state in that round class / active step
+  #   first: { round:, step:, phase:, finished: }  first state matching all given keys (round class,
+  #                                            active step, phase name, finished)
   #   before: { type: }                        the state just before the first logged action of that
   #                                            type (that action is then among the legal ones)
   module FixtureBuilder
@@ -22,7 +23,8 @@ module Oe
     # entries: name, surface (rulebook §), slice, game, finder (at/first), note
     DEFINITION = {
       'games' => {
-        'strategy-4p-1' => { 'players' => 4, 'seed' => 1, 'player' => 'strategy', 'max_actions' => 3000 },
+        'strategy-4p-1' => { 'players' => 4, 'seed' => 1, 'player' => 'strategy', 'max_actions' => 5100 },
+        'strategy-3p-1' => { 'players' => 3, 'seed' => 1, 'player' => 'strategy', 'max_actions' => 4000 },
         'random-4p-1' => { 'players' => 4, 'seed' => 1, 'player' => 'random', 'max_actions' => 2000 },
       },
       'entries' => [
@@ -64,13 +66,57 @@ module Oe
           'game' => 'random-4p-1', 'first' => { 'round' => 'Stock', 'step' => 'MergeToken' } },
         { 'name' => 'merge-discard-train', 'surface' => '§10.5/§11.6 Minor-Merge, Zug abwerfen (Zuglimit)', 'slice' => 'S2',
           'game' => 'random-4p-1', 'first' => { 'round' => 'Stock', 'step' => 'MergeDiscardTrain' } },
+        { 'name' => 'phase-5', 'surface' => 'Zugphase 5 beginnt (Level-5-Zuege, Konsolidierung ausgeloest)', 'slice' => 'S3',
+          'game' => 'strategy-4p-1', 'first' => { 'phase' => '5' } },
+        { 'name' => 'consolidation-first', 'surface' => '§10.6 Konsolidierungsrunde (Minors und Regionals: mergen, kaufen, verkaufen)', 'slice' => 'S3',
+          'game' => 'strategy-4p-1', 'first' => { 'round' => 'Consolidation', 'step' => 'Consolidate' } },
+        { 'name' => 'consolidation-merge-minor', 'surface' => '§10.6 Konsolidierung: Minor in den Major mergen', 'slice' => 'S3',
+          'game' => 'strategy-4p-1', 'first' => { 'round' => 'Consolidation', 'step' => 'MergeMinor' } },
+        { 'name' => 'consolidation-merge-token', 'surface' => '§10.6 Konsolidierung: Token-Wahl nach Merge', 'slice' => 'S3',
+          'game' => 'strategy-4p-1', 'first' => { 'round' => 'Consolidation', 'step' => 'MergeToken' } },
+        { 'name' => 'consolidation-merge-offer', 'surface' => '§10.6 Konsolidierung: Merge-Angebot an die Spieler', 'slice' => 'S3',
+          'game' => 'strategy-4p-1', 'first' => { 'round' => 'Consolidation', 'step' => 'MergeOffer' } },
+        { 'name' => 'consolidation-discard-train', 'surface' => '§10.6/§11.6 Konsolidierung: Zug abwerfen nach Merge (Zuglimit)', 'slice' => 'S3',
+          'game' => 'strategy-3p-1', 'first' => { 'round' => 'Consolidation', 'step' => 'MergeDiscardTrain' } },
+        { 'name' => 'phase-6', 'surface' => 'Zugphase 6', 'slice' => 'S3',
+          'game' => 'strategy-4p-1', 'first' => { 'phase' => '6' } },
+        { 'name' => 'phase-7', 'surface' => 'Zugphase 7', 'slice' => 'S3',
+          'game' => 'strategy-4p-1', 'first' => { 'phase' => '7' } },
+        { 'name' => 'phase-8', 'surface' => 'Zugphase 8 (Level-8-Zuege)', 'slice' => 'S3',
+          'game' => 'strategy-4p-1', 'first' => { 'phase' => '8' } },
+        { 'name' => 'game-end', 'surface' => '§13 Spielende (Endphase, Endstand, View ohne Betrachter)', 'slice' => 'S1',
+          'game' => 'strategy-4p-1', 'first' => { 'finished' => true } },
       ],
       # Surfaces of the slice that no entry covers yet, with the reason (#117 verification).
       'gaps' => [
         { 'surface' => '§13 Spielende durch gesprengte Bank', 'slice' => 'S1',
-          'reason' => 'Ganzpartie (etwa 7 min, Regel 22); folgt als eigener Schnitt des Katalogs.' },
-        { 'surface' => '§8.4 Reserved Shares, §10.4 Spielerhandel, geparrtes Regional ohne Käufer', 'slice' => 'S1',
-          'reason' => 'In Strategie- und Zufallspartien nicht vorgekommen; von Hand zu spielen, Eingabe offen.' },
+          'reason' => 'Strategie-Partie 4p/Seed 1 endet regulaer in der Endphase (Bank 137289 am Ende, nicht gebrochen); ' \
+                      'ein Bankbruch kommt in Bot-/Zufallspartien nicht vor und liesse sich nur durch Zustandsvorgabe erzeugen. ' \
+                      'Regel ist als Zustands-Spec abgedeckt (spec/engine/g_18_oe/bank_break_spec.rb, #68).' },
+        { 'surface' => '§8.4 Reserved Shares (Schritt ReserveShare)', 'slice' => 'S1',
+          'reason' => 'In 12 Zufallspartien (3 bis 6 Spieler) und den Strategiepartien nie erreicht: nach der Concession-Runde haben ' \
+                      'die Spieler zu wenig Geld fuer ein zweites Anteilskaufen in der ersten SR. Gedeckt durch den Script-Game-Lauf ' \
+                      '(slice s1, Ziele stock/ReserveShare/choose:reserve und pass) und Engine-Specs; als Katalogeintrag nur mit ' \
+                      'gesteuerter Partie (Handeingabe) moeglich.' },
+        { 'surface' => '§10.4 Spielerhandel (Kauf von Spielern, Zustimmung des Verkaeufers)', 'slice' => 'S1',
+          'reason' => 'Engine: Game#player_trade_enabled? ist false, die Regel ist nicht gespielbar; Zustimmungs-Abfrage folgt mit #148 ' \
+                      '(Teil 2). Eintrag, sobald #148 den Handel freischaltet.' },
+        { 'surface' => '§10.5/§11.6 Zugkauf mit Aktienverkauf des Praesidenten (BuyTrain/sell_shares)', 'slice' => 'S2',
+          'reason' => 'In den Strategie- und Zufallspartien kommt sell_shares nur im Issue-Step und in der Konsolidierung vor, nie im ' \
+                      'BuyTrain-Schritt (Strategie verkauft nicht fuer Zuege). Script-Game-Ziel operating/BuyTrain/sell_shares:major.' },
+        { 'surface' => 'Geparrtes Regional, das niemand kauft', 'slice' => 'S2',
+          'reason' => 'Kam in keiner der Partien vor; in der Engine wird der Fall durch close_unfloated_regionals_at_maximum! (#348) ' \
+                      'behandelt, eigener Eintrag erst mit gesteuerter Partie.' },
+        { 'surface' => '§11.6 Zuglimit: Zug abwerfen im Betrieb (Step DiscardTrain in der OR)', 'slice' => 'S3',
+          'reason' => 'Kam nur in einer frueheren Fassung der Strategie-Partie 3p/Seed 1 vor und ist nach den Engine-Aenderungen ' \
+                      '(#70 Golden Bell, #352 u. a.) in keiner Katalogpartie mehr erreicht; Eintrag, sobald eine Partie ihn zeigt. ' \
+                      'Die Variante in der Konsolidierung (MergeDiscardTrain) ist abgedeckt.' },
+        { 'surface' => 'Orient-Express-Bonus (OrientExpressBonus-Schritt), SpecialToken', 'slice' => 'S3',
+          'reason' => 'Weder die Strategie-Partien 3p/4p Seed 1 (enden in Phase 8 in der Endphase) noch Zufallspartien erreichen den ' \
+                      'Orient-Express-Bonus-Lauf oder einen SpecialToken-Schritt; nur Szenario-Specs. Eintrag, sobald eine Partie ihn zeigt.' },
+        { 'surface' => 'Auktion mit Pass-Pass bei Preis 0 (Waterfall)', 'slice' => 'S1',
+          'reason' => 'DEFEKT, kein Katalogeintrag: Zufallspartie 3 Spieler/Seed 5 wird in der Auktion mit Pass abgelehnt ' \
+                      '(GameError Cannot spend zero or negative money in Spender.spend(0), Aktion 531); als eigenes Issue zu melden.' },
       ],
     }.freeze
 
@@ -119,7 +165,7 @@ module Oe
                 end
           next unless hit
 
-          positions[e['game']][e['name']] = { position: count, expect: e['first'] || state.slice('round', 'step') }
+          positions[e['game']][e['name']] = { position: count, expect: (e['first'] || {}).merge(state.slice('round', 'step')) }
           pending.delete(e)
         end
       end
