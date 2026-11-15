@@ -84,6 +84,8 @@
     "choices",
     "context",
     "description",
+    "double_head",
+    "double_head_note",
     "help",
     "pass_description",
     "ranges",

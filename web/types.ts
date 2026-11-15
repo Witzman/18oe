@@ -115,6 +115,9 @@ export interface Prompt {
   actions: Record<string, unknown>[];
   // The active step's own texts (#124), English as in the engine; help is null when empty.
   description: string | null; help: string | null; pass_description: string | null;
+  // Offered double-head combinations for the Orient Express (#136) and the note on what they mean.
+  double_head: { entity: string; trains: string[]; names: string[]; train: string; label: string }[];
+  double_head_note: string | null;
   choice_name: string | null;
   choices: { choice: string; target: string | null; entity: string; label: string }[];
   acting_as: { entity: string; kind: "player" | "corporation"; primary: boolean; types: string[] }[];
