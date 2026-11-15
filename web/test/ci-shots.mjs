@@ -76,10 +76,13 @@ const EVAL = (collapse) => `(async () => {
       return { el: String(e.className || e.tagName).slice(0, 40), inView: r.bottom <= vh && r.top >= 0 && r.right <= vw && r.left >= 0, onTop: !!(t && (t === e || e.contains(t))), color: cs.color, bg: cs.backgroundColor, text: (e.textContent || "").trim().slice(0, 20) };
     });
     const body = document.querySelector(".frame-panel-body");
+    // Map metrics (#285): the map element, its camera zoom (px per hex side) and the zoom at which the whole map fits.
+    const mapEl = document.querySelector(".frame-map"); const om = window.oeMap; let mapInfo = null;
+    if (mapEl && om) { const r = mapEl.getBoundingClientRect(); const v = om.view; mapInfo = { rect: [r.x, r.y, r.width, r.height].map(Math.round), zoom: +v.zoom.toFixed(2), pitch: v.pitch, yaw: v.yaw, maxZoom: om.maxZoom ?? null }; }
     await post({ ok: true, vw, vh, docW: document.documentElement.scrollWidth, hScroll: document.documentElement.scrollWidth > vw + 1,
       panelFound, toggleFound, collapsed: panel && panel.dataset.collapsed, panel: pr && [pr.x, pr.y, pr.width, pr.height].map(Math.round),
       panelOutside: pr ? (pr.bottom > vh + 1 || pr.right > vw + 1 || pr.left < -1 || pr.top < -1) : null,
-      bodyScrolls: body ? body.scrollHeight > body.clientHeight + 1 : null, small, mainInfo, sel,
+      bodyScrolls: body ? body.scrollHeight > body.clientHeight + 1 : null, mapInfo, small, mainInfo, sel,
       step: (document.querySelector(".frame-panel-step") || {}).textContent || null });
   } catch (e) { await post({ ok: false, error: String(e && e.stack || e) }); }
 })()`;
