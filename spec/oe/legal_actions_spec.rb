@@ -384,17 +384,23 @@ RSpec.describe Oe::LegalActions, "train from another railroad" do
     allow(step).to receive(:current_entity).and_return(buyer)
   end
 
+  it "keeps the face value as the ceiling without train_span (bot unchanged until #325)" do
+    fund!(game, buyer, 1000 - buyer.cash)
+
+    expect(prices(described_class.new(game)).max).to eq(train.price)
+  end
+
   it "offers nothing from other railroads outside the major phase" do
     allow(game).to receive(:major_phase?).and_return(false)
 
     expect(step.buyable_trains(buyer)).not_to include(train)
-    expect(prices(described_class.new(game))).to eq([])
+    expect(prices(described_class.new(game, train_span: true))).to eq([])
   end
 
   it "spans the engine's whole range, above face value up to the treasury" do
     fund!(game, buyer, 1000 - buyer.cash)
     min, max = engine_span
-    all = prices(described_class.new(game))
+    all = prices(described_class.new(game, train_span: true))
 
     expect([min, max]).to eq([1, buyer.cash])
     expect(max).to be > train.price
@@ -407,7 +413,7 @@ RSpec.describe Oe::LegalActions, "train from another railroad" do
   it "keeps a sample within the span and with face value when limited" do
     fund!(game, buyer, 1000 - buyer.cash)
     min, max = engine_span
-    sample = prices(described_class.new(game, limit: 4, rng: Random.new(3)))
+    sample = prices(described_class.new(game, train_span: true, limit: 4, rng: Random.new(3)))
 
     expect(sample).to include(min, max, train.price)
     expect(sample.all? { |price| price.between?(min, max) }).to be(true)
@@ -416,7 +422,7 @@ RSpec.describe Oe::LegalActions, "train from another railroad" do
   it "is capped at face value when the president has to chip in" do
     buyer.cash > 120 ? buyer.spend(buyer.cash - 120, game.bank) : fund!(game, buyer, 120 - buyer.cash)
     min, max = engine_span
-    all = prices(described_class.new(game))
+    all = prices(described_class.new(game, train_span: true))
 
     expect(max).to be <= train.price # president chips in, EBUY_FROM_OTHERS :value caps at face value
     expect(all.max).to eq(max)
@@ -426,7 +432,7 @@ RSpec.describe Oe::LegalActions, "train from another railroad" do
   it "has every offered price accepted by the engine" do
     fund!(game, buyer, 1000 - buyer.cash)
     min, max = engine_span
-    all = prices(described_class.new(game))
+    all = prices(described_class.new(game, train_span: true))
 
     expect { all.each { |price| step.check_spend(Engine::Action::BuyTrain.new(buyer, train: train, price: price)) } }.not_to raise_error
     expect { step.check_spend(Engine::Action::BuyTrain.new(buyer, train: train, price: max + 1)) }.to raise_error(Engine::GameError)

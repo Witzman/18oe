@@ -33,7 +33,13 @@ module Oe
       new(game, **opts).call
     end
 
-    def initialize(game, limit: nil, rng: Random.new(0), compact: false)
+    # train_span: offer a train of another railroad at every price of the engine's
+    # span (RB 11.6, #324), not only up to its face value. Off by default until
+    # the bot chooses among those prices (#325): its picker takes the highest
+    # affordable price (measured seed 1, 4 players: 460 of 552 purchases from
+    # other railroads above face value).
+    def initialize(game, limit: nil, rng: Random.new(0), compact: false, train_span: false)
+      @train_span = train_span
       @game = game
       @limit = limit
       @rng = rng
@@ -565,6 +571,7 @@ module Oe
     # major phase, G18OE#can_buy_train_from_others?), not just up to face value.
     # The face value is always offered.
     def other_train_prices(train, min, max)
+      max = [train.price, max].min unless @train_span
       prices = amounts(min, max, 10)
       prices << train.price if (min..max).cover?(train.price)
       prices.uniq.sort
