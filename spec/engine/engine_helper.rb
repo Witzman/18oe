@@ -11,7 +11,18 @@ ENV["ENGINE_LOG_LEVEL"] ||= "3"
 require "engine"
 require "rspec"
 
+# Bot games in the specs are capped (#314): a bot plays ~2900 actions/min since it founds regionals and
+# majors, a whole game takes ~7 min. GAME_CAP actions cover set-up, auctions, concessions, stock and
+# operating rounds. One whole game is the :full_game example(s), run in the full stage with
+# OE_FULL_GAME=1 (.github/workflows/full.yml, job full-game); GAME_CAP is then lifted.
+FULL_GAME = ENV["OE_FULL_GAME"] == "1"
+GAME_CAP = FULL_GAME ? 30_000 : 1500
+# The strategy player (view specs) spends ~2400 actions in the auction before the concession round and
+# reaches operating rounds at ~2400 and consolidation at ~3800 (seed 1), cheaply (~5 s per 3000).
+STRATEGY_CAP = FULL_GAME ? 30_000 : 5000
+
 RSpec.configure do |config|
+  config.filter_run_excluding full_game: true unless FULL_GAME
   config.expect_with :rspec do |c|
     c.syntax = :expect
   end

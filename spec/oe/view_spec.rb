@@ -39,7 +39,7 @@ RSpec.describe Oe::View do
       viewer = @game.finished ? nil : @game.active_players.first&.id
       @samples << [label, Oe::View.render(@game, viewer: viewer), Oe::View.render(@game, viewer: nil)]
     end
-    until @game.finished || count > 20_000
+    until @game.finished || count > STRATEGY_CAP
       type = Oe::View.round_type(@game.round)
       snapshot.call("first #{type}") unless seen[type]
       seen[type] = true
@@ -54,7 +54,7 @@ RSpec.describe Oe::View do
 
   it "covers the main round types and the end of the game" do
     expect(@round_types).to include("auction", "concession", "stock", "operating")
-    expect(@game.finished).to be(true)
+    expect(@game.finished).to be(true) if FULL_GAME
   end
 
   it "has the documented top-level shape in every state" do
@@ -116,13 +116,7 @@ RSpec.describe Oe::View do
     end
   end
 
-  it "reports the final standing when the game is finished" do
-    _, view, = @samples.last
-    expect(view[:meta][:finished]).to be(true)
-    expect(view[:meta][:winner]).to eq(view[:meta][:standings].first[:player])
-    expect(view[:meta][:standings].map { |s| s[:value] }).to eq(view[:meta][:standings].map { |s| s[:value] }.sort.reverse)
-    expect(view[:prompt][:actions]).to be_empty
-  end
+  # "reports the final standing when the game is finished" needs a whole game: bot_runner_spec (:full_game, #314).
 
   it "lists only changed hexes on the map, with tile, rotation and tokens" do
     _, view, = @samples.last

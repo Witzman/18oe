@@ -51,6 +51,29 @@ jobs:
         if: always()
         run: ruby .github/scripts/shard.rb --report "$RUNNER_TEMP/rspec.json"
 
+  # The one whole bot game (#314): ~7 min, never in the pull-request stage nor in the shards above
+  # (examples tagged :full_game are excluded unless OE_FULL_GAME=1, spec/engine/engine_helper.rb).
+  full-game:
+    name: whole bot game (rspec --tag full_game)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-progress --no-audit --no-fund && npm run build
+        working-directory: web
+      - run: bundle exec rspec spec --tag full_game
+        env:
+          OE_FULL_GAME: "1"
+
   web:
     name: web (typecheck, unit and browser tests)
     runs-on: ubuntu-24.04
