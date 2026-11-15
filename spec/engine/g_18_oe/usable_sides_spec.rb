@@ -99,13 +99,16 @@ describe 'G18OE upgrades must use all usable sides (§11.1.7)' do
   end
 
   describe 'a double town upgraded to gray' do
-    it 'needs all usable sides of M26 as well' do
-      hex = game.hex_by_id('M26')
-      allow(step).to receive(:hex_neighbors).and_return(hex.neighbors.keys)
-      %w[OE1 OE11 OE21].each { |name| force_lay!(hex, name) }
-      offered = step.upgradeable_tiles(major, hex)
+    # The tile set has no gray double-town tile (every gray tile carries a city), so brown is the
+    # last step for a double town and the offer after OE21 is legitimately empty. The earlier
+    # version of this example only checked "every offered tile has all sides" and passed on that
+    # empty offer for the wrong reason (workshop #345).
+    it 'has no gray tile to offer after the brown OE21 (empty by design, not by accident)' do
+      gray_without_city = game.tiles.select { |tile| tile.color == :gray && tile.cities.empty? && tile.towns.size >= 2 }
+      expect(gray_without_city).to be_empty
+      expect(game.tiles.select { |tile| tile.color == :gray }).not_to be_empty
 
-      expect(offered.map { |tile| tile.exits.size }.uniq - [usable_sides('M26')]).to eq([])
+      expect(offered_after('M26', 'OE1', 'OE11', 'OE21')).to eq([])
     end
   end
 
