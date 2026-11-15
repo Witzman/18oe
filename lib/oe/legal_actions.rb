@@ -561,9 +561,21 @@ module Oe
       step.buyable_trains(entity).flat_map do |train|
         min, max = step.spend_minmax(entity, train)
         max = [max, budget].min
-        prices = train.from_depot? ? [train.price] : other_train_prices(train, min, max)
-        prices.select { |price| price <= max && price.positive? && cheapest_if_contributing?(step, train, price, entity) }.map { |price| A::BuyTrain.new(entity, train: train, price: price) }
+        train_offers(step, entity, train, min, max).select do |_variant, price|
+          price <= max && price.positive? && cheapest_if_contributing?(step, train, price, entity)
+        end.map { |variant, price| A::BuyTrain.new(entity, train: train, price: price, variant: variant) }
       end
+    end
+
+    # [variant name, price] pairs. A depot train is offered once per variant the
+    # engine allows (Step::Train#buyable_train_variants): 3 and 3+3, 4 and 4+4,
+    # 5 and 5+5, 6 and 6+6, 7+7 and 4D, 8+8 and 5D (RB 11.6, the double-sided
+    # cards), each at its own price. A train of another railroad keeps the side
+    # it was bought with: no variant.
+    def train_offers(step, entity, train, min, max)
+      return other_train_prices(train, min, max).map { |price| [nil, price] } unless train.from_depot?
+
+      step.send(:buyable_train_variants, train, entity).map { |variant| [variant[:name], variant[:price]] }
     end
 
     # A train from another corporation: the engine's whole span (RB 11.6,
