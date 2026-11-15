@@ -34,4 +34,12 @@ RSpec.describe Oe::StrategyPlayer do
     pick = player.send(:pick_par, options_for(corporation), {})
     expect(pick.share_price.price).to eq(90)
   end
+
+  # #320: restricted offer (only low pars affordable, e.g. cash left 120-175): float anyway with the best price offered.
+  it "floats with the highest offered par when 2 x it is below the wish" do
+    corporation = regionals.find { |c| player.send(:target_par, c) > 2 * 60 }
+    options = options_for(corporation).select { |a| a.share_price.price <= 60 }
+    pick = player.send(:pick_par, options, {})
+    expect(pick.share_price.price).to eq(60)
+  end
 end
