@@ -3,25 +3,39 @@
 #   bin/test            rspec (engine, backend) + frontend typecheck and unit tests
 #   bin/test web        frontend only (typecheck + node tests)
 #   bin/test changed    only the tests of files changed against origin/main (see below)
-#   bin/test <args>     rspec with the given arguments (files, -e, --tag ...)
-# Every run waits for the machine-wide heavy lock (tmp/heavy.lock of the main checkout), at most
-# $OE_LOCK_TIMEOUT seconds (default 600). On timeout it exits 75 with a clear message; it never retries.
+#   bin/test <args>     rspec with the given arguments (files, -e, --tag ...)  (no lock unless it names whole-game or browser specs)
+# Only heavy runs take the machine-wide heavy lock (tmp/heavy.lock of the main checkout): no arguments,
+# 'web', and arguments naming whole-game/browser specs (bot_simulation|playthrough|script_game|
+# enumeration_timing|browser). Targeted runs (single specs, 'changed') take no lock and run side by side.
+# The lock is never waited for by default (OE_LOCK_TIMEOUT seconds, default 0): if it is held, the holder
+# (tmp/heavy.lock.holder) is printed and the run exits 75. Look: lslocks | grep heavy
 # OE_HEAVY_LOCK_HELD=1 skips the lock (caller already holds it).
 set -euo pipefail
 source "$(dirname "$0")/_env"
 cd "$ROOT"
 
-if [ -z "${OE_HEAVY_LOCK_HELD:-}" ] && command -v flock >/dev/null 2>&1; then
+heavy=0
+case "${1:-}" in
+  ""|web) heavy=1 ;;
+  changed) heavy=0 ;;
+  *) if printf '%s\n' "$*" | grep -q -E 'bot_simulation|playthrough|script_game|enumeration_timing|browser'; then heavy=1; fi ;;
+esac
+
+if [ "$heavy" = 1 ] && [ -z "${OE_HEAVY_LOCK_HELD:-}" ] && command -v flock >/dev/null 2>&1; then
   common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
   lock="$(cd "$ROOT" && cd "$(dirname "$common")" 2>/dev/null && pwd)/tmp/heavy.lock"
+  holder="$lock.holder"
   mkdir -p "$(dirname "$lock")"
-  limit="${OE_LOCK_TIMEOUT:-600}"
+  limit="${OE_LOCK_TIMEOUT:-0}"
   exec 9>>"$lock"
   if ! flock -w "$limit" 9; then
-    echo "bin/test: TIMEOUT after ${limit}s waiting for $lock (another heavy run holds it)." >&2
-    echo "bin/test: not retrying. Use 'bin/test changed' for fewer files, push and read the CI checks, or raise OE_LOCK_TIMEOUT." >&2
+    echo "bin/test: heavy lock $lock is held; not waiting (limit ${limit}s)." >&2
+    echo "bin/test: holder: $(cat "$holder" 2>/dev/null || echo unknown). See: lslocks | grep heavy" >&2
+    echo "bin/test: do something else and retry later, or run targeted specs (no lock) / push and read the CI checks." >&2
     exit 75
   fi
+  echo "pid=$$ user=${USER:-?} cwd=$PWD args=$* since=$(date -u +%FT%TZ)" > "$holder"
+  trap 'rm -f "$holder"' EXIT
   export OE_HEAVY_LOCK_HELD=1
 fi
 
