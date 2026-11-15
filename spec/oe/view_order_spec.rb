@@ -26,6 +26,7 @@ RSpec.describe "Oe::View order (#122)" do
     rounds = 0
     announced = nil
     announced_ids = []
+    announced_pending = false
     seen = []
     count = 0
     last_priority = nil
@@ -53,6 +54,13 @@ RSpec.describe "Oe::View order (#122)" do
       expect(order.map { |o| o[:id] }).to eq(game.operating_order.map(&:id)) unless meta[:round][:type] == "operating"
       if meta[:round][:type] == "operating"
         key = [meta[:round][:turn], meta[:round][:number]]
+        # Minor C (#70): while the president of Golden Bell has not chosen its place, the order is still the
+        # normal one; it is re-announced once, after the choice (the choice holds for this round only).
+        pending = game.golden_bell_pending?
+        if key == announced && announced_pending && !pending
+          announced_ids = order.map { |o| o[:id] }
+          announced_pending = false
+        end
         if key != announced
           unless announced.nil?
             expect(seen.uniq).to eq(announced_ids.select { |id| seen.include?(id) }), "round #{announced}"
@@ -60,9 +68,10 @@ RSpec.describe "Oe::View order (#122)" do
           end
           announced = key
           announced_ids = order.map { |o| o[:id] }
+          announced_pending = pending
           seen = []
         end
-        expect(order.map { |o| o[:id] }).to eq(announced_ids)
+        expect(order.map { |o| o[:id] }).to eq(announced_ids) unless pending
         cur = meta[:current]
         if cur && cur[:kind] == "corporation"
           i = order.index { |o| o[:id] == cur[:id] }
