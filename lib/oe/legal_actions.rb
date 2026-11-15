@@ -103,7 +103,7 @@ module Oe
     def lay_tile_options_unlogged(step, entity)
       candidates = @game.hexes.filter_map do |hex|
         next unless step.available_hex(entity, hex)
-        next if @game.upgrade_cost(hex.tile, hex, entity, entity) > entity.cash
+        next unless affordable_lay?(entity, hex)
 
         # legal_rotations is per hex, and one tile object can be offered on several hexes
         [hex, step.upgradeable_tiles(entity, hex).map { |tile| [tile, tile.legal_rotations.dup] }]
@@ -120,6 +120,16 @@ module Oe
       end
     end
 
+    # The lay's terrain cost fits the cash, and in 18OE's first OR it leaves the
+    # reserved 2+2 payable (§11.6.4, workshop #352; patronage of the hex counted).
+    def affordable_lay?(entity, hex)
+      cost = @game.upgrade_cost(hex.tile, hex, entity, entity)
+      return false if cost > entity.cash
+      return true unless @game.respond_to?(:first_round_spend_allowed?)
+
+      @game.first_round_spend_allowed?(entity, cost - @game.patronage_payout(hex))
+    end
+
     # The company's connected paths on the real map, taken before any trial lay.
     def connected_paths(entity)
       @connected ||= @game.graph_for_entity(entity).connected_paths(entity).dup
@@ -132,7 +142,7 @@ module Oe
       extra_slot = company_extra_slot?(step, entity)
       token_cities(step, entity).select do |city|
         city.tokenable?(tokener, free: false, tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
-          connected_for_token?(step, entity, city)
+          token_spend_ok?(step, tokener, tokens) && connected_for_token?(step, entity, city)
       end
     end
 
@@ -561,6 +571,14 @@ module Oe
       true
     rescue Engine::GameError
       false
+    end
+
+    # 18OE first OR: a bought token must leave the reserved 2+2 payable (§11.6.4,
+    # workshop #352). Home tokens are paid at floating, not here.
+    def token_spend_ok?(step, tokener, tokens)
+      return true if step.is_a?(Engine::Step::HomeToken) || !@game.respond_to?(:first_round_spend_allowed?)
+
+      @game.first_round_spend_allowed?(tokener, tokens.map(&:price).min.to_i)
     end
 
     # 18OE: a minor's home token claims a track-rights region and pays for it.

@@ -2,6 +2,7 @@
 
 require 'fileutils'
 require 'json'
+require_relative 'invariants'
 require_relative 'legal_actions'
 require_relative 'strategy_player'
 
@@ -20,6 +21,7 @@ module Oe
   #   :rejected  GameError on an action the enumerator produced (enumerator or
   #              engine bug)
   #   :dead_end  step is active and offers action types, but no action exists
+  #   :invariant an Oe::Invariants check failed (only with invariants: N, #138)
   #   :limit     max_actions reached
   class Playthrough
     Result = Struct.new(:players, :seed, :status, :actions, :round, :turn, :detail, :seconds,
@@ -37,7 +39,9 @@ module Oe
       new(**opts).run
     end
 
-    def initialize(players:, seed:, max_actions: 20_000, limit: 12, player: :random)
+    def initialize(players:, seed:, max_actions: 20_000, limit: 12, player: :random, invariants: nil)
+      # invariants: nil (off) or N = run Oe::Invariants after every N-th action and stop on a violation.
+      @invariants = invariants
       @player = player
       @players = players
       @seed = seed
@@ -79,6 +83,12 @@ module Oe
         action ||= actions.sample(random: rng)
         game.process_action(action)
         count += 1
+        if !game.exception && @invariants && (count % @invariants).zero? &&
+           (found = Oe::Invariants.failures(Oe::Invariants.run(game))).any?
+          status = :invariant
+          detail = "after action #{count}: " + found.first(3).map { |v| "#{v.check} (§#{v.rule}): #{v.message}" }.join(' | ')
+          break
+        end
         next unless (error = game.exception)
 
         status = error.is_a?(Engine::GameError) ? :rejected : :crash

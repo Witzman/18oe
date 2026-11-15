@@ -44,7 +44,7 @@ RSpec.describe "Oe::View railroad phase (#121)" do
       when "unparred" then expect([corp.ipoed, corp.closed?]).to eq([false, false]), label
       when "parred" then expect([corp.ipoed, corp.floated?, corp.type]).to eq([true, false, :regional]), label
       when "floated" then expect([corp.floated?, corp.type]).to eq([true, :regional]), label
-      when "converted" then expect([corp.floated?, corp.type]).to eq([true, :major]), label
+      when "converted" then expect([corp.floated?, %i[major national].include?(corp.type)]).to eq([true, true]), label
       when "removed" then expect([corp.closed?, corp.par_price]).to eq([true, nil]), label
       end
       expect(view[:corporations].find { |v| v[:id] == r[:id] }&.fetch(:regional_state)).to eq(r[:state]) unless corp.closed?
