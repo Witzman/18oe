@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Fixture catalog (#117): bin/fixture-catalog build | verify [name ...] | list
+set -euo pipefail
+source "$(dirname "$0")/_env"
+cd "$ROOT"
+bundler exec ruby -I lib bin/fixture_catalog.rb "$@"
