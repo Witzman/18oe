@@ -539,8 +539,30 @@ module Oe
         choice_name: step && safe { step.respond_to?(:choice_name) ? step.choice_name : nil },
         choices: choices(game, step, offered),
         acting_as: acting_as(game, step, list),
+        # Orient Express (#136, RB 12.1): one entry per offered
+        # double_head_trains action, and what a combination means.
+        double_head: double_head(game, offered),
+        double_head_note: offered.any?(Engine::Action::DoubleHeadTrains) ? DOUBLE_HEAD_NOTE : nil,
         context: context(game, step, mine && with_actions ? legal : nil, offered, complete: limit.nil?),
       }
+    end
+
+    # The engine's step help says "use Undo to cancel a combination"; there is
+    # no undo here (#34, #137: confirmation step instead), so the prompt says
+    # what holds instead.
+    DOUBLE_HEAD_NOTE = "Combining is final for this operating round and cannot be undone: the combined train " \
+                       "may only run an Orient Express route, and its trains do not run on their own this round."
+
+    # Per offered combination: the trains (ids and names), the train they make
+    # (cities+towns summed, as the engine names it) and a label.
+    def double_head(game, offered)
+      offered.grep(Engine::Action::DoubleHeadTrains).map do |a|
+        names = a.trains.map(&:name)
+        cities, towns = a.trains.map { |t| game.distance(t) }.transpose.map(&:sum)
+        train = "#{cities}+#{towns}"
+        { entity: a.entity.id, trains: a.trains.map(&:id), names: names, train: train,
+          label: "Combine #{names[0..-2].join(', ')} and #{names.last} into #{[8, 11, 18].include?(cities) ? 'an' : 'a'} #{train} train for the Orient Express" }
+      end
     end
 
     # One entry per offered `choose` action: the choice id, its target (a company
