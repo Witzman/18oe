@@ -7,11 +7,18 @@ module Oe
     # inside its track rights; LegalActions#token_targets). A company without
     # a train keeps the cheapest depot train's price back, like Bot::Track.
     #
-    # Choice: the city with the highest revenue, then the one with the fewest
-    # free slots left (claim it before a rival does); seeded among the best
-    # three. Before #293 the fallback passed while the company had no train or
+    # Choice (#322): the last free slot of a city and small cities (bottlenecks)
+    # first, target cities (metropolis, port) higher, then revenue; seeded among
+    # the best three. All weights are assumptions (rule 10), tuned after playtests. Before #293 the fallback passed while the company had no train or
     # less than 140 cash, so bots never placed a token in OR 1.1.
     class Token
+      LAST_SLOT = 25      # placing here fills the city: nobody can follow
+      BOTTLENECK = 10     # small city (at most SMALL_CITY slots): slots are scarce
+      FREE_SLOT = 5       # penalty per slot still free after this token
+      METROPOLIS = 20     # target city: metropolis
+      PORT = 12           # target city: port hex
+      SMALL_CITY = 2
+
       def initialize(game, rng, track)
         @game = game
         @rng = rng
@@ -37,9 +44,18 @@ module Oe
       end
 
       def score(city)
-        revenue = city.max_revenue
         free = city.tokens.count(&:nil?)
-        revenue - (free * 5)
+        value = city.max_revenue - ((free - 1) * FREE_SLOT)
+        value += LAST_SLOT if free == 1
+        value += BOTTLENECK if city.tokens.size <= SMALL_CITY
+        value += METROPOLIS if @game.metropolis_hex?(city.hex)
+        value += PORT if port?(city.hex)
+        value
+      end
+
+      def port?(hex)
+        ports = @game.class::PORTS[hex.id]
+        ports&.values&.any? { |exit| exit.is_a?(Hash) && exit[:port] } || false
       end
     end
   end

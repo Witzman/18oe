@@ -159,6 +159,50 @@ RSpec.describe Oe::Bot do
     end
   end
 
+  describe Oe::Bot::Token do
+    TokCity = Struct.new(:tokens, :max_revenue, :hex)
+    TokHex = Struct.new(:id)
+    TokGame = Struct.new(:metro) do
+      def metropolis_hex?(hex) = hex.id == metro
+      def self.const_missing(_) = super
+    end
+    let(:game) do
+      klass = Class.new(TokGame) { const_set(:PORTS, { "PORT" => { 1 => { port: :public } } }) }
+      klass.new("METRO")
+    end
+    let(:token) { described_class.new(game, Random.new(1), nil) }
+
+    def city(slots, free, revenue, hex = "X")
+      TokCity.new(Array.new(slots) { |i| i < free ? nil : :t }, revenue, TokHex.new(hex))
+    end
+
+    it "scores the last free slot above a city with room left" do
+      expect(token.send(:score, city(3, 1, 20))).to be > token.send(:score, city(3, 2, 20))
+    end
+
+    it "scores a small city (bottleneck) above a big one with equal room" do
+      expect(token.send(:score, city(2, 2, 20))).to be > token.send(:score, city(4, 2, 20))
+    end
+
+    it "scores target cities (metropolis, port) above a plain city of equal revenue" do
+      plain = token.send(:score, city(3, 2, 20))
+      expect(token.send(:score, city(3, 2, 20, "METRO"))).to be > plain
+      expect(token.send(:score, city(3, 2, 20, "PORT"))).to be > plain
+    end
+
+    it "picks the top-scored city most often" do
+      corp = Struct.new(:cash, :trains) do
+        def corporation? = true
+      end.new(500, [1])
+      Act = Struct.new(:entity, :city) unless defined?(Act)
+      best = Act.new(corp, city(3, 1, 20, "METRO"))
+      worse = Act.new(corp, city(4, 3, 10))
+      allow_any_instance_of(described_class).to receive(:price).and_return(0)
+      picks = Array.new(200) { |i| described_class.new(game, Random.new(i), nil).choose({ "PlaceToken" => [worse, best], "Pass" => [Pass.new(corp)] }) }
+      expect(picks.count(best)).to be > picks.count(worse)
+    end
+  end
+
   describe "on a real game" do
     let(:names) { %w[p0 p1 p2 p3] }
 
