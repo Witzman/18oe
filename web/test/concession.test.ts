@@ -8,7 +8,7 @@ import { themes } from "../themes/index.ts";
 import type { MapGeometry } from "../render/mapdata.ts";
 import type { Game } from "../types.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { ConcessionPanel, effectiveSelection, emptySelection, homeTargets, hexOfCity, ladder, offers, orderFor, parPrice, sentenceFor } from "../ui/panels/concession.ts";
+import { ConcessionPanel, effectiveSelection, emptySelection, homeMapTargets, homePreview, homeTapMap, homeTargets, hexOfCity, indexOfCity, ladder, offers, orderFor, parPrice, sentenceFor } from "../ui/panels/concession.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
 
@@ -168,4 +168,33 @@ test("panel DOM: the home token step lists one button per target with zone and p
   const targets = find(tree, (n) => n.attrs.class === "concession-target");
   assert.equal(targets.length, 62);
   assert.ok(targets.every((b) => /Zone [A-Z]+, £\d+/.test(textOf(b))));
+});
+
+test("home token on the map (#261): targets carry the city index, a tap picks it, the preview shows the corp", () => {
+  const g = load("home-token");
+  const ts = homeTargets(g, map);
+  assert.ok(ts.every((t) => t.index === Number(t.city.split("-").pop())));
+  const mt = homeMapTargets(g, map)!;
+  assert.equal(mt.kind, "token");
+  assert.equal(mt.cities!.length, ts.length);
+  const first = ts[0]!;
+  assert.equal(homeTapMap(g, map, first.hex), first.city, "hex with one target picks it");
+  assert.equal(homeTapMap(g, map, first.hex, first.index), first.city, "slot tap picks it");
+  assert.equal(homeTapMap(g, map, "ZZ99"), null, "hex without target picks nothing");
+  assert.equal(homePreview(g, emptySelection(), map), null, "nothing chosen, no preview");
+  const pv = homePreview(g, { corp: null, price: null, city: first.city }, map);
+  assert.deepEqual(pv, { hex: first.hex, city: first.index, corp: String(first.action.entity) });
+});
+
+test("home token on the map (#261): a hex with several targets is ambiguous, the slot decides; context index wins", () => {
+  const g = load("home-token");
+  const [a] = g.state.prompt.actions.filter((x) => x.type === "place_token") as { city: string }[];
+  const hex = hexOfCity(a!.city);
+  g.state.prompt.actions = [{ ...a!, city: `${hex}-0-0` }, { ...a!, city: `${hex}-0-1` }];
+  assert.equal(homeTapMap(g, map, hex), null, "ambiguous without slot");
+  assert.equal(homeTapMap(g, map, hex, 1), `${hex}-0-1`);
+  assert.equal(homeTapMap(g, map, hex, 0), `${hex}-0-0`);
+  assert.equal(indexOfCity("X1-0-3"), 3);
+  (g.state.prompt as { context?: unknown }).context = { token: { cities: [{ id: "X1-0-3", hex: "X1", city: 2, price: 1 }] } };
+  assert.equal(indexOfCity("X1-0-3", g), 2);
 });
