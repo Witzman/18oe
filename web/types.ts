@@ -25,6 +25,7 @@ export interface Meta {
   seq: number;
   game_id: number | string;
   finished: boolean;
+  game_end: GameEnd;
   round: { type: RoundType | string; number: number | null; turn: number; description: string | null };
   phase: {
     name: string; tiles: string[]; operating_rounds: number; status: string[];
@@ -38,6 +39,14 @@ export interface Meta {
   railroads: Railroads;
   operating_order: { id: string; done: boolean }[];
   priority: string[];
+}
+
+export interface GameEnd {
+  triggered: boolean;
+  reason: "bank" | "final_phase" | string | null;
+  timing: "immediate" | "current_round" | "current_or" | "full_or" | "one_more_full_or_set" | string | null;
+  remaining_ors: number | null;
+  bank: { cash: number; starting: number; share: number | null; broken: boolean };
 }
 
 export interface NextPhase {

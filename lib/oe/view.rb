@@ -75,7 +75,51 @@ module Oe
         active_players: game.active_players.map(&:id),
         standings: game.result.map { |id, value| { player: id, value: value } },
         winner: game.finished ? game.result.keys.first : nil,
+        game_end: game_end(game),
       }
+    end
+
+    # End-of-game conditions, read from the engine's own state (game_end_check
+    # -> @game_end_trigger [reason, timing], @bank, end_game!); no parallel rule logic.
+    #   triggered:   an end condition has fired (bank broken, final phase) or the game is over
+    #   reason:      engine reason ("bank", "final_phase"), after the end the reason it ended with
+    #   timing:      engine timing ("current_or", "one_more_full_or_set", ...) or nil
+    #   remaining_ors: operating rounds still to be played including the current one; nil when unknown
+    #   bank:        cash, starting cash, remaining share (0..1) and whether it has broken
+    def game_end(game)
+      reason, timing = game.game_end_trigger
+      reason ||= game.game_end_reason if game.finished
+      starting = game.bank_starting_cash
+      {
+        triggered: reason ? true : false,
+        reason: reason&.to_s,
+        timing: timing&.to_s,
+        remaining_ors: game.finished ? 0 : remaining_ors(game, timing),
+        bank: {
+          cash: game.bank.cash,
+          starting: starting,
+          share: starting.positive? ? (game.bank.cash.to_f / starting).clamp(0.0, 1.0).round(4) : nil,
+          broken: game.bank.broken?,
+        },
+      }
+    end
+
+    def remaining_ors(game, timing)
+      return unless timing
+
+      in_or = game.round.is_a?(Engine::Round::Operating)
+      left_in_set = in_or ? game.operating_rounds - game.round.round_num + 1 : game.operating_rounds
+      case timing
+      when :immediate then 0
+      when :current_round, :current_or then 1
+      when :full_or then left_in_set
+      when :one_more_full_or_set
+        final_turn = game.instance_variable_get(:@final_turn)
+        return unless final_turn
+
+        final_set = game.send(:final_operating_rounds)
+        game.turn >= final_turn ? (in_or ? left_in_set : final_set) : left_in_set + final_set
+      end
     end
 
     def round_type(round)
