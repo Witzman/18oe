@@ -76,7 +76,8 @@ const HEAD = String.raw`const fail = (m) => { throw new Error(m); };
 const TRACK = String.raw`(async () => {
   ${HEAD}
   if (document.querySelectorAll(".track-hex").length !== 2) fail("hex rows " + document.querySelectorAll(".track-hex").length);
-  small(".track-hex"); small(".track-map");
+  small(".track-hex");
+  if (q(".track-map").getBoundingClientRect().height !== 0) fail("'to the map' shown while the map is up");
   if (q(".frame-entry")) fail("generic bar still offers the claimed actions");
   if (q(".kit-main-btn") && !q(".kit-main-btn").disabled) fail("main button open before a pick");
   if (findLabel(m.layer("overlay"), "preview I86")) fail("preview before a pick");
@@ -95,7 +96,7 @@ const TRACK = String.raw`(async () => {
   if (!/M legt Kachel 8 auf I86, Drehung 2 von 2/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   // The way back to the map from another view.
   const other = [...document.querySelectorAll(".frame-tabs [role=tab]")].find((b) => b.getAttribute("aria-selected") !== "true");
-  if (other) { other.click(); await sleep(100); q(".track-map").click(); await sleep(100); if (tab() !== "Karte") fail("no way back to the map: " + tab()); }
+  if (other) { other.click(); await sleep(100); small(".track-map"); q(".track-map").click(); await sleep(100); if (tab() !== "Karte") fail("no way back to the map: " + tab()); }
   if ((await posted()).length !== 0) fail("previewing sent something");
   q(".kit-main-btn").click();
   await sleep(600);

@@ -17,7 +17,8 @@ import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
 import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
-import { OrBandView, OrStripView, orBand } from "./or-band.ts";
+import { OrStripView, orBand } from "./or-band.ts";
+import { opSheet, OpSheetView } from "../panels/op-sheet.ts";
 import { corpColor, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
 import { readCollapsed, writeCollapsed } from "./panel.ts";
 import { createViews } from "./views.ts";
@@ -225,7 +226,9 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     put(panelTitle,
       acting ? Siegel({ sym: acting.id, name: acting.name, color: acting.color }, { theme: t, size: "s" }) : null,
       v("span", { class: "frame-panel-step", title: p.step ? txt(`step.${p.step}`).en : undefined }, stepLabel(p.step)));
-    put(contextEl, b ? OrBandView(b, t, { order: false }) : null);
+    // Operating round (#302): the compact head of the acting company (numbers, step strip), no rules text.
+    const sheet = opSheet(game, t);
+    put(contextEl, sheet ? OpSheetView(sheet) : null);
     contextEl.append(contextSlot);
   }
 

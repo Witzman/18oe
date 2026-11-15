@@ -137,6 +137,7 @@ test("panel: every row is a button of at least touch size class, the mark and th
   const text = textOf(TrainPanel(load("buy-train-reserved"), emptySelection(), noop));
   assert.match(text, /Pflichtkauf/);
   assert.match(text, /Erst der Pflichtkauf/);
-  assert.match(text, /Lokomotivwerk/);
+  assert.match(text, /Aus dem Depot/);
+  assert.match(text, /Von anderen Gesellschaften/);
   assert.match(text, /von A/);
 });

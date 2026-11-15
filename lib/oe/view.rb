@@ -747,7 +747,16 @@ module Oe
             price: entity.share_price && new_share_price(game, entity, opt),
           }
         end,
+        routes: dividend_routes(game),
       }
+    end
+
+    # The run being paid out (#302): per train its hexes and revenue, so the panel can name the run and the
+    # map can show it. `round.routes` is what the Route step stored (Engine::Round::Operating).
+    def dividend_routes(game)
+      Array(safe { game.round.routes }).map do |route|
+        { train: route.train.name, hexes: route.hexes.map(&:id), revenue: route.revenue }
+      end
     end
 
     # Holder -> cash of a dividend option, as Engine::Step::Dividend#payout_shares

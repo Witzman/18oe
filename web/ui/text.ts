@@ -699,6 +699,22 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "div.up": e("steigt", "rises", "§11.4"),
   "div.down": e("fällt", "falls", "§11.4"),
   "div.same": e("unverändert", "unchanged", "§11.4"),
+  // --- Betriebsrunde im Aktionspanel (#302): Kopf, Schrittstreifen, kompakte Schritte ------------
+  "op.token_short": e("{free}/{all} frei", "{free}/{all} free", "§11.2"),
+  "op.strip_item": e("{n} {step}", "{n} {step}", "§11"),
+  "op.strip_Track": e("Gleis", "Track", "§11.1"),
+  "op.strip_Token": e("Station", "Token", "§11.2"),
+  "op.strip_Route": e("Fahrt", "Run", "§11.3"),
+  "op.strip_Dividend": e("Dividende", "Dividend", "§11.4"),
+  "op.strip_BuyTrain": e("Zug", "Train", "§11.6"),
+  "div.run": e("Lauf", "Run revenue", "§11.3"),
+  "div.share_line": e("{share} je Anteil", "{share} per share", "§11.4"),
+  "div.treasury_line": e("{amount} in die Kasse", "{amount} to treasury", "§11.4"),
+  "div.price_line": e("Kurs {from} → {to}", "Price {from} → {to}", "§11.4"),
+  "div.price_same": e("Kurs bleibt", "Price unchanged", "§11.4"),
+  "div.payout_title": e("Auszahlung bei {kind}", "Paid out on {kind}", "§11.4"),
+  "train.group_depot": e("Aus dem Depot", "From the depot", "§11.6"),
+  "train.group_corp": e("Von anderen Gesellschaften", "From other corporations", "§11.6.3"),
   "frame.choice_for": e("für {target}", "for {target}", "—"),
 };
 

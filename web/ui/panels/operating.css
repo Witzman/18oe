@@ -1,24 +1,35 @@
-/* Operating sheet panel (#49). Colours from ui.* tokens, sizes from shape.* tokens only. */
+/* Operating sheet panel (#49, compact in issue 302). Colours from ui.* tokens, sizes from shape.* tokens only. */
 .op-panel { display: flex; flex-direction: column; gap: var(--shape-gap); }
-.op-head h4 { margin: 0 0 4px; }
-.op-facts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; }
-.op-facts div { display: flex; gap: 6px; }
-.op-facts dt { color: var(--ui-faint); }
-.op-facts dd { margin: 0; }
 .op-table { width: 100%; border-collapse: collapse; }
-.op-table th, .op-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--ui-rule); min-height: 2.75rem; }
+.op-table th, .op-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--ui-rule); }
 .op-table .op-num { text-align: right; font-variant-numeric: tabular-nums; }
 .op-table tfoot td { font-weight: bold; border-bottom: 0; }
-.op-note { margin: 4px 0 0; font-size: .85rem; }
-.op-revenue { margin: 0 0 var(--shape-gap); font-weight: bold; }
-.op-opts { display: flex; flex-direction: column; gap: var(--shape-gap); }
-.op-opt { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; align-items: baseline; text-align: left; min-height: 2.75rem; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 6px 10px; }
-.op-opt .op-opt-name { grid-column: 1 / -1; }
-.op-opt .op-cell { display: flex; flex-direction: column; }
+.op-revenue { display: flex; align-items: baseline; gap: 8px; margin: 0; }
+.op-revenue b { margin-left: auto; font-size: var(--type-lg); font-variant-numeric: tabular-nums; }
+.op-runlines { margin: 2px 0 var(--shape-gap); font-size: var(--type-sm); }
+.op-opts { display: flex; flex-direction: column; gap: 6px; }
+.op-opt { display: flex; flex-direction: column; align-items: stretch; gap: 2px; text-align: left; min-height: var(--shape-hit, 44px); background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 5px 10px; }
+.op-opt-line { font-size: var(--type-sm); color: var(--ui-faint); font-variant-numeric: tabular-nums; }
 .op-opt[aria-pressed="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); background: var(--ui-panel); color: var(--ui-ink); }
 .op-opt:disabled { opacity: .7; cursor: default; }
-.op-move[data-move="up"] { color: var(--ui-accent); }
+.op-move { font-weight: 700; }
+.op-move[data-move="up"] { color: var(--map-valid); }
 .op-move[data-move="down"] { color: var(--ui-warn); }
+.op-payouts { margin-top: var(--shape-gap); padding: 6px 10px; border-radius: var(--shape-radius); background: var(--ui-panel-alt); }
+.op-payouts-title { margin: 0 0 2px; font-size: var(--type-sm); }
+.op-payouts ul { list-style: none; margin: 0; padding: 0; }
+.op-payouts li { display: flex; gap: 6px; } .op-payouts li b { margin-left: auto; font-variant-numeric: tabular-nums; }
+.op-table .op-stops { font-size: var(--type-sm); }
+
+/* Head of the acting company in the action panel (issue 302): one name line, one numbers line, the step strip. */
+.op-sheet { display: flex; flex-direction: column; gap: 2px; margin: 0 0 var(--shape-gap); }
+.op-sheet p { margin: 0; }
+.op-sheet-facts { font-size: var(--type-sm); color: var(--ui-faint); }
+.op-sheet-facts b { color: var(--ui-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.op-strip { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 4px 0 0; padding: 0; list-style: none; font-size: var(--type-sm); color: var(--ui-faint); }
+.op-strip-item { padding-bottom: 1px; border-bottom: 2px solid transparent; }
+.op-strip-item[data-state="done"] { opacity: .7; }
+.op-strip-item[data-state="current"] { color: var(--ui-ink); font-weight: 700; border-bottom-color: var(--ui-accent); }
 
 /* Acting company and operating order (#291). Colours from ui.* tokens; the company colour only on the seal. */
 .or-band { display: flex; flex-direction: column; gap: var(--shape-gap); margin: 0 0 var(--shape-gap); }

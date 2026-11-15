@@ -102,3 +102,41 @@ export function dividendOrder(g: Game, pick: string | null): { sentence: string;
   if (now !== null && o.price !== null) changes.push({ label: fillText("div.change_price", { corp: corp.id }), before: formatGeld(now), after: formatGeld(o.price) });
   return { sentence, changes, action: o.action };
 }
+
+// ---- the run on the map and in the dividend step (#302) ------------------------------------------
+export interface RunLine { train: string; stops: string; revenue: number }
+
+/** The run being decided: in the Route step the offered run_routes, in the Dividend step the stored run. */
+export function runLines(g: Game): RunLine[] {
+  if (g.state.prompt.step === ROUTE_STEP) return runModel(g).rows;
+  if (g.state.prompt.step !== DIVIDEND_STEP) return [];
+  return (g.state.prompt.context?.dividend?.routes ?? []).map((r) => ({ train: r.train, stops: r.hexes.join(" – "), revenue: r.revenue }));
+}
+
+/** Hexes of that run, each once, for the highlight on the map; empty when the view does not carry them. */
+export function runHexes(g: Game): string[] {
+  if (!isOperatingStep(g)) return [];
+  const hexes = g.state.prompt.step === ROUTE_STEP
+    ? (Array.isArray(runModel(g).action?.routes) ? runModel(g).action!.routes as { hexes?: unknown }[] : []).flatMap((r) => (Array.isArray(r.hexes) ? r.hexes.map(String) : []))
+    : (g.state.prompt.context?.dividend?.routes ?? []).flatMap((r) => r.hexes);
+  return [...new Set(hexes)];
+}
+
+/** One line per option as on the board: what each share gets, what the treasury keeps, where the price goes. */
+export function optionLine(o: DivOption, now: number | null): string {
+  const parts: string[] = [];
+  if (o.perShare !== null && o.perShare > 0) parts.push(fillText("div.share_line", { share: formatGeld(o.perShare) }));
+  if (o.treasury !== null && o.treasury > 0) parts.push(fillText("div.treasury_line", { amount: formatGeld(o.treasury) }));
+  if (o.price !== null && now !== null) {
+    parts.push(o.move === "same" ? txt("div.price_same").de : fillText("div.price_line", { from: formatGeld(now), to: formatGeld(o.price) }));
+  }
+  return parts.join(" · ");
+}
+
+/** Who gets what for the chosen option, else for the full payout (the mock's "Auszahlung bei ..."). */
+export function payoutRows(g: Game, pick: string | null): { kind: string; label: string; rows: { name: string; amount: number }[] } | null {
+  const opts = dividendOptions(g);
+  const o = chosenOption(g, pick) ?? opts.find((x) => x.kind === "payout") ?? null;
+  if (!o || o.payouts.length === 0) return null;
+  return { kind: o.kind, label: o.label, rows: o.payouts.map((p) => ({ name: playerName(g, p.holder), amount: p.amount })) };
+}
