@@ -73,9 +73,13 @@ const CHECKS = String.raw`(async () => {
   const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s);
-  for (const s of [".frame-roundbar", ".frame-players", ".frame-context", ".frame-main", ".frame-outliner", ".frame-bar"]) if (!q(s)) fail("missing " + s);
+  for (const s of [".frame-roundbar", ".frame-players", ".frame-panel", ".frame-main"]) if (!q(s)) fail("missing " + s);
   const box = (s) => q(s).getBoundingClientRect();
-  if (box(".frame-bar").bottom > innerHeight + 1 || box(".frame-roundbar").top < -1) fail("bars leave the window");
+  if (q(".frame-outliner") || q(".frame-bar")) fail("footer or outliner still there");
+  if (box(".frame-panel").bottom > innerHeight + 1 || box(".frame-panel").left < -1 || box(".frame-roundbar").top < -1) fail("panel or bar leave the window");
+  if (Math.abs(box(".frame-panel").width - 312) > 1) fail("panel width " + box(".frame-panel").width);
+  if (box(".frame-main").width < innerWidth - 2) fail("map area not full width");
+  for (const b of document.querySelectorAll(".frame-panel button")) { const r = b.getBoundingClientRect(); if (r.width && (r.height < 43.5 || r.width < 43.5)) fail("target too small: " + b.textContent + " " + r.width + "x" + r.height); }
   if (!q(".frame-who").textContent.trim()) fail("no who-acts text");
   if (q(".frame-who").dataset.mine !== "true") fail("not marked as mine");
   if (q(".frame-players").querySelectorAll(".frame-player").length < 3) fail("player bar");
@@ -87,14 +91,23 @@ const CHECKS = String.raw`(async () => {
   await sleep(50);
   if (!q(".kit-order")) fail("no order after selecting");
   if ((await (await fetch("/__posted")).json()).length !== before.length) fail("select sent something");
-  q(".kit-main-btn").click();
+  // Enter outside any control is the main button (#301).
+  document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
   await sleep(600);
   const posted = await (await fetch("/__posted")).json();
   if (posted.length !== before.length + 1) fail("confirm did not send exactly one action: " + posted.length);
   const sent = posted.at(-1);
   if (typeof sent.seq !== "number") fail("no seq");
-  if (!q(".frame-bar")) fail("frame gone");
+  if (!q(".frame-panel")) fail("frame gone");
   if (q(".kit-order")) fail("selection stays after a successful send");
+  // Collapse: the body goes, the order line stays; the state is remembered (localStorage).
+  q(".frame-panel-toggle").click();
+  await sleep(50);
+  if (q(".frame-panel").dataset.collapsed !== "true" || box(".frame-panel-body").height > 0) fail("not collapsed");
+  if (localStorage.getItem("oe.panel.collapsed") !== "1") fail("collapse not remembered");
+  q(".frame-panel-toggle").click();
+  await sleep(50);
+  if (q(".frame-panel").dataset.collapsed !== "false" || localStorage.getItem("oe.panel.collapsed") !== null) fail("not expanded again");
   window.__sent = sent;
 })()`;
 

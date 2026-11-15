@@ -39,7 +39,7 @@ export function orBand(g: Game, theme: Theme): OrBand | null {
   return { acting, entries, sentence };
 }
 
-export function OrBandView(b: OrBand, theme: Theme): VNode {
+export function OrBandView(b: OrBand, theme: Theme, opts: { order?: boolean } = {}): VNode {
   const seal = (e: OrEntry) => Siegel({ sym: e.id, color: e.color, name: e.name }, { theme, size: "s" });
   const ownerText = (e: OrEntry) => e.mine ? txt("op.you").de : `${e.owner ?? "?"}${e.bot ? ` · ${txt("frame.bot").de}` : ""}`;
   const card = b.acting ? v("div", { class: "or-acting", "data-mine": b.acting.mine ? "true" : "false", "data-bot": b.acting.bot ? "true" : "false", role: "status" },
@@ -48,7 +48,7 @@ export function OrBandView(b: OrBand, theme: Theme): VNode {
       v("strong", {}, b.sentence),
       v("small", { class: "muted" }, `${b.acting.tier} · ${fillText("op.owner", { who: ownerText(b.acting) })}`))) : null;
   const mark = (s: OrEntry["state"]) => s === "done" ? "✓" : s === "current" ? "▶" : "";
-  const list = v("ol", { class: "or-order", "aria-label": txt("op.order").de },
+  const list = opts.order === false ? null : v("ol", { class: "or-order", "aria-label": txt("op.order").de },
     ...b.entries.map((e) => v("li", {
       class: "or-item", "data-id": e.id, "data-state": e.state, "data-mine": e.mine ? "true" : "false", "data-bot": e.bot ? "true" : "false",
       "aria-current": e.state === "current" ? "step" : undefined,
@@ -59,7 +59,7 @@ export function OrBandView(b: OrBand, theme: Theme): VNode {
     v("span", { class: "or-owner" }, e.mine ? txt("op.you").de : e.owner ?? "?"),
     e.bot ? v("span", { class: "frame-tag" }, txt("frame.bot").de) : null,
     v("span", { class: "or-sr" }, ` ${txt(`op.state_${e.state}`).de}`))));
-  return v("section", { class: "or-band", "aria-label": txt("op.order").de }, card, v("h3", { class: "or-title" }, txt("op.order").de), list);
+  return v("section", { class: "or-band", "aria-label": txt("op.order").de }, card, list ? v("h3", { class: "or-title" }, txt("op.order").de) : null, list);
 }
 
 // Compact strip for the head bar (#300): one chip per company in operating order (seal in company colour,

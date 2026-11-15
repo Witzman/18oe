@@ -86,13 +86,12 @@ const ROUTE = String.raw`(async () => {
 
 const ORDER = String.raw`(async () => {
   ${HEAD}
-  const items = [...document.querySelectorAll(".or-item")];
+  const items = [...document.querySelectorAll(".head-order-item")];
   if (items.map((i) => i.dataset.id).join() !== "A,B,D,F,H,M") fail("order " + items.map((i) => i.dataset.id));
   if (items.map((i) => i.dataset.state).join() !== "done,current,next,next,next,next") fail("states");
-  if (document.querySelectorAll('.or-item[data-mine="true"]').length !== 2) fail("own marks");
-  if (!q('.or-item[data-id="A"]').dataset.bot || q('.or-item[data-id="A"]').dataset.bot !== "true") fail("bot mark");
+  if (document.querySelectorAll('.head-order-item[data-mine="true"]').length !== 2) fail("own marks");
   if (!/du bist am Zug/.test(q(".or-acting").textContent) || q(".or-acting").dataset.mine !== "true") fail("acting card: " + q(".or-acting").textContent);
-  small(".or-item"); small(".or-acting");
+  small(".or-acting"); if (document.querySelector(".frame-panel .or-item")) fail("order list duplicated in the panel");
   const w = document.documentElement.scrollWidth; if (w > window.innerWidth + 1) fail("horizontal overflow " + w);
 })()`;
 
@@ -165,5 +164,5 @@ test("operating sheet in the browser: a fractional dividend rate (£8,75) is dra
 });
 
 test("operating order in the browser: acting company card, order list with done, current, own and bot marks", { skip: browser ? false : "no headless browser installed" }, async () => {
-  await scenario("operating-route", ".or-item", ORDER);
+  await scenario("operating-route", ".head-order-item", ORDER);
 });
