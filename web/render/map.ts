@@ -24,7 +24,7 @@
 import { Application, Container, Graphics, Matrix, RenderLayer, Text } from "pixi.js";
 import type { Game, GameState, HexChange } from "../types.ts";
 import { THEME_CHANGED } from "../ui/theme-switch.ts";
-import { between, centerOn, clampPan, fit, frame, panBy, zoomAt, zoomStage, Z1_FROM, Z2_FROM, type Viewport } from "./camera.ts";
+import { between, centerOn, clampPan, fit, frame, maxZoom, panBy, zoomAt, zoomStage, Z1_FROM, Z2_FROM, type Viewport } from "./camera.ts";
 import { drawCoast, drawGrid, drawPlate, drawWalls, type Block } from "./layers/static.ts";
 import { drawTileSurface } from "./layers/tiles.ts";
 import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
@@ -610,7 +610,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   function flyTo(target: string): boolean {
     const c = hexCenter(target);
     if (c) {
-      animateTo(centerOn(view, c.p, c.z, vp(), Math.min(baseZoom * 4, Math.max(view.zoom, DETAIL_ZOOM))));
+      animateTo(centerOn(view, c.p, c.z, vp(), Math.min(maxZoom(baseZoom), Math.max(view.zoom, DETAIL_ZOOM))));
       return true;
     }
     const corp = state?.corporations.find((k) => k.id === target);
@@ -618,7 +618,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     if (hexes.length === 0) hexes = (geometry.homes ?? []).filter((h) => h.corporation === target).map((h) => h.hex);
     const pts = hexes.map(hexCenter).filter((x): x is { p: Vec; z: number } => !!x);
     if (pts.length === 0) return false;
-    animateTo(frame(view, pts.map((x) => x.p), pts[0]!.z, vp(), Math.min(baseZoom * 4, DETAIL_ZOOM)));
+    animateTo(frame(view, pts.map((x) => x.p), pts[0]!.z, vp(), Math.min(maxZoom(baseZoom), DETAIL_ZOOM)));
     return true;
   }
 
