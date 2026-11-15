@@ -102,15 +102,14 @@ export function TokenPanel(g: Game, sel: string | null, h: TokenHandlers): VNode
   const mine = mineToAct(g);
   const ctx = g.state.prompt.context?.token;
   const corp = placer(g);
-  const head = v("h3", {}, txt("token.title").de);
+  // The step title stands in the panel head (#302); no hint text, the glowing cities say where to tap.
   const left = ctx && ctx.price !== null ? v("p", { class: "token-left" }, fillText("token.left", { n: ctx.tokens_left, price: formatGeld(ctx.price) })) : null;
-  if (!mine) return v("section", { class: "token-panel", "aria-label": txt("token.title").de }, head, left, v("p", { class: "muted" }, fillText("token.waiting", { corp: corp?.id ?? "" })));
+  if (!mine) return v("section", { class: "token-panel", "aria-label": txt("token.title").de }, left, v("p", { class: "muted" }, fillText("token.waiting", { corp: corp?.id ?? "" })));
   const ts = tokenTargets(g);
   const eff = effectiveCity(g, sel);
   return v("section", { class: "token-panel", "aria-label": txt("token.title").de },
-    head, left,
-    v("p", { class: "muted token-hint" }, txt("token.hint").de),
-    v("button", { type: "button", class: "track-map", onclick: () => h.onMap() }, txt("track.to_map").de),
+    left,
+    v("button", { type: "button", class: "track-map", title: txt("token.hint").de, onclick: () => h.onMap() }, txt("track.to_map").de),
     ts.length === 0 ? v("p", { class: "muted" }, txt("token.none").de)
       : v("div", { class: "token-cities", role: "list", "aria-label": txt("token.targets").de }, ...ts.map((t) => v("button", {
         type: "button", class: "token-city", "data-city": t.id, "aria-pressed": String(t.id === eff), "data-state": t.id === eff ? "selected" : "normal",

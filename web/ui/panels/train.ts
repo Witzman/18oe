@@ -172,7 +172,8 @@ function rowButton(r: TrainRow, selected: boolean, mine: boolean, h: TrainHandle
   },
   v("strong", { class: "train-name" }, r.name),
   v("span", { class: "train-price" }, Geld(r.price)),
-  v("span", { class: "train-source muted" }, source, r.left !== null ? ` · ${fillText("train.left", { n: r.left })}` : ""),
+  // The group says "depot"; a depot row only says how many are left, a corporation's row whose it is.
+  v("span", { class: "train-source muted", title: source }, [r.owner === null ? null : source, r.left !== null ? fillText("train.left", { n: r.left }) : null].filter(Boolean).join(" · ")),
   r.reserved ? v("span", { class: "train-mark" }, txt("train.reserved").de) : null,
   r.hint ? v("small", { class: "train-hint muted" }, r.hint) : null,
   r.reason ? v("small", { class: "train-reason" }, r.reason) : null);
@@ -194,11 +195,16 @@ export function TrainPanel(g: Game, sel: TrainSelection, h: TrainHandlers): VNod
   const duty = mine ? dutyLine(g) : null;
   const warn = mine ? sentenceFor(g, sel).warn : null;
   const ins = insolvencyLines(g);
+  // Grouped as in the mock (#302): the depot first, then trains of other corporations; the step title stands
+  // in the panel head.
+  const group = (key: string, list: TrainRow[]) => list.length === 0 ? null : v("div", { class: "train-group", role: "group", "aria-label": txt(key).de },
+    v("p", { class: "train-group-title muted" }, txt(key).de),
+    v("div", { class: "train-list", role: "list" }, ...list.map((r) => rowButton(r, r.id === eff.train, mine, h))));
   return v("section", { class: "train-panel", "aria-label": txt("train.title").de },
-    v("h3", {}, txt("train.title").de),
     duty ? v("p", { class: "train-duty" }, duty) : null,
-    rows.length === 0 ? v("p", { class: "muted" }, txt("train.depot_empty").de)
-      : v("div", { class: "train-list", role: "list" }, ...rows.map((r) => rowButton(r, r.id === eff.train, mine, h))),
+    rows.length === 0 ? v("p", { class: "muted" }, txt("train.depot_empty").de) : null,
+    group("train.group_depot", rows.filter((r) => r.owner === null)),
+    group("train.group_corp", rows.filter((r) => r.owner !== null)),
     chosen && chosen.options.length > 1 ? priceRow(chosen, eff.price, h) : null,
     warn ? v("p", { class: "train-warn", role: "status" }, warn) : null,
     ins.length > 0 ? v("div", { class: "train-insolvency" }, v("h4", {}, txt("train.insolvency").de), v("ul", {}, ...ins.map((t) => v("li", {}, t)))) : null);

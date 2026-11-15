@@ -135,6 +135,8 @@ export interface DividendContext {
     kind: string; per_share: number; payouts?: { holder: string; amount: number }[]; treasury: number; withheld: number;
     direction: string[]; times: number[]; price: number | null;
   }[];
+  // The run being paid out (#302): per train its hexes and revenue; missing in states recorded before.
+  routes?: { train: string; hexes: string[]; revenue: number }[];
 }
 export interface TrainContext {
   limit: number; count: number; must_buy: boolean;

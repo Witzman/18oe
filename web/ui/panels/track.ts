@@ -176,9 +176,9 @@ export function TrackPanel(g: Game, sel: TrackSelection, h: TrackHandlers, geome
   const mine = mineToAct(g);
   const ctx = g.state.prompt.context?.track;
   const corp = builder(g);
-  const head = v("h3", {}, txt("track.title").de);
+  // The step title stands in the panel head (#302); no hint text, the glowing hexes say where to tap.
   const points = ctx ? v("p", { class: "track-points" }, fillText("track.points", { left: ctx.points.left, budget: ctx.points.budget })) : null;
-  if (!mine) return v("section", { class: "track-panel", "aria-label": txt("track.title").de }, head, points, v("p", { class: "muted" }, fillText("track.waiting", { corp: corp?.id ?? "" })));
+  if (!mine) return v("section", { class: "track-panel", "aria-label": txt("track.title").de }, points, v("p", { class: "muted" }, fillText("track.waiting", { corp: corp?.id ?? "" })));
   const hexes = trackHexes(g, tiles);
   const eff = effectiveSelection(g, sel, tiles);
   const chosen = hexes.find((x) => x.hex === eff.hex);
@@ -186,9 +186,8 @@ export function TrackPanel(g: Game, sel: TrackSelection, h: TrackHandlers, geome
   const index = tile ? tile.rotations.findIndex((x) => x.rotation === eff.rotation) : -1;
   const geo = geometry?.tiles ? { tiles: geometry.tiles, frame: hexFrame(geometry.layout.edge_vectors) } : null;
   return v("section", { class: "track-panel", "aria-label": txt("track.title").de },
-    head, points,
-    v("p", { class: "muted track-hint" }, txt("track.hint").de),
-    v("button", { type: "button", class: "track-map", onclick: () => h.onMap() }, txt("track.to_map").de),
+    points,
+    v("button", { type: "button", class: "track-map", title: txt("track.hint").de, onclick: () => h.onMap() }, txt("track.to_map").de),
     hexes.length === 0 ? v("p", { class: "muted" }, txt("track.none").de)
       : v("div", { class: "track-hexes", role: "list", "aria-label": txt("track.hexes").de }, ...hexes.map((x) => v("button", {
         type: "button", class: "track-hex", "data-hex": x.hex, "aria-pressed": String(x.hex === eff.hex), "data-state": x.hex === eff.hex ? "selected" : "normal",

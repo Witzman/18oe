@@ -65,6 +65,7 @@ RSpec.describe "Oe::View operating context (#123)" do
       before = { cash: entity.cash, holders: (game.players + game.corporations).to_h { |h| [h.id, h.cash] } }
       opt = ctx[:dividend][:options].find { |o| o[:kind] == action.kind }
       check(:dividend, label) { expect(opt).not_to be_nil }
+      check(:dividend, label) { check_routes(ctx[:dividend], game) }
       game.process_action(action)
       @game_for_check = game
       @fractional = true if opt[:per_share].to_f != opt[:per_share].to_f.floor
@@ -124,6 +125,13 @@ RSpec.describe "Oe::View operating context (#123)" do
       holder = @game_for_check.players.find { |x| x.id == id } || @game_for_check.corporation_by_id(id)
       expect(holder.cash - cash).to eq(paid.fetch(id, 0)), "#{id}: got #{holder.cash - cash}, view said #{paid[id].inspect}"
     end
+  end
+
+  # #302: the run being paid out, as the Route step stored it; it never claims more than the revenue.
+  def check_routes(dividend, game)
+    expect(dividend[:routes].map { |r| r[:train] }).to eq(game.round.routes.map { |r| r.train.name })
+    dividend[:routes].each { |r| expect(r[:hexes]).not_to be_empty }
+    expect(dividend[:routes].sum { |r| r[:revenue] }).to be <= dividend[:revenue]
   end
 
   def check_train(train, step, entity, game)
