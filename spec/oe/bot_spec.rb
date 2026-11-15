@@ -143,13 +143,22 @@ RSpec.describe Oe::Bot do
     end
 
     it "lays a tile on the company's network that reaches out (new stop or closer to one)" do
+      # The first Track step may legitimately pass (no lay brings progress, e.g. after the auction of #313
+      # changed who owns what), so look at the first Track step where the bot does lay.
       game, = play_until(2) { |g| g.round.operating? && g.round.active_step.is_a?(Engine::Step::Track) }
       bot = described_class.new(game, rng: Random.new(2))
-      entity = game.round.active_step.current_entity
+      action = nil
+      2_000.times do
+        action = bot.choose
+        break if action.is_a?(Engine::Action::LayTile)
+
+        game.process_action(action)
+        raise game.exception if game.exception
+      end
+      expect(action).to be_a(Engine::Action::LayTile)
+      entity = action.entity
       graph = game.graph_for_entity(entity)
       before = [graph.connected_nodes(entity).size, graph.connected_hexes(entity).size]
-      action = bot.choose
-      expect(action).to be_a(Engine::Action::LayTile)
       game.process_action(action)
       expect(game.exception).to be_nil
       game.clear_graph
