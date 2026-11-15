@@ -97,6 +97,7 @@ RSpec.describe Oe::Bot do
       game = Engine::Game::G18OE::Game.new(%w[p0 p1 p2 p3], id: seed, seed: seed)
       bot = described_class.new(game, rng: Random.new(seed))
       log = []
+      @stops_after = {} # entity => connected stops right after its own latest action (not at the end of the OR)
       20_000.times do
         break if yield(game)
 
@@ -105,6 +106,9 @@ RSpec.describe Oe::Bot do
         log << [game.round.operating? ? "#{game.turn}.#{game.round.round_num}" : nil, step.class.name.split("::").last, action]
         game.process_action(action)
         raise game.exception if game.exception
+
+        entity = action.entity
+        @stops_after[entity] = game.graph_for_entity(entity).connected_nodes(entity).size if entity.corporation?
       end
       [game, log]
     end
@@ -138,7 +142,9 @@ RSpec.describe Oe::Bot do
       # tile, or only lays the engine's TRACK_RESTRICTION rejects, #309), not a bot or enumerator miss.
       ran = runs.map { |a| a.entity }
       idle = with_train - ran
-      expect(idle).to all(satisfy { |c| game.graph_for_entity(c).connected_nodes(c).size < 2 })
+      # Judged by the stops it had at its own turn: tiles other companies lay later in the OR can connect it
+      # afterwards (#321: the new Track score changes who lays what, so the end state is not the right moment).
+      expect(idle).to all(satisfy { |c| @stops_after.fetch(c) < 2 })
       expect(runs.size).to be >= with_train.size / 2
     end
 
