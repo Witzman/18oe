@@ -423,8 +423,8 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "concession.sentence_par_only": e("Regional {corp} mit Par-Wert {price} für später versehen.", "Par regional {corp} at {price} for later.", "§8.1"),
   "concession.confirm_float": e("Gründen", "Float", "§9"),
   "concession.confirm_par": e("Par setzen", "Set par", "§8.1"),
-  "concession.help_float": e("Du kannst einen Minor gründen, den du besitzt, oder ein Regional, das du bezahlen kannst.", "Float a minor you own or a regional you can afford.", "§8.1"),
-  "concession.help_par_only": e("Du kannst weder einen Minor gründen noch ein Regional bezahlen: Versieh ein Regional mit einem Par-Wert, damit es später ein Spieler gründen kann.", "You cannot float a minor or afford a regional: par a regional for any player to float later.", "§8.1"),
+  "concession.help_float": e("Du kannst einen Minor gründen, den du besitzt, oder ein Regional, das du bezahlen kannst. Passen ist nicht möglich; Entfernen und Präsidiumkauf gibt es erst in der Regional/Minor-Phase.", "Float a minor you own or a regional you can afford. Passing is not allowed; removing and buying the presidency come in the next phase.", "§8.1, §8.2"),
+  "concession.help_par_only": e("Du kannst weder einen Minor gründen noch ein Regional bezahlen: Versieh ein Regional mit einem Par-Wert, damit es später ein Spieler gründen kann. Passen ist nicht möglich; Entfernen und Präsidiumkauf gibt es erst in der Regional/Minor-Phase.", "You cannot float a minor or afford a regional: par a regional for any player to float later. Passing is not allowed; removing and buying the presidency come in the next phase.", "§8.1, §8.2"),
   "concession.zones": e("Track-Rights-Zonen", "Track-rights zones", "§6.2"),
   "concession.zone_row": e("Zone {zone}: Heimat-Token {price}, {left} Chits frei", "Zone {zone}: home token {price}, {left} chits free", "§6.2"),
   "concession.zone_discount": e("{pct} % Rabatt", "{pct} % discount", "§6.2"),
@@ -716,6 +716,11 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "train.group_depot": e("Aus dem Depot", "From the depot", "§11.6"),
   "train.group_corp": e("Von anderen Gesellschaften", "From other corporations", "§11.6.3"),
   "frame.choice_for": e("für {target}", "for {target}", "—"),
+  // Engine choices (#290): the engine labels are English; the player sees these and a tooltip.
+  "choice.flip_private": e("Schließen (umdrehen): kein Einkommen, zählt nicht fürs Zertifikatslimit", "Flip face down", "§3.3, §6.1, §10.4"),
+  "choice.flip_private_tip": e("Das Privat wird umgedreht und geschlossen: es zahlt keine Einnahme mehr, zählt nicht mehr zum Zertifikatslimit, ist nicht mehr handelbar und zählt nicht in der Endwertung.", "Close the private: flip its certificate face down", "§3.3, §6.1, §10.4"),
+  "choice.remove_private": e("Aus dem Spiel nehmen", "Remove from game", "§3.3, §6.1"),
+  "choice.remove_private_tip": e("Das Privat wird aus dem Spiel genommen und ist danach nicht mehr im Spiel.", "Remove the private from the game", "§3.3, §6.1"),
 };
 
 // Liefert den Eintrag zu einem Schlüssel. Ein unbekannter Schlüssel fällt auf den

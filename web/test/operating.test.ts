@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
-import { choiceLabel, genericModel } from "../ui/frame/generic.ts";
+import { choiceLabel, choiceTip, genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
 import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, runModel, runSentence } from "../ui/panels/operating-model.ts";
 import { DividendPanel, OperatingPanel, RoutePanel } from "../ui/panels/operating.ts";
@@ -129,4 +129,13 @@ test("generic bar: a choose action shows the engine's label and the question, no
   const m = genericModel(g, createClaims());
   assert.equal(m.groups[0]!.label, "Auswahl treffen: Convert");
   assert.deepEqual(m.groups[0]!.entries.map((e) => e.detail), ["Convert to Major · für KSS", "Do not convert", "choice unlabelled"]);
+});
+
+test("private choices: German label and tooltip from text.ts (#290)", () => {
+  const g = load("operating-dividend");
+  const flip = { type: "choose", entity: "p0", entity_type: "player", choice: "flip_private", target: "PeC" };
+  g.state.prompt.actions = [flip];
+  g.state.prompt.choices = [{ choice: "flip_private", target: "PeC", entity: "p0", label: "Flip face down" }];
+  assert.match(choiceLabel(g, flip)!, /^Schließen \(umdrehen\).*· für PeC$/);
+  assert.match(choiceTip(flip)!, /zählt nicht mehr zum Zertifikatslimit/);
 });

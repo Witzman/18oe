@@ -10,7 +10,7 @@ import { playerName } from "./model.ts";
 export type Action = Record<string, unknown>;
 export type Range = Prompt["ranges"][number];
 
-export interface Entry { key: string; action: Action; label: string; detail: string; danger: boolean }
+export interface Entry { key: string; action: Action; label: string; detail: string; danger: boolean; tip?: string }
 export interface Group { type: string; label: string; entries: Entry[] }
 export interface RangeEntry { key: string; range: Range; label: string; detail: string }
 export interface GenericModel { groups: Group[]; ranges: RangeEntry[]; unsupported: string[]; count: number }
@@ -32,7 +32,21 @@ export function choiceLabel(g: Game, a: Action): string | null {
   if (a.type !== "choose") return null;
   const c = g.state.prompt.choices?.find((x) => x.choice === String(a.choice) && x.entity === a.entity && (x.target ?? null) === (a.target ?? null));
   if (!c || c.label === "") return null;
-  return c.target ? `${c.label} · ${fillText("frame.choice_for", { target: c.target })}` : c.label;
+  const label = choiceText(a) ?? c.label;
+  return c.target ? `${label} · ${fillText("frame.choice_for", { target: c.target })}` : label;
+}
+
+/** German label of an engine choice when text.ts has one (#290); null otherwise (engine label stays). */
+function choiceText(a: Action): string | null {
+  const t = txt(`choice.${String(a.choice)}`);
+  return t.de === `choice.${String(a.choice)}` ? null : t.de;
+}
+
+/** Tooltip help for a choice (#290, help level 1); undefined when text.ts has none. */
+export function choiceTip(a: Action): string | undefined {
+  if (a.type !== "choose") return undefined;
+  const t = txt(`choice.${String(a.choice)}_tip`);
+  return t.de === `choice.${String(a.choice)}_tip` ? undefined : t.de;
 }
 
 export function actionDetail(g: Game, a: Action): string {
@@ -55,7 +69,7 @@ export function genericModel(g: Game, claims: Claims): GenericModel {
     const type = String(a.type ?? "");
     if (!open(type)) continue;
     const list = byType.get(type) ?? [];
-    list.push({ key: actionKey(a), action: a, label: txt(`action.${type}`).de, detail: actionDetail(g, a), danger: DANGEROUS.has(type) });
+    list.push({ key: actionKey(a), action: a, label: txt(`action.${type}`).de, detail: actionDetail(g, a), danger: DANGEROUS.has(type), tip: choiceTip(a) });
     byType.set(type, list);
   }
   // A `choose` group carries the step's question (`choice_name`, #124) next to its name.
@@ -92,7 +106,7 @@ export interface GenericHandlers {
 function entryButton(e: Entry, h: GenericHandlers): VNode {
   const selected = h.selectedKey === e.key;
   return v("button", {
-    type: "button", class: "frame-entry", "data-key": e.key, "data-type": String(e.action.type),
+    type: "button", class: "frame-entry", "data-key": e.key, "data-type": String(e.action.type), title: e.tip,
     "aria-pressed": String(selected), "data-state": selected ? "selected" : "normal",
     onclick: () => h.onSelect(e),
   }, e.detail === "" ? e.label : e.detail);
