@@ -11,7 +11,9 @@ require "oe/view"
 # web/test/concession-browser.test.ts; the states there are recorded from exactly this game.)
 RSpec.describe "concession chain over the server (#289)" do
   let(:store) { Oe::Store.new(":memory:") }
-  let(:runner) { Oe::BotRunner.new(store) }
+  # The recorded seed-2 opening comes from the face-value auction (before #313); keep it, the
+  # spec is about the server handing over the concession chain, not about the bot's valuation.
+  let(:runner) { Oe::BotRunner.new(store, bot_factory: ->(game, rng) { Oe::Bot.new(game, rng: rng, valuation: :face) }) }
   let(:seats) do
     [{ "seat" => 0, "kind" => "human", "name" => "Witzman", "account_id" => "acc0" }] +
       (1..3).map { |i| { "seat" => i, "kind" => "bot", "name" => "Bot #{i + 1}" } }
@@ -25,7 +27,7 @@ RSpec.describe "concession chain over the server (#289)" do
       game = session.game
       return session if game.round.is_a?(Engine::Round::G18OE::Concession)
 
-      action = Oe::Bot.new(game, rng: Random.new(session.seq)).choose(player_id: game.active_players.first.id)
+      action = Oe::Bot.new(game, rng: Random.new(session.seq), valuation: :face).choose(player_id: game.active_players.first.id)
       session.append(action, actor: "acc0", expected_seq: session.seq)
     end
     raise "no concession round"

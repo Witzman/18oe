@@ -33,12 +33,12 @@ RSpec.describe Oe::Bot do
     end
   end
 
-  describe Oe::Bot::Auction do
+  describe "Oe::Bot::Auction (face value, before #313)" do
     let(:cheap) { Co.new(60) }
     let(:minor) { Co.new(100) }
     let(:game) { Game.new([minor]) }
     let(:rng) { Random.new(3) }
-    let(:auction) { described_class.new(game, rng) }
+    let(:auction) { Oe::Bot::Auction.new(game, rng, valuation: :face) }
 
     it "does not bid above value plus the premium" do
       player = Player.new(1000, "p0")
@@ -55,7 +55,7 @@ RSpec.describe Oe::Bot do
     it "bids on an affordable company (sometimes passing is allowed)" do
       player = Player.new(1000, "p0")
       bids = [Bid.new(player, cheap, 60), Bid.new(player, cheap, 70)]
-      picks = Array.new(200) { |i| described_class.new(game, Random.new(i)).choose({ "Bid" => bids, "Pass" => [Pass.new(player)] }) }
+      picks = Array.new(200) { |i| Oe::Bot::Auction.new(game, Random.new(i), valuation: :face).choose({ "Bid" => bids, "Pass" => [Pass.new(player)] }) }
       expect(picks.count { |a| a.is_a?(Bid) }).to be > 150
       expect(picks.count { |a| a.is_a?(Pass) }).to be > 0
     end
@@ -63,7 +63,7 @@ RSpec.describe Oe::Bot do
     it "prefers the company that becomes a minor" do
       player = Player.new(1000, "p0")
       bids = [Bid.new(player, cheap, 60), Bid.new(player, minor, 100)]
-      picks = Array.new(300) { |i| described_class.new(game, Random.new(i)).choose({ "Bid" => bids }) }
+      picks = Array.new(300) { |i| Oe::Bot::Auction.new(game, Random.new(i), valuation: :face).choose({ "Bid" => bids }) }
       expect(picks.count { |a| a.company == minor }).to be > picks.count { |a| a.company == cheap }
     end
 
@@ -149,13 +149,22 @@ RSpec.describe Oe::Bot do
     end
 
     it "lays a tile on the company's network that reaches out (new stop or closer to one)" do
+      # The first Track step may legitimately pass (no lay brings progress, e.g. after the auction of #313
+      # changed who owns what), so look at the first Track step where the bot does lay.
       game, = play_until(2) { |g| g.round.operating? && g.round.active_step.is_a?(Engine::Step::Track) }
       bot = described_class.new(game, rng: Random.new(2))
-      entity = game.round.active_step.current_entity
+      action = nil
+      2_000.times do
+        action = bot.choose
+        break if action.is_a?(Engine::Action::LayTile)
+
+        game.process_action(action)
+        raise game.exception if game.exception
+      end
+      expect(action).to be_a(Engine::Action::LayTile)
+      entity = action.entity
       graph = game.graph_for_entity(entity)
       before = [graph.connected_nodes(entity).size, graph.connected_hexes(entity).size]
-      action = bot.choose
-      expect(action).to be_a(Engine::Action::LayTile)
       game.process_action(action)
       expect(game.exception).to be_nil
       game.clear_graph
