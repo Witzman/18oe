@@ -4,7 +4,7 @@
       "file": "strategy-4p-1.json",
       "players": 4,
       "seed": 1,
-      "actions": 2979
+      "actions": 2998
     },
     "random-4p-1": {
       "file": "random-4p-1.json",
@@ -109,7 +109,7 @@
       "surface": "§11.3 Routen (2+2)",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2492,
+      "position": 2507,
       "expect": {
         "round": "Operating",
         "step": "Route"
@@ -120,7 +120,7 @@
       "surface": "§11.4 Dividende",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2506,
+      "position": 2508,
       "expect": {
         "round": "Operating",
         "step": "Dividend"
@@ -131,7 +131,7 @@
       "surface": "§11.2 Heimat-Token einer Regional/Minor im Betrieb",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2514,
+      "position": 2515,
       "expect": {
         "round": "Operating",
         "step": "HomeToken"
@@ -142,7 +142,7 @@
       "surface": "§11.2 Token setzen",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2528,
+      "position": 2531,
       "expect": {
         "round": "Operating",
         "step": "Token"
@@ -153,7 +153,7 @@
       "surface": "§11.7 Issue-Step",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2979,
+      "position": 2998,
       "expect": {
         "round": "Operating",
         "step": "IssueShares"

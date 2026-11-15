@@ -50,4 +50,23 @@ RSpec.describe Oe::Playthrough do
       expect(result.status).to eq(:finished), "#{result.status}: #{result.detail}"
     end
   end
+
+  describe "invariants switch (#138)" do
+    it "is off by default and passes a clean game prefix when on" do
+      result = described_class.run(players: 4, seed: 1, max_actions: 60, invariants: 10)
+
+      expect(result.status).to eq(:limit)
+      expect(result.actions).to eq(60)
+    end
+
+    it "stops with :invariant when a check fails (test of the test)" do
+      broken = Oe::Invariants::Violation.new(check: :money_conserved, rule: "x", message: "planted", pending: nil)
+      allow(Oe::Invariants).to receive(:run).and_return([broken])
+      result = described_class.run(players: 3, seed: 1, max_actions: 50, invariants: 5)
+
+      expect(result.status).to eq(:invariant)
+      expect(result.actions).to eq(5)
+      expect(result.detail).to include("money_conserved", "planted")
+    end
+  end
 end

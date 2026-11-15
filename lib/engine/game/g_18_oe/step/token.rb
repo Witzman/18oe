@@ -13,6 +13,17 @@ module Engine
             super
           end
 
+          # §11.6.4 para. 2 (workshop #352): no token while its price would leave the
+          # reserved 2+2 unpayable; the step then has nothing to offer.
+          def can_place_token?(entity)
+            super && @game.first_round_spend_allowed?(entity, min_token_price(available_tokens(entity)))
+          end
+
+          def pay_token_cost(entity, cost, city)
+            @game.check_first_round_spend!(entity, cost, what: 'a token')
+            super
+          end
+
           def available_hex(entity, hex)
             return nil unless @game.city_in_track_rights?(entity, hex)
 

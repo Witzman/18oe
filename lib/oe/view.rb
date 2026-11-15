@@ -229,11 +229,12 @@ module Oe
     end
 
     # Per regional exactly one state; nil for any other corporation. A converted
-    # regional has become a major (type changes) but keeps its regional id.
+    # regional has become a major or, since the national formation (#53), a
+    # national (type changes) but keeps its regional id.
     def regional_state(game, corp)
       return unless game.class::CORPORATIONS_TRACK_RIGHTS.key?(corp.id)
 
-      if corp.type == :major then "converted"
+      if %i[major national].include?(corp.type) then "converted"
       elsif corp.closed? then corp.par_price ? "closed" : "removed"
       elsif corp.floated? then "floated"
       elsif corp.ipoed then "parred"

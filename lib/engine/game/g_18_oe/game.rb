@@ -589,6 +589,44 @@ module Engine
           @fulfilled_train_obligation.add(entity.id)
         end
 
+        # §11.6.4 para. 2: a player may not force a RR into first-round insolvency by
+        # spending money on track or tokens. The rule undoes such spending (tokens first,
+        # then paid track, each refunded); the engine instead refuses it up front: while the
+        # reserved 2+2 is still owed, a paid lay or token is legal only if the RR's and its
+        # president's cash still cover that 2+2 afterwards. ASSUMPTION (workshop #352): same
+        # outcome, because in the first OR no money arrives between Track/Token and BuyTrain
+        # (no train, no revenue; private income is paid at the start of the OR), and Track
+        # comes before Token, so a token is what the guard drops first, as the rule does.
+        # `cost` is the net spend (a patronage payout of the same lay already deducted).
+        def first_round_spend_allowed?(entity, cost)
+          reserve = first_round_train_reserve(entity)
+          return true if reserve.nil? || !cost.positive?
+
+          entity.cash + entity.owner.cash - cost >= reserve
+        end
+
+        def check_first_round_spend!(entity, cost, net_cost: cost, what: 'track')
+          return if first_round_spend_allowed?(entity, net_cost)
+
+          raise GameError, "#{entity.name} cannot spend #{format_currency(cost)} on #{what}: its cash and its " \
+                           "president's would no longer cover the reserved 2+2 (§11.6.4)"
+        end
+
+        # Price of the reserved 2+2 the RR still has to buy (§11.6.1), or nil when it owes
+        # none: obligation fulfilled or over, the RR already has a train, or no player owns it.
+        def first_round_train_reserve(entity)
+          return unless entity&.corporation? && entity.floated? && entity.trains.empty? && entity.owner&.player?
+          return if fulfilled_train_obligation?(entity)
+
+          depot.depot_trains.find { |train| train.name == '2+2' && train.from_depot? }&.price
+        end
+
+        # What fulfilling the patronage tile on this hex would pay now (§11.1.8), 0 without one.
+        def patronage_payout(hex)
+          payouts = hex.tile.patronage
+          payouts ? payouts[patronage_color].to_i : 0
+        end
+
         def non_starter_trains_available?
           major_phase? && @first_or_complete
         end
@@ -763,6 +801,29 @@ module Engine
 
         def abandoned_minor?(corporation)
           corporation.type == :minor && corporation.floated? && !corporation.owner
+        end
+
+        # §11.6.5 (#353): an insolvent minor/regional has its charter or president's certificate
+        # in the Open Market. §10 (RB l. 2925 ff.) allows a president's certificate there only
+        # after a first-round insolvency, so the share's place is the insolvency state.
+        def insolvent_corporations
+          @corporations.select { |corporation| insolvent?(corporation) }
+        end
+
+        def insolvent?(corporation)
+          %i[minor regional].include?(corporation.type) && corporation.floated? &&
+            corporation.presidents_share&.owner == @share_pool
+        end
+
+        # §11.6.5 step 4: face value (£120 / 2 x par) plus the gap between treasury and the 2+2.
+        def insolvent_buyback_price(corporation)
+          face_value = if corporation.type == :minor
+                         G18OE::Step::BuyTrain::MINOR_CHARTER_VALUE
+                       else
+                         corporation.par_price.price * 2
+                       end
+          reserved_price = self.class::TRAINS.find { |train| train[:name] == '2+2' }[:price]
+          face_value + [reserved_price - corporation.cash, 0].max
         end
 
         def corporation_show_shares?(corporation)
