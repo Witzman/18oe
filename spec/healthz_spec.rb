@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require "spec_helper"
+require "tmpdir"
+require "fileutils"
 
 RSpec.describe "GET /healthz" do
   it "answers 200 with the ok status" do
@@ -19,6 +21,27 @@ RSpec.describe "GET /healthz" do
     expect(body["version"]).to match(/\A\d+\.\d+\.\d+(-dev)?\z/)
     expect(body["engine"]).to eq(Oe::GameSession.engine_rev)
     expect(body["engine"]).to end_with("+#{body['build']}")
+  end
+
+  it "reports a hash of the shipped frontend bundle as web_build (#284)" do
+    get "/healthz"
+    body = JSON.parse(last_response.body)
+    expect(body["web_build"]).to eq(Oe::BuildId.web_value)
+    expect(body["web_build"]).to match(/\A\h{12}\z/).or be_nil
+  end
+
+  it "does not change build when only the frontend changes, but web_build does (#284)" do
+    Dir.mktmpdir do |dir|
+      FileUtils.mkdir_p(File.join(dir, "web/dist"))
+      File.write(File.join(dir, "web/dist/main.js"), "a")
+      File.write(File.join(dir, "web/dist/main.js.map"), "m1")
+      first = Oe::BuildId.compute_web(dir)
+      File.write(File.join(dir, "web/dist/main.js.map"), "m2")
+      expect(Oe::BuildId.compute_web(dir)).to eq(first) # source maps are ignored
+      File.write(File.join(dir, "web/dist/main.js"), "b")
+      expect(Oe::BuildId.compute_web(dir)).not_to eq(first)
+    end
+    expect(Oe::BuildId.compute_web(Dir.mktmpdir)).to be_nil # no bundle, no hash
   end
 
   it "reports the database as writable" do
