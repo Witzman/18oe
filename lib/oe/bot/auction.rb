@@ -75,8 +75,9 @@ module Oe
         end
       end
 
+      # Lower-row bids tie up cash until the row above sells out; a bid in the
+      # top row (purchase or open auction) settles at once.
       def top_row?(step, company)
-        return true if step.respond_to?(:auctioning) && step.auctioning
         return true unless step.respond_to?(:top_row?, true)
 
         step.send(:top_row?, company)
