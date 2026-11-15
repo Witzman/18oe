@@ -195,7 +195,7 @@ RSpec.describe Oe::LegalActions do
       end.new
     end
     let(:hex) { double("hex", tile: double("old tile")) }
-    let(:game) { double("game", hexes: [hex], upgrade_cost: 0) }
+    let(:game) { double("game", hexes: [hex], upgrade_cost: 0, log: []) }
     let(:entity) { double("entity", cash: 100) }
     let(:step) do
       t = tile
