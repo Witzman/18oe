@@ -84,6 +84,13 @@ module Engine
             @round.pending_tokens[pending..].each { |entry| entry[:token].price = 0 }
           end
 
+          # §11.6.4 para. 2: no paid lay that leaves the reserved 2+2 unpayable (workshop #352).
+          # The patronage payout of the same lay counts against the cost.
+          def pay_tile_cost!(entity_or_entities, tile, rotation, hex, spender, cost, extra_cost)
+            @game.check_first_round_spend!(spender, cost, net_cost: cost - @game.patronage_payout(hex))
+            super
+          end
+
           def lay_tile_action(action)
             tile = action.tile
             old_tile = action.hex.tile
