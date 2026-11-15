@@ -36,6 +36,11 @@ export interface CorpRow {
   market: number;
   reserved: number;
   president: string | null;
+  presidentId: string | null;
+  /** Trains the corporation owns (card, #303). */
+  trains: number;
+  /** Who holds the certificates, president first, then players by percent, market, treasury (the share bar, #303). */
+  holders: Holder[];
   /** The viewer's percent of this corporation. */
   mine: number;
   buys: BuyOffer[];
@@ -44,6 +49,9 @@ export interface CorpRow {
   /** Anything to choose in this row (the viewer to act and an offer exists). */
   actionable: boolean;
 }
+
+/** One slice of a corporation's share bar: a player (`seat` 1-based, as the colour of the player), the market or the treasury. */
+export interface Holder { kind: "player" | "market" | "ipo"; id: string; name: string; seat: number; percent: number; president: boolean }
 
 export interface Selection { corp: string; key: string }
 
@@ -80,6 +88,30 @@ const corpOfShare = (a: Action, corps: Corporation[]): string | null => {
   return corps.some((c) => c.id === id) ? id : null;
 };
 
+/** The share bar of a corporation: players (president first, then by percent), then market, then treasury. */
+export function holdersOf(g: Game, c: Corporation): Holder[] {
+  const sum = new Map<string, number>();
+  for (const s of c.shares) sum.set(s.holder, (sum.get(s.holder) ?? 0) + s.percent);
+  const out: Holder[] = [];
+  for (const [id, percent] of sum) {
+    if (percent <= 0) continue;
+    const at = g.state.players.findIndex((p) => p.id === id);
+    if (id === "ipo" || id === "market") out.push({ kind: id, id, name: txt(id === "ipo" ? "stock.source_ipo" : "stock.source_market").de, seat: 0, percent, president: false });
+    else out.push({ kind: "player", id, name: playerName(g, id), seat: at + 1, percent, president: id === c.president });
+  }
+  const rank = (h: Holder) => (h.kind === "player" ? (h.president ? 0 : 1) : h.kind === "market" ? 2 : 3);
+  return out.sort((a, b) => rank(a) - rank(b) || b.percent - a.percent || a.seat - b.seat);
+}
+
+export interface Presidency { player: string; name: string; seat: number; me: boolean; corps: { id: string; name: string }[] }
+/** Per player the corporations he presides (the strip below the cards, #303); players in seat order. */
+export function presidencies(g: Game): Presidency[] {
+  return g.state.players.map((p, i) => ({
+    player: p.id, name: p.name, seat: i + 1, me: p.id === g.viewer,
+    corps: g.state.corporations.filter((c) => !c.closed && c.president === p.id).map((c) => ({ id: c.id, name: c.name })),
+  }));
+}
+
 /** The rows of the sheet, in a stable order (tier, then price high to low, unfounded last). */
 export function corpRows(g: Game): CorpRow[] {
   const corps = g.state.corporations;
@@ -113,11 +145,13 @@ export function corpRows(g: Game): CorpRow[] {
     const shown = !c.closed && state !== "other" && (c.type !== "minor" || any);
     if (!shown) continue;
     const pct = (holder: string) => c.shares.filter((s) => s.holder === holder).reduce((n, s) => n + s.percent, 0);
+    const holders = holdersOf(g, c);
     rows.push({
       id: c.id, name: c.name, tier: c.type, state,
       price: c.share_price, par: c.par_price,
       treasury: pct("ipo"), market: pct("market"), reserved: c.reserved?.percent ?? 0,
-      president: c.president ? playerName(g, c.president) : null,
+      president: c.president ? playerName(g, c.president) : null, presidentId: c.president,
+      trains: c.trains.length, holders,
       mine: mineList.filter((s) => s.corporation === c.id).reduce((n, s) => n + s.percent, 0),
       buys: o.buys, sells: o.sells, pars: o.pars.sort((x, y) => y.price - x.price),
       actionable: mine && any,

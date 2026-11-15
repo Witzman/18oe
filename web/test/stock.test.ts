@@ -8,8 +8,8 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { corpRows, marketModel, mustSell, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
-import { offerLabel, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
+import { corpRows, marketModel, presidencies, mustSell, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
+import { offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
 const pool = load("stock-pool"), par = load("stock-par");
@@ -123,7 +123,7 @@ test("sheet: offers of the focused row are buttons with the label of the offer; 
   const rows = corpRows(pool);
   const row = rows.find((r) => r.id === SELL)!;
   const picked: [string, string][] = [];
-  const tree = sheetNode(input(pool, { focus: SELL }), { ...noop, onPick: (c, k) => picked.push([c, k]) });
+  const tree = offersNode(input(pool, { focus: SELL }), { ...noop, onPick: (c, k) => picked.push([c, k]) })!;
   const offers = find(tree, (n) => n.tag === "button" && n.attrs.class === "stock-offer");
   assert.equal(offers.length, row.buys.length + row.sells.length + row.pars.length);
   for (const b of offers) assert.ok(textOf(b).length > 3);
@@ -142,6 +142,22 @@ test("sheet: every row opens by a real button; the rows of the whole list are al
   // Seals sit on the cells of their corporations.
   const seals = find(tree, (n) => n.attrs.class?.includes("kit-seal") === true && (n.attrs.class ?? "").length > 0);
   assert.ok(seals.length > 0);
+});
+
+test("cards: share bar slices add up to 100, president first and marked; presidencies list the corporations a player presides", () => {
+  const rows = corpRows(pool);
+  for (const r of rows) {
+    assert.equal(r.holders.reduce((n, h) => n + h.percent, 0), 100, r.id);
+    if (r.presidentId) assert.ok(r.holders[0]!.president && r.holders[0]!.id === r.presidentId, r.id);
+  }
+  const tree = sheetNode(input(pool), noop);
+  assert.equal(find(tree, (n) => n.attrs.class === "stock-bar").length, rows.length);
+  const pres = presidencies(pool);
+  assert.equal(pres.length, pool.state.players.length);
+  const total = pres.reduce((n, p) => n + p.corps.length, 0);
+  assert.equal(total, pool.state.corporations.filter((c) => !c.closed && c.president).length);
+  assert.equal(find(tree, (n) => n.attrs.class === "stock-pres-item").length, pres.length);
+  assert.equal(find(offersNode(input(pool), noop) ?? { tag: "i", attrs: {}, on: {}, children: [] } as never, (n) => n.attrs.class === "stock-offer").length, 0);
 });
 
 test("claims: buy, sell, par and pass of the stock step are the panel's; convert and choose stay generic", () => {
