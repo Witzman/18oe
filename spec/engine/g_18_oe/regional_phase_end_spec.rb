@@ -62,11 +62,52 @@ describe 'G18OE end of the Regional/Minor RR Phase (§5.1.3, §8.2)' do
   end
 
   it 'does not remove the other regionals while 15 have floated and 3 are only parred (§8.2 "when the 18th is floated")' do
-    pending 'deviation: regionals_in_play counts parred regionals, so the 18th par removes the six un-parred regionals (workshop #348)'
     float_regionals!(game, 15)
     par_only!(3)
     step.close_unfloated_regionals_at_maximum!
 
     expect(unparred.size).to eq(6)
+  end
+
+  it 'refuses to par a 19th regional while 18 are floated or parred' do
+    float_regionals!(game, 15)
+    par_only!(3)
+
+    expect(game.can_par?(unparred.first, game.players.first)).to be(false)
+  end
+
+  it 'still lets a regional be parred while fewer than 18 are floated or parred' do
+    float_regionals!(game, 15)
+    par_only!(2)
+
+    expect(game.can_par?(unparred.first, game.players.first)).to be(true)
+  end
+
+  it 'removes the six others when the 18th regional floats by buying the president share (§8.2)' do
+    float_regionals!(game, 17)
+    par_only!(1)
+    parred = game.corporations.find { |c| game.parred_regional?(c) }
+    expect(unparred.size).to eq(6)
+
+    buyer = round.current_entity
+    fund!(game, buyer)
+    act!(round, Engine::Action::BuyShares.new(buyer, shares: parred.presidents_share, percent: 50))
+
+    expect(parred.floated?).to be(true)
+    expect(unparred).to be_empty
+    expect(game.corporations.count { |c| c.type == :regional }).to eq(18)
+  end
+
+  it 'keeps the six others when a parred regional floats as only the 17th (§8.2)' do
+    float_regionals!(game, 16)
+    par_only!(1)
+    parred = game.corporations.find { |c| game.parred_regional?(c) }
+
+    buyer = round.current_entity
+    fund!(game, buyer)
+    act!(round, Engine::Action::BuyShares.new(buyer, shares: parred.presidents_share, percent: 50))
+
+    expect(parred.floated?).to be(true)
+    expect(unparred.size).to eq(7)
   end
 end
