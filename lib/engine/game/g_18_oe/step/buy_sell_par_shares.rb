@@ -328,7 +328,12 @@ module Engine
           end
 
           def process_buy_shares(action)
-            return super unless reservation_prompt?(action)
+            unless reservation_prompt?(action)
+              super
+              # §8.2: buying a parred regional's president share floats it; the 18th float removes the rest (#348).
+              @game.close_unfloated_regionals_at_maximum!
+              return
+            end
 
             check_legal_buy(action.entity, action.bundle, swap: action.swap)
             @round.pending_share_buy = action
@@ -534,14 +539,7 @@ module Engine
           end
 
           def close_unfloated_regionals_at_maximum!
-            return unless @game.regionals_in_play >= @game.class::MAX_FLOATED_REGIONALS
-
-            leftovers = @game.corporations.reject { |corp| corp.ipoed || corp.type == :minor }
-            return if leftovers.empty?
-
-            leftovers.each { |corp| @game.close_corporation(corp) }
-
-            pass!
+            pass! if @game.close_unfloated_regionals_at_maximum!
           end
 
           def get_par_prices(entity, corp)

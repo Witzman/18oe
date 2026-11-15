@@ -934,6 +934,30 @@ module Engine
           @corporations.count { |corporation| corporation.type == :regional && corporation.ipoed }
         end
 
+        # Regionals that have floated (president's share bought, §9.2). Only these end the
+        # Regional/Minor RR Phase (§5.1.3, §8.2); parred ones are merely in play (#348).
+        def regionals_floated
+          @corporations.count { |corporation| corporation.type == :regional && corporation.floated? }
+        end
+
+        # §8.2: the six remaining un-floated regionals are removed when the 18th regional floats.
+        # Returns true if regionals were removed.
+        def close_unfloated_regionals_at_maximum!
+          return false unless regionals_floated >= self.class::MAX_FLOATED_REGIONALS
+
+          leftovers = @corporations.select { |corporation| corporation.type == :regional && !corporation.floated? }
+          leftovers.each { |corporation| close_corporation(corporation) }
+          !leftovers.empty?
+        end
+
+        # At most MAX_FLOATED_REGIONALS regionals may be parred or floated at the same time, since each
+        # parred one can still float; the others are removed only when the 18th floats (#348).
+        def can_par?(corporation, parrer)
+          return false if corporation.type == :regional && regionals_in_play >= self.class::MAX_FLOATED_REGIONALS
+
+          super
+        end
+
         def removable_regional?(corporation)
           return false if corporation.type != :regional || corporation.ipoed
           return false unless @corporations.count { |c| c.type == :regional } > self.class::MAX_FLOATED_REGIONALS
