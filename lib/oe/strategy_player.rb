@@ -114,6 +114,11 @@ module Oe
     end
 
     def pick_buy_train(trains, by_class)
+      # The enumerator offers every side of a double-sided card (#127). Choosing
+      # the dearer side is v0.3 (bots on the full rules); until then the bot
+      # buys the base side as before.
+      base = trains.select { |a| a.variant.nil? || a.variant == a.train.variants.keys.first }
+      trains = base unless base.empty?
       entity = trains.first.entity
       affordable = trains.select { |a| a.price <= entity.cash }
       return affordable.max_by(&:price) unless affordable.empty?

@@ -333,7 +333,18 @@ module Oe
         distance: train.distance.is_a?(Array) ? train.distance.map { |d| d.respond_to?(:to_h) ? d.to_h : d } : train.distance,
         rusts_on: train.rusts_on,
         obsolete_on: train.obsolete_on,
+        variants: train_variants(train),
       }
+    end
+
+    # The sides of a double-sided card (#127): name, price and reach per variant,
+    # the base side first; empty for a train with a single side.
+    def train_variants(train)
+      return [] if train.variants.size < 2
+
+      train.variants.values.map do |v|
+        { name: v[:name], price: v[:price], distance: Array(v[:distance]).map { |d| d.respond_to?(:to_h) ? d.to_h : d }, multiplier: v[:multiplier] }
+      end
     end
 
     def last_run(corp)
