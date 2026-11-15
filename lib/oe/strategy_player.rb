@@ -67,7 +67,9 @@ module Oe
       candidates = minors.empty? ? pars : minors
       corporation_groups = candidates.group_by(&:corporation)
       corporation, options = corporation_groups.to_a.sample(random: @rng)
-      target = target_par(corporation)
+      # The wish may exceed what the company can ever be parred at (regional par
+      # tops out at 90, 2 x 90 < BUFFER_PAR_CASH): cap it so the best price is still taken.
+      target = [target_par(corporation), 2 * options.map { |a| a.share_price.price }.max].min
       fitting = options.select { |a| a.share_price.price * 2 >= target }
       fitting.min_by { |a| a.share_price.price }
     end

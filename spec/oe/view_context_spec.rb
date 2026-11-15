@@ -62,7 +62,7 @@ RSpec.describe "Oe::View operating context (#123)" do
       check(:train, label) { check_train(ctx[:train], step, entity, game) } if ctx[:train]
       next unless ctx[:dividend] && action.is_a?(Engine::Action::Dividend)
 
-      before = { cash: entity.cash, holders: (game.players + game.corporations).to_h { |h| [h.id, h.cash] } }
+      before = { round: game.round, cash: entity.cash, holders: (game.players + game.corporations).to_h { |h| [h.id, h.cash] } }
       opt = ctx[:dividend][:options].find { |o| o[:kind] == action.kind }
       check(:dividend, label) { expect(opt).not_to be_nil }
       check(:dividend, label) { check_routes(ctx[:dividend], game) }
@@ -106,7 +106,7 @@ RSpec.describe "Oe::View operating context (#123)" do
 
       expect(c[:price]).to eq(game.track_rights_cost(game.region_for_hex(city.hex)))
     end
-    return if step.is_a?(G::Step::HomeToken)
+    return if step.is_a?(Engine::Step::HomeToken) # also the engine's own home-token step (majors, regionals)
 
     expect(token[:price]).to eq(tokens.first.price)
     expect(token[:kind]).to eq("operating")
@@ -118,6 +118,10 @@ RSpec.describe "Oe::View operating context (#123)" do
     expect(opt[:price]).to eq(entity.share_price&.price)
     expect(entity.cash - before[:cash]).to eq(opt[:treasury])
     # #294: every holder got exactly the announced payout (rounded up per recipient), nobody else got money.
+    # The last dividend of an operating round starts the next one, which pays the private companies' income to
+    # the players (bot games now reach this): the cash comparison only holds while the round is still the same.
+    return unless @game_for_check.round.equal?(before[:round])
+
     paid = opt[:payouts].to_h { |p| [p[:holder], p[:amount]] }
     before[:holders].each do |id, cash|
       next if id == entity.id

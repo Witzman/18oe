@@ -3,6 +3,7 @@
 require_relative "../engine/engine_helper"
 require "oe/bot_runner"
 require "oe/legal_actions"
+require "oe/view"
 require "tmpdir"
 
 RSpec.describe Oe::BotRunner do
@@ -44,10 +45,11 @@ RSpec.describe Oe::BotRunner do
     rows.map { |r| r["payload"].reject { |k, _| k == "created_at" } }
   end
 
-  it "plays a bots-only game to its regular end from one kick, as bot:<seat> with gapless seq" do
+  # The one whole bot game of the suite (#314, ~7 min): full stage only (OE_FULL_GAME=1, job full-game).
+  it "plays a bots-only game to its regular end from one kick, as bot:<seat> with gapless seq", :full_game do
     id = new_game(%i[bot bot bot], seed: 1).id
     expect(runner.kick(id)).to be(true)
-    expect(runner.wait_idle(id, timeout: 240)).to be(true)
+    expect(runner.wait_idle(id, timeout: 1500)).to be(true)
 
     session = reload(id)
     expect(session.game.finished).to be(true)
@@ -56,6 +58,24 @@ RSpec.describe Oe::BotRunner do
     expect(rows.map { |r| r["seq"] }).to eq((1..rows.size).to_a)
     expect(rows.map { |r| r["actor"] }.uniq.sort).to eq(%w[bot:0 bot:1 bot:2])
     expect(store.incidents(id)).to eq([])
+
+    # the final standing of a finished game (view_spec only renders capped games)
+    view = Oe::View.render(session.game, viewer: nil)
+    meta = view[:meta]
+    expect(view[:prompt][:actions]).to be_empty
+    expect(meta[:finished]).to be(true)
+    expect(meta[:winner]).to eq(meta[:standings].first[:player])
+    expect(meta[:standings].map { |s| s[:value] }).to eq(meta[:standings].map { |s| s[:value] }.sort.reverse)
+  end
+
+  it "plays a bots-only game for a capped number of actions from one kick, as bot:<seat> with gapless seq" do
+    id = new_game(%i[bot bot bot], seed: 1).id
+    expect(runner.drain(id, max: GAME_CAP)).to eq(GAME_CAP)
+    rows = log(id)
+    expect(rows.map { |r| r["seq"] }).to eq((1..rows.size).to_a)
+    expect(rows.map { |r| r["actor"] }.uniq.sort).to eq(%w[bot:0 bot:1 bot:2])
+    expect(store.incidents(id)).to eq([])
+    expect { reload(id) }.not_to raise_error # the whole log replays
   end
 
   it "stops at the human: bots move until a human is on turn, then continue after the human's move" do
