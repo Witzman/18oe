@@ -4,13 +4,13 @@
       "file": "strategy-4p-1.json",
       "players": 4,
       "seed": 1,
-      "actions": 5029
+      "actions": 5038
     },
     "strategy-3p-1": {
       "file": "strategy-3p-1.json",
       "players": 3,
       "seed": 1,
-      "actions": 2862
+      "actions": 2868
     },
     "random-4p-1": {
       "file": "random-4p-1.json",
@@ -236,7 +236,7 @@
       "surface": "Zugphase 5 beginnt (Level-5-Zuege, Konsolidierung ausgeloest)",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 3736,
+      "position": 3739,
       "expect": {
         "phase": "5",
         "round": "Operating",
@@ -248,7 +248,7 @@
       "surface": "§10.6 Konsolidierungsrunde (Minors und Regionals: mergen, kaufen, verkaufen)",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4041,
+      "position": 4047,
       "expect": {
         "round": "Consolidation",
         "step": "Consolidate"
@@ -259,7 +259,7 @@
       "surface": "§10.6 Konsolidierung: Minor in den Major mergen",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4295,
+      "position": 4301,
       "expect": {
         "round": "Consolidation",
         "step": "MergeMinor"
@@ -270,7 +270,7 @@
       "surface": "§10.6 Konsolidierung: Token-Wahl nach Merge",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4296,
+      "position": 4302,
       "expect": {
         "round": "Consolidation",
         "step": "MergeToken"
@@ -281,7 +281,7 @@
       "surface": "§10.6 Konsolidierung: Merge-Angebot an die Spieler",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4316,
+      "position": 4322,
       "expect": {
         "round": "Consolidation",
         "step": "MergeOffer"
@@ -292,7 +292,7 @@
       "surface": "§10.6/§11.6 Konsolidierung: Zug abwerfen nach Merge (Zuglimit)",
       "slice": "S3",
       "game": "strategy-3p-1",
-      "position": 2758,
+      "position": 2761,
       "expect": {
         "round": "Consolidation",
         "step": "MergeDiscardTrain"
@@ -303,7 +303,7 @@
       "surface": "§11.6 Zuglimit: Zug abwerfen im Betrieb (Phasenwechsel)",
       "slice": "S3",
       "game": "strategy-3p-1",
-      "position": 2862,
+      "position": 2868,
       "expect": {
         "round": "Operating",
         "step": "DiscardTrain"
@@ -314,11 +314,11 @@
       "surface": "Zugphase 6",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 3944,
+      "position": 3947,
       "expect": {
         "phase": "6",
         "round": "Operating",
-        "step": "BuyTrain"
+        "step": "ConvertToNational"
       }
     },
     {
@@ -326,7 +326,7 @@
       "surface": "Zugphase 7",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4530,
+      "position": 4536,
       "expect": {
         "phase": "7",
         "round": "Operating",
@@ -338,11 +338,11 @@
       "surface": "Zugphase 8 (Level-8-Zuege)",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4707,
+      "position": 4713,
       "expect": {
         "phase": "8",
         "round": "Operating",
-        "step": "IssueShares"
+        "step": "ConvertToNational"
       }
     },
     {
@@ -350,7 +350,7 @@
       "surface": "§13 Spielende (Endphase, Endstand, View ohne Betrachter)",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 5029,
+      "position": 5038,
       "expect": {
         "finished": true,
         "round": "Operating",
