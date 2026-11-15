@@ -568,14 +568,18 @@ module Oe
     # Who the offered actions are issued for (#91, #123): one entry per acting
     # entity in `actions`, the entity the step waits for first (`primary`), the
     # others are "also possible" (a president selling shares for a corporation
-    # that must buy a train, a player converting a regional).
+    # that must buy a train, a player converting a regional, a private placing
+    # its token: kind "company", #128).
     def acting_as(game, step, list)
       current = step && safe { step.current_entity }&.id
       list.group_by { |a| a["entity"] }.map do |id, actions|
         entity = game.get(actions.first["entity_type"], id)
         {
           entity: id,
-          kind: entity.player? ? "player" : "corporation",
+          kind: if entity.player? then "player"
+                elsif entity.company? then "company" # a private acting itself (#128), never primary
+                else "corporation"
+                end,
           primary: id == current || (current.nil? && entity.player?),
           types: actions.map { |a| a["type"] }.uniq,
         }

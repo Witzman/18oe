@@ -151,14 +151,15 @@ module Oe
 
       # Entities that are not active themselves but act on behalf of the
       # acting side (see Oe::LegalActions#acting_for, #132): a regional that its
-      # president converts, the president selling shares in a train purchase.
+      # president converts, the president selling shares in a train purchase, a
+      # private company of the viewer acting itself (White Cliffs Ferry, #128).
       # Allowed when the entity belongs to the viewer and the viewer is the
       # acting player (or the president of the active corporation).
       def acting_for?(game, viewer, entity_id)
-        other = game.players.find { |p| p.id == entity_id } || game.corporation_by_id(entity_id)
+        other = game.players.find { |p| p.id == entity_id } || game.corporation_by_id(entity_id) || game.company_by_id(entity_id)
         return false unless other
 
-        other_player = other.player? ? other : other.player
+        other_player = other.player? ? other : other.company? ? other.owner : other.player
         return false unless other_player && other_player.id == viewer
 
         game.round.active_entities.any? do |e|

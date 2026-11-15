@@ -93,7 +93,9 @@ module Oe
       actions = Oe::LegalActions.new(@game, limit: @limit, rng: @rng).call
       return actions unless player_id
 
-      actions.select { |a| acting_player(a.entity)&.id == player_id }
+      # Bots do not use privates yet: an action a private issues itself (#128)
+      # stays unplayed until the bot learns that private (S8, #77 ff.).
+      actions.select { |a| !a.entity.company? && acting_player(a.entity)&.id == player_id }
     end
 
     private
