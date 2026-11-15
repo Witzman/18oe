@@ -429,6 +429,7 @@ module Engine
           @merged_minors = Hash.new { |hash, corporation| hash[corporation] = [] }
           @removed_regional_zones = []
           @orient_express_markers = []
+          @last_payouts = {}
           @concessions = companies.select { |company| concession?(company) }
           @fulfilled_train_obligation = Set.new
           @first_or_complete = false
@@ -895,6 +896,31 @@ module Engine
           @players.size == 2 ? self.class::TWO_PLAYER_MAJOR_MAX_OWNERSHIP_PERCENT : self.class::MAJOR_MAX_OWNERSHIP_PERCENT
         end
 
+        def long_endgame?
+          @optional_rules.include?(:long_endgame)
+        end
+
+        # §13: the last OR of the final turn only repeats the previous OR's payout. PB 5.3 (long_endgame)
+        # plays it fully. A bank break ends the game after the current OR, so it never reaches this OR.
+        def abbreviated_or?(round_num)
+          !long_endgame? && !@final_turn.nil? && @turn == @final_turn && round_num == @operating_rounds
+        end
+
+        # Remembered at every dividend: what the next (abbreviated) OR repeats for this railroad.
+        def record_payout!(entity, revenue, kind)
+          @last_payouts[entity.id] = { revenue: revenue, kind: kind.to_sym, train_ids: entity.trains.map(&:id).sort }
+        end
+
+        # The payout the abbreviated OR repeats for entity, or nil when it has to be decided anew:
+        # not in an abbreviated OR, no earlier payout, or its trains changed since (bought or rusted, §13).
+        # round is the step's own round: during setup @round is still the previous one.
+        def repeated_payout(entity, round)
+          return unless round.respond_to?(:abbreviated?) && round.abbreviated?
+
+          last = @last_payouts[entity.id]
+          last if last && last[:train_ids] == entity.trains.map(&:id).sort
+        end
+
         def place_major_par_marker!(corporation)
           corporation.max_ownership_percent = major_max_ownership_percent
           corporation.always_market_price = false
@@ -1081,6 +1107,8 @@ module Engine
         end
 
         def operating_round(round_num)
+          return abbreviated_operating_round(round_num) if abbreviated_or?(round_num)
+
           Round::G18OE::Operating.new(self, [
             Engine::Step::Bankrupt,
             Engine::Step::Exchange,
@@ -1095,6 +1123,15 @@ module Engine
             G18OE::Step::BuyTrain,
             # Convert step to do national conversions at 4/6/8?
             G18OE::Step::IssueShares,
+          ], round_num: round_num)
+        end
+
+        # §13: no track, tokens or train buying; routes are only re-run for a changed train set.
+        def abbreviated_operating_round(round_num)
+          Round::G18OE::Operating.new(self, [
+            G18OE::Step::Route,
+            G18OE::Step::Dividend,
+            G18OE::Step::OrientExpressBonus,
           ], round_num: round_num)
         end
 
