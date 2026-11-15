@@ -33,3 +33,7 @@
 .auction-player { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; padding: 6px 0; border-bottom: 1px solid var(--ui-rule); }
 .auction-owned { display: flex; flex-wrap: wrap; gap: 4px 16px; }
 @media (max-width: 960px) { .auction-row { grid-template-columns: minmax(0, 1fr); } .auction-card { width: 9.5rem; } }
+.auction-ability, .auction-home { font-size: .78rem; line-height: 1.25; color: var(--ui-faint); overflow-wrap: anywhere; }
+.auction-card[data-state="selected"] .auction-ability, .auction-card[aria-pressed="true"] .auction-ability,
+.auction-card[data-state="selected"] .auction-home, .auction-card[aria-pressed="true"] .auction-home { color: inherit; opacity: .85; }
+.auction-ability { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

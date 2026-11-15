@@ -3,7 +3,8 @@
 // `pass` of the WaterfallAuction step so the generic bar does not offer them twice. Choosing a lot only
 // selects; the main button sends (owner decision #137, no undo).
 import { choiceFromRoot } from "../../themes/choice.ts";
-import type { Game } from "../../types.ts";
+import type { Api } from "../../api.ts";
+import type { Catalog, Game } from "../../types.ts";
 import type { GameFrame } from "../frame/frame.ts";
 import { Geld, toDom } from "../kit/index.ts";
 import { txt } from "../text.ts";
@@ -13,7 +14,10 @@ import { openingNode, sheetNode, type SheetHandlers } from "./auction-sheet.ts";
 const theme = () => choiceFromRoot(document.documentElement).theme;
 
 /** Mounts the panel into a game frame; returns the function that takes it out again. */
-export function mountAuction(frame: GameFrame): () => void {
+export function mountAuction(frame: GameFrame, api?: Pick<Api, "catalog">): () => void {
+  let catalog: Catalog | null = null;
+  // The ability texts come from GET /catalog, loaded once; the sheet shows without them until they arrive.
+  api?.catalog().then((c) => { catalog = c; draw(); }, () => {});
   let game: Game | null = null;
   let seq = -1;
   let sel: Selection | null = null;
@@ -50,7 +54,7 @@ export function mountAuction(frame: GameFrame): () => void {
   function drawSheet(container: HTMLElement) {
     host = container;
     const g = game;
-    const m = g ? sheetModel(g, sel?.id ?? null) : null;
+    const m = g ? sheetModel(g, sel?.id ?? null, catalog) : null;
     if (!g || !m) { container.replaceChildren(); return; }
     container.replaceChildren(toDom(sheetNode(m, g, sel, theme(), handlers)));
   }

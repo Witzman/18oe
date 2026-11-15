@@ -1,7 +1,7 @@
 // What the auction sheet shows and what the main button would do (#46, ui-spec 4.2). Pure: reads `Game`
 // only, no DOM, tests run under node. No rule is rebuilt here: which lots can be bid on, and between which
 // amounts, comes from `prompt.ranges` / `prompt.actions`; the card data comes from `state.auction` (#120).
-import type { AuctionCard, Game } from "../../types.ts";
+import type { AuctionCard, Catalog, Game } from "../../types.ts";
 import { rangeAction, rangeValue, type Action, type Range } from "../frame/generic.ts";
 import { playerName } from "../frame/model.ts";
 import { fillText } from "../text.ts";
@@ -25,6 +25,35 @@ export interface CardModel {
   state: CardState;
   /** Tooltip reason when `state` is "blocked". */
   why: string | null;
+  /** Full ability text of the lot from the catalog (#256), null while the catalog is not loaded. */
+  text: string | null;
+  /** First sentence of `text`: the line on the card itself (the tooltip does not show on touch). */
+  short: string | null;
+  /** Minor lots only: the home is not fixed; the free zones with their home-token price. */
+  home: { zone: string; price: number }[] | null;
+}
+
+/** Ability text of a lot by id: private/concession `text`; a minor's own `text`, else its charter's. */
+export function abilityText(cat: Catalog | null, card: AuctionCard): string | null {
+  if (!cat) return null;
+  const pick = (t: string | undefined | null) => (t && t.trim() !== "" ? t.trim() : null);
+  if (card.kind === "minor") {
+    const m = cat.minors.find((x) => x.id === card.id);
+    return m ? pick(m.text) ?? pick(m.charter?.text) : null;
+  }
+  const list = card.kind === "concession" ? cat.concessions : cat.privates;
+  return pick(list.find((x) => x.id === card.id)?.text);
+}
+
+/** The first sentence (up to the first full stop followed by a space or the end). */
+export function firstSentence(text: string): string {
+  const m = /^.*?[.!?](?=\s|$)/s.exec(text.trim());
+  return (m ? m[0] : text).trim();
+}
+
+/** Free zones with price for a minor lot (the home is chosen when it floats, no fixed hex). */
+export function freeZones(g: Game): { zone: string; price: number }[] {
+  return g.state.zones.filter((z) => z.free).map((z) => ({ zone: z.id, price: z.price }));
 }
 export interface RowModel { row: number; roman: string; top: boolean; sold: boolean; cards: CardModel[] }
 export interface Running {
@@ -48,7 +77,7 @@ export const roman = (n: number): string => ROMAN[n] ?? String(n);
 
 const rangeOf = (g: Game, id: string): Range | null => g.state.prompt.ranges.find((r) => r.type === "bid" && r.company === id) ?? null;
 
-export function sheetModel(g: Game, selectedId: string | null): SheetModel | null {
+export function sheetModel(g: Game, selectedId: string | null, catalog: Catalog | null = null): SheetModel | null {
   const a = g.state.auction;
   if (!a) return null;
   const me = g.state.players.find((p) => p.id === g.viewer) ?? null;
@@ -74,7 +103,11 @@ export function sheetModel(g: Game, selectedId: string | null): SheetModel | nul
             : fillText("auction.why_other", {});
         }
       }
-      return { card, range, top: card.row === top, buyNow: card.row === top && current === null, running, state, why };
+      const text = abilityText(catalog, card);
+      return {
+        card, range, top: card.row === top, buyNow: card.row === top && current === null, running, state, why,
+        text, short: text ? firstSentence(text) : null, home: card.kind === "minor" ? freeZones(g) : null,
+      };
     });
     rows.push({ row: n, roman: roman(n), top: n === top, sold: cards.length === 0, cards });
   }

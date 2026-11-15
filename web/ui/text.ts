@@ -583,6 +583,11 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "auction.opening_title": e("Wer hat was gekauft", "Who bought what", "§7"),
   "auction.opening_none": e("noch nichts gekauft", "nothing bought yet", "§7"),
   "auction.opening_value": e("Wert {amount}", "Value {amount}", "§6.1"),
+  "auction.home_free": e("Heimat frei wählbar", "Home chosen freely", "§7.3"),
+  "auction.home_zones": e("Frei: {zones}", "Free: {zones}", "§7.3"),
+  "auction.home_zone": e("{zone} £{price}", "{zone} £{price}", "§7.3"),
+  "auction.home_none": e("keine Zone mehr frei", "no zone left", "§7.3"),
+  "auction.ability_label": e("Fähigkeit", "Ability", "§6"),
   "auction.open_left": e("Noch offen: {n} Lose", "Lots left: {n}", "§7"),
 
   // --- Kursblatt (Aktienrunde, #47) ---------------------------------------------

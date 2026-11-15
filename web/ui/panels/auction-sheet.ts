@@ -17,6 +17,13 @@ export interface SheetHandlers {
 const seatOf = (g: Game, id: string): number => g.state.players.findIndex((p) => p.id === id) + 1;
 const pennant = (g: Game, id: string, theme: Theme) => Wimpel({ seat: seatOf(g, id), name: playerName(g, id) }, { theme });
 
+/** Minor lots: no fixed home hex; says so and lists the free zones with the home-token price (#256, ui-spec 4.2). */
+export function homeLine(zones: { zone: string; price: number }[]): VNode {
+  const list = zones.length === 0 ? txt("auction.home_none").de
+    : fillText("auction.home_zones", { zones: zones.map((z) => fillText("auction.home_zone", { zone: z.zone, price: z.price })).join(", ") });
+  return v("small", { class: "auction-home" }, v("strong", {}, txt("auction.home_free").de), " · ", list);
+}
+
 function cardNode(c: CardModel, g: Game, theme: Theme, h: SheetHandlers): VNode {
   const { card } = c;
   const price = card.min_bid;
@@ -26,6 +33,8 @@ function cardNode(c: CardModel, g: Game, theme: Theme, h: SheetHandlers): VNode 
     v("span", { class: "auction-price" },
       card.bid ? fillText("auction.high_bid", { amount: formatGeld(card.bid.price) }) : fillText(c.buyNow ? "auction.price_top" : "auction.min_bid", { amount: formatGeld(price) }),
       card.discount > 0 ? v("small", { class: "auction-discount" }, ` ${fillText("auction.discount", { amount: formatGeld(card.discount) })}`) : null),
+    c.short ? v("small", { class: "auction-ability" }, c.short) : null,
+    c.home ? homeLine(c.home) : null,
     card.bid ? v("span", { class: "auction-buyer" }, pennant(g, card.bid.player, theme)) : null,
     card.revenue > 0 ? v("small", { class: "muted" }, fillText("auction.revenue", { amount: formatGeld(card.revenue) })) : null,
   ];
@@ -33,13 +42,13 @@ function cardNode(c: CardModel, g: Game, theme: Theme, h: SheetHandlers): VNode 
     class: "auction-card", "data-card": card.id, "data-kind": card.kind, "data-state": c.state,
     "data-running": c.running ? "true" : "false",
   };
-  const tip = { title: card.name, term: txt(`auction.kind_${card.kind}`).en, reason: c.why ?? undefined, rows: [{ label: txt("auction.face_label").de, amount: card.value }], source: txt(`auction.kind_${card.kind}`).regel };
+  const tip = { title: card.name, text: c.text ?? undefined, term: txt(`auction.kind_${card.kind}`).en, reason: c.why ?? undefined, rows: [{ label: txt("auction.face_label").de, amount: card.value }], source: txt(`auction.kind_${card.kind}`).regel };
   if (c.state === "pick" || c.state === "selected") {
     const btn = v("button", { ...attrs, type: "button", "aria-pressed": String(c.state === "selected"), onclick: () => h.onSelect(card.id) }, ...body, v("span", { class: "auction-mark", "aria-hidden": "true" }, "◂"));
     return v("li", {}, mitTooltip(btn, tip));
   }
   const box = v("div", { ...attrs, "aria-disabled": c.state === "blocked" ? "true" : undefined }, ...body);
-  return v("li", {}, c.why ? mitTooltip(box, tip) : box);
+  return v("li", {}, c.why || c.text ? mitTooltip(box, tip) : box);
 }
 
 function rowNode(r: RowModel, g: Game, theme: Theme, h: SheetHandlers): VNode {

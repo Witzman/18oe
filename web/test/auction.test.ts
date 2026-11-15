@@ -154,3 +154,68 @@ test("Eröffnung: who owns what, kind from the id", () => {
   assert.match(textOf(openingNode(rows, theme)), /Ponts et Chaussees/);
   assert.match(textOf(openingNode(openingModel(start), theme)), /noch nichts gekauft/);
 });
+
+// ---- #256: ability text from the catalog, home line of the minor lots ----
+import type { Catalog } from "../types.ts";
+import { abilityText, firstSentence } from "../ui/panels/auction-model.ts";
+import { createApi } from "../api.ts";
+
+const cat = {
+  schema: 1,
+  privates: [{ id: "PeC", name: "Ponts", value: 20, revenue: 5, text: "Closes in phase 3. Pays double.", auction_row: 1, abilities: [] }],
+  concessions: [{ id: "CON1", name: "Conc", value: 0, revenue: 0, text: "Concession for a regional.", auction_row: 9, abilities: [] }],
+  minors: [
+    { id: "A", name: "Minor A", color: "#fff", text_color: null, token_prices: [], text: "Runs a ferry. Extra token.", charter: { id: "A", name: "A", value: 0, revenue: 0, text: "Charter text.", auction_row: 5, abilities: [] } },
+    { id: "B", name: "Minor B", color: "#fff", text_color: null, token_prices: [], text: "", charter: { id: "B", name: "B", value: 0, revenue: 0, text: "Charter of B.", auction_row: 5, abilities: [] } },
+  ],
+  regionals: [],
+} as Catalog;
+
+test("abilityText: private and concession by id, minor own text with charter as fallback, nothing without catalog", () => {
+  assert.equal(abilityText(cat, card(start, "PeC")), "Closes in phase 3. Pays double.");
+  assert.equal(abilityText(cat, card(start, "CON1")), "Concession for a regional.");
+  assert.equal(abilityText(cat, card(start, "A")), "Runs a ferry. Extra token.");
+  assert.equal(abilityText(cat, card(start, "B")), "Charter of B.");
+  assert.equal(abilityText(cat, card(start, "WS")), null);
+  assert.equal(abilityText(null, card(start, "PeC")), null);
+});
+
+test("firstSentence: up to the first stop, whole text when there is none", () => {
+  assert.equal(firstSentence("Closes in phase 3. Pays double."), "Closes in phase 3.");
+  assert.equal(firstSentence("No stop here"), "No stop here");
+  assert.equal(firstSentence("Costs 1.5 times. Next."), "Costs 1.5 times.");
+});
+
+test("sheet: lots carry text and short line; minors list the free zones, others no home", () => {
+  const m = sheetModel(start, null, cat)!;
+  const cards = m.rows.flatMap((r) => r.cards);
+  const pec = cards.find((c) => c.card.id === "PeC")!, a = cards.find((c) => c.card.id === "A")!;
+  assert.equal(pec.short, "Closes in phase 3.");
+  assert.equal(pec.home, null);
+  assert.deepEqual(a.home, start.state.zones.filter((z) => z.free).map((z) => ({ zone: z.id, price: z.price })));
+  assert.ok(a.home!.length > 0);
+  assert.equal(sheetModel(start, null)!.rows[0]!.cards[0]!.text, null);
+});
+
+test("sheet node: short line and home line stay visible on the card, the tooltip carries the full text", () => {
+  const m = sheetModel(start, null, cat)!;
+  const node = sheetNode(m, start, null, theme, noop);
+  const pec = find(node, (n) => n.attrs["data-card"] === "PeC")[0]!;
+  assert.match(textOf(pec), /Closes in phase 3\./);
+  const a = find(node, (n) => n.attrs["data-card"] === "A")[0]!;
+  assert.match(textOf(a), /Heimat frei wählbar/);
+  assert.match(textOf(a), /£\d+/);
+  const tips = find(node, (n) => n.attrs.class === "kit-tip-text" && textOf(n).includes("Pays double"));
+  assert.equal(tips.length, 1);
+});
+
+test("api.catalog: one request, cached; a failure is retried", async () => {
+  let calls = 0;
+  const api = createApi(async () => { calls++; return new Response(JSON.stringify(cat), { status: 200, headers: { "Content-Type": "application/json" } }); });
+  await api.catalog(); await api.catalog();
+  assert.equal(calls, 1);
+  let n = 0;
+  const flaky = createApi(async () => { n++; return n === 1 ? new Response("{}", { status: 500 }) : new Response(JSON.stringify(cat), { status: 200 }); });
+  await assert.rejects(flaky.catalog());
+  assert.equal((await flaky.catalog()).schema, 1);
+});
