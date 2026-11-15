@@ -195,7 +195,7 @@ RSpec.describe Oe::LegalActions do
       end.new
     end
     let(:hex) { double("hex", tile: double("old tile")) }
-    let(:game) { double("game", hexes: [hex], upgrade_cost: 0) }
+    let(:game) { double("game", hexes: [hex], upgrade_cost: 0, log: []) }
     let(:entity) { double("entity", cash: 100) }
     let(:step) do
       t = tile
@@ -217,5 +217,31 @@ RSpec.describe Oe::LegalActions do
       allow(tile).to receive(:legal_rotations).and_return([1])
       expect(described_class.new(game).lay_tile_options(step, entity)).to eq([])
     end
+  end
+end
+
+# #296: pricing a tile while enumerating must not write the zone discount line
+# into the real game log.
+RSpec.describe Oe::LegalActions, "#lay_tile_options log" do
+  include G18OESpecHelpers
+
+  it "leaves the game log unchanged" do
+    game = new_game
+    corp = game.corporation_by_id("CHN")
+    hex = game.hex_by_id("X23")
+    step = Object.new
+    step.define_singleton_method(:available_hex) { |_e, h| h.id == "X23" }
+    step.define_singleton_method(:upgradeable_tiles) { |_e, _h| [] }
+
+    # sanity: the engine does log the discount when pricing directly
+    probe = game.log.size
+    game.upgrade_cost(hex.tile, hex, corp, corp)
+    expect(game.log.size).to be > probe
+    game.log.slice!(probe..)
+
+    before = game.log.map(&:message)
+    described_class.new(game).lay_tile_options(step, corp)
+
+    expect(game.log.map(&:message)).to eq(before)
   end
 end
