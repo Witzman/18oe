@@ -51,11 +51,28 @@ describe 'G18OE any available token may be placed (§11.2)' do
   end
 
   it 'keeps the choice in the action record, so a replay places the same token (§11.2)' do
-    pending 'deviation: PlaceToken serialises no token, a replay always takes the first unused token (workshop #346)'
     action = Engine::Action::PlaceToken.new(major, city: city, slot: 0)
     action.token = spare_tokens.last
     replayed = Engine::Action::Base.action_from_h(action.to_h, game)
 
     expect(replayed.token.price).to eq(80)
+    expect(replayed.token).to equal(action.token)
+  end
+
+  it 'writes no token key for the default pick, so old logs stay identical' do
+    action = Engine::Action::PlaceToken.new(major, city: city, slot: 0)
+
+    expect(action.to_h).not_to have_key('token_index')
+    old = Engine::Action::Base.action_from_h(action.to_h, game)
+    expect(old.token).to equal(spare_tokens.first)
+  end
+
+  it 'replays a logged choice through the whole game action path' do
+    action = Engine::Action::PlaceToken.new(major, city: city, slot: 0)
+    action.token = spare_tokens.last
+    h = action.to_h
+    act!(round, Engine::Action::Base.action_from_h(h, game))
+
+    expect(major.tokens.reject(&:city).map(&:price)).to eq([20, 40, 60, 60, 80, 80])
   end
 end
