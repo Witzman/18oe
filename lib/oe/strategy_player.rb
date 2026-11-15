@@ -153,8 +153,12 @@ module Oe
       pick(tokens)
     end
 
+    # A regional is always converted into a major. Forming a national (§9.4) is
+    # declined (falls through to pass) until nationals operate (#64); when to
+    # form one is the bot rule of v0.3.
     def pick_convert(converts, _by_class)
-      pick(converts)
+      converts = converts.reject { |a| a.entity.corporation? && a.entity.type == :major }
+      converts.empty? ? nil : pick(converts)
     end
 
     def pick_merge(merges, _by_class)

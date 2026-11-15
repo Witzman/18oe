@@ -9,6 +9,8 @@ require_relative '../base'
 require_relative 'round/consolidation'
 require_relative 'round/concession'
 require_relative 'step/consolidate'
+require_relative 'step/convert_to_national'
+require_relative 'step/discard_train'
 require_relative 'step/merge_discard_train'
 require_relative 'step/merge_minor'
 require_relative 'step/merge_offer'
@@ -28,7 +30,7 @@ module Engine
         include G18OE::Map
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
-        attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder
+        attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation
 
         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
                            { group: :white, count: 3 }, { group: :green, count: 8 }].freeze
@@ -419,6 +421,8 @@ module Engine
         MAJOR_MAX_OWNERSHIP_PERCENT = 60
         TWO_PLAYER_MAJOR_MAX_OWNERSHIP_PERCENT = 70
         EXTENDED_FINAL_OPERATING_ROUNDS = 3
+        # §9.4: nationals may form when these Train Phases begin (the level 2, 3, 4 trains rust).
+        NATIONAL_FORMATION_PHASES = %w[4 6 8].freeze
 
         def setup
           super
@@ -882,6 +886,7 @@ module Engine
 
         def after_phase_change(name)
           super
+          @national_formation_phase = name if self.class::NATIONAL_FORMATION_PHASES.include?(name)
           return unless name == self.class::PHASES.last[:name]
 
           @final_set_extended = @round.is_a?(Engine::Round::Operating) && final_or_in_set?(@round)
@@ -1134,9 +1139,10 @@ module Engine
           return abbreviated_operating_round(round_num) if abbreviated_or?(round_num)
 
           Round::G18OE::Operating.new(self, [
+            G18OE::Step::ConvertToNational,
             Engine::Step::Bankrupt,
             Engine::Step::Exchange,
-            Engine::Step::DiscardTrain,
+            G18OE::Step::DiscardTrain,
             Engine::Step::HomeToken,
             G18OE::Step::Track,
             G18OE::Step::SpecialToken,
@@ -1145,7 +1151,6 @@ module Engine
             G18OE::Step::Dividend,
             G18OE::Step::OrientExpressBonus,
             G18OE::Step::BuyTrain,
-            # Convert step to do national conversions at 4/6/8?
             G18OE::Step::IssueShares,
           ], round_num: round_num)
         end
@@ -1395,7 +1400,130 @@ module Engine
           @ef_abilities.select { |_id, ability| ability && corp.abilities.include?(ability) }.keys
         end
 
+        # ---- Nationals: formation (§9.4) ------------------------------------------
+
+        # Phase#buying_train! calls this right after the phase change, with the buyer. When the
+        # change began Train Phase 4, 6 or 8, the trains rusting now stay with a major that converts
+        # ("Majors that choose to convert ... do not remove their level 2/3/4 trains") and with every
+        # national (§9.4: a national "retains all trains ..., including rusted trains").
+        def rust_trains!(train, entity)
+          phase = @national_formation_phase
+          @national_formation_phase = nil
+          rusting = trains.select do |t|
+            !t.rusted && t.owner.respond_to?(:corporation?) && t.owner.corporation? &&
+              %i[major national].include?(t.owner.type) && rust?(t, train)
+          end.group_by(&:owner)
+          super
+          rusting.each { |owner, kept| return_rusted_trains!(owner, kept) if owner.type == :national }
+          start_national_formation!(phase, entity, rusting.reject { |owner, _| owner.type == :national }) if phase
+        end
+
+        # The majors the player may convert now (§9.4: "one or more of their majors").
+        def national_candidates(player)
+          return [] unless player&.player?
+
+          @corporations.select { |c| c.type == :major && c.floated? && !c.closed? && c.owner == player }
+        end
+
+        # The player whose turn it is to form nationals, nil when no formation is under way.
+        def national_formation_player
+          return unless @national_formation
+
+          @national_formation[:players].find { |player| !national_candidates(player).empty? }
+        end
+
+        def national_formation_done!(player)
+          return unless @national_formation
+
+          @national_formation[:players].delete(player)
+          @national_formation = nil unless national_formation_player
+        end
+
+        # §9.4 steps 1 to 4, then the charter is flipped. Trains stay (including the ones that
+        # rusted at this phase change); the share price marker stays; shares stay with the players.
+        def form_national!(corporation)
+          @log << "#{corporation.name} forms a national (§9.4)"
+          national_cash_to_bank!(corporation)
+          national_treasury_to_market!(corporation)
+          national_tokens_off!(corporation)
+          national_charter_assets_off!(corporation)
+          corporation.type = :national
+          kept = @national_formation&.dig(:rusted)&.delete(corporation)
+          return_rusted_trains!(corporation, kept) if kept
+          @national_formation = nil if @national_formation && !national_formation_player
+          clear_graph
+        end
+
         private
+
+        def start_national_formation!(phase, entity, rusting)
+          buyer = entity.respond_to?(:player) ? entity.player : nil
+          order = @players.rotate(@players.index(buyer) || 0)
+          return if order.all? { |player| national_candidates(player).empty? }
+
+          @national_formation = { phase: phase, players: order, rusted: rusting }
+          @log << "-- Train Phase #{phase}: nationals may form, beginning with " \
+                  "#{national_formation_player.name} (§9.4) --"
+        end
+
+        def return_rusted_trains!(corporation, kept)
+          kept.each do |train|
+            train.owner = corporation
+            corporation.trains << train
+          end
+          @crowded_corps = nil
+          @log << "#{corporation.name} keeps its rusted #{kept.map(&:name).join(', ')}"
+        end
+
+        # §9.4 step 1: cash to the bank.
+        def national_cash_to_bank!(corporation)
+          return unless corporation.cash.positive?
+
+          @log << "#{corporation.name} pays #{format_currency(corporation.cash)} into the bank"
+          corporation.spend(corporation.cash, @bank)
+        end
+
+        # §9.4 step 1: treasury certificates to the Open Market. Not a sale: the share price does not
+        # move and the 50 % Open Market limit may be exceeded for a while (§10.1).
+        # The national's Pullman also goes to the Open Market (§9.4 step 1): Pullman cars are #55.
+        def national_treasury_to_market!(corporation)
+          shares = corporation.treasury_shares.reject(&:president)
+          return if shares.empty?
+
+          bundle = Engine::ShareBundle.new(shares)
+          @share_pool.transfer_shares(bundle, @share_pool, allow_president_change: false)
+          @log << "#{corporation.name} places #{bundle.percent}% of its treasury in the Open Market"
+        end
+
+        # §9.4 step 2 and step 4 (tokens on the charter), §11.2.2 "Nationals may never have tokens
+        # on the Map". Removing the White Cliffs Ferry token opens Lille for good (§11.2.2).
+        def national_tokens_off!(corporation)
+          placed = corporation.placed_tokens
+          wcf_token = placed.find { |token| lille_city.extra_tokens.include?(token) }
+          placed.each(&:remove!)
+          corporation.tokens.clear
+          @log << "#{corporation.name} removes its #{placed.size} token(s) from the map" unless placed.empty?
+          open_lille! if wcf_token
+        end
+
+        # §11.2.2: "If the token on the White Cliffs Ferry token position is removed due to the
+        # formation of a national, Lille becomes permanently open for all RRs to pass through."
+        # ASSUMPTION (workshop #53): open as before the ferry was used, so the placeholder that
+        # keeps the ferry passage through Lille free goes back into the extra position for good.
+        def open_lille!
+          setup_wcf_placeholder!
+          @log << 'The White Cliffs Ferry position in Lille is free again: Lille stays open for good (§11.2.2)'
+        end
+
+        # §9.4 step 4: every other asset on the charter except trains goes. Merged-minor track
+        # rights follow in the §9.5 step; port authorities (#56) and private markers (S8) do not
+        # exist yet and join here with their issues.
+        def national_charter_assets_off!(corporation)
+          return unless orient_express_marker?(corporation)
+
+          @orient_express_markers.delete(corporation)
+          @log << "#{corporation.name} loses its Orient Express marker"
+        end
 
         def location_hexes(names)
           self.class::LOCATION_NAMES.filter_map { |id, name| hex_by_id(id) if names.include?(name) }
