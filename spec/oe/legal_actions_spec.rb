@@ -184,38 +184,90 @@ RSpec.describe Oe::LegalActions do
   end
 
   # #309: the engine's rotation check ignores TRACK_RESTRICTION; the step
-  # rejects such a lay only when it is processed.
+  # rejects such a lay only when it is processed. #315: the step checks it
+  # after laying the tile, so the enumerator must check it on the map as it
+  # would look after the lay, or every upgrade is refused.
   describe "#lay_tile_options and the track restriction" do
-    let(:tile) do
-      Class.new do
-        attr_reader :legal_rotations, :rotation
-
-        def initialize = @legal_rotations = [0, 1, 2]
-        def rotate!(rotation = 0) = @rotation = rotation
-      end.new
+    # Phase 3 (yellow and green), LNWR operating with track around London.
+    def track_build
+      game = new_game(%w[a b c])
+      game.players.each_with_index { |_player, index| start_major!(game, %w[LNWR PLM SFAI][index], game.players[index]) }
+      game.corporations.select { |c| c.type == :major }.each { |major| fund!(game, major, 700) }
+      game.phase.next!
+      enter_round!(game, game.operating_round(1))
+      game
     end
-    let(:hex) { double("hex", tile: double("old tile")) }
-    let(:game) { double("game", hexes: [hex], upgrade_cost: 0, log: []) }
-    let(:entity) { double("entity", cash: 100) }
-    let(:step) do
-      t = tile
-      Class.new do
-        define_method(:available_hex) { |*| true }
-        define_method(:upgradeable_tiles) { |*| [t] }
-        define_method(:check_track_restrictions!) do |_e, _old, new_tile|
-          raise Engine::GameError, "Must use new track or change city value" if new_tile.rotation == 1
+
+    def offered(game)
+      step = game.round.active_step
+      described_class.new(game).lay_tile_options(step, step.current_entity).flat_map do |hex, tiles|
+        tiles.flat_map { |tile, rotations| rotations.map { |r| [hex.id, tile.name, r] } }
+      end
+    end
+
+    # Every lay the engine's rotation check allows, before the track restriction.
+    def candidates(game)
+      step = game.round.active_step
+      entity = step.current_entity
+      game.hexes.select { |hex| step.available_hex(entity, hex) }.flat_map do |hex|
+        step.upgradeable_tiles(entity, hex).flat_map do |tile|
+          rotations = tile.legal_rotations
+          tile.rotate!(0)
+          rotations.map { |r| [hex.id, tile.name, r] }
         end
-      end.new
+      end
     end
 
-    it "leaves out rotations the step would reject" do
-      options = described_class.new(game).lay_tile_options(step, entity)
-      expect(options).to eq([[hex, [[tile, [0, 2]]]]])
+    def accepted?(hex_id, tile_name, rotation)
+      game = track_build
+      entity = game.round.active_step.current_entity
+      tile = game.tiles.find { |t| t.name == tile_name }
+      game.process_action(Engine::Action::LayTile.new(entity, tile: tile, hex: game.hex_by_id(hex_id), rotation: rotation))
+      game.exception.nil?
     end
 
-    it "leaves out a hex when no rotation of any tile is allowed" do
-      allow(tile).to receive(:legal_rotations).and_return([1])
-      expect(described_class.new(game).lay_tile_options(step, entity)).to eq([])
+    it "offers exactly the lays the engine accepts, upgrades of yellow tiles included" do
+      game = track_build
+      all = candidates(game)
+      expect(all.map { |hex, _, _| game.hex_by_id(hex).tile.color }.uniq).to include(:yellow, :white)
+
+      accepted = all.select { |lay| accepted?(*lay) }
+      expect(accepted).to include(["J27", "205", 1]) # green upgrade of the home city
+      expect(accepted).to include(["I20", "57", 4]) # white hex with a preprinted stub (Dublin)
+      expect(offered(game)).to match_array(accepted)
+    end
+
+    it "leaves out rotations the engine's check refuses" do
+      game = track_build
+      step = game.round.active_step
+      allow(step).to receive(:check_track_restrictions!).and_wrap_original do |original, entity, old_tile, new_tile|
+        if new_tile.hex&.id == "J27" && new_tile.name == "205" && new_tile.rotation == 1
+          raise Engine::GameError, "Must use new track or change city value"
+        end
+
+        original.call(entity, old_tile, new_tile)
+      end
+
+      lays = offered(game)
+      expect(lays).not_to include(["J27", "205", 1])
+      expect(lays).to include(["J27", "205", 4])
+    end
+
+    it "leaves the map, the tokens and the graph as they were" do
+      game = track_build
+      entity = game.round.active_step.current_entity
+      snapshot = lambda do
+        [game.hexes.map { |hex| [hex.id, hex.tile.object_id, hex.tile.hex&.id, hex.paths.values.flatten.size] },
+         game.hexes.flat_map { |hex| hex.tile.cities.map { |city| city.tokens.map { |t| t&.corporation&.id } } },
+         game.graph_for_entity(entity).connected_paths(entity).keys.map(&:object_id).sort,
+         # route info survives Graph#clear once a train may be bought; a trial map must not set it
+         game.graph_for_entity(entity).instance_variable_get(:@routes).transform_values(&:dup),
+         # (not rotation: Step#upgradeable_tiles leaves tiles it filters out rotated, engine behaviour)
+         game.tiles.map { |tile| [tile.object_id, tile.hex&.id] }]
+      end
+      before = snapshot.call
+      offered(game)
+      expect(snapshot.call).to eq(before)
     end
   end
 end

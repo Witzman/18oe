@@ -117,14 +117,76 @@ module Oe
 
     private
 
+    # The engine runs Tracker#check_track_restrictions! inside lay_tile, after
+    # hex.lay(tile) and with the graph cleared, so `connected_paths` already
+    # holds the new tile's paths. Called on the untouched map, no new path is
+    # ever "connected" and every lay on a hex with track (all upgrades, also
+    # white hexes with a preprinted stub such as Dublin) was refused (#315).
+    # A hex without track needs no graph (used_new_track starts true), so the
+    # check runs directly; otherwise it runs on the map as it would look after
+    # the lay (#with_tile_laid), with the engine's own check, unchanged.
     def track_restriction_ok?(step, entity, hex, tile, rotation)
       return true unless step.respond_to?(:check_track_restrictions!)
 
       tile.rotate!(rotation)
-      step.check_track_restrictions!(entity, hex.tile, tile)
+      if hex.tile.paths.empty?
+        step.check_track_restrictions!(entity, hex.tile, tile)
+      else
+        old_tile = hex.tile
+        with_tile_laid(entity, hex, tile) { step.check_track_restrictions!(entity, old_tile, tile) }
+      end
       true
     rescue Engine::GameError
       false
+    end
+
+    # Puts `tile` on `hex` for the duration of the block, as far as the graph
+    # sees it: the hex shows the new tile, and the tokens of each old city sit
+    # in the city it maps to (Hex#city_map_for, the same map Hex#lay uses). The
+    # graph is cleared before and after, so it is computed on the trial map and
+    # then again on the real one. Everything is restored in `ensure`; tokens
+    # themselves are not moved (their #city stays the old one).
+    def with_tile_laid(entity, hex, tile)
+      old_tile = hex.tile
+      tile_hex = tile.hex
+      saved = []
+      hex.city_map_for(tile).compact.group_by(&:last).each do |new_city, pairs|
+        saved << [new_city, new_city.tokens, new_city.extra_tokens]
+        tokens = pairs.flat_map { |old_city, _| old_city.tokens.compact }
+        tokens.concat([nil] * [new_city.tokens.size - tokens.size, 0].max)
+        new_city.instance_variable_set(:@tokens, tokens)
+        new_city.instance_variable_set(:@extra_tokens, pairs.flat_map { |old_city, _| old_city.extra_tokens })
+      end
+      routes = saved_routes(entity)
+      hex.instance_variable_set(:@tile, tile)
+      hex.instance_variable_set(:@paths, nil)
+      old_tile.hex = nil
+      tile.hex = hex
+      @game.clear_graph_for_entity(entity)
+      yield
+    ensure
+      if old_tile
+        tile.hex = tile_hex
+        old_tile.hex = hex
+        hex.instance_variable_set(:@tile, old_tile)
+        hex.instance_variable_set(:@paths, nil)
+        saved.each do |city, tokens, extra|
+          city.instance_variable_set(:@tokens, tokens)
+          city.instance_variable_set(:@extra_tokens, extra)
+        end
+        @game.clear_graph_for_entity(entity)
+        routes&.each { |graph_routes, copy| graph_routes.replace(copy) }
+      end
+    end
+
+    # Graph#clear keeps a corporation's route info once it may buy a train
+    # (`route_train_purchase` is sticky). A trial map must not leave such a
+    # flag behind, so the route info is copied before and put back after.
+    def saved_routes(entity)
+      [@game.graph_for_entity(entity), @game.token_graph_for_entity(entity)].uniq.map do |graph|
+        routes = graph.instance_variable_get(:@routes)
+        [routes, routes.transform_values(&:dup)]
+      end
     end
 
     # Actions a non-active entity issues while the step waits for someone else:
