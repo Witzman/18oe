@@ -716,6 +716,11 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "train.group_depot": e("Aus dem Depot", "From the depot", "§11.6"),
   "train.group_corp": e("Von anderen Gesellschaften", "From other corporations", "§11.6.3"),
   "frame.choice_for": e("für {target}", "for {target}", "—"),
+  // Engine choices (#290): the engine labels are English; the player sees these and a tooltip.
+  "choice.flip_private": e("Schließen (umdrehen): kein Einkommen, zählt nicht fürs Zertifikatslimit", "Flip face down", "§3.3, §6.1, §10.4"),
+  "choice.flip_private_tip": e("Das Privat wird umgedreht und geschlossen: es zahlt keine Einnahme mehr, zählt nicht mehr zum Zertifikatslimit, ist nicht mehr handelbar und zählt nicht in der Endwertung.", "Close the private: flip its certificate face down", "§3.3, §6.1, §10.4"),
+  "choice.remove_private": e("Aus dem Spiel nehmen", "Remove from game", "§3.3, §6.1"),
+  "choice.remove_private_tip": e("Das Privat wird aus dem Spiel genommen und ist danach nicht mehr im Spiel.", "Remove the private from the game", "§3.3, §6.1"),
 };
 
 // Liefert den Eintrag zu einem Schlüssel. Ein unbekannter Schlüssel fällt auf den
