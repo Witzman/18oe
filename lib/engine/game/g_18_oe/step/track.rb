@@ -19,6 +19,19 @@ module Engine
             get_tile_lay(entity) - @points_used
           end
 
+          # §11.1.7: a double town upgraded to brown or gray needs a tile with track to all
+          # usable sides of the hex. The base `TILE_UPGRADES_MUST_USE_MAX_EXITS` only knows
+          # cities, so this narrows brown/gray offers on a double-town hex to the max exits.
+          # Green is not restricted. (Extension, see workshop #345.)
+          def upgradeable_tiles(entity_or_entities, ui_hex)
+            tiles = super
+            hex = @game.hex_by_id(ui_hex.id)
+            return tiles unless hex.tile.cities.empty? && hex.tile.towns.size >= 2
+
+            restricted, free = tiles.partition { |tile| %i[brown gray].include?(tile.color) }
+            free + max_exits(restricted)
+          end
+
           # Tile points a lay on this hex costs: 1 for a yellow, 2 for an upgrade,
           # doubled on a metropolis hex.
           def points_for_hex(hex)
