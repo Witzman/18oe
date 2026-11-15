@@ -347,3 +347,95 @@ RSpec.describe Oe::RouteSearch do
     expect(search(total)).to eq([full, false, total])
   end
 end
+
+# #324: a train bought from another railroad may cost anything from £1 up to the
+# buyer's whole treasury (RB 11.6, Step::Train#spend_minmax), not only up to its
+# face value; the set must equal the engine's span, and only in the major phase.
+RSpec.describe Oe::LegalActions, "train from another railroad" do
+  include G18OESpecHelpers
+
+  let(:game) { new_game }
+  let(:buyer) { start_major!(game, "LNWR", game.players[0]) }
+  let(:seller) { start_major!(game, "GWR", game.players[1]) }
+  let(:train) { game.depot.upcoming.find { |t| t.name == "3" } }
+  let(:step) { round_step(round, Engine::Game::G18OE::Step::BuyTrain) }
+  let(:round) do
+    buyer
+    seller
+    game.fulfill_train_obligation!(buyer)
+    game.fulfill_train_obligation!(seller)
+    game.depot.upcoming.select { |t| t.name == "2+2" }.each { |t| game.depot.remove_train(t) }
+    game.instance_variable_set(:@first_or_complete, true)
+    game.buy_train(seller, train, :free)
+    enter_round!(game, game.operating_round(1))
+  end
+
+  def prices(legal)
+    legal.send(:generate_buy_train, step, buyer).select { |a| a.train == train }.map(&:price)
+  end
+
+  def engine_span
+    step.spend_minmax(buyer, train)
+  end
+
+  before do
+    allow(game).to receive(:major_phase?).and_return(true)
+    round
+    allow(step).to receive(:current_entity).and_return(buyer)
+  end
+
+  it "keeps the face value as the ceiling without train_span (bot unchanged until #325)" do
+    fund!(game, buyer, 1000 - buyer.cash)
+
+    expect(prices(described_class.new(game)).max).to eq(train.price)
+  end
+
+  it "offers nothing from other railroads outside the major phase" do
+    allow(game).to receive(:major_phase?).and_return(false)
+
+    expect(step.buyable_trains(buyer)).not_to include(train)
+    expect(prices(described_class.new(game, train_span: true))).to eq([])
+  end
+
+  it "spans the engine's whole range, above face value up to the treasury" do
+    fund!(game, buyer, 1000 - buyer.cash)
+    min, max = engine_span
+    all = prices(described_class.new(game, train_span: true))
+
+    expect([min, max]).to eq([1, buyer.cash])
+    expect(max).to be > train.price
+    expect(all.min).to eq(min)
+    expect(all.max).to eq(max)
+    expect(all).to include(train.price)
+    expect(all.all? { |price| price.between?(min, max) }).to be(true)
+  end
+
+  it "keeps a sample within the span and with face value when limited" do
+    fund!(game, buyer, 1000 - buyer.cash)
+    min, max = engine_span
+    sample = prices(described_class.new(game, train_span: true, limit: 4, rng: Random.new(3)))
+
+    expect(sample).to include(min, max, train.price)
+    expect(sample.all? { |price| price.between?(min, max) }).to be(true)
+  end
+
+  it "is capped at face value when the president has to chip in" do
+    buyer.cash > 120 ? buyer.spend(buyer.cash - 120, game.bank) : fund!(game, buyer, 120 - buyer.cash)
+    min, max = engine_span
+    all = prices(described_class.new(game, train_span: true))
+
+    expect(max).to be <= train.price # president chips in, EBUY_FROM_OTHERS :value caps at face value
+    expect(all.max).to eq(max)
+    expect(all).to include(train.price)
+  end
+
+  it "has every offered price accepted by the engine" do
+    fund!(game, buyer, 1000 - buyer.cash)
+    min, max = engine_span
+    all = prices(described_class.new(game, train_span: true))
+
+    expect { all.each { |price| step.check_spend(Engine::Action::BuyTrain.new(buyer, train: train, price: price)) } }.not_to raise_error
+    expect { step.check_spend(Engine::Action::BuyTrain.new(buyer, train: train, price: max + 1)) }.to raise_error(Engine::GameError)
+    expect { step.check_spend(Engine::Action::BuyTrain.new(buyer, train: train, price: min - 1)) }.to raise_error(Engine::GameError)
+  end
+end
