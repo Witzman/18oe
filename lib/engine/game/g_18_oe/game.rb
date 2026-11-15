@@ -586,6 +586,44 @@ module Engine
           @fulfilled_train_obligation.add(entity.id)
         end
 
+        # §11.6.4 para. 2: a player may not force a RR into first-round insolvency by
+        # spending money on track or tokens. The rule undoes such spending (tokens first,
+        # then paid track, each refunded); the engine instead refuses it up front: while the
+        # reserved 2+2 is still owed, a paid lay or token is legal only if the RR's and its
+        # president's cash still cover that 2+2 afterwards. ASSUMPTION (workshop #352): same
+        # outcome, because in the first OR no money arrives between Track/Token and BuyTrain
+        # (no train, no revenue; private income is paid at the start of the OR), and Track
+        # comes before Token, so a token is what the guard drops first, as the rule does.
+        # `cost` is the net spend (a patronage payout of the same lay already deducted).
+        def first_round_spend_allowed?(entity, cost)
+          reserve = first_round_train_reserve(entity)
+          return true if reserve.nil? || !cost.positive?
+
+          entity.cash + entity.owner.cash - cost >= reserve
+        end
+
+        def check_first_round_spend!(entity, cost, net_cost: cost, what: 'track')
+          return if first_round_spend_allowed?(entity, net_cost)
+
+          raise GameError, "#{entity.name} cannot spend #{format_currency(cost)} on #{what}: its cash and its " \
+                           "president's would no longer cover the reserved 2+2 (§11.6.4)"
+        end
+
+        # Price of the reserved 2+2 the RR still has to buy (§11.6.1), or nil when it owes
+        # none: obligation fulfilled or over, the RR already has a train, or no player owns it.
+        def first_round_train_reserve(entity)
+          return unless entity&.corporation? && entity.floated? && entity.trains.empty? && entity.owner&.player?
+          return if fulfilled_train_obligation?(entity)
+
+          depot.depot_trains.find { |train| train.name == '2+2' && train.from_depot? }&.price
+        end
+
+        # What fulfilling the patronage tile on this hex would pay now (§11.1.8), 0 without one.
+        def patronage_payout(hex)
+          payouts = hex.tile.patronage
+          payouts ? payouts[patronage_color].to_i : 0
+        end
+
         def non_starter_trains_available?
           major_phase? && @first_or_complete
         end
