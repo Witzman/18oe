@@ -3,7 +3,8 @@
 # the first failure's output is kept as annotations (so a flaky test stays visible), and a file that fails twice
 # fails the job. A skipped test is a failure (no browser = no check). Run from web/.
 set -uo pipefail
-files=$(ls test/*.test.ts | grep -E '(-browser|^test/shot|^test/ipad)')
+# Shard i of n (#335): BROWSER_SHARD / BROWSER_SHARDS (default 1/1), files dealt round-robin in name order.
+files=$(ls test/*.test.ts | grep -E '(-browser|^test/shot|^test/ipad)' | awk -v s="${BROWSER_SHARD:-1}" -v n="${BROWSER_SHARDS:-1}" '(NR - 1) % n == s - 1')
 echo "$files"
 log="$RUNNER_TEMP/browser-logs"; mkdir -p "$log"
 rc=0; flaky=""; total=0; skipped=0

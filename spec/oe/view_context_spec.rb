@@ -14,7 +14,7 @@ RSpec.describe "Oe::View operating context (#123)" do
 
   # One strategy game; yields [game, view] before every action, with the action
   # the strategist is about to play.
-  def play(seed: 1, max: 6000)
+  def play(seed: 1, max: STRATEGY_CAP) # #335: capped like the other view specs
     game = G::Game.new(%w[p0 p1 p2 p3], id: seed, seed: seed)
     rng = Random.new(seed)
     strategist = Oe::StrategyPlayer.new(game, rng: rng)
