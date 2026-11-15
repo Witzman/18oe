@@ -417,6 +417,7 @@ module Engine
         ORIENT_EXPRESS_BONUS = { '2' => 30, '3' => 30, '4' => 30, '5' => 60, '6' => 60, '7' => 100, '8' => 100 }.freeze
         CONVERSION_NEW_SHARES = 6
         MAJOR_MAX_OWNERSHIP_PERCENT = 60
+        TWO_PLAYER_MAJOR_MAX_OWNERSHIP_PERCENT = 70
         EXTENDED_FINAL_OPERATING_ROUNDS = 3
 
         def setup
@@ -889,8 +890,13 @@ module Engine
           @final_set_extended ? self.class::EXTENDED_FINAL_OPERATING_ROUNDS : super
         end
 
+        # §10.2: 60 % of a major or national; PB 5.4: 70 % with two players.
+        def major_max_ownership_percent
+          @players.size == 2 ? self.class::TWO_PLAYER_MAJOR_MAX_OWNERSHIP_PERCENT : self.class::MAJOR_MAX_OWNERSHIP_PERCENT
+        end
+
         def place_major_par_marker!(corporation)
-          corporation.max_ownership_percent = self.class::MAJOR_MAX_OWNERSHIP_PERCENT
+          corporation.max_ownership_percent = major_max_ownership_percent
           corporation.always_market_price = false
         end
 
