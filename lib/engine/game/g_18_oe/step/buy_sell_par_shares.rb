@@ -328,6 +328,8 @@ module Engine
           end
 
           def process_buy_shares(action)
+            return process_insolvent_buyback(action) if insolvent_buyback?(action.bundle)
+
             unless reservation_prompt?(action)
               super
               # §8.2: buying a parred regional's president share floats it; the 18th float removes the rest (#348).
@@ -382,6 +384,7 @@ module Engine
           end
 
           def modify_purchase_price(bundle)
+            return @game.insolvent_buyback_price(bundle.corporation) if insolvent_buyback?(bundle)
             return bundle.corporation.share_price.price * 2 if president_pool_overcap_buy?(current_entity, bundle)
 
             super
@@ -633,6 +636,33 @@ module Engine
             return false unless corp.president?(entity)
 
             entity.common_percent_of(corp) >= @game.major_max_ownership_percent
+          end
+
+          # §11.6.5 step 4 (#353): the Open-Market charter/president's certificate of an insolvent
+          # minor or regional, bought as one stock action. can_buy? runs the usual checks (cash
+          # against modify_purchase_price, certificate limit, one purchase per turn).
+          def insolvent_buyback?(bundle)
+            !bundle.nil? && bundle.owner == @game.share_pool && !bundle.presidents_share.nil? &&
+              bundle.percent == bundle.corporation.presidents_percent && @game.insolvent?(bundle.corporation)
+          end
+
+          # ASSUMPTION (#54 plan, assumption 2): the price goes to the bank, which financed the gap;
+          # the treasury keeps its cash and the regional its par value.
+          def process_insolvent_buyback(action)
+            player = action.entity
+            bundle = action.bundle
+            corporation = bundle.corporation
+            raise GameError, "Cannot buy #{corporation.name}" unless can_buy?(player, bundle)
+
+            price = @game.insolvent_buyback_price(corporation)
+            @round.players_bought[player][corporation] += bundle.percent
+            @game.share_pool.transfer_shares(bundle, player, spender: player, receiver: @game.bank, price: price,
+                                                             allow_president_change: false)
+            corporation.owner = player
+            @log << "#{player.name} buys the insolvent #{corporation.name} " \
+                    "#{corporation.type == :minor ? 'charter' : "president's certificate"} from the market " \
+                    "for #{@game.format_currency(price)}; #{corporation.name} operates again"
+            track_action(action, corporation)
           end
 
           def complete_conversion

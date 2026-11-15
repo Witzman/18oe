@@ -761,6 +761,29 @@ module Engine
           corporation.type == :minor && corporation.floated? && !corporation.owner
         end
 
+        # §11.6.5 (#353): an insolvent minor/regional has its charter or president's certificate
+        # in the Open Market. §10 (RB l. 2925 ff.) allows a president's certificate there only
+        # after a first-round insolvency, so the share's place is the insolvency state.
+        def insolvent_corporations
+          @corporations.select { |corporation| insolvent?(corporation) }
+        end
+
+        def insolvent?(corporation)
+          %i[minor regional].include?(corporation.type) && corporation.floated? &&
+            corporation.presidents_share&.owner == @share_pool
+        end
+
+        # §11.6.5 step 4: face value (£120 / 2 x par) plus the gap between treasury and the 2+2.
+        def insolvent_buyback_price(corporation)
+          face_value = if corporation.type == :minor
+                         G18OE::Step::BuyTrain::MINOR_CHARTER_VALUE
+                       else
+                         corporation.par_price.price * 2
+                       end
+          reserved_price = self.class::TRAINS.find { |train| train[:name] == '2+2' }[:price]
+          face_value + [reserved_price - corporation.cash, 0].max
+        end
+
         def corporation_show_shares?(corporation)
           return false if abandoned_minor?(corporation)
 
