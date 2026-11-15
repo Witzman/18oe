@@ -4,13 +4,13 @@
       "file": "strategy-4p-1.json",
       "players": 4,
       "seed": 1,
-      "actions": 2985
+      "actions": 2998
     },
     "random-4p-1": {
       "file": "random-4p-1.json",
       "players": 4,
       "seed": 1,
-      "actions": 1546
+      "actions": 1700
     }
   },
   "entries": [
@@ -87,7 +87,7 @@
       "surface": "§11.1 erste Betriebsrunde, Gleisbau",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2434,
+      "position": 2435,
       "expect": {
         "round": "Operating",
         "step": "Track"
@@ -98,7 +98,7 @@
       "surface": "§11.6 Zugkauf (Reservierung, Pflicht)",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2436,
+      "position": 2437,
       "expect": {
         "round": "Operating",
         "step": "BuyTrain"
@@ -109,7 +109,7 @@
       "surface": "§11.3 Routen (2+2)",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2485,
+      "position": 2507,
       "expect": {
         "round": "Operating",
         "step": "Route"
@@ -120,7 +120,7 @@
       "surface": "§11.4 Dividende",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2500,
+      "position": 2508,
       "expect": {
         "round": "Operating",
         "step": "Dividend"
@@ -142,7 +142,7 @@
       "surface": "§11.2 Token setzen",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2584,
+      "position": 2531,
       "expect": {
         "round": "Operating",
         "step": "Token"
@@ -153,7 +153,7 @@
       "surface": "§11.7 Issue-Step",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2985,
+      "position": 2998,
       "expect": {
         "round": "Operating",
         "step": "IssueShares"
@@ -175,7 +175,7 @@
       "surface": "§10.1 Anteile verkaufen",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1317,
+      "position": 1483,
       "expect": {
         "round": "Stock",
         "step": "BuySellParShares"
@@ -186,7 +186,7 @@
       "surface": "§9.3 Regional zum Major konvertieren",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1310,
+      "position": 1464,
       "expect": {
         "round": "Stock",
         "step": "BuySellParShares"
@@ -197,7 +197,7 @@
       "surface": "§10.5 Minor-Merge in den eigenen Major (Angebot)",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1544,
+      "position": 1697,
       "expect": {
         "round": "Stock",
         "step": "MergeMinor"
@@ -208,7 +208,7 @@
       "surface": "§10.5 Minor-Merge, Token-Wahl",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1545,
+      "position": 1698,
       "expect": {
         "round": "Stock",
         "step": "MergeToken"
@@ -219,7 +219,7 @@
       "surface": "§10.5/§11.6 Minor-Merge, Zug abwerfen (Zuglimit)",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1546,
+      "position": 1700,
       "expect": {
         "round": "Stock",
         "step": "MergeDiscardTrain"
