@@ -91,18 +91,32 @@ module Oe
       @game.log.slice!(size..)
     end
 
+    # Two passes: first every candidate on the real map (the graph is computed
+    # once), then the track restriction, whose trial lays clear the graph; doing
+    # them interleaved would recompute the real graph after every trial lay.
     def lay_tile_options_unlogged(step, entity)
-      @game.hexes.filter_map do |hex|
+      candidates = @game.hexes.filter_map do |hex|
         next unless step.available_hex(entity, hex)
         next if @game.upgrade_cost(hex.tile, hex, entity, entity) > entity.cash
 
-        tiles = step.upgradeable_tiles(entity, hex).map do |tile|
-          rotations = tile.legal_rotations.select { |r| track_restriction_ok?(step, entity, hex, tile, r) }
+        # legal_rotations is per hex, and one tile object can be offered on several hexes
+        [hex, step.upgradeable_tiles(entity, hex).map { |tile| [tile, tile.legal_rotations.dup] }]
+      end
+      @connected = nil
+      connected_paths(entity) unless candidates.empty?
+      candidates.filter_map do |hex, tiles|
+        tiles = tiles.map do |tile, legal|
+          rotations = legal.select { |r| track_restriction_ok?(step, entity, hex, tile, r) }
           tile.rotate!(0)
           [tile, rotations]
         end.reject { |_, rotations| rotations.empty? }
         [hex, tiles] unless tiles.empty?
       end
+    end
+
+    # The company's connected paths on the real map, taken before any trial lay.
+    def connected_paths(entity)
+      @connected ||= @game.graph_for_entity(entity).connected_paths(entity).dup
     end
 
     # The cities a token may be placed in now (#123).
@@ -122,22 +136,74 @@ module Oe
     # holds the new tile's paths. Called on the untouched map, no new path is
     # ever "connected" and every lay on a hex with track (all upgrades, also
     # white hexes with a preprinted stub such as Dublin) was refused (#315).
-    # A hex without track needs no graph (used_new_track starts true), so the
-    # check runs directly; otherwise it runs on the map as it would look after
-    # the lay (#with_tile_laid), with the engine's own check, unchanged.
+    # A hex without track needs no graph (used_new_track starts true); the
+    # common upgrade cases are decided by #semi_restrictive_verdict; the rest
+    # runs the engine's own check, unchanged, on the map as it would look after
+    # the lay (#with_tile_laid).
     def track_restriction_ok?(step, entity, hex, tile, rotation)
       return true unless step.respond_to?(:check_track_restrictions!)
 
       tile.rotate!(rotation)
-      if hex.tile.paths.empty?
-        step.check_track_restrictions!(entity, hex.tile, tile)
-      else
-        old_tile = hex.tile
-        with_tile_laid(entity, hex, tile) { step.check_track_restrictions!(entity, old_tile, tile) }
-      end
+      old_tile = hex.tile
+      # without old track every new path is new track: only the graph-free part can fail
+      return towns_kept?(old_tile, tile) if old_tile.paths.empty?
+
+      verdict = semi_restrictive_verdict(entity, old_tile, tile)
+      return verdict && towns_kept?(old_tile, tile) unless verdict.nil?
+
+      with_tile_laid(entity, hex, tile) { step.check_track_restrictions!(entity, old_tile, tile) }
       true
     rescue Engine::GameError
       false
+    end
+
+    # The trial lay costs two graph computations, so the common cases are
+    # decided without it, by the engine's own rule (Tracker#check_track_restrictions!,
+    # :semi_restrictive): true/false when certain, nil when only the trial map can tell.
+    # - false: every new path lies on an old one and no stop changes its revenue;
+    # - true: a new path that is surely connected after the lay adds track or
+    #   changes a stop's revenue. Surely connected: it lies on an old path that
+    #   is connected now (laying only adds track), or meets such a path at a
+    #   junction, a town, or a city the company may pass (own token or free slot).
+    def semi_restrictive_verdict(entity, old_tile, tile)
+      return nil unless @game.class::TRACK_RESTRICTION == :semi_restrictive
+
+      old_paths = old_tile.paths
+      info = tile.paths.map do |np|
+        op = old_paths.find { |path| np <= path }
+        changed = op && op.nodes.map(&:max_revenue).sort != np.nodes.map(&:max_revenue).sort
+        [np, op, !op || changed]
+      end
+      return false if info.none? { |_, _, gain| gain }
+
+      connected = connected_paths(entity)
+      sure = info.select { |_, op, _| op && connected[op] }.map(&:first)
+      return nil if sure.empty?
+
+      joints = sure.flat_map { |path| joints_of(path, entity, old_tile) }
+      surely = info.select { |np, _, _| sure.include?(np) || joints_of(np, entity, old_tile).intersect?(joints) }
+      surely.any? { |_, _, gain| gain } ? true : nil
+    end
+
+    def joints_of(path, entity, old_tile)
+      nodes = path.nodes.select { |node| !node.city? || passable_city?(node, entity, old_tile) }
+      [*nodes, path.junction].compact
+    end
+
+    # The new city carries the tokens of the old city it replaces (Hex#city_map_for).
+    def passable_city?(city, entity, old_tile)
+      old = old_tile.hex.city_map_for(city.tile).key(city)
+      return true unless old
+
+      old.tokened_by?(entity) || old.tokens.include?(nil)
+    end
+
+    # The graph-free first check of Tracker#check_track_restrictions!.
+    def towns_kept?(old_tile, tile)
+      @game.class::ALLOW_REMOVING_TOWNS ||
+        old_tile.city_towns.all? do |old_city|
+          tile.city_towns.any? { |new_city| (old_city.exits - new_city.exits).empty? }
+        end
     end
 
     # Puts `tile` on `hex` for the duration of the block, as far as the graph
@@ -514,6 +580,13 @@ module Oe
     # Picks, per train, the best-revenue non-conflicting route found by the
     # engine's path search. (AutoRouter#route, the combiner, is Opal-only.)
     class RoutePicker
+      # Seconds the path search may start new walks (AutoRouter's default is 30,
+      # meant for a click in the browser). Here it runs on every prompt and bot
+      # move; once networks have green tiles (#315) a search took up to 32 s.
+      # Nodes are searched best first (own tokens, offboards, revenue), so a
+      # cut-off search still finds the strong routes.
+      PATH_TIMEOUT = 3
+
       def initialize(game, entity)
         @game = game
         @entity = entity
@@ -521,7 +594,7 @@ module Oe
 
       def call
         router = RouteSearch.new(@game)
-        train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity)
+        train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity, path_timeout: PATH_TIMEOUT)
         chosen = []
         train_routes.each do |train, candidates|
           route = candidates.find { |candidate| compatible?(router, chosen, train, candidate) }

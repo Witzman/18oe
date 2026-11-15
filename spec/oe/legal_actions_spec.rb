@@ -235,11 +235,16 @@ RSpec.describe Oe::LegalActions do
       expect(accepted).to include(["J27", "205", 1]) # green upgrade of the home city
       expect(accepted).to include(["I20", "57", 4]) # white hex with a preprinted stub (Dublin)
       expect(offered(game)).to match_array(accepted)
+
+      # the same without the shortcut: every upgrade through the trial lay
+      allow_any_instance_of(described_class).to receive(:semi_restrictive_verdict).and_return(nil)
+      expect(offered(track_build)).to match_array(accepted)
     end
 
     it "leaves out rotations the engine's check refuses" do
       game = track_build
       step = game.round.active_step
+      allow_any_instance_of(described_class).to receive(:semi_restrictive_verdict).and_return(nil)
       allow(step).to receive(:check_track_restrictions!).and_wrap_original do |original, entity, old_tile, new_tile|
         if new_tile.hex&.id == "J27" && new_tile.name == "205" && new_tile.rotation == 1
           raise Engine::GameError, "Must use new track or change city value"
@@ -295,5 +300,22 @@ RSpec.describe Oe::LegalActions, "#lay_tile_options log" do
     described_class.new(game).lay_tile_options(step, corp)
 
     expect(game.log.map(&:message)).to eq(before)
+  end
+end
+
+# #315: the path search runs on every prompt and bot move; AutoRouter's 30 s
+# default made one search take up to 32 s once networks had green tiles.
+RSpec.describe Oe::LegalActions::RoutePicker do
+  include G18OESpecHelpers
+
+  it "bounds the path search" do
+    game = new_game
+    corp = game.corporation_by_id("LNWR")
+    allow_any_instance_of(Oe::RouteSearch).to receive(:path) do |_router, _trains, _corp, **opts|
+      expect(opts[:path_timeout]).to eq(described_class::PATH_TIMEOUT)
+      [{}]
+    end
+    expect(described_class.new(game, corp).call).to eq([])
+    expect(described_class::PATH_TIMEOUT).to be <= 5
   end
 end
