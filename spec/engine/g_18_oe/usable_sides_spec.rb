@@ -77,7 +77,6 @@ describe 'G18OE upgrades must use all usable sides (§11.1.7)' do
   describe 'a double town upgraded to brown' do
     # M26 has five usable sides: brown OE21 (5 exits) must be the only choice, OE20 (4 exits) is not enough.
     it 'needs a tile with a track section on each usable side of the hex' do
-      pending 'deviation: TILE_UPGRADES_MUST_USE_MAX_EXITS lists only :cities, so a double town may take OE20 (workshop #345)'
       offered = offered_after('M26', 'OE1', 'OE11')
 
       expect(offered.map { |tile| tile.exits.size }.uniq).to eq([usable_sides('M26')])
@@ -87,6 +86,38 @@ describe 'G18OE upgrades must use all usable sides (§11.1.7)' do
       offered = offered_after('M26', 'OE1', 'OE11')
 
       expect(offered.map(&:name)).to include('OE21')
+    end
+  end
+
+  describe 'a double town upgraded to green' do
+    it 'is not restricted to the maximum exits (rule covers brown and gray only)' do
+      offered = offered_after('M26', 'OE1')
+
+      expect(offered.map(&:color).uniq).to eq([:green])
+      expect(offered.map(&:name)).to include('OE11')
+    end
+  end
+
+  describe 'a double town upgraded to gray' do
+    it 'needs all usable sides of M26 as well' do
+      hex = game.hex_by_id('M26')
+      allow(step).to receive(:hex_neighbors).and_return(hex.neighbors.keys)
+      %w[OE1 OE11 OE21].each { |name| force_lay!(hex, name) }
+      offered = step.upgradeable_tiles(major, hex)
+
+      expect(offered.map { |tile| tile.exits.size }.uniq - [usable_sides('M26')]).to eq([])
+    end
+  end
+
+  describe 'a hex with a single town' do
+    it 'keeps the base upgrade offer (the rule names double towns only)' do
+      hex = game.hex_by_id('M26')
+      single = game.tiles.find { |tile| tile.towns.size == 1 && tile.cities.empty? && tile.color == :yellow }
+      hex.lay(single)
+      allow(step).to receive(:hex_neighbors).and_return(hex.neighbors.keys)
+      base = Engine::Step::Track.instance_method(:upgradeable_tiles).bind(step).call(major, hex)
+
+      expect(step.upgradeable_tiles(major, hex).map(&:name)).to eq(base.map(&:name))
     end
   end
 
