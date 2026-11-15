@@ -105,4 +105,18 @@ RSpec.describe Oe::LegalActions, "private company actions" do
     actions = Oe::Bot.new(game, rng: Random.new(1)).legal_actions(owner.id)
     expect(company_places(actions)).to eq([])
   end
+
+  # full workflow, view_spec/view_order_spec: the strategy read `trains` of the
+  # private (NoMethodError) once the enumerator offered its place_token.
+  it "is skipped by the strategy player, which picks one of the operator's own actions" do
+    require "oe/strategy_player"
+    fund!(game, operator, 200)
+    round
+    actions = described_class.new(game).call
+    expect(company_places(actions)).not_to be_empty
+    # the private's token plus the operator's pass (its tile lays would be picked before any token)
+    actions = company_places(actions) + actions.select { |a| a.is_a?(Engine::Action::Pass) }
+    strategist = Oe::StrategyPlayer.new(game, rng: Random.new(1))
+    5.times { expect(strategist.choose(actions).entity).to eq(operator) }
+  end
 end

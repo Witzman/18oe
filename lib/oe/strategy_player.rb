@@ -29,6 +29,13 @@ module Oe
     end
 
     def choose(actions)
+      # Like Oe::Bot (#128): actions a private issues itself (White Cliffs Ferry's
+      # place_token, entity = the company) are not played by the strategy; its
+      # rules read corporation state (trains, cash) from the entity.
+      own = actions.reject { |a| a.entity.company? }
+      return pick(actions) if own.empty?
+
+      actions = own
       by_class = actions.group_by { |a| a.class.name.split('::').last }
       method = "choose_#{underscore(actions.first.class.name.split('::').last)}"
       Engine::Action.constants # (autoload no-op)
