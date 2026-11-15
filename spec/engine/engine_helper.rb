@@ -19,9 +19,11 @@ FULL_GAME = ENV["OE_FULL_GAME"] == "1"
 # OE_GAME_CAP (#335) overrides both caps (GAME_CAP and STRATEGY_CAP) for a run without OE_FULL_GAME.
 CAP_OVERRIDE = ENV["OE_GAME_CAP"].to_s.empty? ? nil : ENV["OE_GAME_CAP"].to_i
 GAME_CAP = FULL_GAME ? 30_000 : (CAP_OVERRIDE || 1500)
-# The strategy player (view specs) spends ~2400 actions in the auction before the concession round and
+# #335: 3200 (was 5000) per pull request: the auction costs little (~5 s per 3000 actions), the operating
+# rounds after it dominate (upgrades, route search), and a CI round must stay near 5 min; the full stage
+# plays to the end. The strategy player (view specs) spends ~2400 actions in the auction before the concession round and
 # reaches operating rounds at ~2400 and consolidation at ~3800 (seed 1), cheaply (~5 s per 3000).
-STRATEGY_CAP = FULL_GAME ? 30_000 : (CAP_OVERRIDE || 5000)
+STRATEGY_CAP = FULL_GAME ? 30_000 : (CAP_OVERRIDE || 3200)
 
 RSpec.configure do |config|
   config.filter_run_excluding full_game: true unless FULL_GAME
