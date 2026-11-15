@@ -70,16 +70,22 @@ module Oe
     # hex the upgradeable tiles with their legal rotations,
     # [[hex, [[tile, [rotation, ...]], ...]], ...]. Tile rotations are reset
     # before returning.
+    #
+    # The engine's rotation check (Tracker#legal_tile_rotations) does not know
+    # the game's TRACK_RESTRICTION (e.g. semi_restrictive: "Must use new track
+    # or change city value"), it is only raised when the action is processed
+    # (#309). Rotations the step would reject are left out here, using the
+    # step's own Tracker#check_track_restrictions!.
     def lay_tile_options(step, entity)
       @game.hexes.filter_map do |hex|
         next unless step.available_hex(entity, hex)
         next if @game.upgrade_cost(hex.tile, hex, entity, entity) > entity.cash
 
         tiles = step.upgradeable_tiles(entity, hex).map do |tile|
-          rotations = tile.legal_rotations.dup
+          rotations = tile.legal_rotations.select { |r| track_restriction_ok?(step, entity, hex, tile, r) }
           tile.rotate!(0)
           [tile, rotations]
-        end
+        end.reject { |_, rotations| rotations.empty? }
         [hex, tiles] unless tiles.empty?
       end
     end
@@ -95,6 +101,16 @@ module Oe
     end
 
     private
+
+    def track_restriction_ok?(step, entity, hex, tile, rotation)
+      return true unless step.respond_to?(:check_track_restrictions!)
+
+      tile.rotate!(rotation)
+      step.check_track_restrictions!(entity, hex.tile, tile)
+      true
+    rescue Engine::GameError
+      false
+    end
 
     # Actions a non-active entity issues while the step waits for someone else:
     # a player converts a regional they hold (issued by the corporation), and
