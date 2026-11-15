@@ -33,12 +33,12 @@ RSpec.describe Oe::Bot do
     end
   end
 
-  describe Oe::Bot::Auction do
+  describe "Oe::Bot::Auction (face value, before #313)" do
     let(:cheap) { Co.new(60) }
     let(:minor) { Co.new(100) }
     let(:game) { Game.new([minor]) }
     let(:rng) { Random.new(3) }
-    let(:auction) { described_class.new(game, rng) }
+    let(:auction) { Oe::Bot::Auction.new(game, rng, valuation: :face) }
 
     it "does not bid above value plus the premium" do
       player = Player.new(1000, "p0")
@@ -55,7 +55,7 @@ RSpec.describe Oe::Bot do
     it "bids on an affordable company (sometimes passing is allowed)" do
       player = Player.new(1000, "p0")
       bids = [Bid.new(player, cheap, 60), Bid.new(player, cheap, 70)]
-      picks = Array.new(200) { |i| described_class.new(game, Random.new(i)).choose({ "Bid" => bids, "Pass" => [Pass.new(player)] }) }
+      picks = Array.new(200) { |i| Oe::Bot::Auction.new(game, Random.new(i), valuation: :face).choose({ "Bid" => bids, "Pass" => [Pass.new(player)] }) }
       expect(picks.count { |a| a.is_a?(Bid) }).to be > 150
       expect(picks.count { |a| a.is_a?(Pass) }).to be > 0
     end
@@ -63,7 +63,7 @@ RSpec.describe Oe::Bot do
     it "prefers the company that becomes a minor" do
       player = Player.new(1000, "p0")
       bids = [Bid.new(player, cheap, 60), Bid.new(player, minor, 100)]
-      picks = Array.new(300) { |i| described_class.new(game, Random.new(i)).choose({ "Bid" => bids }) }
+      picks = Array.new(300) { |i| Oe::Bot::Auction.new(game, Random.new(i), valuation: :face).choose({ "Bid" => bids }) }
       expect(picks.count { |a| a.company == minor }).to be > picks.count { |a| a.company == cheap }
     end
 
