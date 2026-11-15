@@ -77,6 +77,21 @@ module Oe
     # (#309). Rotations the step would reject are left out here, using the
     # step's own Tracker#check_track_restrictions!.
     def lay_tile_options(step, entity)
+      without_log do
+        lay_tile_options_unlogged(step, entity)
+      end
+    end
+
+    # Game#upgrade_cost logs the zone discount it applies; pricing a hex while
+    # enumerating must not write to the real game log (#296).
+    def without_log
+      size = @game.log.size
+      yield
+    ensure
+      @game.log.slice!(size..)
+    end
+
+    def lay_tile_options_unlogged(step, entity)
       @game.hexes.filter_map do |hex|
         next unless step.available_hex(entity, hex)
         next if @game.upgrade_cost(hex.tile, hex, entity, entity) > entity.cash
