@@ -6,6 +6,7 @@
 // All numbers come from the view model (`concession`, `zones`, `prompt`); the client checks no rules.
 import type { MapGeometry } from "../../render/mapdata.ts";
 import { corpColor, playerName } from "../frame/model.ts";
+import type { MapPreview, MapTargets } from "../../render/map.ts";
 import type { OrderSpec } from "../frame/order.ts";
 import type { GameFrame } from "../frame/frame.ts";
 import { Geld, Leiter, Siegel, formatGeld, toDom, v, type Step, type VNode } from "../kit/index.ts";
@@ -13,6 +14,7 @@ import { choiceFromRoot } from "../../themes/choice.ts";
 import type { Theme } from "../../themes/schema.ts";
 import type { Corporation, Game, Zone } from "../../types.ts";
 import { fillText, txt } from "../text.ts";
+import { mapPick } from "./map-pick.ts";
 
 type Action = Record<string, unknown>;
 
@@ -23,7 +25,7 @@ export const PAR_PRICES = [90, 80, 75, 70, 65, 60] as const;
 export type OfferKind = "minor" | "regional" | "par_only";
 export interface PriceOption { price: number; action: Action | null; cost: number | null; reason: "cash" | "now" | null }
 export interface Offer { corp: string; name: string; kind: OfferKind; prices: PriceOption[] }
-export interface HomeTarget { city: string; hex: string; name: string | null; zone: string | null; zoneInfo: Zone | null; action: Action }
+export interface HomeTarget { city: string; hex: string; index: number; name: string | null; zone: string | null; zoneInfo: Zone | null; action: Action }
 
 export const isConcessionRound = (g: Game): boolean => g.state.meta.round.type === "concession";
 export const isFounding = (g: Game): boolean => isConcessionRound(g) && g.state.prompt.step === "Concession";
@@ -83,6 +85,15 @@ export function offers(g: Game): Offer[] {
 /** "Q38-0-0" -> "Q38": the hex of a city id (Engine::Part::Base#id is "<tile id>-<index>"). */
 export const hexOfCity = (city: string): string => city.split("-")[0]!;
 
+/** "Q38-0-1" -> 1: the city index on its tile is the last segment (Engine::Part::Base#id is "#{tile.id}-#{index}",
+ *  lib/engine/part/base.rb); the view's `context.token.cities` says it too when the actions were computed. */
+export function indexOfCity(city: string, g?: Game): number {
+  const c = g?.state.prompt.context?.token?.cities?.find((x) => x.id === city);
+  if (c) return c.city;
+  const n = Number(city.split("-").pop());
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+
 export function homeTargets(g: Game, map: MapGeometry | null): HomeTarget[] {
   const p = g.state.prompt;
   if (!isHomeToken(g) || !p.viewer_to_act) return [];
@@ -90,11 +101,29 @@ export function homeTargets(g: Game, map: MapGeometry | null): HomeTarget[] {
     const hex = hexOfCity(String(a.city));
     const info = map?.hexes.find((x) => x.id === hex);
     const zone = info?.zone ?? null;
-    return { city: String(a.city), hex, name: info?.name ?? null, zone, zoneInfo: zone ? g.state.zones.find((z) => z.id === zone) ?? null : null, action: a };
+    return { city: String(a.city), hex, index: indexOfCity(String(a.city), g), name: info?.name ?? null, zone, zoneInfo: zone ? g.state.zones.find((z) => z.id === zone) ?? null : null, action: a };
   });
 }
 
 export const placeLabel = (t: HomeTarget): string => (t.name ? `${t.name} (${t.hex})` : t.hex);
+
+/** A tap on the map: on a slot (`city` given) picks that city; on a hex only when it has exactly one target. */
+export function homeTapMap(g: Game, map: MapGeometry | null, hex: string, city?: number): string | null {
+  const on = homeTargets(g, map).filter((t) => t.hex === hex);
+  const hit = city === undefined ? undefined : on.find((t) => t.index === city);
+  return hit?.city ?? (on.length === 1 ? on[0]!.city : null);
+}
+
+export function homeMapTargets(g: Game, map: MapGeometry | null): MapTargets | null {
+  const cities = homeTargets(g, map).map((t) => ({ hex: t.hex, city: t.index }));
+  return cities.length > 0 ? { cities, kind: "token" } : null;
+}
+
+export function homePreview(g: Game, sel: Selection, map: MapGeometry | null): MapPreview {
+  const t = homeTargets(g, map).find((x) => x.city === effectiveSelection(g, sel, map).city);
+  const corp = g.state.prompt.actions.find((a) => typeof a.entity === "string")?.entity;
+  return t && typeof corp === "string" ? { hex: t.hex, city: t.index, corp } : null;
+}
 
 // ---- selection and order ------------------------------------------------------------------------
 export interface Selection { corp: string | null; price: number | null; city: string | null }
@@ -239,12 +268,32 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
   let releaseOrder: (() => void) | null = null;
   const releases: (() => void)[] = [];
   const map = () => opts.map?.() ?? null;
+  const pick = mapPick(frame);
+  let wasHome = false;
+
+  const mineHome = () => game !== null && isHomeToken(game) && game.state.prompt.viewer_to_act;
+  const choose = (city: string) => { frame.discardSelection(); handlers.onCity(city); };
+  // A slot tap fires "city" and then "hex": the city wins, the hex only picks when its target is unambiguous.
+  let lastCity: { hex: string; at: number } | null = null;
+  pick.on("city", ({ hex, city }) => {
+    if (!game || !hex || !mineHome()) return;
+    const id = homeTapMap(game, map(), hex, city);
+    if (id) { lastCity = { hex, at: Date.now() }; choose(id); }
+  });
+  pick.on("hex", ({ hex }) => {
+    if (!game || !hex || !mineHome()) return;
+    if (lastCity && lastCity.hex === hex && Date.now() - lastCity.at < 50) return;
+    const id = homeTapMap(game, map(), hex);
+    if (id) choose(id);
+  });
 
   const handlers: Handlers = {
     onCorp: (corp) => { sel = { corp, price: null, city: null }; draw(); },
     onPrice: (corp, price) => { sel = { corp, price, city: null }; draw(); },
     onCity: (city) => { sel = { corp: null, price: null, city }; draw(); },
   };
+  // The list stays (iPad, 44 px targets); a row also flies to its city.
+  const listHandlers: Handlers = { ...handlers, onCity: (city) => { handlers.onCity(city); const t = game ? homeTargets(game, map()).find((x) => x.city === city) : undefined; if (t) pick.flyTo(t.hex); } };
 
   function claim(active: boolean) {
     while (releases.length > 0) releases.pop()!();
@@ -257,11 +306,15 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
     releaseOrder?.();
     releaseOrder = null;
     // Only clear what this panel drew; the context slot is shared with the other round panels (#49).
-    if (!g || !isConcessionRound(g)) { claim(false); if (owns) { frame.slots.context.replaceChildren(); owns = false; } return; }
+    if (!g || !isConcessionRound(g)) { claim(false); pick.show(null, null); wasHome = false; if (owns) { frame.slots.context.replaceChildren(); owns = false; } return; }
     owns = true;
     // The claims only hold while this panel owns the step: HomeToken also occurs in other rounds.
     claim(isFounding(g) || isHomeToken(g));
-    frame.slots.context.replaceChildren(toDom(ConcessionPanel(g, sel, map(), handlers, choiceFromRoot(document.documentElement).theme)));
+    frame.slots.context.replaceChildren(toDom(ConcessionPanel(g, sel, map(), listHandlers, choiceFromRoot(document.documentElement).theme)));
+    const home = isHomeToken(g) && g.state.prompt.viewer_to_act;
+    if (home && !wasHome) { pick.toMap(); const t = homeTargets(g, map())[0]; if (t) pick.flyTo(t.hex); }
+    wasHome = home;
+    pick.show(home ? homeMapTargets(g, map()) : null, home ? homePreview(g, sel, map()) : null);
     const spec = orderFor(g, sel, map(), (a) => frame.send(a));
     if (spec) releaseOrder = frame.setOrder(spec);
   }
@@ -275,6 +328,6 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
     selectCity: (city) => { if (game && homeTargets(game, map()).some((t) => t.city === city)) handlers.onCity(city); },
     targets: () => (game ? homeTargets(game, map()) : []),
     refresh: draw,
-    stop: () => { off(); releaseOrder?.(); claim(false); if (owns) frame.slots.context.replaceChildren(); },
+    stop: () => { off(); releaseOrder?.(); claim(false); pick.stop(); if (owns) frame.slots.context.replaceChildren(); },
   };
 }

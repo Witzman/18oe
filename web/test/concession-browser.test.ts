@@ -97,6 +97,9 @@ const CHECKS_FOUND = String.raw`(async () => {
 
 const CHECKS_HOME = String.raw`(async () => {
   ${HEAD}
+  const errs = [];
+  addEventListener("error", (e) => errs.push(String(e.message)));
+  addEventListener("unhandledrejection", (e) => errs.push(String(e.reason)));
   const t = document.querySelectorAll(".concession-target");
   if (t.length < 2) fail("targets " + t.length);
   small(".concession-target");
@@ -107,6 +110,9 @@ const CHECKS_HOME = String.raw`(async () => {
   q(".kit-main-btn").click();
   await sleep(600);
   if ((await (await fetch("/__posted")).json()).length !== 1) fail("not sent once");
+  // #261: the map binding (targets, preview, switch to the map) must not break the list; a map tap itself is
+  // covered by the pure tests (the stub server has no /map).
+  if (errs.length) fail("page errors: " + errs.join(" | "));
 })()`;
 
 async function scenario(name: string, waitFor: string, checks: string, nextNames: string[] = [], delays = { postMs: 0, getMs: 0 }) {
