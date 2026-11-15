@@ -103,7 +103,7 @@ RSpec.describe Oe::LegalActions do
     end
   end
 
-  describe "scenarios reached by hand" do
+  describe "scenarios reached by hand", :game_flow do
     # Mutated starts (helpers set up entities directly), so each checkpoint
     # rebuilds the scenario and replays the recorded moves on top of it.
     def operating_build
@@ -163,7 +163,7 @@ RSpec.describe Oe::LegalActions do
     end
   end
 
-  describe "random play" do
+  describe "random play", :game_flow do
     [1, 2].each do |seed|
       it "only offers actions the engine accepts (seed #{seed})" do
         build = -> { Engine::Game::G18OE::Game.new(%w[A B C D], id: 1, seed: seed) }

@@ -7,7 +7,7 @@ require "json"
 
 # One full 4-player strategy game, played once; views are rendered at the first
 # state of every round type seen, every 500 actions, and at the end.
-RSpec.describe Oe::View do
+RSpec.describe Oe::View, :game_flow do
   PLAIN = [Hash, Array, String, Symbol, Integer, Float, TrueClass, FalseClass, NilClass].freeze
 
   def plain?(value)

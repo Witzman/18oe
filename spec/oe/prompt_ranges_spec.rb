@@ -8,7 +8,7 @@ require "json"
 
 # #91: bids are described as ranges instead of thousands of actions. The ranges
 # must describe exactly the bids the full enumeration offers.
-RSpec.describe "prompt ranges (#91)" do
+RSpec.describe "prompt ranges (#91)", :game_flow do
   def expand(ranges)
     ranges.flat_map do |r|
       (r[:min]..r[:max]).step(r[:step]).map { |price| [r[:entity], r[:company], price] }

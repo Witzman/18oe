@@ -7,7 +7,7 @@ require "oe/strategy_player"
 require "json"
 
 # #115: the time series, checked against the engine as it plays.
-RSpec.describe Oe::History do
+RSpec.describe Oe::History, :game_flow do
   def json(value) = JSON.parse(JSON.generate(value))
 
   # Plays a strategy game, recording in step and keeping the true share price

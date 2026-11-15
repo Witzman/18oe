@@ -9,7 +9,7 @@ require "json"
 # #121: concession sequence, railroad phase, regional states and track-rights
 # zones in the view, checked against the engine over a strategy game and a
 # random game.
-RSpec.describe "Oe::View railroad phase (#121)" do
+RSpec.describe "Oe::View railroad phase (#121)", :game_flow do
   REGIONAL_STATES = %w[unparred parred floated converted removed closed].freeze
 
   def play(game, rng, strategist, max: 20_000)

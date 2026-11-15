@@ -9,7 +9,7 @@ require "json"
 # #119: the run each train drove, per corporation, in the view. Checked against a
 # played game: the train revenues add up, the hexes exist on the board, and the
 # paths form a connected sequence.
-RSpec.describe "Oe::View last_run routes (#119)" do
+RSpec.describe "Oe::View last_run routes (#119)", :game_flow do
   it "describes every train's run consistently in a played game" do
     game = Engine::Game::G18OE::Game.new(%w[A B C D], id: 1, seed: 1)
     rng = Random.new(1)

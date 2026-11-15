@@ -9,7 +9,7 @@ require "json"
 # #123: the numbers of the operating steps in `prompt.context`, tile supply,
 # phase limits and the train schedule, each checked against the engine method
 # it comes from (and against what the engine does when the action is played).
-RSpec.describe "Oe::View operating context (#123)" do
+RSpec.describe "Oe::View operating context (#123)", :game_flow do
   G = Engine::Game::G18OE
 
   # One strategy game; yields [game, view] before every action, with the action

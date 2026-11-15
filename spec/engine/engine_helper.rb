@@ -10,6 +10,7 @@ ENV["ENGINE_LOG_LEVEL"] ||= "3"
 
 require "engine"
 require "rspec"
+require_relative "../support/tags"
 
 # Bot games in the specs are capped (#314): a bot plays ~2900 actions/min since it founds regionals and
 # majors, a whole game takes ~7 min. GAME_CAP actions cover set-up, auctions, concessions, stock and

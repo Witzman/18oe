@@ -37,7 +37,7 @@ RSpec.describe Oe::BotAudit do
     expect(check.join).to include("shares sum 60% != 100%")
   end
 
-  it "plays a capped game with fixed seed and reports plain figures, no findings" do
+  it "plays a capped game with fixed seed and reports plain figures, no findings", :game_flow do
     result = described_class.run(players: 3, seed: 1, max_actions: 120)
     expect(result.status).to eq(:limit)
     expect(result.actions).to eq(120)

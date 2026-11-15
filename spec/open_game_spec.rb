@@ -7,7 +7,7 @@ require "oe/bot"
 # "Keine Verbindung" and a map-only page. The server side of that state is checked here over the real
 # HTTP API: GET /games/:id answers 200 with the full state (prompt with the viewer's actions) quickly,
 # also from a cold process (no cached session). The client path is web/test/open-game-browser.test.ts.
-RSpec.describe "opening a game at OR 1.1 with the viewer operating a regional (#294)" do
+RSpec.describe "opening a game at OR 1.1 with the viewer operating a regional (#294)", :game_flow do
   include AppHelper
   include AccountHelper
 

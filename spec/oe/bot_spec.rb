@@ -92,7 +92,7 @@ RSpec.describe Oe::Bot do
 
   # Operating round 1.1 / 1.2 of a real 4-bot game (#293): before #293 every
   # company passed its track points and its token in OR 1.1.
-  describe "operating" do
+  describe "operating", :game_flow do
     def play_until(seed)
       game = Engine::Game::G18OE::Game.new(%w[p0 p1 p2 p3], id: seed, seed: seed)
       bot = described_class.new(game, rng: Random.new(seed))
@@ -218,7 +218,7 @@ RSpec.describe Oe::Bot do
     end
   end
 
-  describe "on a real game" do
+  describe "on a real game", :game_flow do
     let(:names) { %w[p0 p1 p2 p3] }
 
     def new_game(seed)
