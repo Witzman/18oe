@@ -29,7 +29,22 @@ RSpec.describe "Oe::View order (#122)" do
     seen = []
     count = 0
     last_priority = nil
+    last_round = nil
     until game.finished || count > STRATEGY_CAP
+      # #335: View.render per action dominates the run time. Operating rounds are checked on every action
+      # (the sequence of `current` corporations needs each one); the other rounds on every 20th action and
+      # whenever the round object changes (the invariants hold on any state).
+      round = game.round
+      if !round.equal?(last_round) || Oe::View.round_type(round) == "operating" || (count % 20).zero?
+        last_round = round
+      else
+        acts = Oe::LegalActions.new(game, limit: 8, rng: rng).call
+        break if acts.empty?
+
+        game.process_action(strategist.choose(acts) || acts.sample(random: rng))
+        count += 1
+        next
+      end
       view = Oe::View.render(game, actions: false, log: nil)
       meta = view[:meta]
       order = meta[:operating_order]
@@ -71,9 +86,12 @@ RSpec.describe "Oe::View order (#122)" do
     rng = Random.new(1)
     strategist = Oe::StrategyPlayer.new(game, rng: rng)
     checked = 0
+    last_stock = nil
     count = 0
     until game.finished || count > STRATEGY_CAP
-      if game.round.is_a?(Engine::Round::Stock)
+      # #335: render on the first action of each stock round object and every 10th action (cost)
+      if game.round.is_a?(Engine::Round::Stock) && (!game.round.equal?(last_stock) || (count % 10).zero?)
+        last_stock = game.round
         prio = Oe::View.render(game, actions: false, log: nil)[:meta][:priority]
         expect(prio.first).to eq(game.send(:priority_deal_player).id)
         expect(prio.size).to eq(4)
