@@ -30,6 +30,7 @@ RSpec.describe "Oe::View order (#122)" do
     count = 0
     last_priority = nil
     last_round = nil
+    out_of_turn = 0
     until game.finished || count > STRATEGY_CAP
       # #335: View.render per action dominates the run time. Operating rounds are checked on every action
       # (the sequence of `current` corporations needs each one); the other rounds on every 20th action and
@@ -66,8 +67,18 @@ RSpec.describe "Oe::View order (#122)" do
         if cur && cur[:kind] == "corporation"
           i = order.index { |o| o[:id] == cur[:id] }
           expect(i).not_to be_nil
-          expect(order.map { |o| o[:done] }).to eq(order.each_index.map { |j| j < i })
-          seen << cur[:id]
+          operator = game.round.current_operator
+          if game.round.active_step.is_a?(Engine::Step::DiscardTrain) && operator && cur[:id] != operator.id
+            # A train purchase that lowers the train limit (phase change) makes another corporation
+            # discard out of turn (Engine::Step::DiscardTrain): it is current, but the operating one
+            # still sets `done`. Seen in the full game since #72 changed its course (full workflow).
+            o = order.index { |e| e[:id] == operator.id }
+            expect(order.map { |e| e[:done] }).to eq(order.each_index.map { |j| j < o })
+            out_of_turn += 1
+          else
+            expect(order.map { |o| o[:done] }).to eq(order.each_index.map { |j| j < i })
+            seen << cur[:id]
+          end
         end
       end
       last_priority = meta[:priority]
@@ -78,6 +89,7 @@ RSpec.describe "Oe::View order (#122)" do
       count += 1
     end
     expect(rounds).to be >= 2
+    warn "view_order: #{count} actions, #{rounds} operating rounds, #{out_of_turn} out-of-turn discard checks" if ENV["OE_FULL_GAME"]
     expect(last_priority).not_to be_nil
   end
 
