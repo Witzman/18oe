@@ -1,11 +1,14 @@
-// The game page frame (#45, ui-spec 3.1 to 3.4): round bar, player bar, context sheet, main area,
-// outliner, action bar with the generic action bar. Special panels and views hook in through
-// `claims` (which action types they handle), `views` (main area) and `slots` (containers).
+// The game page frame (#45, ui-spec 3.1 to 3.4, rebuilt in #301): head bar (round, order, players), the main
+// area full-bleed, and ONE floating action panel (bottom left; bottom sheet on iPad portrait; collapsible to
+// one line with the main button). The panel holds the step title, the special panels' slot, the generic action
+// bar, the order (sentence, before/after, main button) and the log toggle; the former footer and outliner are
+// gone. Special panels and views hook in through `claims` (which action types they handle), `views` (main
+// area) and `slots` (containers). The generic action bar stays inside the panel for everything nobody claimed.
 import { choiceFromRoot } from "../../themes/choice.ts";
 import type { Theme } from "../../themes/schema.ts";
 import type { Api } from "../../api.ts";
 import type { createSession } from "../../session.ts";
-import type { Corporation, Game } from "../../types.ts";
+import type { Game } from "../../types.ts";
 import { connectionBand, messageArea } from "../connection.ts";
 import { h } from "../dom.ts";
 import { Auftrag, Geld, mitTooltip, Siegel, toDom, v, Wimpel, type VNode } from "../kit/index.ts";
@@ -15,7 +18,8 @@ import { createClaims } from "./claims.ts";
 import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
 import { OrBandView, OrStripView, orBand } from "./or-band.ts";
-import { corpColor, outlinerCorps, playerName, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
+import { corpColor, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
+import { readCollapsed, writeCollapsed } from "./panel.ts";
 import { createViews } from "./views.ts";
 import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
 import { versionButton } from "../version.ts";
@@ -50,8 +54,6 @@ export interface GameFrame {
   subscribe: (fn: (g: Game) => void) => () => void;
 }
 
-type Focus = { kind: "player" | "corporation"; id: string } | null;
-
 const theme = (): Theme => choiceFromRoot(document.documentElement).theme;
 const put = (el: Element, ...nodes: (VNode | string | null)[]) =>
   el.replaceChildren(...nodes.filter((n): n is VNode | string => n !== null).map((n) => toDom(n)));
@@ -71,8 +73,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   let armed = false;
   let busy = false;
   let rangeError: { key: string; text: string } | null = null;
-  let focus: Focus = null;
-  let outlinerOpen = true;
+  let collapsed = readCollapsed();
   let genericOpen: boolean | null = null; // null = automatic (open while there is something to choose)
   let logOpen = false;
   // The full log (#292): fetched from /games/:id/log while the sheet is open; the sheet element lives on
@@ -99,18 +100,24 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
 
   const roundEl = h("div", { class: "frame-roundbar" });
   const playersEl = h("nav", { class: "frame-players", "aria-label": txt("frame.player_bar").de });
-  const contextEl = h("aside", { class: "frame-context", "aria-label": txt("frame.context").de });
+  const contextEl = h("div", { class: "frame-context" });
   const contextSlot = h("div", { class: "frame-context-slot" });
   const mainEl = h("main", { class: "frame-main", "aria-label": txt("frame.main").de });
   const tabsEl = h("div", { class: "frame-tabs", role: "tablist" });
   const viewEl = h("div", { class: "frame-view" });
   const endEl = h("div", { class: "frame-end-slot" });
   mainEl.append(endEl, tabsEl, viewEl);
-  const outlinerEl = h("aside", { class: "frame-outliner", "aria-label": txt("frame.outliner").de });
+  // The action panel (#301): head (collapse button, step title), body (context, slot, generic bar, log), foot
+  // (order with the main button, stall line, messages, tools).
+  const panelTitle = h("div", { class: "frame-panel-title" });
+  const panelToggle = h("button", { type: "button", class: "frame-panel-toggle" });
+  const panelHead = h("div", { class: "frame-panel-head" }, panelToggle, panelTitle);
   const drawerEl = h("div", { class: "frame-drawer" });
-  const barEl = h("footer", { class: "frame-bar", "aria-label": txt("frame.action_bar").de });
+  const panelBody = h("div", { class: "frame-panel-body" }, contextEl, drawerEl);
+  const barEl = h("div", { class: "frame-panel-foot" });
   const barMain = h("div", { class: "frame-bar-order" });
   const barTools = h("div", { class: "frame-bar-tools" });
+  const panelEl = h("aside", { class: "frame-panel", "aria-label": txt("frame.panel").de }, panelHead, panelBody, barEl);
   // #289: "nobody can act" / "the bot does not move" / "no action offered", never a silent hang.
   const stallEl = h("p", { class: "frame-stall", role: "status", "aria-live": "polite" });
   stallEl.hidden = true;
@@ -147,9 +154,9 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   // failed load shows in the band above (reason and "Jetzt"), this line stays until a state arrives.
   const loadingEl = h("p", { class: "muted frame-loading", role: "status" }, txt("frame.loading").de);
   contextEl.append(loadingEl);
-  const body = h("div", { class: "frame-body" }, contextEl, mainEl, outlinerEl);
+  const body = h("div", { class: "frame-body" }, mainEl, panelEl);
   const headEl = h("header", { class: "frame-head" }, roundEl, playersEl);
-  const root = h("div", { class: "frame" }, headEl, band.el, body, drawerEl, barEl, versionButton());
+  const root = h("div", { class: "frame" }, headEl, band.el, body, versionButton());
 
   const model = () => (game ? genericModel(game, claims) : null);
 
@@ -190,10 +197,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
 
   // ---- player bar ------------------------------------------------------------------------------
   function playerEntry(p: PlayerRow, t: Theme): VNode {
-    const btn = v("button", {
-      type: "button", class: "frame-player", "data-me": p.me ? "true" : "false", "data-to-act": p.toAct ? "true" : "false",
-      "aria-pressed": String(focus?.kind === "player" && focus.id === p.id),
-      onclick: () => { focus = { kind: "player", id: p.id }; outlinerOpen = true; drawOutliner(); drawLayout(); },
+    const btn = v("span", {
+      class: "frame-player", tabindex: "0", "data-me": p.me ? "true" : "false", "data-to-act": p.toAct ? "true" : "false",
     },
     Wimpel({ seat: p.seat, name: p.name }, { theme: t }),
     v("span", { class: "frame-cash" }, Geld(p.cash)),
@@ -210,73 +215,18 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       v("span", { class: "frame-bank" }, `${txt("frame.bank").de} `, Geld(game.state.bank.cash)));
   }
 
-  // ---- context sheet ---------------------------------------------------------------------------
+  // ---- action panel: context (only the current step, no rules text) -------------------------------------
   function drawContext() {
-    if (!game) { contextEl.replaceChildren(loadingEl); return; }
+    if (!game) { contextEl.replaceChildren(loadingEl); put(panelTitle); return; }
     const p = game.state.prompt;
-    const entry = p.step ? txt(`step.${p.step}`) : null;
-    const rule = entry && entry.regel !== "—" ? entry.regel : null;
-    put(contextEl,
-      v("h2", {}, roundBar(game, theme()).round),
-      (() => { const b = orBand(game, theme()); return b ? OrBandView(b, theme()) : null; })(),
-      v("p", { class: "frame-step" }, v("strong", {}, `${txt("frame.step").de}: `), stepLabel(p.step)),
-      rule ? v("p", { class: "muted", title: entry?.en }, fillText("frame.rule", { ref: rule })) : null,
-      p.types.length > 0 ? v("div", {}, v("strong", {}, txt("frame.allowed").de), v("ul", {}, ...p.types.map((ty) => v("li", { title: txt(`action.${ty}`).en }, txt(`action.${ty}`).de)))) : null);
-    contextEl.append(contextSlot);
-  }
-
-  // ---- outliner --------------------------------------------------------------------------------
-  function corpCard(c: Corporation, t: Theme, g: Game): VNode {
-    const open = focus?.kind === "corporation" && focus.id === c.id;
-    const head = v("button", {
-      type: "button", class: "frame-corp", "aria-expanded": String(open), "data-id": c.id,
-      onclick: () => { focus = open ? null : { kind: "corporation", id: c.id }; drawOutliner(); },
-    }, Siegel({ sym: c.id, name: c.name, color: corpColor(t, g, c.id) }, { theme: t, size: "s" }),
-    v("span", { class: "frame-corp-name" }, c.name),
-    v("span", { class: "muted" }, txt(`tier.${c.type}`).de),
-    c.share_price !== null ? v("span", {}, Geld(c.share_price)) : null,
-    v("span", {}, Geld(c.cash)),
-    v("span", { title: txt("frame.trains").de }, `${c.trains.length}×`));
-    if (!open) return v("li", {}, head);
-    const holders = c.shares.map((s) => `${playerName(g, s.holder)} ${s.percent}%`).join(", ");
-    return v("li", {}, head, v("dl", { class: "frame-detail" },
-      v("dt", {}, txt("frame.president").de), v("dd", {}, c.president ? playerName(g, c.president) : txt("frame.none").de),
-      v("dt", {}, txt("frame.share_price").de), v("dd", {}, c.share_price !== null ? Geld(c.share_price) : txt("frame.none").de),
-      v("dt", {}, txt("frame.trains").de), v("dd", {}, c.trains.length > 0 ? c.trains.map((x) => x.name).join(", ") : txt("frame.none").de),
-      v("dt", {}, txt("frame.shares").de), v("dd", {}, holders || txt("frame.none").de),
-      c.floated ? null : v("dd", { class: "muted" }, txt("frame.not_floated").de)),
-    v("button", { type: "button", class: "frame-focus", onclick: () => frame.hooks.onFocusCorporation?.(c.id) }, txt("frame.focus_home").de));
-  }
-  function drawOutliner() {
-    if (!game) return put(outlinerEl);
-    const g = game;
     const t = theme();
-    const toggle = v("button", {
-      type: "button", class: "frame-collapse", "aria-expanded": String(outlinerOpen),
-      title: txt(outlinerOpen ? "frame.outliner_collapse" : "frame.outliner_expand").de,
-      "aria-label": txt(outlinerOpen ? "frame.outliner_collapse" : "frame.outliner_expand").de,
-      onclick: () => { outlinerOpen = !outlinerOpen; drawOutliner(); drawLayout(); },
-    }, outlinerOpen ? "▸" : "◂");
-    if (!outlinerOpen) return put(outlinerEl, toggle);
-    const { shown, hidden } = outlinerCorps(g);
-    put(outlinerEl,
-      v("div", { class: "frame-outliner-head" }, v("h2", {}, txt("frame.outliner").de), toggle),
-      v("h3", {}, txt("frame.players").de),
-      v("ul", { class: "frame-list" }, ...playerRows(g).map((p) => {
-        const open = focus?.kind === "player" && focus.id === p.id;
-        const pl = g.state.players.find((x) => x.id === p.id)!;
-        return v("li", {},
-          v("button", { type: "button", class: "frame-corp", "aria-expanded": String(open), onclick: () => { focus = open ? null : { kind: "player", id: p.id }; drawOutliner(); } },
-            Wimpel({ seat: p.seat, name: p.name }, { theme: t }), v("span", {}, Geld(p.cash)), v("span", { class: "muted" }, fillText("frame.certs", { n: p.certs, limit: p.certLimit }))),
-          open ? v("dl", { class: "frame-detail" },
-            v("dt", {}, txt("frame.cash").de), v("dd", {}, Geld(p.cash)),
-            v("dt", {}, txt("frame.worth").de), v("dd", {}, Geld(p.value)),
-            v("dt", {}, txt("frame.shares").de), v("dd", {}, pl.shares.map((s) => `${s.corporation} ${s.percent}%${s.president ? " ★" : ""}`).join(", ") || txt("frame.none").de),
-            v("dt", {}, txt("frame.companies").de), v("dd", {}, pl.companies.map((c) => c.name ?? c.id).join(", ") || txt("frame.none").de)) : null);
-      })),
-      v("h3", {}, txt("frame.corps").de),
-      shown.length === 0 ? v("p", { class: "muted" }, txt("frame.corps_empty").de) : v("ul", { class: "frame-list" }, ...shown.map((c) => corpCard(c, t, g))),
-      hidden > 0 ? v("p", { class: "muted" }, fillText("frame.corps_hidden", { n: hidden })) : null);
+    const b = orBand(game, t);
+    const acting = b?.acting ?? null;
+    put(panelTitle,
+      acting ? Siegel({ sym: acting.id, name: acting.name, color: acting.color }, { theme: t, size: "s" }) : null,
+      v("span", { class: "frame-panel-step", title: p.step ? txt(`step.${p.step}`).en : undefined }, stepLabel(p.step)));
+    put(contextEl, b ? OrBandView(b, t, { order: false }) : null);
+    contextEl.append(contextSlot);
   }
 
   // ---- main area -------------------------------------------------------------------------------
@@ -383,11 +333,31 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   };
 
   function drawLayout() {
-    root.dataset.outliner = outlinerOpen ? "open" : "closed";
+    panelEl.dataset.collapsed = collapsed ? "true" : "false";
+    panelToggle.setAttribute("aria-expanded", String(!collapsed));
+    const label = txt(collapsed ? "frame.panel_expand" : "frame.panel_collapse").de;
+    panelToggle.title = label;
+    panelToggle.setAttribute("aria-label", label);
+    panelToggle.textContent = collapsed ? "▴" : "▾";
   }
+  panelToggle.addEventListener("click", () => { collapsed = !collapsed; writeCollapsed(collapsed); drawLayout(); });
+
+  // Enter = the main button (#301), unless the focus is in something that uses Enter itself.
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== "Enter" || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey || !root.isConnected) return;
+    const t = e.target as HTMLElement | null;
+    if (t && t !== document.body && t.closest("input, textarea, select, button, a, summary, [contenteditable], dialog")) return;
+    if (document.querySelector("dialog[open]")) return;
+    const main = panelEl.querySelector<HTMLButtonElement>(".kit-main-btn");
+    if (!main || main.disabled) return;
+    e.preventDefault();
+    main.click();
+  };
+  document.addEventListener("keydown", onKey);
+  disposers.push(() => document.removeEventListener("keydown", onKey));
 
   function drawAll() {
-    drawLayout(); drawRound(); drawPlayers(); drawContext(); drawOutliner(); drawMain(); drawEnd(); drawBar();
+    drawLayout(); drawRound(); drawPlayers(); drawContext(); drawMain(); drawEnd(); drawBar();
   }
 
   document.addEventListener(THEME_CHANGED, () => { if (root.isConnected) drawAll(); });
