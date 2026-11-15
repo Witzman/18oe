@@ -11,6 +11,9 @@ module Oe
     # - otherwise its new exits (not on the old tile, not joining a
     #   neighbour's track) score by how much closer their neighbour is to the nearest
     #   unreached stop inside the company's track-rights zone (hex distance);
+    # - an upgrade of a stop the network reaches scores its yield gain (#321): the
+    #   new tile's stop revenue minus the old tile's, both in the current phase
+    #   (Part::RevenueCenter#revenue by Phase#tiles, as route_base_revenue reads it);
     # - yellow before upgrades (1 track point instead of 2), cheap before dear.
     # Lays without progress are not made (pass). The three best candidates are
     # picked by Pick.weighted (seeded randomness, rule 7: local, no AI).
@@ -28,6 +31,8 @@ module Oe
       COLOR_RANK = { white: 0, yellow: 1, green: 2, brown: 3, gray: 4 }.freeze
       NEW_STOP = 100
       FAR = 99
+      # Assumption (#321, rule 10, cheap to change): points per revenue unit gained.
+      YIELD_WEIGHT = 2
 
       def initialize(game, rng)
         @game = game
@@ -100,7 +105,24 @@ module Oe
         here = distance.fetch(hex, FAR)
         value = new_stop ? NEW_STOP : 0
         value += (here - best) * 10 if best < here
+        value += yield_gain(hex, tile, reached) * YIELD_WEIGHT
         value - (COLOR_RANK.fetch(tile.color, 0) * 3) - (cost(action) / 10.0)
+      end
+
+      # Stop revenue the new tile adds over the old one in the current phase;
+      # only for a hex whose old stop the network reaches (else it is no income).
+      def yield_gain(hex, tile, reached)
+        old = hex.tile.city_towns
+        return 0 unless old.any? { |n| reached[n] }
+
+        [stop_revenue(tile.city_towns) - stop_revenue(old), 0].max
+      end
+
+      def stop_revenue(nodes)
+        nodes.sum do |node|
+          color = @game.phase.tiles.reverse.find { |c| node.revenue[c] }
+          color ? node.revenue[color] : 0
+        end
       end
 
       # Edges of `hex` where the neighbour's track already runs in: an exit

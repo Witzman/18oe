@@ -15,7 +15,8 @@ module Oe
   #
   # Per game there is at most one worker (`kick` while one runs only marks it
   # dirty, so it looks again before it exits). Appends carry `expected_seq`,
-  # so even two workers could never produce a duplicate move.
+  # so even two workers could never produce a duplicate move; each move is
+  # chosen and appended under the game lock (GameSession.with, #339).
   #
   # Robustness: a game must never hang on a bot. If the bot raises or its action
   # is rejected, a random legal action of that seat is played instead and an
@@ -76,12 +77,16 @@ module Oe
     def drain(game_id, max: MAX_MOVES)
       played = 0
       while played < max
-        session = GameSession.load(@store, game_id)
-        break if session.game.finished
+        # One move = look, choose, append under the game lock (#339): the bot reads
+        # (and LegalActions temporarily changes) the cached game that other
+        # runners, API requests and appends share.
+        step = GameSession.with(@store, game_id) do |session|
+          next :done if session.game.finished
 
-        seat = acting_bot_seat(session) or break
-        step = play_one(session, seat)
-        break if step == :stuck
+          seat = acting_bot_seat(session) or next :done
+          play_one(session, seat)
+        end
+        break if %i[done stuck].include?(step)
 
         played += 1 if step == :played
       end

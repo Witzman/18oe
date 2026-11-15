@@ -80,6 +80,8 @@ module Oe
       @path = path
       @mutex = Monitor.new
       @sessions = {} # GameSession cache: game_id => { seq:, game: }; speed only
+      @game_locks = {} # game_id => Monitor, see #game_lock
+      @game_locks_mutex = Mutex.new
       FileUtils.mkdir_p(File.dirname(path)) unless path == ":memory:"
       @db = SQLite3::Database.new(path)
       @db.results_as_hash = true
@@ -91,6 +93,16 @@ module Oe
 
     def close
       @mutex.synchronize { @db.close }
+    end
+
+    # One re-entrant lock per game (#339). The session cache hands the same
+    # engine game object to every loader in this process, and both an append
+    # (process_action) and Oe::LegalActions (which swaps tiles in and out to
+    # test them) change that object. Everyone who reads or changes a cached
+    # game holds this lock: GameSession.with / GameSession#append.
+    # Order: game lock first, then the store mutex (never the other way round).
+    def game_lock(game_id)
+      @game_locks_mutex.synchronize { @game_locks[game_id] ||= Monitor.new }
     end
 
     # True when a write transaction can be opened and committed (BEGIN IMMEDIATE
