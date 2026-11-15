@@ -10,6 +10,7 @@ module Engine
           def setup
             super
             @points_used = 0
+            @ef_bonus_used = []
           end
 
           attr_reader :points_used
@@ -25,9 +26,23 @@ module Engine
             @game.metropolis_hex?(hex) ? base * 2 : base
           end
 
+          # §15.5/§15.6: Minor E/F (or the major holding their ability) may spend one extra tile
+          # point per OR, only on a yellow tile in a hex with their terrain colour. Returns the
+          # charter id whose point it would be, or nil.
+          def ef_bonus_id(entity, hex, tile = nil)
+            return nil unless hex.tile.color == :white && (tile.nil? || tile.color == :yellow)
+
+            augmenters = @game.terrain_augmenters(entity, hex.tile).map(&:id)
+            (augmenters & @game.ef_bonus_ids(entity)).find { |id| !@ef_bonus_used.include?(id) }
+          end
+
+          def ef_bonus_left?(entity)
+            (@game.ef_bonus_ids(entity) - @ef_bonus_used).any?
+          end
+
           def can_lay_tile?(entity)
             points_available = get_tile_lay(entity) - @points_used
-            return false unless points_available.positive?
+            return false unless points_available.positive? || ef_bonus_left?(entity)
 
             !entity.tokens.empty?
           end
@@ -62,11 +77,14 @@ module Engine
                           else
                             1
                           end
+            bonus_id = ef_bonus_id(action.entity, action.hex, tile)
+            points_cost -= 1 if bonus_id
             raise GameError, 'Cannot lay an upgrade now' if tile.color != :yellow && points_cost > points_available
             raise GameError, 'Cannot lay a yellow now' if tile.color == :yellow && points_cost > points_available
 
             lay_tile(action)
-            @game.log << "Used #{points_cost} tile point(s) to lay tile"
+            @ef_bonus_used << bonus_id if bonus_id
+            @game.log << "Used #{points_cost} tile point(s) to lay tile#{" (+1 extra point of Minor #{bonus_id})" if bonus_id}"
             @game.log << "#{points_available - points_cost} point(s) remaining"
             @game.fulfill_patronage!(action.entity, action.hex)
             if track_upgrade?(old_tile, tile, action.hex)
@@ -86,7 +104,9 @@ module Engine
 
             points_available = get_tile_lay(entity) - @points_used
             return nil if hex.tile.color == :blue
-            return nil if points_available < points_for_hex(hex)
+
+            needed = points_for_hex(hex) - (ef_bonus_id(entity, hex) ? 1 : 0)
+            return nil if points_available < needed
 
             connected
           end

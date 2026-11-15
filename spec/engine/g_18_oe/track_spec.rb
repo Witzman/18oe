@@ -156,4 +156,106 @@ describe 'G18OE lay track (§11.1)' do
     expect([cost('Z23', e), cost('X23', e)]).to eq([15, 96])
     expect(cost('E52', minor_in('E', 'SC'))).to eq(22)
   end
+
+  describe 'Minor E and F (§15.5, §15.6)' do
+    def merged_major(id, minor_id, zone = nil)
+      major = start_major!(game, id, player)
+      minor = game.corporation_by_id(minor_id)
+      game.minor_floated_regions[minor_id] = zone if zone
+      game.add_minor_charter!(minor, major)
+      [major, minor]
+    end
+
+    it 'gives E 33% off blue terrain outside any discount zone, rounded down (§15.5)' do
+      expect(cost('K64', 'E')).to eq(20)
+      expect(cost('M30', 'E')).to eq(30)
+      expect(cost('R39', 'E')).to eq(30)
+    end
+
+    it 'gives F 33% off green terrain outside any discount zone, rounded down (§15.6)' do
+      expect(cost('R39', 'F')).to eq(20)
+      expect(cost('M30', 'F')).to eq(45)
+      expect(cost('K64', 'F')).to eq(30)
+    end
+
+    it 'keeps the 50% in a discount zone for an unmerged minor (§11.1.5)' do
+      expect(cost('Z23', minor_in('E', 'SP'))).to eq(15)
+    end
+
+    it 'keeps the ability when the minor merges into a major (§10.5)' do
+      major, minor = merged_major('LNWR', 'E')
+
+      expect(cost('K64', major.id)).to eq(20)
+      expect(cost('R39', major.id)).to eq(30)
+      expect(cost('K64', minor.id)).to eq(30)
+    end
+
+    it 'keeps F on merging as well' do
+      major, = merged_major('LNWR', 'F')
+
+      expect(cost('R39', major.id)).to eq(20)
+    end
+
+    it 'gives a major 50% in the merged minor\'s zone and 33% elsewhere' do
+      major, = merged_major('LNWR', 'E', 'SP')
+
+      expect([cost('Z23', major.id), cost('K64', major.id)]).to eq([15, 20])
+    end
+
+    it 'gives a major without E or F no 33% discount' do
+      major = start_major!(game, 'LNWR', player)
+
+      expect(cost('K64', major.id)).to eq(30)
+    end
+
+    describe 'extra tile point' do
+      let(:major) { merged_major('LNWR', 'E').first }
+      let(:round) { enter_round!(game, game.operating_round(1)) }
+      let(:step) { round.active_step }
+
+      before do
+        major
+        round
+      end
+
+      it 'is spent only on a yellow tile in a matching hex' do
+        expect(step.ef_bonus_id(major, game.hex_by_id('K64'))).to eq('E')
+        expect(step.ef_bonus_id(major, game.hex_by_id('R39'))).to be_nil
+        expect(step.ef_bonus_id(major, game.hex_by_id('K64'), game.hex_by_id('K64').tile)).to be_nil
+      end
+
+      it 'is not given to a major without the ability' do
+        other = start_major!(game, 'CHN', player)
+
+        expect(step.ef_bonus_id(other, game.hex_by_id('K64'))).to be_nil
+      end
+
+      it 'is not available for an upgrade of a laid hex' do
+        hex = game.hex_by_id('K64')
+        allow(hex.tile).to receive(:color).and_return(:yellow)
+
+        expect(step.ef_bonus_id(major, hex)).to be_nil
+      end
+
+      it 'keeps the step open after the regular points are used, once per OR' do
+        step.instance_variable_set(:@points_used, 6)
+        expect(step.can_lay_tile?(major)).to be(true)
+
+        step.instance_variable_set(:@ef_bonus_used, ['E'])
+        expect(step.can_lay_tile?(major)).to be(false)
+        expect(step.ef_bonus_id(major, game.hex_by_id('K64'))).to be_nil
+      end
+
+      it 'makes a matching yellow lay cost one point less' do
+        step.instance_variable_set(:@points_used, 5)
+        allow(step).to receive(:hex_neighbors).and_return([0])
+        allow(game).to receive(:hex_within_national_region?).and_return(true)
+
+        expect(step.tracker_available_hex(major, game.hex_by_id('K64'))).to eq([0])
+        step.instance_variable_set(:@points_used, 6)
+        expect(step.tracker_available_hex(major, game.hex_by_id('K64'))).to eq([0])
+        expect(step.tracker_available_hex(major, game.hex_by_id('R39'))).to be_nil
+      end
+    end
+  end
 end
