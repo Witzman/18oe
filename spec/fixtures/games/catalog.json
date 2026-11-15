@@ -4,7 +4,7 @@
       "file": "strategy-4p-1.json",
       "players": 4,
       "seed": 1,
-      "actions": 2973
+      "actions": 2985
     },
     "random-4p-1": {
       "file": "random-4p-1.json",
@@ -153,7 +153,7 @@
       "surface": "§11.7 Issue-Step",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2973,
+      "position": 2985,
       "expect": {
         "round": "Operating",
         "step": "IssueShares"
