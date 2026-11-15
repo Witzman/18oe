@@ -69,7 +69,7 @@ module Oe
       actions = step.active_entities.reject(&:closed?).flat_map do |entity|
         step.actions(entity).flat_map { |type| generate(type, step, entity) }
       end
-      actions + acting_for(step)
+      actions + acting_for(step) + company_actions(step)
     end
 
     # The whole choice space of a tile lay, not sampled (#123): per affordable
@@ -128,14 +128,23 @@ module Oe
     # The cities a token may be placed in now (#123).
     def token_targets(step, entity)
       tokens = step.available_tokens(entity)
-      tokener = step.is_a?(Engine::Step::HomeToken) ? tokens.first.corporation : entity
+      tokener = step.is_a?(Engine::Step::HomeToken) || entity.company? ? tokens.first.corporation : entity
+      extra_slot = company_extra_slot?(step, entity)
       token_cities(step, entity).select do |city|
-        city.tokenable?(tokener, free: false, tokens: tokens) && home_region_ok?(step, tokener, city) &&
+        city.tokenable?(tokener, free: false, tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
           connected_for_token?(step, entity, city)
       end
     end
 
     private
+
+    # A private's token ability may use an extra position of the city (White
+    # Cliffs Ferry in Lille); Tokener#place_token passes the same flag (#128).
+    def company_extra_slot?(step, entity)
+      return false unless entity.company? && step.respond_to?(:ability)
+
+      step.ability(entity)&.then { |a| a.type == :token && a.extra_slot } ? true : false
+    end
 
     # The engine runs Tracker#check_track_restrictions! inside lay_tile, after
     # hex.lay(tile) and with the graph cleared, so `connected_paths` already
@@ -270,6 +279,26 @@ module Oe
         others.flat_map do |other|
           allowed = other.corporation? ? %w[convert] : %w[sell_shares]
           (step.actions(other) & allowed).flat_map { |type| generate(type, step, other) }
+        end
+      end
+    end
+
+    # Actions a private company issues itself (#128). The engine keeps these in
+    # steps that are not the blocking one (Engine::Round::Base#active_step(company):
+    # "steps for companies are non-blocking"), e.g. Step::SpecialToken for the
+    # White Cliffs Ferry token while the corporation is in its Track step. The
+    # candidates are the unclosed companies of the players behind the active
+    # entities; a step decides itself whether the company may act now
+    # (`step.actions(company)`), as the round does when it routes the action.
+    def company_actions(step)
+      entities = step.active_entities
+      players = entities.map { |e| e.player? ? e : e.owner }.select { |o| o&.player? }.uniq
+      players.flat_map do |player|
+        player.companies.reject { |c| c.closed? || entities.include?(c) }.flat_map do |company|
+          company_step = @game.round.active_step(company)
+          next [] unless company_step
+
+          company_step.actions(company).flat_map { |type| generate(type, company_step, company) }
         end
       end
     end
@@ -516,8 +545,11 @@ module Oe
       end
     end
 
+    # A private places the token of the corporation it acts for (#128): the
+    # action names it as `tokener`, as the engine's own PlaceToken does.
     def generate_place_token(step, entity)
-      sample(token_targets(step, entity)).map { |city| A::PlaceToken.new(entity, city: city) }
+      tokener = entity.company? ? @game.token_owner(entity) : nil
+      sample(token_targets(step, entity)).map { |city| A::PlaceToken.new(entity, city: city, tokener: tokener) }
     end
 
     # Tokens laid by operating (not home/merge tokens) must connect to a route
