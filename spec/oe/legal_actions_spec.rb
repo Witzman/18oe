@@ -182,4 +182,40 @@ RSpec.describe Oe::LegalActions do
       expect(played.dead_end).to be_nil
     end
   end
+
+  # #309: the engine's rotation check ignores TRACK_RESTRICTION; the step
+  # rejects such a lay only when it is processed.
+  describe "#lay_tile_options and the track restriction" do
+    let(:tile) do
+      Class.new do
+        attr_reader :legal_rotations, :rotation
+
+        def initialize = @legal_rotations = [0, 1, 2]
+        def rotate!(rotation = 0) = @rotation = rotation
+      end.new
+    end
+    let(:hex) { double("hex", tile: double("old tile")) }
+    let(:game) { double("game", hexes: [hex], upgrade_cost: 0) }
+    let(:entity) { double("entity", cash: 100) }
+    let(:step) do
+      t = tile
+      Class.new do
+        define_method(:available_hex) { |*| true }
+        define_method(:upgradeable_tiles) { |*| [t] }
+        define_method(:check_track_restrictions!) do |_e, _old, new_tile|
+          raise Engine::GameError, "Must use new track or change city value" if new_tile.rotation == 1
+        end
+      end.new
+    end
+
+    it "leaves out rotations the step would reject" do
+      options = described_class.new(game).lay_tile_options(step, entity)
+      expect(options).to eq([[hex, [[tile, [0, 2]]]]])
+    end
+
+    it "leaves out a hex when no rotation of any tile is allowed" do
+      allow(tile).to receive(:legal_rotations).and_return([1])
+      expect(described_class.new(game).lay_tile_options(step, entity)).to eq([])
+    end
+  end
 end
