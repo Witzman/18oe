@@ -6,7 +6,7 @@ require "oe/legal_actions"
 
 # #47: `prompt.context.stock` gives the money of every offered buy/sell bundle. Checked against what the engine
 # does when the action is played: the cash that moves and the share price after a sale.
-RSpec.describe "Oe::View stock context (#47)" do
+RSpec.describe "Oe::View stock context (#47)", :game_flow do
   G = Engine::Game::G18OE
 
   it "names cost, proceeds and new price of the offered bundles as the engine charges them" do

@@ -6,7 +6,7 @@ require "tmpdir"
 
 # Small, permanent run of the random-playthrough harness (#31). The full
 # collecting run is `bin/playthrough --players 3-7 --seeds 1-10`.
-RSpec.describe Oe::Playthrough do
+RSpec.describe Oe::Playthrough, :game_flow do
   let(:statuses) { %i[finished crash rejected dead_end limit] }
 
   [1, 2, 3].each do |seed|

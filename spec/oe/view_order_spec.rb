@@ -8,7 +8,7 @@ require "json"
 
 # #122: operating order and player priority in the view, checked against the
 # sequence of `current` corporations of each operating round.
-RSpec.describe "Oe::View order (#122)" do
+RSpec.describe "Oe::View order (#122)", :game_flow do
   def json(view) = JSON.parse(JSON.generate(view))
 
   it "lists the players in priority order with the priority deal first, and no operating order before the majors" do

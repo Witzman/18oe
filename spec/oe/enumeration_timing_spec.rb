@@ -4,7 +4,7 @@ require_relative "../engine/engine_helper"
 require "oe/enumeration_timing"
 
 # Structure only, no time limits (#87).
-RSpec.describe Oe::EnumerationTiming do
+RSpec.describe Oe::EnumerationTiming, :game_flow do
   it "times full and bot enumeration per step on a short game and reports a table" do
     run = described_class.run(players: 3, seed: 1, max_actions: 200)
     expect(run[:actions]).to eq(200)

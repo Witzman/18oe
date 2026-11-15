@@ -6,7 +6,7 @@ require "oe/legal_actions"
 require "oe/view"
 require "tmpdir"
 
-RSpec.describe Oe::BotRunner do
+RSpec.describe Oe::BotRunner, :game_flow do
   let(:store) { Oe::Store.new(":memory:") }
   let(:runner) { described_class.new(store) }
 

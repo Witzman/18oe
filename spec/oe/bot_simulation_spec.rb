@@ -3,7 +3,7 @@
 require_relative "../engine/engine_helper"
 require "oe/bot_simulation"
 
-RSpec.describe Oe::BotSimulation do
+RSpec.describe Oe::BotSimulation, :game_flow do
   def sim(**opts)
     described_class.new(**{ players: 4, seed: 1, max_actions: 150 }.merge(opts))
   end

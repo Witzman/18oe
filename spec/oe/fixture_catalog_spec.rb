@@ -41,7 +41,7 @@ RSpec.describe Oe::FixtureCatalog do
   end
 
   Oe::FixtureCatalog.entries.each do |entry|
-    it "plays #{entry.name} (#{entry.surface})" do
+    it "plays #{entry.name} (#{entry.surface})", :game_flow do
       findings = described_class.check(entry, max_actions: 6)
 
       expect(described_class.problems(findings)).to be_empty

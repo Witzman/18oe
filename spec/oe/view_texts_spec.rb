@@ -75,7 +75,7 @@ RSpec.describe "Oe::View texts and catalog (#124)" do
     end
   end
 
-  describe "prompt texts" do
+  describe "prompt texts", :game_flow do
     # A game that takes `choose` whenever it can, so the rarer dialogs come up.
     before(:all) do
       @steps = Hash.new(0)

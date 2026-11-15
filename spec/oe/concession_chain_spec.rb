@@ -9,7 +9,7 @@ require "oe/view"
 # token on I50). Through the server it does not: the same human holds the 2nd concession, and the view
 # hands him the next founding. (The hang was in the browser: the busy lock of the frame, see
 # web/test/concession-browser.test.ts; the states there are recorded from exactly this game.)
-RSpec.describe "concession chain over the server (#289)" do
+RSpec.describe "concession chain over the server (#289)", :game_flow do
   let(:store) { Oe::Store.new(":memory:") }
   # The recorded seed-2 opening comes from the face-value auction (before #313); keep it, the
   # spec is about the server handing over the concession chain, not about the bot's valuation.

@@ -7,6 +7,7 @@ ENV["ENGINE_LOG_LEVEL"] ||= "3"
 
 require "rack/test"
 require "rspec"
+require_relative "support/tags"
 
 # Sinatra classic style only auto-starts a server when app.rb is the
 # executed file ($0), so requiring it here does not boot anything.

@@ -7,7 +7,7 @@ require "oe/script_game"
 # every round/step/action combination of slice S1 (lib/oe/script_game/slices/s1.yml)
 # executed at least once. Slow on purpose (one whole game, about a minute or two);
 # the same run against a running instance: bin/script-game.
-RSpec.describe Oe::ScriptGame do
+RSpec.describe Oe::ScriptGame, :game_flow do
   ACCOUNTS = %w[alice bob carol dave].freeze
 
   before do

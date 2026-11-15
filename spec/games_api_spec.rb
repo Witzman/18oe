@@ -220,7 +220,7 @@ RSpec.describe "games API (#36)" do
       state_of(client)["state"]["prompt"]["actions"]
     end
 
-    it "plays 80 random legal actions: every turn goes to the right account, seq rises, log grows" do
+    it "plays 80 random legal actions: every turn goes to the right account, seq rises, log grows", :game_flow do
       rng = Random.new(5)
       80.times do |n|
         current = state_of(alice)
@@ -417,7 +417,7 @@ end
 # The authorizer decides who may act for which entity. The HTTP specs above stay in
 # the auction (players as entities); this checks a corporation in an operating round,
 # on a real state reached by playing a strategy game directly.
-RSpec.describe "games API authorizer (#36)" do
+RSpec.describe "games API authorizer (#36)", :game_flow do
   require "oe/strategy_player"
 
   let(:host) do

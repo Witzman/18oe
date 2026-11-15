@@ -25,7 +25,7 @@ RSpec.describe Oe::Invariants do
     expect(described_class.report).to include("money_conserved", "§3.3")
   end
 
-  describe "over the catalog" do
+  describe "over the catalog", :game_flow do
     Oe::FixtureCatalog.entries.each do |entry|
       it "holds at #{entry.name}" do
         found = described_class.failures(described_class.run(Oe::FixtureCatalog.game_at(entry)))
@@ -35,7 +35,7 @@ RSpec.describe Oe::Invariants do
     end
   end
 
-  describe "over a replayed log" do
+  describe "over a replayed log", :game_flow do
     %w[strategy-4p-1 random-4p-1].each do |name|
       it "holds at every 10th action of the whole #{name} log" do
         found = described_class.check_log(Oe::FixtureCatalog.log_file(name), every: 10)
