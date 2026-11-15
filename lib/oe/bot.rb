@@ -19,7 +19,8 @@ module Oe
   # play right now — for the player itself or for a corporation it presides
   # over — and picks one. It can only return legal actions.
   #
-  # Heuristics per action family, one small class each (Bot::Auction,
+  # Heuristics per action family, one small class each (Bot::Auction with
+  # Bot::Valuation for what privates and minors are worth (#313),
   # Bot::Stock, Bot::Track, Bot::Token). Everything else — dividends, train purchases,
   # routes, merges, discards — falls back to the rules of
   # Oe::StrategyPlayer (#32), which already carries whole games to the end.
@@ -53,16 +54,18 @@ module Oe
 
     attr_reader :game
 
-    def self.choose(game, rng:, player_id: nil, limit: 12)
-      new(game, rng: rng, limit: limit).choose(player_id: player_id)
+    def self.choose(game, rng:, player_id: nil, limit: 12, profile: :standard, valuation: :derived)
+      new(game, rng: rng, limit: limit, profile: profile, valuation: valuation).choose(player_id: player_id)
     end
 
-    def initialize(game, rng: Random.new(0), limit: 12)
+    # profile: :einfach | :standard (= :mittel) | :schwer (Bot::Valuation::PROFILES, #313)
+    # valuation: :derived (Bot::Valuation) | :face (face-value auction before #313)
+    def initialize(game, rng: Random.new(0), limit: 12, profile: :standard, valuation: :derived)
       @game = game
       @rng = Rng.new(rng)
       @limit = limit
       @fallback = StrategyPlayer.new(game, rng: @rng)
-      @auction = Auction.new(game, @rng)
+      @auction = Auction.new(game, @rng, valuation: valuation, profile: profile)
       @stock = Stock.new(game, @rng, @fallback)
       @track = Track.new(game, @rng)
       @token = Token.new(game, @rng, @track)
