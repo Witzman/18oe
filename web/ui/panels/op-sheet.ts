@@ -10,8 +10,9 @@ import type { Theme } from "../../themes/schema.ts";
 import type { Game } from "../../types.ts";
 import { formatGeld, v, type VNode } from "../kit/index.ts";
 import { orBand } from "../frame/or-band.ts";
+import { playerName } from "../frame/model.ts";
 import { fillText, txt } from "../text.ts";
-import { LADDER, ladderIndex } from "./operating-model.ts";
+import { LADDER, ladderIndex, operator } from "./operating-model.ts";
 
 export interface OpFact { key: string; label: string; value: string }
 export interface OpStep { step: string; label: string; state: "done" | "current" | "next" }
@@ -26,12 +27,15 @@ export interface OpSheet {
 }
 
 export function opSheet(g: Game, theme: Theme): OpSheet | null {
-  const b = orBand(g, theme);
-  const a = b?.acting;
-  if (!a) return null;
-  const c = g.state.corporations.find((x) => x.id === a.id);
+  if (g.state.meta.finished || g.state.meta.round.type !== "operating") return null;
+  // The acting company from the operating order; states without the order fall back to the current entity.
+  const a = orBand(g, theme)?.acting ?? null;
+  const c = g.state.corporations.find((x) => x.id === (a?.id ?? operator(g)?.id));
   if (!c) return null;
-  const who = a.mine ? txt("op.you").de : `${a.owner ?? "?"}${a.bot ? ` (${txt("frame.bot").de})` : ""}`;
+  const mine = a ? a.mine : c.president !== null && c.president === g.viewer;
+  const bot = a ? a.bot : g.seats.some((s) => s.kind === "bot" && s.name === (c.president ? playerName(g, c.president) : null));
+  const owner = a ? a.owner : c.president ? playerName(g, c.president) : null;
+  const who = mine ? txt("op.you").de : `${owner ?? "?"}${bot ? ` (${txt("frame.bot").de})` : ""}`;
   const fact = (key: string, value: string): OpFact => ({ key, label: txt(key).de, value });
   const facts: OpFact[] = [fact("op.cash", formatGeld(c.cash))];
   if (c.share_price !== null) facts.push(fact("op.price", formatGeld(c.share_price)));
@@ -42,7 +46,7 @@ export function opSheet(g: Game, theme: Theme): OpSheet | null {
     step: s, label: fillText("op.strip_item", { n: i + 1, step: txt(`op.strip_${s}`).de }),
     state: i < at ? "done" : i === at ? "current" : "next",
   }));
-  return { id: c.id, name: c.name, who, mine: a.mine, facts, steps };
+  return { id: c.id, name: c.name, who, mine, facts, steps };
 }
 
 export function OpSheetView(s: OpSheet): VNode {

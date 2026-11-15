@@ -61,3 +61,10 @@ test("dividend: one line per option with share, treasury and price; payout list 
   assert.deepEqual(payoutRows(f, "half")!.rows.map((r) => [r.name, r.amount]), [["p0", 18], ["p1", 9]]);
   assert.equal(payoutRows(f, "withhold"), null, "withhold pays nobody");
 });
+
+test("head: a state without the operating order still names the current company (older states)", () => {
+  const g = load("buy-train-reserved");
+  const s = opSheet(g, theme)!;
+  assert.equal(s.id, "B");
+  assert.equal(s.steps.find((x) => x.state === "current")!.step, "BuyTrain");
+});
