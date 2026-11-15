@@ -189,6 +189,18 @@ RSpec.describe Oe::BotRunner do
     expect { reload(id) }.not_to raise_error
   end
 
+  it "lets a reader take the game lock between bot moves instead of starving it (#341)" do
+    id = new_game(%i[bot bot bot], seed: 1).id
+    drain = Thread.new { runner.drain(id, max: 400) }
+    sleep 0.3
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    store.with_game_lock(id) { :read }
+    waited = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+    drain.join
+    expect(waited).to be < 1.0
+    expect(store.last_seq(id)).to be > 300
+  end
+
   it "coalesces repeated kicks into one worker" do
     id = new_game(%i[human bot bot], seed: 2).id
     results = Array.new(5) { runner.kick(id) }

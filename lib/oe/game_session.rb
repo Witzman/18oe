@@ -97,7 +97,7 @@ module Oe
     # Oe::LegalActions, bots) must keep appends of other threads out meanwhile.
     # Re-entrant: an append inside the block is fine.
     def self.with(store, id)
-      store.game_lock(id).synchronize { yield load(store, id) }
+      store.with_game_lock(id) { yield load(store, id) }
     end
 
     def self.replay(store, row, id)
@@ -145,7 +145,7 @@ module Oe
 
       # The game lock (#339) keeps readers of the shared cached game (GameSession.with)
       # out while process_action changes it; taken before the store mutex.
-      @store.game_lock(@id).synchronize do
+      @store.with_game_lock(@id) do
         @store.transaction do
           db_seq = @store.last_seq(@id)
           raise Conflict, "expected seq #{expected_seq}, log is at #{db_seq}" if expected_seq && expected_seq != db_seq
