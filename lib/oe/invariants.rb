@@ -118,7 +118,8 @@ module Oe
       out << "a train object appears twice" if trains.map(&:object_id).uniq.size != trains.size
       trains.each do |t|
         owner = t.owner
-        out << "#{t.id} has no owner" if owner.nil?
+        # A rusted train has left the game: the engine clears its owner (5.2 Train Phases).
+        out << "#{t.id} has no owner" if owner.nil? && !t.rusted
         out << "#{t.id} not in the trains of #{owner.name}" if owner && owner != g.depot && !owner.trains.include?(t)
       end
       out

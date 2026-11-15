@@ -67,6 +67,7 @@ module Oe
       step = game.round.active_step
       { 'round' => game.round.class.name.split('::').last,
         'step' => step&.class&.name&.split('::')&.last,
+        'phase' => game.phase.name.to_s,
         'finished' => game.finished ? true : false }
     end
 
