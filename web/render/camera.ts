@@ -6,6 +6,14 @@ import { apply, fitView, invert, levelMatrix, type Box, type HexGrid, type Vec, 
 /** Zoom limits as factors of the base zoom (the zoom at which the whole map fits, key `0`). */
 export const ZOOM_MIN = 0.35;
 export const ZOOM_MAX = 4;
+/**
+ * The zoom limit never drops below this many px per hex side (#285, rule 18): a hex of side 26 is 45 px across the
+ * flats, so a fingertip (44 px) can hit one hex even when the base zoom is small (phone, narrow map area).
+ */
+export const ZOOM_TOUCH_MIN = 26;
+
+/** Upper zoom limit for a base zoom: 4x the base, but at least a touch-sized hex. */
+export const maxZoom = (base: number): number => Math.max(base * ZOOM_MAX, ZOOM_TOUCH_MIN);
 
 /** Zoom stages by hex side length on screen in px (ui-spec 2.8). */
 export const Z1_FROM = 14;
@@ -31,10 +39,10 @@ export function fit(grid: HexGrid, view: View, vp: Viewport): View {
 /**
  * Zoom by `factor` about the screen point s: whatever lies under s stays under s, at every
  * height (screen = pan + zoom * f(world, z), so pan' = s - k (s - pan) holds for all z).
- * The new zoom is clamped to [ZOOM_MIN, ZOOM_MAX] x base.
+ * The new zoom is clamped to [ZOOM_MIN x base, maxZoom(base)].
  */
 export function zoomAt(view: View, s: Vec, factor: number, base: number): View {
-  const zoom = Math.min(base * ZOOM_MAX, Math.max(base * ZOOM_MIN, view.zoom * factor));
+  const zoom = Math.min(maxZoom(base), Math.max(base * ZOOM_MIN, view.zoom * factor));
   const k = zoom / view.zoom;
   return { ...view, zoom, panX: s.x - k * (s.x - view.panX), panY: s.y - k * (s.y - view.panY) };
 }

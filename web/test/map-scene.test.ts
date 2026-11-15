@@ -10,7 +10,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import {
-  between, centerOn, clampPan, fit, frame, panBy, zoomAt, zoomStage, ZOOM_MAX, ZOOM_MIN,
+  between, centerOn, clampPan, fit, frame, maxZoom, panBy, zoomAt, zoomStage, ZOOM_MAX, ZOOM_MIN, ZOOM_TOUCH_MIN,
 } from "../render/camera.ts";
 import type { MapGeometry, MapHex } from "../render/mapdata.ts";
 import { levelMatrix, mapCenter, pick, project, unproject, worldCorners, type View } from "../render/projection.ts";
@@ -166,6 +166,15 @@ test("zoom about the pointer keeps what is under it in place, at every height, w
     assert.ok(close(zoomAt(v0, s, 100, v0.zoom).zoom, v0.zoom * ZOOM_MAX));
     assert.ok(close(zoomAt(v0, s, 0.01, v0.zoom).zoom, v0.zoom * ZOOM_MIN));
   }
+});
+
+test("zoom limit: 4x the base, but never below a touch-sized hex (#285)", () => {
+  assert.equal(maxZoom(10), 10 * ZOOM_MAX);
+  assert.equal(maxZoom(4.2), ZOOM_TOUCH_MIN, "small base (narrow map area): still reaches a 44 px hex");
+  assert.ok(Math.sqrt(3) * ZOOM_TOUCH_MIN >= 44);
+  const v0 = { ...start(0, 0), zoom: 4.2 };
+  assert.ok(close(zoomAt(v0, { x: 100, y: 100 }, 100, 4.2).zoom, ZOOM_TOUCH_MIN));
+  assert.ok(close(zoomAt(v0, { x: 100, y: 100 }, 0.01, 4.2).zoom, 4.2 * ZOOM_MIN));
 });
 
 test("pan and clamp: the map cannot be dragged out of the window", () => {
