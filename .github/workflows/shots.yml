@@ -1,0 +1,58 @@
+# iPad-10.2 acceptance recordings (#304): screenshots and measurements of every game fixture, landscape and portrait,
+# panel open and collapsed, on the runner's Chrome (Chromium iPad profile, not real WebKit). Tool only, no product change.
+# Runs on manual dispatch and on pull requests whose branch name or title contains "shots" (not on every PR).
+name: shots
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenes:
+        description: "comma-separated fixture names (empty = all)"
+        required: false
+        default: ""
+  pull_request:
+
+concurrency:
+  group: shots-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  shots:
+    name: shots (iPad 10.2)
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.head_ref, 'shots') || contains(github.event.pull_request.title, 'shots') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-progress --no-audit --no-fund
+      - run: npm run build
+      - name: headless Chrome wrapper
+        run: |
+          wrapper="$RUNNER_TEMP/chrome-headless"
+          printf '#!/bin/sh\nexec "%s" --headless=new --no-sandbox --disable-dev-shm-usage "$@"\n' "$(command -v google-chrome)" > "$wrapper"
+          chmod +x "$wrapper"
+          echo "OE_BROWSER=$wrapper" >> "$GITHUB_ENV"
+          google-chrome --version
+      - name: record
+        run: node test/ci-shots.mjs "$RUNNER_TEMP/shots" "${{ github.event.inputs.scenes }}"
+        timeout-minutes: 17
+      - name: keep what exists
+        if: always()
+        run: mkdir -p "$RUNNER_TEMP/shots" && cp -r "$RUNNER_TEMP/shots" "$GITHUB_WORKSPACE/shots-out"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots-ipad-10.2
+          path: shots-out
+          retention-days: 7
