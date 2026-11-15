@@ -88,6 +88,8 @@ module Oe
         end
         break if %i[done stuck].include?(step)
 
+        @store.yield_to_waiters(game_id) # #341: readers must get in between two bot moves
+
         played += 1 if step == :played
       end
       played

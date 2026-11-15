@@ -82,6 +82,7 @@ module Oe
       @sessions = {} # GameSession cache: game_id => { seq:, game: }; speed only
       @game_locks = {} # game_id => Monitor, see #game_lock
       @game_locks_mutex = Mutex.new
+      @lock_waiters = Hash.new(0) # game_id => threads waiting in #with_game_lock (#341)
       FileUtils.mkdir_p(File.dirname(path)) unless path == ":memory:"
       @db = SQLite3::Database.new(path)
       @db.results_as_hash = true
@@ -103,6 +104,34 @@ module Oe
     # Order: game lock first, then the store mutex (never the other way round).
     def game_lock(game_id)
       @game_locks_mutex.synchronize { @game_locks[game_id] ||= Monitor.new }
+    end
+
+    # Takes the game lock and counts the wait, so a long chain of bot moves can step
+    # aside (#341): Ruby's Monitor is not fair, and a runner that unlocks and locks
+    # again right away starved GET /games/:id for the whole chain (measured: no
+    # reader got the lock in 43 s of a bots-only game).
+    def with_game_lock(game_id, &block)
+      lock = game_lock(game_id)
+      waiting = true
+      @game_locks_mutex.synchronize { @lock_waiters[game_id] += 1 }
+      lock.synchronize do
+        @game_locks_mutex.synchronize { @lock_waiters[game_id] -= 1 }
+        waiting = false
+        block.call
+      end
+    ensure
+      @game_locks_mutex.synchronize { @lock_waiters[game_id] -= 1 } if waiting
+    end
+
+    # Called by a bot runner between two moves, without holding the lock: gives
+    # waiting readers (views, appends) the turn, at most `limit` seconds.
+    def yield_to_waiters(game_id, limit: 0.5)
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + limit
+      while @game_locks_mutex.synchronize { @lock_waiters[game_id] }.positive?
+        break if Process.clock_gettime(Process::CLOCK_MONOTONIC) > deadline
+
+        sleep 0.001
+      end
     end
 
     # True when a write transaction can be opened and committed (BEGIN IMMEDIATE
