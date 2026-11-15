@@ -22,8 +22,8 @@ module Oe
     #   and a minor never above £180 (more goes to the bank, §7.1).
     #
     # Duties, never skipped (also not by 'einfach'): the cash reserve for this
-    # player's share of the 18 regional floats (§8.2; #140: all 30 floats before
-    # OR 1), the quota and the £180 cap. The profile only decides how much risk
+    # player's share of the 18 regional floats (§8.2; #140: capitalise all 30
+    # companies, then train phase 3 as early as possible), the quota and the £180 cap. The profile only decides how much risk
     # is priced in and how often an optional check (synergy, zone, deny) is forgotten.
     class Valuation
       # Difficulty levels (#140, owner 2026-11-15; values are an assumption, not yet tuned).
@@ -92,8 +92,9 @@ module Oe
       # The bot's view of the table when valuing an item.
       #   owned: syms of companies the player holds; opponents: [{id:, owned:, cash:}] in
       #   player order starting after the player (first = next to act).
+      #   seat: index in player order (0 = first), decides who floats one regional more.
       Stellung = Struct.new(:player_id, :cash, :owned, :opponents, :players, :regionals_floated,
-                            :regional_par, keyword_init: true) do
+                            :regional_par, :seat, keyword_init: true) do
         def self.from(game, player, step = nil)
           committed = step.respond_to?(:committed_cash) ? step.committed_cash(player).to_i : 0
           order = game.players.rotate(game.players.index(player) || 0)
@@ -103,7 +104,8 @@ module Oe
               opponents: order.drop(1).map { |p| { id: p.id, owned: p.companies.map(&:sym), cash: p.cash } },
               players: game.players.size,
               regionals_floated: game.corporations.count { |c| c.type != :minor && c.floated? && c.owner == player },
-              regional_par: Valuation.highest_regional_par(game))
+              regional_par: Valuation.highest_regional_par(game),
+              seat: game.players.index(player) || 0)
         end
       end
 
@@ -142,12 +144,18 @@ module Oe
         worth.floor
       end
 
-      # Duty: what the player must keep for its share of the 18 regional floats (2 x par each).
+      # Duty: what the player must keep for its share of the 18 regional floats
+      # (2 x par each). Whole regionals: cash below 2 x par cannot float one, so a
+      # fractional share (4.5 at 4p) would strand money. 18 = N x base + extra; the
+      # first `extra` seats in player order plan one regional more (4p: 5, 5, 4, 4).
       def reserve(stellung)
-        share = (REGIONALS_TO_FLOAT.to_f / stellung.players) - stellung.regionals_floated
-        return 0 unless share.positive?
+        left = planned_regionals(stellung) - stellung.regionals_floated
+        left.positive? ? left * 2 * stellung.regional_par : 0
+      end
 
-        (share * 2 * stellung.regional_par).ceil
+      def planned_regionals(stellung)
+        base, extra = REGIONALS_TO_FLOAT.divmod(stellung.players)
+        base + ((stellung.seat || 0) < extra ? 1 : 0)
       end
 
       def affordable?(price, stellung)
