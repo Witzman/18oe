@@ -1156,6 +1156,47 @@ module Engine
           end.max
         end
 
+        # Base#compute_stops scores every combination of the visited stops; with
+        # towns 'visit' 99 a 5+5 train on a 15-stop route tries C(15,10) = 3003
+        # sets, which was 90 % of the route search in green networks (#319).
+        # When the distance rows are nested (each row's node types include those
+        # of the row before, as here: towns, then city/offboard/town), the stop
+        # sets that fit form a matroid, so taking stops best revenue first while
+        # they still fit gives the best set. The Orient Express bonus does not
+        # depend on the chosen stops. Other distance shapes use the base search.
+        def compute_stops(route, train = nil)
+          train ||= route.train
+          rows = train.distance
+          return super if rows.is_a?(Numeric)
+
+          rows = rows.sort_by { |h| h['nodes'].size }
+          return super unless rows.each_cons(2).all? { |a, b| (a['nodes'] - b['nodes']).empty? }
+
+          visits = revenue_stops(route)
+          return [] if visits.empty?
+
+          revenue = visits.to_h { |stop| [stop, stop.route_revenue(route.phase, train)] }
+          ranked = visits.each_with_index.sort_by { |stop, i| [-revenue[stop], i] }.map(&:first)
+          best = greedy_stops(ranked, rows, train)
+          if train.requires_token && best.none? { |stop| stop.tokened_by?(route.corporation) }
+            best = ranked.select { |stop| stop.tokened_by?(route.corporation) }
+                         .map { |token| greedy_stops([token] + (ranked - [token]), rows, train) }
+                         .max_by { |stops| stops.sum { |stop| revenue[stop] } } || []
+          end
+          best.sum { |stop| revenue[stop] }.positive? ? visits & best : []
+        end
+
+        # Places each stop, in the given order, in the first row with room for
+        # its type (the slot rule of Base#compute_stops); stops without room are left out.
+        def greedy_stops(ranked, rows, train)
+          used = Array.new(rows.size, 0)
+          ranked.select do |stop|
+            row = rows.index.with_index { |h, i| h['nodes'].include?(stop_type(stop, train)) && used[i] < h['pay'] }
+            used[row] += 1 if row
+            row
+          end
+        end
+
         def revenue_for(route, stops)
           revenue = super
           revenue += self.class::ORIENT_EXPRESS_BONUS[route.phase.name] if orient_express_bonus_route?(route)
