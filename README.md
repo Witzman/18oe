@@ -114,7 +114,7 @@ The roadmap version (v0.1 to v0.9, see 18oe-workshop#20) lives in ONE file, `VER
 root (`0.1.0-dev` while a version is being built). `lib/oe/version.rb` and `web/build.mjs` read it;
 nothing else repeats it. Where it shows:
 
-- `GET /healthz` returns `status`, `build` (content hash, `bin/build-id` for the local tree),
+- `GET /healthz` returns `status`, `build` (content hash, `bin/build-id` for the local tree), `web_build` (hash of the shipped `web/dist`, `bin/build-id --web` after `npm run build`; null without a bundle),
   `version` (from `VERSION`) and `engine` (engine revision: upstream commit + build id, the stamp new
   games get). Fields are only ever added.
 - The UI: a footer line on the login/registration pages and a version button (top right, opens an info

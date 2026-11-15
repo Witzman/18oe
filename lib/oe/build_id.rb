@@ -29,5 +29,24 @@ module Oe
     def self.value
       @value ||= compute
     end
+
+    # Hash of the shipped frontend bundle (web/dist, source maps excluded), nil
+    # when no bundle exists. Kept apart from #compute on purpose: the engine
+    # revision is derived from `build`, and a frontend-only deploy must not
+    # look like an engine change (#284).
+    def self.compute_web(root = ROOT)
+      files = Dir.glob("web/dist/**/*", base: root)
+                 .select { |path| File.file?(File.join(root, path)) }
+                 .reject { |path| path.end_with?(".map") }.sort
+      return nil if files.empty?
+
+      digest = Digest::SHA256.new
+      files.each { |path| digest << path << "\0" << File.binread(File.join(root, path)) << "\0" }
+      digest.hexdigest[0, 12]
+    end
+
+    def self.web_value
+      @web_value ||= compute_web
+    end
   end
 end

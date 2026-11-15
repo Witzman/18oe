@@ -3,4 +3,11 @@
 
 # Prints the build id of this working tree; compare with /healthz on the server.
 require_relative "../lib/oe/build_id"
-puts Oe::BuildId.compute
+# Plain: the backend build id (unchanged). `bin/build-id --web` also prints the
+# frontend hash of web/dist (run `cd web && npm run build` first), as
+# "build=<id> web_build=<id|none>", matching the /healthz fields (#284).
+if ARGV.include?("--web")
+  puts "build=#{Oe::BuildId.compute} web_build=#{Oe::BuildId.compute_web || 'none'}"
+else
+  puts Oe::BuildId.compute
+end
