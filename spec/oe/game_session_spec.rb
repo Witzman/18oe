@@ -210,6 +210,39 @@ RSpec.describe Oe::GameSession do
       expect(store.last_seq(session.id)).to eq(6)
     end
 
+    # #339: loads share the cached game object, so an append of one thread
+    # mutated the game another thread was still reading (bot_runner_spec:179
+    # failed in Step::HomeToken with pending_token nil). Readers hold the
+    # game lock (GameSession.with); an append waits for it.
+    it "makes an append wait while another thread reads the shared game under its lock" do
+      play(session, 5)
+      inside = Queue.new
+      release = Queue.new
+      reader = Thread.new do
+        described_class.with(store, session.id) do |s|
+          inside << [s.game, s.game.raw_actions.size]
+          release.pop
+          s.game.raw_actions.size
+        end
+      end
+      shared, size_before = inside.pop
+
+      writer_session = described_class.load(store, session.id)
+      expect(writer_session.game).to equal(shared) # the cache hands out one object
+      hash = Oe::LegalActions.new(writer_session.game, limit: 4, rng: Random.new(3)).call.first.to_h
+      writer = Thread.new { writer_session.append(hash, actor: "w", expected_seq: 5) }
+      deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + 5
+      Thread.pass while writer.status == "run" && Process.clock_gettime(Process::CLOCK_MONOTONIC) < deadline
+
+      expect(writer.status).to eq("sleep") # blocked on the game lock, not finished
+      expect(store.last_seq(session.id)).to eq(5)
+      release << true
+      expect(reader.value).to eq(size_before) # the game did not change under the reader
+      expect(writer.value).to eq(6)
+    ensure
+      release&.push(true)
+    end
+
     it "refuses actions on a finished game" do
       store.set_status(session.id, "finished")
       session.game.instance_variable_set(:@finished, true)
