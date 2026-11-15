@@ -584,6 +584,74 @@ module Oe
       routes ? [A::RunRoutes.new(entity, routes: routes)] : []
     end
 
+    # ---- Orient Express (RB 12.1, #136) -----------------------------------
+    #
+    # A major may combine two or more of its non-permanent trains that have not
+    # run yet into one train for an Orient Express run. The engine's step
+    # (G18OE::Step::Route#process_double_head_trains) builds the combined train
+    # from the summed cities and towns; the train may then run only an Orient
+    # Express route (G18OE::Game#check_other), and its components do not run on
+    # their own this OR. A combination cannot be taken back (no undo, #34/#137),
+    # so only combinations that can make an Orient Express run are offered:
+    # one path search with all candidates combined (the largest train: any
+    # route a smaller combination can run, it can run too) gives the fewest
+    # cities an Orient Express route needs; a combination is offered when its
+    # cities reach that. Towns never limit a combined train (its town row has
+    # 'visit' 99). Trains of the same name are interchangeable, so each
+    # multiset of names is offered once.
+    def generate_double_head_trains(_step, entity)
+      candidates = @game.double_head_candidates(entity)
+      combos = double_head_combinations(candidates)
+      return [] if combos.empty?
+
+      need = OrientExpressReach.new(@game, entity).fewest_cities(candidates)
+      return [] unless need
+
+      fitting = combos.select { |trains| trains.sum { |t| @game.distance(t).first } >= need }
+      sample(fitting).map { |trains| A::DoubleHeadTrains.new(entity, trains: trains) }
+    end
+
+    # Every set of two or more candidates, one per multiset of train names,
+    # smallest first.
+    def double_head_combinations(candidates)
+      sorted = candidates.sort_by { |t| [t.name, t.id] }
+      (2..sorted.size).flat_map { |n| sorted.combination(n).to_a }
+        .uniq { |trains| trains.map(&:name) }
+    end
+
+    # The fewest cities (city and offboard stops) on an Orient Express route
+    # that a train of the summed reach of `trains` finds, nil if it finds none.
+    # Read-only: the trial train is never added to the depot or the
+    # corporation. Its reach is built as the engine's step builds the combined
+    # train (G18OE::Step::Route#combined_train!, private and adding the train
+    # to the depot, hence repeated here). The search is the one run_routes uses
+    # (RoutePicker, same walk limit), so an offered combination is one the
+    # picker can route.
+    class OrientExpressReach
+      def initialize(game, entity)
+        @game = game
+        @entity = entity
+      end
+
+      def fewest_cities(trains)
+        trial = trial_train(trains)
+        routes, = RouteSearch.new(@game).path([trial], @entity, walk_limit: RoutePicker::WALK_LIMIT)
+        routes[trial].select { |route| @game.orient_express_run?(route) }
+          .map { |route| route.visited_stops.count { |stop| !stop.town? } }.min
+      end
+
+      private
+
+      def trial_train(trains)
+        cities, towns = trains.map { |t| @game.distance(t) }.transpose.map(&:sum)
+        distance = [
+          { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
+          { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
+        ]
+        Engine::Train.new(name: "#{cities}+#{towns}", distance: distance, price: 0).tap { |t| t.owner = @entity }
+      end
+    end
+
     def generate_dividend(step, entity)
       step.dividend_types.map { |kind| A::Dividend.new(entity, kind: kind.to_s) }
     end
@@ -661,7 +729,7 @@ module Oe
         router = RouteSearch.new(@game)
         train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity, walk_limit: WALK_LIMIT)
         chosen = []
-        train_routes.each do |train, candidates|
+        combined_first(train_routes).each do |train, candidates|
           route = candidates.find { |candidate| compatible?(router, chosen, train, candidate) }
           chosen << route if route
         end
@@ -670,6 +738,16 @@ module Oe
       end
 
       private
+
+      # A train combined for the Orient Express (#136) may run only an Orient
+      # Express route and its components do not run otherwise, so it picks
+      # first; other trains keep the search's order. Without this a 3 took the
+      # one Orient Express route and the combined train ran nothing.
+      def combined_first(train_routes)
+        train_routes.each_with_index
+          .sort_by { |(train, _), i| [@game.combined_train?(train) ? 0 : 1, i] }
+          .map(&:first)
+      end
 
       # Each route validates itself against the other chosen routes, so the
       # shared `routes` list must be the final one before the action is built.
