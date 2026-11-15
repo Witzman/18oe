@@ -19,6 +19,7 @@
     "active_players",
     "current",
     "finished",
+    "game_end",
     "game_id",
     "operating_order",
     "phase",
