@@ -45,6 +45,7 @@ RSpec.describe "Oe::View operating context (#123)" do
     @errors = Hash.new { |h, k| h[k] = [] }
     @views = []
     @enumerated = 0
+    @compared = 0
     play do |game, view, action|
       ctx = view[:prompt][:context]
       step = game.round.active_step
@@ -87,12 +88,21 @@ RSpec.describe "Oe::View operating context (#123)" do
       expect(h[:tiles].map { |t| t[:name] }.sort).to eq(step.upgradeable_tiles(entity, hex).map { |t| t.name.to_s }.sort)
       h[:tiles].each { |t| expect(t[:rotations]).not_to be_empty }
     end
+    compare_sampled_track(track, game) if track[:hexes] && track[:hexes].size > 2 && @compared < 10
     return unless track[:hexes] && @enumerated < 15
 
     @enumerated += 1
     legal = Oe::LegalActions.new(game, limit: nil).call.grep(Engine::Action::LayTile)
     from_view = track[:hexes].flat_map { |h| h[:tiles].flat_map { |t| t[:rotations].map { |r| [h[:hex], t[:name], r] } } }
     expect(from_view.sort).to eq(legal.map { |a| [a.hex.id, a.tile.name.to_s, a.rotation] }.sort)
+  end
+
+  # #340: the track panel regrouped from the unsampled legal set equals the one
+  # from a second enumeration (taken when the prompt is sampled), order included.
+  def compare_sampled_track(track, game)
+    @compared += 1
+    sampled = Oe::View.render(game, viewer: game.active_players.first&.id, log: nil, actions_limit: 1_000_000)
+    expect(sampled[:prompt][:context][:track]).to eq(track)
   end
 
   def check_token(token, step, entity, game)
@@ -167,6 +177,10 @@ RSpec.describe "Oe::View operating context (#123)" do
     acting = Oe::View.acting_as(game, game.round.active_step, list)
     expect(acting).to eq([{ entity: "p0", kind: "player", primary: true, types: ["pass"] },
                           { entity: "LNWR", kind: "corporation", primary: false, types: ["convert"] }])
+  end
+
+  it "compared the track panel with the second enumeration on states with several hexes (#340)" do
+    expect(@compared).to be > 0
   end
 
   it "saw a president having to chip in for a train" do
