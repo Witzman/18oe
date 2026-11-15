@@ -303,7 +303,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     const open = genericOpen ?? showGeneric;
     put(barTools,
       showGeneric ? v("button", { type: "button", class: "frame-toggle", "aria-expanded": String(open), onclick: () => { genericOpen = !open; drawBar(); } }, fillText("frame.generic_open", { n: m.count })) : null,
-      v("button", { type: "button", class: "frame-toggle", "aria-expanded": String(logOpen), onclick: () => { logOpen = !logOpen; drawBar(); } }, `${txt("frame.log").de} ${logOpen ? "▾" : "▴"}`));
+      v("button", { type: "button", class: "frame-toggle", title: txt("frame.log_hint").de, "aria-expanded": String(logOpen), onclick: () => { logOpen = !logOpen; drawBar(); } }, `${txt("frame.log").de} ${logOpen ? "▾" : "▴"}`));
     const drawerNodes: VNode[] = [];
     if (showGeneric && open) {
       drawerNodes.push(v("section", { class: "frame-drawer-sheet", "aria-label": txt("frame.generic_title").de },
