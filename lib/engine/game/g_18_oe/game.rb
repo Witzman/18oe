@@ -271,6 +271,7 @@ module Engine
         ZONE_TERRAIN_DISCOUNT_RATE  = 0.5 # 50% §11.1.5; E/F augment zone discount to this rate
         TILE_POINT_BUDGET = { minor: 3, regional: 3, major: 6, national: 9 }.freeze
         MINOR_MAX_TREASURY = 180
+        EF_TERRAIN_COST_FACTOR      = [67, 100].freeze # §15.5/15.6: x 0.67, rounded down
         EF_TERRAIN_AUGMENT          = { 'E' => %i[water river lake], 'F' => %i[mountain hill] }.freeze
 
         CORPORATIONS_TRACK_RIGHTS = {
@@ -440,6 +441,8 @@ module Engine
           setup_patronage_tiles!
           setup_wcf_placeholder!
           @minor_g_ability = corporation_by_id('G')&.abilities&.first
+          # §15.5/§15.6: the ability objects travel with the charter into the major on a merge
+          @ef_abilities = %w[E F].to_h { |id| [id, corporation_by_id(id)&.abilities&.first] }
         end
 
         def setup_wcf_placeholder!
@@ -681,16 +684,20 @@ module Engine
               self.class::NATIONAL_REGION_HEXES[zone].include?(hex.coordinates)
           end
 
-          return super unless zone_match
-
-          # §11.1.5: 20% zone discount; E/F augment to 50% when terrain matches
           ef_corp = terrain_augmented_by?(entity, tile)
-          rate = ef_corp ? self.class::ZONE_TERRAIN_DISCOUNT_RATE : self.class::ZONE_DISCOUNT_RATE
-          cost = (base_cost * (1 - rate)).floor
+          return super unless zone_match || ef_corp
+
+          # §11.1.5: 20% zone discount, 50% with E/F on matching terrain. §15.5/§15.6: E/F alone
+          # (no zone discount) give 33% (cost x 0.67, rounded down).
+          cost = if zone_match
+                   (base_cost * (1 - (ef_corp ? self.class::ZONE_TERRAIN_DISCOUNT_RATE : self.class::ZONE_DISCOUNT_RATE))).floor
+                 else
+                   base_cost * self.class::EF_TERRAIN_COST_FACTOR[0] / self.class::EF_TERRAIN_COST_FACTOR[1]
+                 end
           discount = base_cost - cost
           if discount.positive?
-            pct = (rate * 100).to_i
-            label = ef_corp ? "#{pct}% zone+#{ef_corp.name}" : "#{pct}% zone"
+            pct = (discount * 100.0 / base_cost).round
+            label = ef_corp ? "#{zone_match ? "#{(self.class::ZONE_TERRAIN_DISCOUNT_RATE * 100).to_i}% zone+" : '33% '}#{ef_corp.name}" : "#{pct}% zone"
             @log << "#{spender.name} receives a #{label} discount of #{format_currency(discount)}"
           end
           cost
@@ -1297,6 +1304,30 @@ module Engine
           sea_zone_distance(port_sea_zone(*from_port), port_sea_zone(*to_port))
         end
 
+        # Minor E / F charters whose ability (bound to the ability object, so it survives a merge into
+        # a major) the entity holds and whose terrain colour the tile's hex has.
+        def terrain_augmenters(entity, tile)
+          corp = owning_corporation(entity)
+          return [] unless corp
+
+          self.class::EF_TERRAIN_AUGMENT.filter_map do |id, terrains|
+            ability = @ef_abilities[id]
+            corporation_by_id(id) if ability && corp.abilities.include?(ability) && (tile.terrain & terrains).any?
+          end
+        end
+
+        def terrain_augmented_by?(entity, tile)
+          terrain_augmenters(entity, tile).first
+        end
+
+        # Charters (E/F ids) whose extra tile point the entity holds, matching or not.
+        def ef_bonus_ids(entity)
+          corp = owning_corporation(entity)
+          return [] unless corp
+
+          @ef_abilities.select { |_id, ability| ability && corp.abilities.include?(ability) }.keys
+        end
+
         private
 
         def location_hexes(names)
@@ -1312,14 +1343,6 @@ module Engine
           return nil unless corp
 
           self.class::CORPORATIONS_TRACK_RIGHTS[corp.id] || @minor_floated_regions[corp.id]
-        end
-
-        def terrain_augmented_by?(entity, tile)
-          corp = owning_corporation(entity)
-          return nil unless corp
-
-          terrains = self.class::EF_TERRAIN_AUGMENT[corp.id]
-          terrains && (tile.terrain & terrains).any? ? corp : nil
         end
 
         def owning_corporation(entity)

@@ -10,7 +10,7 @@
       "file": "random-4p-1.json",
       "players": 4,
       "seed": 1,
-      "actions": 1959
+      "actions": 1546
     }
   },
   "entries": [
@@ -175,7 +175,7 @@
       "surface": "§10.1 Anteile verkaufen",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1696,
+      "position": 1317,
       "expect": {
         "round": "Stock",
         "step": "BuySellParShares"
@@ -186,7 +186,7 @@
       "surface": "§9.3 Regional zum Major konvertieren",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1678,
+      "position": 1310,
       "expect": {
         "round": "Stock",
         "step": "BuySellParShares"
@@ -197,7 +197,7 @@
       "surface": "§10.5 Minor-Merge in den eigenen Major (Angebot)",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1957,
+      "position": 1544,
       "expect": {
         "round": "Stock",
         "step": "MergeMinor"
@@ -208,7 +208,7 @@
       "surface": "§10.5 Minor-Merge, Token-Wahl",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1958,
+      "position": 1545,
       "expect": {
         "round": "Stock",
         "step": "MergeToken"
@@ -219,7 +219,7 @@
       "surface": "§10.5/§11.6 Minor-Merge, Zug abwerfen (Zuglimit)",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1959,
+      "position": 1546,
       "expect": {
         "round": "Stock",
         "step": "MergeDiscardTrain"

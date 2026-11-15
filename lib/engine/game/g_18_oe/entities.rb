@@ -563,9 +563,10 @@ module Engine
             abilities: [
               {
                 type: 'description',
-                description: 'Augments the zone terrain discount from 20% to 50% for water/coast '\
-                             'track construction in the owning RR\'s zone (§11.1.5). '\
-                             'Extra tile point for matching terrain: not yet implemented (BUG-034).',
+                description: '33% discount on water/coast/river (blue terrain cost) track construction '\
+                             'anywhere (§15.5); with the 20% zone discount the discount in that zone is 50% '\
+                             '(§11.1.5). Once per OR one extra tile point, only for a yellow tile on a hex with '\
+                             'blue terrain cost (§15.5).',
               },
             ],
           },
@@ -583,9 +584,10 @@ module Engine
             abilities: [
               {
                 type: 'description',
-                description: 'Augments the zone terrain discount from 20% to 50% for mountain/rough '\
-                             'track construction in the owning RR\'s zone (§11.1.5). '\
-                             'Extra tile point for matching terrain: not yet implemented (BUG-034).',
+                description: '33% discount on mountain/rough (green terrain cost) track construction '\
+                             'anywhere (§15.6); with the 20% zone discount the discount in that zone is 50% '\
+                             '(§11.1.5). Once per OR one extra tile point, only for a yellow tile on a hex with '\
+                             'green terrain cost (§15.6).',
               },
             ],
           },
