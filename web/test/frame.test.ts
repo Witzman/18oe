@@ -163,6 +163,15 @@ test("frame.css uses only theme variables and no fixed colours (rule 10)", async
   assert.deepEqual(css.match(/#[0-9a-f]{3,8}\b|rgba?\(/gi) ?? [], []);
 });
 
+test("portrait: the sheet is in the flow below the map, not over it; head order list scrolls on its own (#333)", () => {
+  const css = readFileSync(new URL("../ui/frame/frame.css", import.meta.url), "utf8");
+  const portrait = css.slice(css.indexOf("@media (orientation: portrait)"));
+  assert.match(portrait, /\.frame-body \{ flex-direction: column; \}/);
+  assert.match(portrait, /\.frame-panel \{ position: relative;/);
+  assert.match(portrait, /max-height: calc\(var\(--shape-sheet-max-height\) \* 1%\)/);
+  assert.match(css, /\.frame-roundbar > \.head-order \{[^}]*overflow-x: auto/);
+});
+
 // ---- order interface for special panels (#213) ----------------------------------------------------
 import { createOrderSlot, orderView, type OrderSpec } from "../ui/frame/order.ts";
 

@@ -567,14 +567,19 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     });
   }
 
+  let autoFit = false;
   function setView(v: View) {
     view = clampPan(v, scene.bounds, vp());
     render();
   }
 
+  /** A view the player chose (drag, pinch, wheel, keys): stops the automatic re-framing on resize. */
+  function userView(v: View) { autoFit = false; setView(v); }
+
   let flight = 0;
   function animateTo(to: View) {
     cancelAnimationFrame(flight);
+    autoFit = false;
     const ms = theme.motion.flyMs;
     if (reducedMotion(theme) || ms <= 0) { setView(to); return; }
     const from = view, start = performance.now(), size = vp();
@@ -592,6 +597,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     baseZoom = v.zoom;
     if (animate) animateTo(v);
     else setView(v);
+    autoFit = true; // until the player moves the camera; a resize then re-frames the whole map (#333)
   }
 
   function hexCenter(id: string): { p: Vec; z: number } | null {
@@ -710,7 +716,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     if (pointers.size === 1 && drag) {
       if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > (drag.touch ? theme.dragTouchPx : theme.dragPx)) { drag.moved = true; closePicker(); }
       pointers.set(e.pointerId, p);
-      if (drag.moved) { setView(panBy(view, p.x - prev.x, p.y - prev.y)); samples = pushSample(samples, { t: e.timeStamp, p }); }
+      if (drag.moved) { userView(panBy(view, p.x - prev.x, p.y - prev.y)); samples = pushSample(samples, { t: e.timeStamp, p }); }
     } else if (pointers.size === 2) {
       const [a, b] = [...pointers.entries()].map(([id, q]) => [id, q] as const);
       const other = (a![0] === e.pointerId ? b! : a!)[1];
@@ -718,7 +724,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       const mid1 = { x: (p.x + other.x) / 2, y: (p.y + other.y) / 2 };
       const d0 = Math.hypot(prev.x - other.x, prev.y - other.y), d1 = Math.hypot(p.x - other.x, p.y - other.y);
       pointers.set(e.pointerId, p);
-      if (d0 > 0) setView(panBy(zoomAt(view, mid0, d1 / d0, baseZoom), mid1.x - mid0.x, mid1.y - mid0.y));
+      if (d0 > 0) userView(panBy(zoomAt(view, mid0, d1 / d0, baseZoom), mid1.x - mid0.x, mid1.y - mid0.y));
     }
   };
   /** Pan inertia after a touch drag: exponential decay, stopped by any new touch. */
@@ -730,7 +736,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       last = now;
       const [d, next] = inertiaStep(vel, dt, theme.motion.inertiaMs);
       vel = next;
-      setView(panBy(view, d.x, d.y));
+      userView(panBy(view, d.x, d.y));
       if (Math.hypot(vel.x, vel.y) > INERTIA_STOP) flight = requestAnimationFrame(step);
     };
     flight = requestAnimationFrame(step);
@@ -760,7 +766,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     const step = e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 1 : 0.0015;
-    setView(zoomAt(view, pos(e), Math.exp(-e.deltaY * step), baseZoom));
+    userView(zoomAt(view, pos(e), Math.exp(-e.deltaY * step), baseZoom));
   };
   const onDbl = (e: MouseEvent) => {
     if (lastType !== "mouse") return; // touch has its own double tap
@@ -803,7 +809,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     view = panBy(view, (w - size.width) / 2, (h - size.height) / 2);
     size = vp();
     baseZoom = fit(scene.grid, view, size).zoom;
-    setView(view);
+    if (autoFit) fitView(false);
+    else setView(view);
   });
   resize.observe(el);
 

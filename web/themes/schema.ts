@@ -57,6 +57,8 @@ export const NUMBER_RANGES = {
     hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24], hit: [32, 64],
     // Panel metrics in px (#298): floating action panel width, top bar height, panel corner radius.
     panelWidth: [240, 400], topbarHeight: [40, 64], panelRadius: [0, 24],
+    // Portrait bottom sheet (#333): largest share of the body height the open sheet may take, in percent.
+    sheetMaxHeight: [30, 70],
     // Map strokes in hex side lengths (they scale with the map like printed lines), alpha 0..1 (#44).
     zoneLine: [0.01, 0.3], focusLine: [0.01, 0.3], targetAlpha: [0, 1],
     // Soft coast (#100): Chaikin cut ratio (0 = hard hex outline) and noise amplitude in side lengths.
