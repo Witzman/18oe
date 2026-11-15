@@ -528,7 +528,7 @@ module Oe
         choice_name: step && safe { step.respond_to?(:choice_name) ? step.choice_name : nil },
         choices: choices(game, step, offered),
         acting_as: acting_as(game, step, list),
-        context: context(game, step, mine && with_actions ? legal : nil, offered),
+        context: context(game, step, mine && with_actions ? legal : nil, offered, complete: limit.nil?),
       }
     end
 
@@ -582,7 +582,10 @@ module Oe
     #   stock:    price and new share price of the offered share actions (#47)
     # `legal` (an Oe::LegalActions) is given only for the viewer to act: choice
     # spaces that need the enumeration (tile lays, token targets) are nil otherwise.
-    def context(game, step, legal, offered = [])
+    # complete: `offered` is the unsampled legal set (no limit), so the track
+    # panel can be built from its lay_tile actions instead of a second
+    # enumeration (#340).
+    def context(game, step, legal, offered = [], complete: false)
       empty = { track: nil, token: nil, dividend: nil, train: nil, stock: nil }
       return empty.merge(stock: safe { stock_context(game, step, offered) }) if stock_step?(step)
       return empty unless step
@@ -591,7 +594,7 @@ module Oe
       return empty unless entity&.corporation?
 
       {
-        track: step.is_a?(Engine::Game::G18OE::Step::Track) ? safe { track_context(game, step, entity, legal) } : nil,
+        track: step.is_a?(Engine::Game::G18OE::Step::Track) ? safe { track_context(game, step, entity, legal, complete ? offered : nil) } : nil,
         token: token_step?(step) ? safe { token_context(game, step, entity, legal) } : nil,
         dividend: step.is_a?(Engine::Step::Dividend) ? safe { dividend_context(game, step, entity) } : nil,
         train: step.is_a?(Engine::Step::BuyTrain) ? safe { train_context(game, step, entity) } : nil,
@@ -710,18 +713,37 @@ module Oe
       game.log.slice!(size..)
     end
 
-    def track_context(game, step, entity, legal)
+    def track_context(game, step, entity, legal, offered = nil)
       budget = step.get_tile_lay(entity)
       {
         points: { budget: budget, used: step.points_used, left: step.points_left(entity) },
-        hexes: legal && without_log(game) { track_hexes(game, step, entity, legal) },
+        hexes: legal && without_log(game) { track_hexes(game, step, entity, lay_options(step, entity, legal, offered)) },
       }
+    end
+
+    # [[hex, [[tile, [rotation, ...]], ...]], ...] as LegalActions#lay_tile_options
+    # gives it. The tile enumeration is the dearest part of a track GET (route
+    # graph plus a trial lay per rotation); when the unsampled legal set was
+    # already computed for the prompt, its lay_tile actions are that very list
+    # flattened in the same order (generate_lay_tile), so it is regrouped here
+    # instead of enumerated a second time (#340).
+    def lay_options(step, entity, legal, offered)
+      return legal.lay_tile_options(step, entity) unless offered
+
+      by_hex = {}.compare_by_identity
+      offered.each do |action|
+        next unless action.is_a?(Engine::Action::LayTile) && action.entity.equal?(entity)
+
+        tiles = (by_hex[action.hex] ||= {}.compare_by_identity)
+        (tiles[action.tile] ||= []) << action.rotation
+      end
+      by_hex.map { |hex, tiles| [hex, tiles.to_a] }
     end
 
     # Per hex that can be built on: the price for this corporation split into
     # its parts, the tile points, and tile + legal rotations. Not sampled.
-    def track_hexes(game, step, entity, legal)
-      legal.lay_tile_options(step, entity).map do |hex, tiles|
+    def track_hexes(game, step, entity, options)
+      options.map do |hex, tiles|
         cost = game.upgrade_cost(hex.tile, hex, entity, entity)
         {
           hex: hex.id,
