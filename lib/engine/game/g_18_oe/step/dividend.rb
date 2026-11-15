@@ -11,12 +11,32 @@ module Engine
           include Engine::Step::HalfPay
 
           def actions(entity)
-            return [] if %i[minor national].include?(entity.type)
+            return [] if %i[minor national].include?(entity.type) || @game.repeated_payout(entity, @round)
 
             super
           end
 
+          # The abbreviated OR (§13) has no Track step, but OperatingInfo records the laid hexes.
+          def round_state
+            super.merge(laid_hexes: [])
+          end
+
+          # §13 abbreviated OR: the same revenue, paid out the same way.
+          def total_revenue
+            (last = @game.repeated_payout(current_entity, @round)) ? last[:revenue] : super
+          end
+
+          def process_dividend(action)
+            revenue = total_revenue
+            super
+            @game.record_payout!(action.entity, revenue, action.kind)
+          end
+
           def skip!
+            if (last = @game.repeated_payout(current_entity, @round))
+              return process_dividend(Action::Dividend.new(current_entity, kind: last[:kind]))
+            end
+
             case current_entity.type
             when :minor
               kind = total_revenue.zero? ? 'withhold' : 'half'

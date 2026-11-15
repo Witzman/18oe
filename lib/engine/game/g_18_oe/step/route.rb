@@ -8,6 +8,8 @@ module Engine
       module Step
         class Route < Engine::Step::Route
           def actions(entity)
+            return [] if @game.repeated_payout(entity, @round)
+
             actions = super
             return actions if actions.empty? || @game.double_head_candidates(entity).size < 2
             return actions if !@game.loading && !@game.orient_express_reachable?(entity)
