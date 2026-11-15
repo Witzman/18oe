@@ -8,7 +8,7 @@ import type { GameFrame } from "../frame/frame.ts";
 import { Geld, toDom } from "../kit/index.ts";
 import { txt } from "../text.ts";
 import { corpRows, marketModel, mustSell, offerOf, orderModel, passAction, STOCK_STEP, STOCK_TYPES, type Selection } from "./stock-model.ts";
-import { sheetNode, type SheetHandlers, type Tab } from "./stock-sheet.ts";
+import { offersNode, sheetNode, type SheetHandlers, type Tab } from "./stock-sheet.ts";
 
 const theme = () => choiceFromRoot(document.documentElement).theme;
 export const MARKET_VIEW = "market";
@@ -26,7 +26,11 @@ export function mountStock(frame: GameFrame): () => void {
   const releaseClaims = STOCK_TYPES.map((t) => frame.claims.claim(STOCK_STEP, t));
 
   const handlers: SheetHandlers = {
-    onFocus(corp) { focus = focus === corp ? null : corp; if (sel && sel.corp !== focus) sel = null; refresh(); },
+    onFocus(corp) {
+      // The offers are in the action panel: open it when it is collapsed (the card would otherwise seem dead).
+      const panel = frame.root.querySelector<HTMLElement>(".frame-panel");
+      if (panel?.dataset.collapsed === "true") panel.querySelector<HTMLButtonElement>(".frame-panel-toggle")?.click();
+      focus = focus === corp ? null : corp; if (sel && sel.corp !== focus) sel = null; refresh(); },
     onPick(corp, key) {
       // A selection here replaces one made in the generic bar.
       frame.discardSelection();
@@ -38,6 +42,23 @@ export function mountStock(frame: GameFrame): () => void {
     onMap() { frame.views.activate("map"); },
   };
 
+  // The offers of the chosen corporation live in the action panel (#303), not on the card.
+  let ownsSlot = false;
+  function drawOffers() {
+    const g = game;
+    const slot = frame.slots.context;
+    const inStock = g !== null && g.state.prompt.step === STOCK_STEP && !g.state.meta.finished;
+    if (!g || !inStock) { if (ownsSlot) { slot.replaceChildren(); ownsSlot = false; } return; }
+    const rows = corpRows(g);
+    if (sel && !offerOf(rows, sel)) sel = null;
+    const tree = offersNode(inputOf(g, rows), handlers);
+    const active = document.activeElement instanceof HTMLElement && slot.contains(document.activeElement) ? document.activeElement.dataset.key : null;
+    slot.replaceChildren(...(tree ? [toDom(tree)] : []));
+    ownsSlot = tree !== null;
+    if (active) slot.querySelector<HTMLElement>(`[data-key="${CSS.escape(active)}"]`)?.focus();
+  }
+  const inputOf = (g: Game, rows: ReturnType<typeof corpRows>) => ({ g, theme: theme(), rows, market: marketModel(g, rows, focus, sel), focus, sel, tab, must: mustSell(g) });
+
   function draw() {
     const el = host;
     const g = game;
@@ -48,7 +69,7 @@ export function mountStock(frame: GameFrame): () => void {
     const scroll = [".stock-list", ".stock-grid-scroll"].map((s) => el.querySelector<HTMLElement>(s)?.scrollTop ?? 0);
     const active = document.activeElement instanceof HTMLElement && el.contains(document.activeElement) ? document.activeElement : null;
     const key = active ? { corp: active.closest<HTMLElement>("[data-corp]")?.dataset.corp, offer: active.dataset.key, tab: active.dataset.tab } : null;
-    const tree = sheetNode({ g, theme: theme(), rows, market: marketModel(g, rows, focus, sel), focus, sel, tab, must: mustSell(g) }, handlers);
+    const tree = sheetNode(inputOf(g, rows), handlers);
     el.replaceChildren(toDom(tree));
     [".stock-list", ".stock-grid-scroll"].forEach((s, i) => { const n = el.querySelector<HTMLElement>(s); if (n) n.scrollTop = scroll[i]!; });
     if (key) {
@@ -79,7 +100,7 @@ export function mountStock(frame: GameFrame): () => void {
     });
   }
 
-  function refresh() { draw(); syncOrder(); }
+  function refresh() { draw(); drawOffers(); syncOrder(); }
 
   const stop = frame.subscribe((g) => {
     game = g;
@@ -90,9 +111,10 @@ export function mountStock(frame: GameFrame): () => void {
     // Back to the map when the operating round begins (the tab "Markt" stays for reading).
     if (!inStock && wasStock && frame.views.activeId === MARKET_VIEW) frame.views.activate("map");
     wasStock = inStock;
+    drawOffers();
     syncOrder();
   });
   const releaseView = frame.views.register({ id: MARKET_VIEW, labelKey: "stock.view", render: ({ container }) => { host = container; draw(); } });
 
-  return () => { stop(); releaseView(); releaseOrder?.(); releaseClaims.forEach((f) => f()); };
+  return () => { stop(); releaseView(); releaseOrder?.(); if (ownsSlot) frame.slots.context.replaceChildren(); releaseClaims.forEach((f) => f()); };
 }

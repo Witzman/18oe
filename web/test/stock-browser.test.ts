@@ -79,7 +79,7 @@ const CHECKS_SELL = (corp: string, percent: number, price: number) => String.raw
   if (!/Markt/.test(q(".frame-tabs").textContent)) fail("no tab Markt");
   if (document.querySelectorAll(".stock-row").length < 5) fail("rows " + document.querySelectorAll(".stock-row").length);
   if ([...document.querySelectorAll(".frame-entry")].some((e) => ["buy_shares", "sell_shares", "par", "pass"].includes(e.dataset.type))) fail("generic bar still offers claimed actions");
-  if (!/Wähle eine Aktion/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/Wähle eine Gesellschaft/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   if (!q(".kit-main-btn").disabled) fail("main button open without a choice");
   // tablet: no target below the hit size
   const small = [...document.querySelectorAll(".stock-rowbtn, .stock-head button")].filter((b) => b.getBoundingClientRect().height < 43.5 && b.offsetParent !== null);
