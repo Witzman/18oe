@@ -239,6 +239,8 @@ describe 'G18OE lay track (§11.1)' do
 
       it 'keeps the step open after the regular points are used, once per OR' do
         step.instance_variable_set(:@points_used, 6)
+        allow(step).to receive(:hex_neighbors).and_return([0])
+        allow(game).to receive(:hex_within_national_region?).and_return(true)
         expect(step.can_lay_tile?(major)).to be(true)
 
         step.instance_variable_set(:@ef_bonus_used, ['E'])

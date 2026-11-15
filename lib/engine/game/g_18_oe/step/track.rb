@@ -36,13 +36,19 @@ module Engine
             (augmenters & @game.ef_bonus_ids(entity)).find { |id| !@ef_bonus_used.include?(id) }
           end
 
-          def ef_bonus_left?(entity)
-            (@game.ef_bonus_ids(entity) - @ef_bonus_used).any?
+          # True when only the extra point is left and some hex still takes a yellow lay with it;
+          # otherwise the step ends as before instead of waiting for a pointless pass.
+          def ef_bonus_lay_possible?(entity)
+            return false if (@game.ef_bonus_ids(entity) - @ef_bonus_used).empty?
+
+            @game.hexes.any? do |hex|
+              ef_bonus_id(entity, hex) && tracker_available_hex(entity, hex)
+            end
           end
 
           def can_lay_tile?(entity)
             points_available = get_tile_lay(entity) - @points_used
-            return false unless points_available.positive? || ef_bonus_left?(entity)
+            return false unless points_available.positive? || ef_bonus_lay_possible?(entity)
 
             !entity.tokens.empty?
           end
