@@ -24,7 +24,7 @@ module Oe
     DEFINITION = {
       'games' => {
         'strategy-4p-1' => { 'players' => 4, 'seed' => 1, 'player' => 'strategy', 'max_actions' => 5100 },
-        'strategy-3p-1' => { 'players' => 3, 'seed' => 1, 'player' => 'strategy', 'max_actions' => 3700 },
+        'strategy-3p-1' => { 'players' => 3, 'seed' => 1, 'player' => 'strategy', 'max_actions' => 4000 },
         'random-4p-1' => { 'players' => 4, 'seed' => 1, 'player' => 'random', 'max_actions' => 2000 },
       },
       'entries' => [
@@ -78,8 +78,6 @@ module Oe
           'game' => 'strategy-4p-1', 'first' => { 'round' => 'Consolidation', 'step' => 'MergeOffer' } },
         { 'name' => 'consolidation-discard-train', 'surface' => '§10.6/§11.6 Konsolidierung: Zug abwerfen nach Merge (Zuglimit)', 'slice' => 'S3',
           'game' => 'strategy-3p-1', 'first' => { 'round' => 'Consolidation', 'step' => 'MergeDiscardTrain' } },
-        { 'name' => 'operating-discard-train', 'surface' => '§11.6 Zuglimit: Zug abwerfen im Betrieb (Phasenwechsel)', 'slice' => 'S3',
-          'game' => 'strategy-3p-1', 'first' => { 'round' => 'Operating', 'step' => 'DiscardTrain' } },
         { 'name' => 'phase-6', 'surface' => 'Zugphase 6', 'slice' => 'S3',
           'game' => 'strategy-4p-1', 'first' => { 'phase' => '6' } },
         { 'name' => 'phase-7', 'surface' => 'Zugphase 7', 'slice' => 'S3',
@@ -109,6 +107,10 @@ module Oe
         { 'surface' => 'Geparrtes Regional, das niemand kauft', 'slice' => 'S2',
           'reason' => 'Kam in keiner der Partien vor; in der Engine wird der Fall durch close_unfloated_regionals_at_maximum! (#348) ' \
                       'behandelt, eigener Eintrag erst mit gesteuerter Partie.' },
+        { 'surface' => '§11.6 Zuglimit: Zug abwerfen im Betrieb (Step DiscardTrain in der OR)', 'slice' => 'S3',
+          'reason' => 'Kam nur in einer frueheren Fassung der Strategie-Partie 3p/Seed 1 vor und ist nach den Engine-Aenderungen ' \
+                      '(#70 Golden Bell, #352 u. a.) in keiner Katalogpartie mehr erreicht; Eintrag, sobald eine Partie ihn zeigt. ' \
+                      'Die Variante in der Konsolidierung (MergeDiscardTrain) ist abgedeckt.' },
         { 'surface' => 'Orient-Express-Bonus (OrientExpressBonus-Schritt), SpecialToken', 'slice' => 'S3',
           'reason' => 'Weder die Strategie-Partien 3p/4p Seed 1 (enden in Phase 8 in der Endphase) noch Zufallspartien erreichen den ' \
                       'Orient-Express-Bonus-Lauf oder einen SpecialToken-Schritt; nur Szenario-Specs. Eintrag, sobald eine Partie ihn zeigt.' },

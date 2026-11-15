@@ -4,19 +4,19 @@
       "file": "strategy-4p-1.json",
       "players": 4,
       "seed": 1,
-      "actions": 5038
+      "actions": 4986
     },
     "strategy-3p-1": {
       "file": "strategy-3p-1.json",
       "players": 3,
       "seed": 1,
-      "actions": 2868
+      "actions": 2787
     },
     "random-4p-1": {
       "file": "random-4p-1.json",
       "players": 4,
       "seed": 1,
-      "actions": 1546
+      "actions": 1700
     }
   },
   "entries": [
@@ -93,7 +93,7 @@
       "surface": "§11.1 erste Betriebsrunde, Gleisbau",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2434,
+      "position": 2435,
       "expect": {
         "round": "Operating",
         "step": "Track"
@@ -104,7 +104,7 @@
       "surface": "§11.6 Zugkauf (Reservierung, Pflicht)",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2436,
+      "position": 2437,
       "expect": {
         "round": "Operating",
         "step": "BuyTrain"
@@ -115,7 +115,7 @@
       "surface": "§11.3 Routen (2+2)",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2485,
+      "position": 2507,
       "expect": {
         "round": "Operating",
         "step": "Route"
@@ -126,7 +126,7 @@
       "surface": "§11.4 Dividende",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2500,
+      "position": 2508,
       "expect": {
         "round": "Operating",
         "step": "Dividend"
@@ -148,7 +148,7 @@
       "surface": "§11.2 Token setzen",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2584,
+      "position": 2531,
       "expect": {
         "round": "Operating",
         "step": "Token"
@@ -159,7 +159,7 @@
       "surface": "§11.7 Issue-Step",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 2973,
+      "position": 2998,
       "expect": {
         "round": "Operating",
         "step": "IssueShares"
@@ -181,7 +181,7 @@
       "surface": "§10.1 Anteile verkaufen",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1317,
+      "position": 1483,
       "expect": {
         "round": "Stock",
         "step": "BuySellParShares"
@@ -192,7 +192,7 @@
       "surface": "§9.3 Regional zum Major konvertieren",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1310,
+      "position": 1464,
       "expect": {
         "round": "Stock",
         "step": "BuySellParShares"
@@ -203,7 +203,7 @@
       "surface": "§10.5 Minor-Merge in den eigenen Major (Angebot)",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1544,
+      "position": 1697,
       "expect": {
         "round": "Stock",
         "step": "MergeMinor"
@@ -214,7 +214,7 @@
       "surface": "§10.5 Minor-Merge, Token-Wahl",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1545,
+      "position": 1698,
       "expect": {
         "round": "Stock",
         "step": "MergeToken"
@@ -225,7 +225,7 @@
       "surface": "§10.5/§11.6 Minor-Merge, Zug abwerfen (Zuglimit)",
       "slice": "S2",
       "game": "random-4p-1",
-      "position": 1546,
+      "position": 1700,
       "expect": {
         "round": "Stock",
         "step": "MergeDiscardTrain"
@@ -236,11 +236,11 @@
       "surface": "Zugphase 5 beginnt (Level-5-Zuege, Konsolidierung ausgeloest)",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 3739,
+      "position": 3782,
       "expect": {
         "phase": "5",
         "round": "Operating",
-        "step": "IssueShares"
+        "step": "BuyTrain"
       }
     },
     {
@@ -248,7 +248,7 @@
       "surface": "§10.6 Konsolidierungsrunde (Minors und Regionals: mergen, kaufen, verkaufen)",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4047,
+      "position": 4076,
       "expect": {
         "round": "Consolidation",
         "step": "Consolidate"
@@ -259,7 +259,7 @@
       "surface": "§10.6 Konsolidierung: Minor in den Major mergen",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4301,
+      "position": 4116,
       "expect": {
         "round": "Consolidation",
         "step": "MergeMinor"
@@ -270,7 +270,7 @@
       "surface": "§10.6 Konsolidierung: Token-Wahl nach Merge",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4302,
+      "position": 4117,
       "expect": {
         "round": "Consolidation",
         "step": "MergeToken"
@@ -281,7 +281,7 @@
       "surface": "§10.6 Konsolidierung: Merge-Angebot an die Spieler",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4322,
+      "position": 4144,
       "expect": {
         "round": "Consolidation",
         "step": "MergeOffer"
@@ -292,21 +292,10 @@
       "surface": "§10.6/§11.6 Konsolidierung: Zug abwerfen nach Merge (Zuglimit)",
       "slice": "S3",
       "game": "strategy-3p-1",
-      "position": 2761,
+      "position": 2787,
       "expect": {
         "round": "Consolidation",
         "step": "MergeDiscardTrain"
-      }
-    },
-    {
-      "name": "operating-discard-train",
-      "surface": "§11.6 Zuglimit: Zug abwerfen im Betrieb (Phasenwechsel)",
-      "slice": "S3",
-      "game": "strategy-3p-1",
-      "position": 2868,
-      "expect": {
-        "round": "Operating",
-        "step": "DiscardTrain"
       }
     },
     {
@@ -314,7 +303,7 @@
       "surface": "Zugphase 6",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 3947,
+      "position": 4065,
       "expect": {
         "phase": "6",
         "round": "Operating",
@@ -326,11 +315,11 @@
       "surface": "Zugphase 7",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4536,
+      "position": 4405,
       "expect": {
         "phase": "7",
         "round": "Operating",
-        "step": "Track"
+        "step": "IssueShares"
       }
     },
     {
@@ -338,7 +327,7 @@
       "surface": "Zugphase 8 (Level-8-Zuege)",
       "slice": "S3",
       "game": "strategy-4p-1",
-      "position": 4713,
+      "position": 4709,
       "expect": {
         "phase": "8",
         "round": "Operating",
@@ -350,7 +339,7 @@
       "surface": "§13 Spielende (Endphase, Endstand, View ohne Betrachter)",
       "slice": "S1",
       "game": "strategy-4p-1",
-      "position": 5038,
+      "position": 4986,
       "expect": {
         "finished": true,
         "round": "Operating",
@@ -383,6 +372,11 @@
       "surface": "Geparrtes Regional, das niemand kauft",
       "slice": "S2",
       "reason": "Kam in keiner der Partien vor; in der Engine wird der Fall durch close_unfloated_regionals_at_maximum! (#348) behandelt, eigener Eintrag erst mit gesteuerter Partie."
+    },
+    {
+      "surface": "§11.6 Zuglimit: Zug abwerfen im Betrieb (Step DiscardTrain in der OR)",
+      "slice": "S3",
+      "reason": "Kam nur in einer frueheren Fassung der Strategie-Partie 3p/Seed 1 vor und ist nach den Engine-Aenderungen (#70 Golden Bell, #352 u. a.) in keiner Katalogpartie mehr erreicht; Eintrag, sobald eine Partie ihn zeigt. Die Variante in der Konsolidierung (MergeDiscardTrain) ist abgedeckt."
     },
     {
       "surface": "Orient-Express-Bonus (OrientExpressBonus-Schritt), SpecialToken",
