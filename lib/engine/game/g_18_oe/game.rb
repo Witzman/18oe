@@ -8,7 +8,9 @@ require_relative 'graph'
 require_relative '../base'
 require_relative 'round/consolidation'
 require_relative 'round/concession'
+require_relative 'golden_bell'
 require_relative 'step/consolidate'
+require_relative 'step/golden_bell_order'
 require_relative 'step/convert_to_national'
 require_relative 'step/discard_train'
 require_relative 'step/merge_discard_train'
@@ -28,6 +30,7 @@ module Engine
         include_meta(G18OE::Meta)
         include G18OE::Entities
         include G18OE::Map
+        include G18OE::GoldenBell
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
         attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation
@@ -592,7 +595,8 @@ module Engine
 
         def operating_order
           floated_minors_and_regionals = @minor_regional_order.select(&:floated?)
-          floated_minors_and_regionals + @corporations.select { |c| %i[major national].include?(c.type) && c.floated? }.sort
+          golden_bell_order(floated_minors_and_regionals,
+                            @corporations.select { |c| %i[major national].include?(c.type) && c.floated? }.sort)
         end
 
         def hex_within_national_region?(entity, hex)
@@ -1139,6 +1143,7 @@ module Engine
           return abbreviated_operating_round(round_num) if abbreviated_or?(round_num)
 
           Round::G18OE::Operating.new(self, [
+            G18OE::Step::GoldenBellOrder,
             G18OE::Step::ConvertToNational,
             Engine::Step::Bankrupt,
             Engine::Step::Exchange,

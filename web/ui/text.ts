@@ -60,6 +60,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.Consolidate": e("Konsolidierung", "Consolidation", "§10.6"),
   "step.DiscardTrain": e("Zug abwerfen", "Discard train", "§11.6"),
   "step.ConvertToNational": e("Nationalbildung", "National formation", "§9.4"),
+  "step.GoldenBellOrder": e("Betriebsreihenfolge (Golden Bell)", "Operating position (Golden Bell)", "§15.6"),
   "step.Bankrupt": e("Bankrott", "Bankruptcy", "§11.6.5"),
   "step.Exchange": e("Tausch", "Exchange", "§11"),
 
