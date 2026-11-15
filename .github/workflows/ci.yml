@@ -39,9 +39,13 @@ jobs:
           node --test $files
 
   browser:
-    name: browser (Chrome, iPad profile)
+    name: browser (Chrome, iPad profile) ${{ matrix.shard }}/3
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     defaults:
       run:
         working-directory: web
@@ -68,6 +72,9 @@ jobs:
       - name: browser tests (no skips allowed, flaky files retried once)
         run: ../.github/scripts/browser-tests.sh
         shell: bash
+        env:
+          BROWSER_SHARD: ${{ matrix.shard }}
+          BROWSER_SHARDS: 3
 
   ruby:
     name: ruby (targeted specs, contracts) ${{ matrix.shard }}/3

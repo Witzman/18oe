@@ -303,8 +303,8 @@ RSpec.describe Oe::LegalActions, "#lay_tile_options log" do
   end
 end
 
-# #315: the path search runs on every prompt and bot move; AutoRouter's 30 s
-# default made one search take up to 32 s once networks had green tiles.
+# #315/#319: the path search runs on every prompt and bot move; unbounded, one
+# search in a phase-8 network took 47 s. It is bounded by a visit count.
 RSpec.describe Oe::LegalActions::RoutePicker do
   include G18OESpecHelpers
 
@@ -312,10 +312,38 @@ RSpec.describe Oe::LegalActions::RoutePicker do
     game = new_game
     corp = game.corporation_by_id("LNWR")
     allow_any_instance_of(Oe::RouteSearch).to receive(:path) do |_router, _trains, _corp, **opts|
-      expect(opts[:path_timeout]).to eq(described_class::PATH_TIMEOUT)
+      expect(opts[:walk_limit]).to eq(described_class::WALK_LIMIT)
+      expect(opts).not_to have_key(:path_timeout)
       [{}]
     end
     expect(described_class.new(game, corp).call).to eq([])
-    expect(described_class::PATH_TIMEOUT).to be <= 5
+    expect(described_class::WALK_LIMIT).to be_between(1000, 20_000)
+  end
+end
+
+# #319: walk_limit bounds the number of visits deterministically (no wall clock).
+RSpec.describe Oe::RouteSearch do
+  include G18OESpecHelpers
+
+  def search(walk_limit)
+    game = new_game
+    corp = start_major!(game, "LNWR", game.players[0])
+    game.phase.next!
+    game.buy_train(corp, game.depot.upcoming.first, :free)
+    router = described_class.new(game)
+    routes, cut = router.path(game.route_trains(corp), corp, walk_limit: walk_limit)
+    [routes.transform_keys(&:name).transform_values { |rs| rs.map(&:revenue) }, cut, router.walks]
+  end
+
+  it "stops after walk_limit visits, the same way every time" do
+    full, full_cut, total = search(nil)
+    expect(full_cut).to be(false)
+    expect(total).to be > 2
+
+    limited, cut, walks = search(2)
+    expect(cut).to be(true)
+    expect(walks).to be < total
+    expect(search(2)).to eq([limited, cut, walks])
+    expect(search(total)).to eq([full, false, total])
   end
 end
