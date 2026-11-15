@@ -49,14 +49,20 @@ module Oe
     end
 
     Result = Struct.new(:seed, :players, :status, :actions, :seconds, :turn, :findings, :steps, :stalls,
-                        :slowest, keyword_init: true) do
+                        :slowest, :opening, keyword_init: true) do
       def to_h = super.transform_keys(&:to_s)
     end
 
     def self.run(**opts) = new(**opts).run
 
     # stall_after: identical (state fingerprint) repeated this many times = loop.
-    def initialize(players:, seed:, max_actions: 20_000, limit: 12, stall_after: 25, max_findings: 50, log: nil)
+    # valuation/profile: passed to Oe::Bot (#313). stop_at: :phase3 ends the run when
+    # train phase 3 begins (the opening measurement does not need a whole game).
+    def initialize(players:, seed:, max_actions: 20_000, limit: 12, stall_after: 25, max_findings: 50, log: nil,
+                   valuation: :derived, profile: :standard, stop_at: nil)
+      @valuation = valuation
+      @profile = profile
+      @stop_at = stop_at
       @players = players
       @seed = seed
       @max_actions = max_actions
@@ -69,7 +75,8 @@ module Oe
     def run
       ids = (0...@players).map { |i| "p#{i}" }
       game = Engine::Game::G18OE::Game.new(ids, id: @seed, seed: @seed)
-      bot = Oe::Bot.new(game, rng: Random.new(@seed), limit: @limit)
+      bot = Oe::Bot.new(game, rng: Random.new(@seed), limit: @limit, valuation: @valuation, profile: @profile)
+      opening = Opening.new(game)
       baseline = Invariants.total_cash(game)
       steps = Hash.new { |h, k| h[k] = { offered: 0, only_pass: 0, visits: 0, visits_with_choice: 0, visits_skipped: 0, chosen: Hash.new(0), legal: Hash.new(0), seconds: 0.0, max: 0.0 } }
       findings = []
@@ -85,6 +92,7 @@ module Oe
 
       while count < @max_actions
         (status = :finished; break) if game.finished
+        (status = :phase3; break) if @stop_at == :phase3 && opening.phase3
 
         t0 = now
         game_turn_before = game.turn
@@ -143,6 +151,7 @@ module Oe
         slowest << [dt, key, count]
         slowest = slowest.max_by(10, &:first) if slowest.size > 40
         count += 1
+        opening.observe(count)
         @log&.puts(JSON.generate(n: count, step: key, player: pid, legal: legal, chosen: short(action), sec: dt.round(4)))
 
         Invariants.check(game, baseline).each do |msg|
@@ -168,11 +177,63 @@ module Oe
 
       close_visit(steps, last_visit_key, last_visit_state)
       Result.new(seed: @seed, players: @players, status: status, actions: count, seconds: now - started,
-                 turn: game.turn, findings: findings, stalls: stalls,
+                 turn: game.turn, findings: findings, stalls: stalls, opening: opening.to_h,
                  slowest: slowest.sort_by { |x| -x[0] }.first(5).map { |dt, k, n| { "sec" => dt.round(3), "step" => k, "n" => n } },
                  steps: steps.transform_values do |v|
                    v.merge(seconds: v[:seconds].round(3), max: v[:max].round(3), chosen: v[:chosen].dup, legal: v[:legal].dup)
                  end)
+    end
+
+    # The opening (#313): who got which private/minor at what price, what was
+    # floated before the first operating round, and when train phase 3 began
+    # (the first level-3 train; goal of every player, #140).
+    class Opening
+      attr_reader :phase3
+
+      def initialize(game)
+        @game = game
+        @start_cash = game.players.to_h { |p| [p.id, p.cash] }
+        @auction = nil
+        @first_or = nil
+        @phase3 = nil
+      end
+
+      def observe(count)
+        round = @game.round
+        @auction ||= snapshot_auction(count) unless round.is_a?(Engine::Round::Auction)
+        @first_or ||= snapshot_first_or(count) if round.operating?
+        @phase3 ||= { "action" => count, "turn" => @game.turn, "round" => round_name(round) } if @game.phase.name.to_s >= "3"
+      end
+
+      def to_h
+        { "auction" => @auction, "first_or" => @first_or, "phase3" => @phase3 }
+      end
+
+      private
+
+      def snapshot_auction(count)
+        players = @game.players.to_h do |p|
+          companies = p.companies.reject { |c| c.type == :concession }
+          minors, privates = companies.partition { |c| @game.company_becomes_minor?(c) }
+          [p.id, { "privates" => privates.map(&:sym), "minors" => minors.map(&:sym),
+                   "face" => companies.sum(&:value), "spent" => @start_cash[p.id] - p.cash, "cash" => p.cash }]
+        end
+        { "action" => count, "players" => players }
+      end
+
+      def snapshot_first_or(count)
+        floated = @game.corporations.select(&:floated?)
+        parred = @game.corporations.select do |c|
+          c.ipoed && c.presidents_share&.owner == @game.share_pool
+        end
+        { "action" => count, "minors" => floated.count { |c| c.type == :minor },
+          "regionals" => floated.count { |c| c.type != :minor && c.type != :national },
+          "parred_to_market" => parred.map(&:id), "cash" => @game.players.to_h { |p| [p.id, p.cash] } }
+      end
+
+      def round_name(round)
+        round.operating? ? "OR #{@game.turn}.#{round.round_num}" : "#{round.class.name.split('::').last} #{@game.turn}"
+      end
     end
 
     private
