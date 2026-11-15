@@ -9,6 +9,8 @@ export interface TipContent {
   term?: string;
   /** Why an action is not possible. */
   reason?: string;
+  /** Free text, e.g. the ability of a card (#256). */
+  text?: string;
   rows?: TipRow[];
   total?: TipRow;
   /** Rulebook or issue reference, e.g. "Regeln §9.2" or "#112". */
@@ -29,6 +31,7 @@ export function Tooltip(c: TipContent, id: string): VNode {
     v("strong", { class: "kit-tip-title" }, c.title),
     c.term ? v("em", { class: "kit-term" }, c.term) : null,
     c.reason ? v("span", { class: "kit-tip-reason" }, c.reason) : null,
+    c.text ? v("span", { class: "kit-tip-text" }, c.text) : null,
     ...(c.rows ?? []).map((r) => row(r, "kit-tip-row")),
     c.total ? row(c.total, "kit-tip-row kit-tip-total") : null,
     c.source ? v("small", { class: "kit-tip-source" }, `Quelle: ${c.source}`) : null);

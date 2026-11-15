@@ -1,5 +1,5 @@
 import type { MapGeometry } from "./render/mapdata.ts";
-import type { Account, Game, GameSummary, LogPage, SeatRequest, Version } from "./types.ts";
+import type { Account, Catalog, Game, GameSummary, LogPage, SeatRequest, Version } from "./types.ts";
 
 export class ApiError extends Error {
   status: number;
@@ -34,6 +34,7 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init), opts
   const getTimeout = opts.getTimeoutMs ?? GET_TIMEOUT_MS;
   const postTimeout = opts.postTimeoutMs ?? POST_TIMEOUT_MS;
   const now = opts.now ?? (() => performance.now());
+  let catalogCache: Promise<Catalog> | null = null;
   async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
     const init: RequestInit = { method, credentials: "same-origin", headers: { Accept: "application/json" } };
     if (body !== undefined) {
@@ -81,6 +82,11 @@ export function createApi(fetchFn: FetchLike = (i, init) => fetch(i, init), opts
   return {
     me: () => call<Account>("GET", "/me"),
     map: () => call<MapGeometry>("GET", "/map"),
+    // #256: the static card texts; loaded once, a failed load is retried on the next call.
+    catalog: (): Promise<Catalog> => {
+      catalogCache ??= call<Catalog>("GET", "/catalog").catch((e) => { catalogCache = null; throw e; });
+      return catalogCache;
+    },
     // #208: login is the e-mail or the name; the invite code only ever travels in the POST body.
     register: (r: RegisterRequest) => call<Account>("POST", "/register", r),
     login: (login: string, password: string) => call<Account>("POST", "/login", { login, password }),

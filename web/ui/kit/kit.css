@@ -51,6 +51,7 @@ a.kit-pennant:hover, .kit-pennant[data-state="hover"] { background: var(--ui-pan
 .kit-tip-title { font-family: var(--font-head); letter-spacing: .04em; }
 .kit-term { opacity: .8; }
 .kit-tip-reason { color: var(--ui-bar-ink); }
+.kit-tip-text { display: block; white-space: normal; }
 .kit-tip-row { display: flex; justify-content: space-between; gap: 12px; }
 .kit-tip-total { border-top: 1px solid var(--ui-bar-ink); margin-top: 2px; padding-top: 2px; font-weight: 700; }
 .kit-tip-source { opacity: .75; margin-top: 2px; }

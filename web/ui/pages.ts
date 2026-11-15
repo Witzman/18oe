@@ -27,7 +27,7 @@ export function notFoundPage(): HTMLElement {
 
 export function gameFrame(retryNow: () => void = () => {}, api?: Api): GameFrame {
   const frame = createGameFrame(retryNow, api);
-  mountAuction(frame);
+  mountAuction(frame, api);
   if (api) frame.onDispose(mountMapView(frame, api));
   mountStock(frame);
   frame.onDispose(mountOperating(frame).stop);
