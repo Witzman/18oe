@@ -580,12 +580,16 @@ module Oe
     # Picks, per train, the best-revenue non-conflicting route found by the
     # engine's path search. (AutoRouter#route, the combiner, is Opal-only.)
     class RoutePicker
-      # Seconds the path search may start new walks (AutoRouter's default is 30,
-      # meant for a click in the browser). Here it runs on every prompt and bot
-      # move; once networks have green tiles (#315) a search took up to 32 s.
-      # Nodes are searched best first (own tokens, offboards, revenue), so a
-      # cut-off search still finds the strong routes.
-      PATH_TIMEOUT = 3
+      # Visits the path search may make (RouteSearch walk_limit, #319). It runs
+      # on every prompt and bot move; unbounded, one search in a phase-8 network
+      # walked 266000 visits in 47 s. The limit is a count, not wall-clock time
+      # (the former 3 s path_timeout, #315), so the routes offered do not depend
+      # on the machine, and it also stops a single long walk. Nodes are searched
+      # best first (own tokens, offboards, revenue). Measured (4p seed 1,
+      # phases 7-8, 40 searches): 21 s instead of 169 s in all, at most 2.3 s
+      # instead of 47 s; revenue equal in 35 of 40, the others -100, -20 (3x)
+      # and +300 (the picker is greedy, more candidates are not always better).
+      WALK_LIMIT = 10_000
 
       def initialize(game, entity)
         @game = game
@@ -594,7 +598,7 @@ module Oe
 
       def call
         router = RouteSearch.new(@game)
-        train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity, path_timeout: PATH_TIMEOUT)
+        train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity, walk_limit: WALK_LIMIT)
         chosen = []
         train_routes.each do |train, candidates|
           route = candidates.find { |candidate| compatible?(router, chosen, train, candidate) }

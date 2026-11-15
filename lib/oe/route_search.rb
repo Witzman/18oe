@@ -12,6 +12,8 @@ module Oe
   # the path search is plain Ruby, kept here as in engine/auto_router.rb.
   class RouteSearch
     attr_accessor :running
+    # visits of the last #path (see walk_limit)
+    attr_reader :walks
 
     def initialize(game, flash = nil)
       @game = game
@@ -35,6 +37,13 @@ module Oe
       static = opts[:routes] || []
       path_timeout = opts[:path_timeout] || 30
       route_limit = opts[:route_limit] || 10_000
+      # Oe extension (not in AutoRouter): at most this many visits of the walk
+      # (calls of the walk_token block). Unlike path_timeout (wall clock, checked
+      # only between start nodes, so a single walk ran up to 93 s in green
+      # networks, #315/#319) it is deterministic, and it also cuts a running walk
+      # short: past the limit every visit is aborted.
+      walk_limit = opts[:walk_limit]
+      walks = @walks = 0
 
       connections = {}
 
@@ -74,7 +83,7 @@ module Oe
       @next_hexside_bit = 0
 
       nodes.each do |node|
-        if Time.now - now > path_timeout
+        if Time.now - now > path_timeout || (walk_limit && walks >= walk_limit)
           ::LOGGER.debug('Path timeout reached')
           path_walk_timed_out = true
           break
@@ -84,6 +93,12 @@ module Oe
 
         walk_corporation = graph.no_blocking? ? nil : corporation
         graph.walk_token(node, corporation: walk_corporation, skip_paths: skip_paths) do |_, vp|
+          walks = @walks += 1
+          if walk_limit && walks > walk_limit
+            path_walk_timed_out = true
+            next :abort
+          end
+
           paths = vp.keys
           chains = []
           chain = []
