@@ -394,6 +394,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "frame.range_invalid": e("Der Betrag muss zwischen {min} und {max} liegen (Schritt {step}).", "Amount out of range", "§7"),
   "frame.unsupported": e("Der Server kann diese Aktionen nicht aufzählen: {list}", "The server cannot list these actions: {list}", "—"),
   "frame.log": e("Protokoll", "Log", "—"),
+  "frame.log_close": e("Schließen", "Close", "—"),
   "frame.log_empty": e("Noch keine Einträge.", "No entries yet.", "—"),
   "frame.param_entity": e("für {entity}", "for {entity}", "—"),
 

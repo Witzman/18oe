@@ -78,12 +78,15 @@ const CHECKS_BID = String.raw`(async () => {
   if (!q(".frame-tabs") || q(".frame-tabs").hidden) fail("view tabs missing");
   if (q(".frame-entry")) fail("generic bar still offers the claimed actions");
   if (q(".kit-dialog")) fail("dialog open without a choice");
+  if (q(".frame-panel") && !q(".frame-panel").hidden) fail("action panel still covers the auction");
+  if (!q(".frame-tabs .frame-log-link")) fail("no log link next to the tabs");
   if (!/Wähle ein Los/.test(q(".auction-idle").textContent)) fail("idle line: " + q(".auction-idle").textContent);
   if (!q('.auction-head [data-action="pass"]')) fail("no pass button in the sheet head");
   q('.auction-card[data-card="A"]').click();
   await sleep(50);
   const dlg = q(".kit-dialog") || fail("no dialog after choosing a lot");
   const r = dlg.getBoundingClientRect(), head = q(".frame-head").getBoundingClientRect();
+  if (/Silver Banner Line/.test(dlg.querySelector(".auction-bidform").textContent)) fail("lot name repeated in the form");
   if (r.top < head.bottom - 1) fail("dialog covers the round bar: " + r.top + " < " + head.bottom);
   if (Math.abs((r.left + r.right) / 2 - innerWidth / 2) > innerWidth * 0.2) fail("dialog not centred: " + r.left + ".." + r.right);
   if (r.bottom > innerHeight || r.right > innerWidth) fail("dialog leaves the screen");

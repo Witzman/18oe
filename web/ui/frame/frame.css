@@ -171,3 +171,15 @@ body:has(.frame) .dev-menu { top: 8px; bottom: auto; right: 12px; z-index: 20; }
 .frame-end-privates { list-style: none; padding: 0; margin: 0; }
 .frame-end-sub { display: block; width: 100%; color: var(--ui-faint); }
 .frame-end-sub::before { content: "= "; }
+
+/* Log as a large dialog (issue 370): over the body (below the round bar), the link sits after the view tabs. */
+.frame-panel[hidden] { display: none; }
+.frame-tabs { align-items: center; }
+.frame-log-link { min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); margin-left: 8px; }
+.frame-log-host { position: absolute; inset: 0; z-index: 30; pointer-events: none; }
+.frame-log-host[hidden] { display: none; }
+.frame-log-host .kit-backdrop { pointer-events: auto; }
+.frame-log-host .kit-dialog { display: flex; flex-direction: column; max-width: min(64rem, 100%); height: min(86%, 56rem); }
+.frame-log-host .kit-dialog-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.frame-log-host .frame-log { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; height: auto; }
+.frame-log-host .kit-dialog-actions button { min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); }
