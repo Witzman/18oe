@@ -180,3 +180,24 @@ test("auction in the browser: a running auction preselects its lot and bids from
   const { posted } = await scenario("auction-open", CHECKS_RUNNING);
   assert.deepEqual(posted[0]!.action, { type: "bid", entity: "p0", entity_type: "player", company: "A", price: 135 });
 });
+
+// #404: the lots of a row sit in the middle of the row's lot area, not flush left.
+const CHECKS_CENTRED = String.raw`(async () => {
+  const fail = (m) => { throw new Error(m); };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  await sleep(300);
+  const rows = [...document.querySelectorAll(".auction-row")];
+  if (rows.length === 0) fail("no rows");
+  for (const row of rows) {
+    const list = row.querySelector(".auction-cards").getBoundingClientRect();
+    const cards = [...row.querySelectorAll(".auction-card")].map((c) => c.getBoundingClientRect());
+    if (cards.length === 0) continue;
+    const left = Math.min(...cards.map((r) => r.left)) - list.left;
+    const right = list.right - Math.max(...cards.map((r) => r.right));
+    if (Math.abs(left - right) > 2) fail("row " + row.dataset.row + " not centred: left " + left + " right " + right);
+  }
+})()`;
+
+test("auction in the browser: the lots of every row are centred in the row (#404)", { skip: browser ? false : "no headless browser installed" }, async () => {
+  await scenario("auction", CHECKS_CENTRED);
+});
