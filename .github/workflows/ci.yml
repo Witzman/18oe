@@ -1,7 +1,12 @@
-# Fast stage (#269): runs on every pull request and on manual dispatch.
-# Frontend: typecheck + unit tests without a browser. Ruby: targeted specs without the long game runs.
-# Browser job (#277): the *-browser tests, shot and ipad on the runner's Chrome; fails if any is skipped.
-# The full suite is in full.yml (push to main, manual). No secrets, no deploy.
+# Fast stage (#269, #365): runs on every pull request and on manual dispatch. Target: wall time under 3 min.
+# Frontend: typecheck + unit tests without a browser (they hold the contract tests text.test.ts and the
+# view-keys drift test). Ruby: every example that does not play a seed game or a recorded log
+# (--tag ~game_flow, see spec/support/tags.rb), engine specs and the contract examples of spec/web_spec.rb included.
+# Browser job (#277): the *-browser tests, shot and ipad on the runner's Chrome (touch-browser excluded: milestone
+# stage); fails if any is skipped. The job ALWAYS runs so that it can be a required check; a `changes` job decides
+# whether web/** was touched, and if not, its steps are skipped and it ends green.
+# Everything that plays a game (:game_flow, :full_game), touch-browser, the scripted game: milestone stage, full.yml
+# (nightly, tag v0.*, manual for any SHA). No secrets, no deploy.
 name: ci
 
 on:
@@ -16,6 +21,32 @@ permissions:
   contents: read
 
 jobs:
+  # Which parts of the pull request changed (no third-party action: git diff against the merge base).
+  changes:
+    name: changes (which stages apply)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.diff.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "web=true" >> "$GITHUB_OUTPUT"; echo "not a pull request: browser tests run"; exit 0
+          fi
+          files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}")
+          echo "$files"
+          # web/** = everything the browser tests exercise (they use stub servers, no Ruby code);
+          # plus the files that define this job.
+          if echo "$files" | grep -q -E '^(web/|\.github/workflows/ci\.yml$|\.github/scripts/browser-tests\.sh$)'; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "web=false" >> "$GITHUB_OUTPUT"; echo "::notice::no web/** change: browser tests skipped (they run in the milestone stage)"
+          fi
+
   web:
     name: web (typecheck, unit tests)
     runs-on: ubuntu-24.04
@@ -40,6 +71,7 @@ jobs:
 
   browser:
     name: browser (Chrome, iPad profile) ${{ matrix.shard }}/3
+    needs: changes
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     strategy:
@@ -51,16 +83,23 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+        if: needs.changes.outputs.web == 'true'
       - uses: actions/setup-node@v4
+        if: needs.changes.outputs.web == 'true'
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - run: npm ci --no-progress --no-audit --no-fund
+      - if: needs.changes.outputs.web == 'true'
+        run: npm ci --no-progress --no-audit --no-fund
       # The tests start $OE_BROWSER without --headless (locally chromium-headless-shell); the runner's
       # preinstalled Google Chrome gets a thin headless wrapper. bin/shot --device ipad uses the Chromium
       # iPad profile (viewport, DPR 2, touch, UA); real WebKit (.tools/pw) is not installed here.
+      - name: no web/** change
+        if: needs.changes.outputs.web != 'true'
+        run: echo 'no web change, browser tests skipped, this check passes'
       - name: headless Chrome wrapper
+        if: needs.changes.outputs.web == 'true'
         run: |
           wrapper="$RUNNER_TEMP/chrome-headless"
           printf '#!/bin/sh\nexec "%s" --headless=new --no-sandbox --disable-dev-shm-usage "$@"\n' "$(command -v google-chrome)" > "$wrapper"
@@ -69,15 +108,17 @@ jobs:
           google-chrome --version
       # The browser tests skip silently without a browser: here a skip is a failure. One node process per
       # file, a failing file is retried once; first failures stay visible as annotations (.github/scripts).
-      - name: browser tests (no skips allowed, flaky files retried once)
+      - name: "browser tests (no skips allowed, flaky files retried once, touch-browser is in the milestone stage)"
+        if: needs.changes.outputs.web == 'true'
         run: ../.github/scripts/browser-tests.sh
         shell: bash
         env:
           BROWSER_SHARD: ${{ matrix.shard }}
           BROWSER_SHARDS: 3
+          BROWSER_SKIP: touch-browser
 
   ruby:
-    name: ruby (targeted specs, contracts) ${{ matrix.shard }}/4
+    name: ruby (fast specs, contracts) ${{ matrix.shard }}/4
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     strategy:
@@ -98,12 +139,14 @@ jobs:
       # spec/web_spec.rb serves web/dist and checks web/view-keys.json against lib/oe/view.rb.
       - run: npm ci --no-progress --no-audit --no-fund && npm run build
         working-directory: web
-      - name: specs without the long game runs and view_railroad_phase_spec, engine specs included (shard)
+      - name: fast specs (--tag ~game_flow), engine specs and contracts included (shard)
         run: |
-          # time-balanced shard (.github/scripts/shard.rb, timings in .github/rspec-timings.json)
-          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 '(script_game_spec|playthrough_spec|bot_simulation_spec|enumeration_timing_spec|view_railroad_phase_spec)')
+          # time-balanced shard (.github/scripts/shard.rb, timings in .github/rspec-timings.json). No file
+          # exclusion: the game-playing files are tagged :game_flow and drop out by tag (the same selection as
+          # `bin/test fast`); everything tagged :game_flow runs in full.yml.
+          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 '')
           echo "$files"
-          bundle exec rspec $files --format progress --format json --out "$RUNNER_TEMP/rspec.json"
+          bundle exec rspec $files --tag ~game_flow --format progress --format json --out "$RUNNER_TEMP/rspec.json"
       - name: per-file timings (to refresh .github/rspec-timings.json)
         if: always()
         run: ruby .github/scripts/shard.rb --report "$RUNNER_TEMP/rspec.json"
