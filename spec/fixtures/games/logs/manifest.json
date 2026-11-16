@@ -1,0 +1,54 @@
+{
+  "logs": {
+    "random-4p-1": {
+      "engine_sha": "7b6c88bad1ffa45ddd269ba0649c5f82c60690ae",
+      "actions": 1700,
+      "sha256": "1619355c6808c2800f240106b96c2376b0b3f2404ea0c920be75b7fcc619c24f",
+      "positions": {
+        "stock-par": 638,
+        "stock-sell": 1483,
+        "stock-convert": 1464,
+        "merge-minor": 1697,
+        "merge-token": 1698,
+        "merge-discard-train": 1700
+      }
+    },
+    "strategy-3p-1": {
+      "engine_sha": "7b6c88bad1ffa45ddd269ba0649c5f82c60690ae",
+      "actions": 2787,
+      "sha256": "0f2a0c43ee66fb42488f8a4519259cde1d4dddf43edec2d194b1d3c6269e1956",
+      "positions": {
+        "consolidation-discard-train": 2787
+      }
+    },
+    "strategy-4p-1": {
+      "engine_sha": "7b6c88bad1ffa45ddd269ba0649c5f82c60690ae",
+      "actions": 4986,
+      "sha256": "ea19c1e61bca65c7daa60ac4cc8a8a8b0fbf91042ec26b00dcf38fa8d177726a",
+      "positions": {
+        "auction-start": 0,
+        "auction-running": 1,
+        "concession-first": 2356,
+        "concession-home-token": 2357,
+        "stock-first": 2373,
+        "stock-home-token": 2376,
+        "operating-track": 2435,
+        "operating-buy-train": 2437,
+        "operating-route": 2507,
+        "operating-dividend": 2508,
+        "operating-home-token": 2515,
+        "operating-token": 2531,
+        "operating-issue-shares": 2998,
+        "phase-5": 3782,
+        "consolidation-first": 4076,
+        "consolidation-merge-minor": 4116,
+        "consolidation-merge-token": 4117,
+        "consolidation-merge-offer": 4144,
+        "phase-6": 4065,
+        "phase-7": 4405,
+        "phase-8": 4709,
+        "game-end": 4986
+      }
+    }
+  }
+}

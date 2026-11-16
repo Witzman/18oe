@@ -1,28 +1,22 @@
 {
   "games": {
     "strategy-4p-1": {
-      "file": "strategy-4p-1.json",
       "players": 4,
       "seed": 1,
       "player": "strategy",
-      "max_actions": 5100,
-      "actions": 4986
+      "max_actions": 5100
     },
     "strategy-3p-1": {
-      "file": "strategy-3p-1.json",
       "players": 3,
       "seed": 1,
       "player": "strategy",
-      "max_actions": 4000,
-      "actions": 2787
+      "max_actions": 4000
     },
     "random-4p-1": {
-      "file": "random-4p-1.json",
       "players": 4,
       "seed": 1,
       "player": "random",
-      "max_actions": 2000,
-      "actions": 1700
+      "max_actions": 2000
     }
   },
   "entries": [

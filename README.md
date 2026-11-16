@@ -129,6 +129,19 @@ least one stage: fast = `~game_flow`, milestone = all; `view_spec`, `view_order_
 only in the `long games` jobs there (whole files, caps lifted), not additionally in the capped rspec shards.
 The browser job of `ci.yml` always runs (a `changes` job decides: without a `web/**` change its steps are skipped and it ends green), so it can be a required check. Wall time of the fast stage: about 2 to 3 min (measured, PRs 157 and 159); milestone stage: about 7 to 8 min.
 
+## Fixture catalog (#365)
+
+`spec/fixtures/games/catalog.json` is the one definition: the games (players, seed, player kind,
+`max_actions`), the entries (rule surface, slice, a finder such as `first: {round, step}`, `before: {type}`,
+`at: 0`, plus `where`/`after`) and the gaps. It holds no positions. The stored game logs are
+`spec/fixtures/games/logs/<game>.jsonl` (one accepted action per line) with `logs/manifest.json` (engine commit,
+number of actions, sha256 and resolved positions per log, information for the refresh diff). The loader resolves
+the finders against the log when it is first used. A log is written only by a catalog refresh PR (branch
+`refresh/catalog-*`), never by a feature PR: `bin/fixture-catalog diff <game>` shows what a rebuild changes,
+`bin/fixture-catalog build <game>` writes it (a game takes minutes; one game per call, under `timeout`).
+`OE_CATALOG=live` plays fresh games instead of the stored logs; a stored log the engine no longer accepts raises
+`log <game> stale at action K`.
+
 ## Versions, tags and changelog (#271)
 
 The roadmap version (v0.1 to v0.9, see 18oe-workshop#20) lives in ONE file, `VERSION` in the repo
