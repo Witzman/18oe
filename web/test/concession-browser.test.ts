@@ -95,6 +95,34 @@ const CHECKS_FOUND = String.raw`(async () => {
   if ((await (await fetch("/__posted")).json()).length !== 1) fail("not sent once");
 })()`;
 
+const CHECKS_STEPS = String.raw`(async () => {
+  ${HEAD}
+  const step = () => q(".concession-step").textContent;
+  if (!/Schritt 1 von 3: Gesellschaft wählen/.test(step())) fail("step 1: " + step());
+  if (q(".concession-back")) fail("Zurück on the first step");
+  if (q(".concession-price")) fail("par values before a corporation is chosen");
+  if (q(".concession-fold[open]")) fail("a fold is open by default");
+  q('.concession-card[data-corp="C"]').click();
+  await sleep(50);
+  if (!/Schritt 2 von 3: Par-Kurs wählen/.test(step())) fail("step 2: " + step());
+  if (document.querySelectorAll(".concession-card").length !== 1) fail("the other corporations stay after the choice");
+  q('.concession-price[data-price="90"]').click();
+  await sleep(50);
+  if (!/Schritt 3 von 3: Bestätigen/.test(step())) fail("step 3: " + step());
+  small(".concession-back");
+  q(".concession-back").click();
+  await sleep(50);
+  if (!/Schritt 2 von 3/.test(step())) fail("Zurück from step 3: " + step());
+  q(".concession-back").click();
+  await sleep(50);
+  if (!/Schritt 1 von 3/.test(step()) || document.querySelectorAll(".concession-card").length < 2) fail("Zurück from step 2: " + step());
+  // The panel does not need to scroll: its content fits the box it is in.
+  const panel = q(".concession-panel");
+  const box = panel.closest(".frame-panel-body, .frame-panel") || panel.parentElement;
+  if (panel.scrollHeight > box.clientHeight + 2 && getComputedStyle(box).overflowY !== "visible") fail("the panel scrolls: " + panel.scrollHeight + " > " + box.clientHeight);
+  if ((await (await fetch("/__posted")).json()).length !== 0) fail("walking the steps sent something");
+})()`;
+
 const CHECKS_HOME = String.raw`(async () => {
   ${HEAD}
   const errs = [];
@@ -220,4 +248,9 @@ test("stall line in the browser (#289): nobody to act is said, with a reload but
     server.close();
     assert.equal(code, 0, "page checks failed (see stderr)");
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("concession in the browser (#409): the steps follow one another, Zurück goes back, the panel does not scroll", { skip: browser ? false : "no headless browser installed" }, async () => {
+  const { posted } = await scenario("concession", ".concession-card", CHECKS_STEPS);
+  assert.equal(posted.length, 0);
 });

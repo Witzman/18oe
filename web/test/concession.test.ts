@@ -8,7 +8,7 @@ import { themes } from "../themes/index.ts";
 import type { MapGeometry } from "../render/mapdata.ts";
 import type { Game } from "../types.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { ConcessionPanel, effectiveSelection, emptySelection, homeMapTargets, homePreview, homeTapMap, homeTargets, hexOfCity, indexOfCity, ladder, offers, orderFor, parPrice, sentenceFor } from "../ui/panels/concession.ts";
+import { backSelection, ConcessionPanel, effectiveSelection, emptySelection, homeMapTargets, homePreview, homeTapMap, homeTargets, hexOfCity, indexOfCity, ladder, offers, orderFor, parPrice, progress, sentenceFor } from "../ui/panels/concession.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
 
@@ -136,21 +136,65 @@ test("home token: only the viewer sees targets; the others see who executes the 
   assert.match(text, /führt die 1\. Konzession aus/);
 });
 
-test("panel DOM: ladder with ten rows, aria-current on the running one; cards and price buttons for the offers", () => {
+test("panel DOM: ladder with ten rows, aria-current on the running one; the zones are listed too (both fold away)", () => {
   const g = load("concession");
   const tree = ConcessionPanel(g, { corp: "B", price: null, city: null }, null, noop, themes[0]!);
   const rows = find(tree, (n) => n.tag === "li" && n.attrs["data-step"] !== undefined);
   assert.equal(rows.length, 10);
   assert.equal(rows.filter((r) => r.attrs["aria-current"] === "step").length, 1);
-  assert.equal(find(tree, (n) => n.attrs.class === "concession-card").length, 4);
-  const buttons = find(tree, (n) => n.attrs.class === "concession-price");
-  assert.equal(buttons.length, 6);
   assert.equal(find(tree, (n) => n.tag === "li" && n.attrs["data-zone"] !== undefined).length, 8);
+  const folds = find(tree, (n) => n.tag === "details");
+  assert.equal(folds.length, 2);
+  assert.ok(folds.every((f) => f.attrs.open === undefined), "closed by default while there is a decision to make");
+});
+
+test("steps (#409): one step at a time, the corporation, then the par value, then confirm; a single offer skips the first", () => {
+  const g = load("concession");
+  const cards = (sel: { corp: string | null; price: number | null }) => find(ConcessionPanel(g, { ...sel, city: null }, null, noop, themes[0]!), (n) => n.attrs.class === "concession-card");
+  const prices = (sel: { corp: string | null; price: number | null }) => find(ConcessionPanel(g, { ...sel, city: null }, null, noop, themes[0]!), (n) => n.attrs.class === "concession-price");
+  assert.deepEqual([cards({ corp: null, price: null }).length, prices({ corp: null, price: null }).length], [4, 0]);
+  assert.deepEqual([cards({ corp: "B", price: null }).length, prices({ corp: "B", price: null }).length], [1, 6]);
+  assert.equal(cards({ corp: "B", price: null })[0]!.attrs["aria-pressed"], "true");
+  assert.deepEqual([cards({ corp: "B", price: 70 }).length, prices({ corp: "B", price: 70 }).length], [1, 6]);
+  assert.deepEqual(progress(g, emptySelection(), null), { n: 1, total: 3, kind: "corp" });
+  assert.deepEqual(progress(g, { corp: "B", price: null, city: null }, null), { n: 2, total: 3, kind: "price" });
+  assert.deepEqual(progress(g, { corp: "B", price: 70, city: null }, null), { n: 3, total: 3, kind: "confirm" });
+  const text = (sel: { corp: string | null; price: number | null }) => textOf(ConcessionPanel(g, { ...sel, city: null }, null, noop, themes[0]!));
+  assert.match(text({ corp: null, price: null }), /Schritt 1 von 3: Gesellschaft wählen/);
+  assert.match(text({ corp: "B", price: null }), /Schritt 2 von 3: Par-Kurs wählen/);
+  assert.match(text({ corp: "B", price: 70 }), /Schritt 3 von 3: Bestätigen/);
+  // One offer only: it is chosen already, the flow has two steps.
+  const single = load("concession");
+  const only = String(single.state.prompt.actions.find((a) => a.type === "par")!.corporation);
+  single.state.prompt.actions = single.state.prompt.actions.filter((a) => a.type !== "par" || a.corporation === only);
+  assert.equal(offers(single).length, 1);
+  assert.deepEqual(progress(single, emptySelection(), null), { n: 1, total: 2, kind: "price" });
+  assert.deepEqual(progress(single, { corp: only, price: 70, city: null }, null), { n: 2, total: 2, kind: "confirm" });
+  assert.equal(backSelection(single, emptySelection(), null), null, "the only offer cannot be taken back");
+  assert.deepEqual(backSelection(single, { corp: only, price: 70, city: null }, null), { corp: only, price: null, city: null });
+});
+
+test("steps (#409): Zurück goes one step back, and is not offered where nothing can be undone", () => {
+  const g = load("concession");
+  assert.equal(backSelection(g, emptySelection(), null), null);
+  assert.deepEqual(backSelection(g, { corp: "B", price: null, city: null }, null), emptySelection());
+  assert.deepEqual(backSelection(g, { corp: "B", price: 70, city: null }, null), { corp: "B", price: null, city: null });
   const calls: string[] = [];
-  const t2 = ConcessionPanel(g, { corp: "B", price: null, city: null }, null, { onCorp: (c) => calls.push(`corp ${c}`), onPrice: (c, p) => calls.push(`price ${c} ${p}`), onCity: () => {} }, themes[0]!);
-  find(t2, (n) => n.attrs.class === "concession-price")[2]!.on.click!(new Event("click"));
-  find(t2, (n) => n.attrs.class === "concession-card")[1]!.on.click!(new Event("click"));
-  assert.deepEqual(calls, ["price B 75", "corp C"]);
+  const tree = ConcessionPanel(g, { corp: "B", price: 70, city: null }, null, { ...noop, onBack: () => calls.push("back") }, themes[0]!);
+  const back = find(tree, (n) => n.tag === "button" && n.attrs.class === "concession-back");
+  assert.equal(back.length, 1);
+  back[0]!.on.click!(new Event("click"));
+  assert.deepEqual(calls, ["back"]);
+  assert.equal(find(ConcessionPanel(g, emptySelection(), null, noop, themes[0]!), (n) => n.attrs.class === "concession-back").length, 0);
+});
+
+test("panel DOM: choosing calls back with corporation and price", () => {
+  const g = load("concession");
+  const calls: string[] = [];
+  const h = { ...noop, onCorp: (c: string) => calls.push(`corp ${c}`), onPrice: (c: string, p: number) => calls.push(`price ${c} ${p}`) };
+  find(ConcessionPanel(g, emptySelection(), null, h, themes[0]!), (n) => n.attrs.class === "concession-card")[1]!.on.click!(new Event("click"));
+  find(ConcessionPanel(g, { corp: "B", price: null, city: null }, null, h, themes[0]!), (n) => n.attrs.class === "concession-price")[2]!.on.click!(new Event("click"));
+  assert.deepEqual(calls, ["corp C", "price B 75"]);
 });
 
 test("panel DOM: dimmed price buttons are disabled with the reason", () => {
@@ -197,4 +241,15 @@ test("home token on the map (#261): a hex with several targets is ambiguous, the
   assert.equal(indexOfCity("X1-0-3"), 3);
   (g.state.prompt as { context?: unknown }).context = { token: { cities: [{ id: "X1-0-3", hex: "X1", city: 2, price: 1 }] } };
   assert.equal(indexOfCity("X1-0-3", g), 2);
+});
+
+test("steps (#409): the home token takes the city, then confirm", () => {
+  const g = load("home-token");
+  assert.deepEqual(progress(g, emptySelection(), map), { n: 1, total: 2, kind: "city" });
+  const t = homeTargets(g, map)[0]!;
+  assert.deepEqual(progress(g, { corp: null, price: null, city: t.city }, map), { n: 2, total: 2, kind: "confirm" });
+  assert.match(textOf(ConcessionPanel(g, emptySelection(), map, noop, themes[0]!)), /Schritt 1 von 2: Ort wählen/);
+  assert.deepEqual(backSelection(g, { corp: null, price: null, city: t.city }, map), emptySelection());
+  g.state.prompt.viewer_to_act = false;
+  assert.equal(progress(g, emptySelection(), map), null);
 });
