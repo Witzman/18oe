@@ -2,6 +2,8 @@
 
 require_relative "../engine/engine_helper"
 require "oe/fixture_catalog"
+require "oe/fixture_builder"
+require "stringio"
 require "tmpdir"
 
 # Fixture catalog (#117): playable game states from action logs, one or more per rule
@@ -142,6 +144,100 @@ RSpec.describe Oe::FixtureCatalog do
       2.times { described_class.entries(@dir).each(&:position) }
 
       expect(described_class).to have_received(:scan).twice # the start state, and one scan for the log
+    end
+  end
+
+  # #365 B4: stale logs, live mode, rebuild and diff, on a tiny game of a few actions (no whole game).
+  describe "stale logs, live mode, build and diff" do
+    let(:game_spec) { { "file" => "log.json", "players" => 4, "seed" => 1, "player" => "random", "max_actions" => 3 } }
+    let(:definition) do
+      { "games" => { "g" => game_spec },
+        "entries" => [{ "name" => "start", "surface" => "x", "slice" => "S1", "game" => "g", "at" => 0 },
+                      { "name" => "late", "surface" => "x", "slice" => "S1", "game" => "g", "first" => { "round" => "Auction" }, "after" => "start" }],
+        "gaps" => [] }
+    end
+
+    around do |example|
+      Dir.mktmpdir do |dir|
+        @dir = dir
+        example.run
+      end
+    end
+
+    def built(dir = @dir)
+      Oe::FixtureBuilder.build(dir, definition, out: StringIO.new)
+      JSON.parse(File.read(File.join(dir, "log.json")))
+    end
+
+    def store(log)
+      File.write(File.join(@dir, "log.json"), JSON.generate(log))
+    end
+
+    it "builds one game of the catalog, deterministically, and keeps the others as they are" do
+      first = built
+      second = built(File.join(@dir, "again"))
+
+      expect(second).to eq(first)
+      expect(first["actions_log"].size).to be_between(1, 3)
+      other = definition.merge("games" => definition["games"].merge("h" => game_spec.merge("file" => "h.json")))
+      Oe::FixtureBuilder.build(File.join(@dir, "one"), other, only: ["g"], out: StringIO.new)
+      expect(File).not_to exist(File.join(@dir, "one", "h.json"))
+      expect { Oe::FixtureBuilder.build(@dir, other, only: ["x"], out: StringIO.new) }.to raise_error(/unknown game x/)
+    end
+
+    it "says stale at which action when the stored log no longer fits the engine" do
+      log = built.merge("actions_log" => described_class.play(game_spec).log)
+      log["actions_log"][1] = log["actions_log"][1].merge("type" => "bid", "company" => "NOPE", "price" => 1)
+      store(log)
+      File.write(File.join(@dir, "catalog.json"), JSON.generate(definition.merge("entries" => [{ "name" => "x", "surface" => "x", "slice" => "S1", "game" => "g", "position" => 2, "expect" => {} }])))
+
+      expect { described_class.game_at(described_class.entry("x", @dir), @dir) }
+        .to raise_error(described_class::StaleLog, /log g stale at action 2 \(bid\).*needs a refresh/)
+    end
+
+    it "scans a stale stored log with the same message" do
+      log = built
+      log["actions_log"][0] = log["actions_log"][0].merge("company" => "NOPE")
+      store(log)
+      File.write(File.join(@dir, "catalog.json"), JSON.generate(definition))
+
+      expect { described_class.entries(@dir).last.position }.to raise_error(described_class::StaleLog, /log g stale at action 1 /)
+    end
+
+    it "plays a fresh game instead of the stored log in live mode" do
+      File.write(File.join(@dir, "catalog.json"), JSON.generate(definition))
+      File.write(File.join(@dir, "log.json"), "not even json")
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("OE_CATALOG").and_return("live")
+
+      expect(described_class).to be_live
+      expect(described_class.entries(@dir).map(&:position)).to eq([0, 1])
+      expect(described_class.game_at("late", @dir).actions.size).to eq(1)
+    end
+
+    it "reports the first differing action and moved entries without writing" do
+      log = built.merge("actions_log" => described_class.play(game_spec).log)
+      store(log)
+      File.write(File.join(@dir, "catalog.json"), JSON.generate(definition))
+      same = Oe::FixtureBuilder.diff("g", @dir, definition)
+      expect(same[:first_difference]).to be_nil
+      expect(Oe::FixtureBuilder.report(same)).to include("logs: identical", "moved or unmatched: 0")
+
+      log["actions_log"][1] = log["actions_log"][1].merge("price" => 999)
+      store(log)
+      changed = Oe::FixtureBuilder.diff("g", @dir, definition)
+      expect(changed[:first_difference]).to eq(1)
+      expect(Oe::FixtureBuilder.report(changed)).to include("first difference at action 2")
+      expect(JSON.parse(File.read(File.join(@dir, "log.json")))).to eq(log)
+    end
+
+    it "finds the first differing action of two logs, ignoring ids and times" do
+      a = [{ "type" => "pass", "id" => 1 }, { "type" => "bid", "id" => 2 }]
+
+      expect(described_class.first_difference(a, [{ "type" => "pass", "id" => 9, "created_at" => 1 }, { "type" => "bid" }])).to be_nil
+      expect(described_class.first_difference(a, [{ "type" => "pass" }, { "type" => "pass" }])).to eq(1)
+      expect(described_class.first_difference(a, a.first(1))).to eq(1) # stored longer than fresh
+      expect(described_class.first_difference(a.first(1), a)).to be_nil # stored cut after its last needed position
     end
   end
 
