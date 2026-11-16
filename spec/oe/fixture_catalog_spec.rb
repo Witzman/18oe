@@ -2,7 +2,6 @@
 
 require_relative "../engine/engine_helper"
 require "oe/fixture_catalog"
-require "oe/fixture_builder"
 require "tmpdir"
 
 # Fixture catalog (#117): playable game states from action logs, one or more per rule
@@ -160,47 +159,6 @@ RSpec.describe Oe::FixtureCatalog do
 
   it "finds a state by round and step", :game_flow do
     expect(described_class.find(round: "Operating", step: "Dividend")&.name).to eq("operating-dividend")
-  end
-
-  # ONE-OFF (#365 B2, removed again before merge): the finders moved from FixtureBuilder::DEFINITION
-  # into catalog.json resolve to the positions the stored catalog had. auction-running (was @200)
-  # is now the first state with bids and is not pinned.
-  it "resolves the moved finders to the old positions", :game_flow do
-    pins = {
-    "auction-start" => [0, {"round" => "Auction", "step" => "WaterfallAuction"}],
-    "concession-first" => [2356, {"round" => "Concession", "step" => "Concession"}],
-    "concession-home-token" => [2357, {"round" => "Concession", "step" => "HomeToken"}],
-    "stock-first" => [2373, {"round" => "Stock", "step" => "BuySellParShares"}],
-    "stock-home-token" => [2376, {"round" => "Stock", "step" => "HomeToken"}],
-    "operating-track" => [2435, {"round" => "Operating", "step" => "Track"}],
-    "operating-buy-train" => [2437, {"round" => "Operating", "step" => "BuyTrain"}],
-    "operating-route" => [2507, {"round" => "Operating", "step" => "Route"}],
-    "operating-dividend" => [2508, {"round" => "Operating", "step" => "Dividend"}],
-    "operating-home-token" => [2515, {"round" => "Operating", "step" => "HomeToken"}],
-    "operating-token" => [2531, {"round" => "Operating", "step" => "Token"}],
-    "operating-issue-shares" => [2998, {"round" => "Operating", "step" => "IssueShares"}],
-    "stock-par" => [638, {"round" => "Concession", "step" => "Concession"}],
-    "stock-sell" => [1483, {"round" => "Stock", "step" => "BuySellParShares"}],
-    "stock-convert" => [1464, {"round" => "Stock", "step" => "BuySellParShares"}],
-    "merge-minor" => [1697, {"round" => "Stock", "step" => "MergeMinor"}],
-    "merge-token" => [1698, {"round" => "Stock", "step" => "MergeToken"}],
-    "merge-discard-train" => [1700, {"round" => "Stock", "step" => "MergeDiscardTrain"}],
-    "phase-5" => [3782, {"phase" => "5", "round" => "Operating", "step" => "BuyTrain"}],
-    "consolidation-first" => [4076, {"round" => "Consolidation", "step" => "Consolidate"}],
-    "consolidation-merge-minor" => [4116, {"round" => "Consolidation", "step" => "MergeMinor"}],
-    "consolidation-merge-token" => [4117, {"round" => "Consolidation", "step" => "MergeToken"}],
-    "consolidation-merge-offer" => [4144, {"round" => "Consolidation", "step" => "MergeOffer"}],
-    "consolidation-discard-train" => [2787, {"round" => "Consolidation", "step" => "MergeDiscardTrain"}],
-    "phase-6" => [4065, {"phase" => "6", "round" => "Operating", "step" => "ConvertToNational"}],
-    "phase-7" => [4405, {"phase" => "7", "round" => "Operating", "step" => "IssueShares"}],
-    "phase-8" => [4709, {"phase" => "8", "round" => "Operating", "step" => "ConvertToNational"}],
-    "game-end" => [4986, { "finished" => true, "round" => "Operating", "step" => nil }],
-    }
-    pins.each do |name, (position, expect)|
-      entry = described_class.entry(name)
-      expect([name, entry.position, entry.expect]).to eq([name, position, expect])
-    end
-    expect(described_class.entry("auction-running").position).to eq(1)
   end
 
   Oe::FixtureCatalog.entries.each do |entry|
