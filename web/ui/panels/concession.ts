@@ -167,12 +167,58 @@ export function orderFor(g: Game, sel: Selection, map: MapGeometry | null, send:
   return { sentence: s.text, state: action ? "preview" : "invalid", reason: action ? undefined : s.text, confirmLabel: s.confirm, onConfirm: () => { if (action) send(action); } };
 }
 
-// ---- view ---------------------------------------------------------------------------------------
-export interface Handlers { onCorp: (corp: string) => void; onPrice: (corp: string, price: number) => void; onCity: (city: string) => void }
+// ---- steps --------------------------------------------------------------------------------------
+export type StepKind = "corp" | "price" | "city" | "confirm";
+/** Where the viewer stands in the flow (#409): founding takes the corporation, the par value, then confirm; the home
+ *  token takes the city, then confirm. A single offer or target is chosen already, so that step is left out. */
+export interface Progress { n: number; total: number; kind: StepKind }
 
-function zoneRows(g: Game): VNode {
-  return v("div", { class: "concession-zones" },
-    v("h3", {}, txt("concession.zones").de),
+export function progress(g: Game, sel: Selection, map: MapGeometry | null): Progress | null {
+  if (!g.state.prompt.viewer_to_act) return null;
+  const eff = effectiveSelection(g, sel, map);
+  if (isFounding(g)) {
+    const skip = offers(g).length === 1 ? 1 : 0;
+    const total = 3 - skip;
+    if (eff.corp === null) return { n: 1, total, kind: "corp" };
+    return eff.price === null ? { n: 2 - skip, total, kind: "price" } : { n: 3 - skip, total, kind: "confirm" };
+  }
+  if (isHomeToken(g)) {
+    const skip = homeTargets(g, map).length === 1 ? 1 : 0;
+    const total = 2 - skip;
+    return eff.city === null ? { n: 1, total, kind: "city" } : { n: total, total, kind: "confirm" };
+  }
+  return null;
+}
+
+/** The selection one step back, or null when there is nothing to take back (first step, or the step before was chosen for the viewer). */
+export function backSelection(g: Game, sel: Selection, map: MapGeometry | null): Selection | null {
+  const p = progress(g, sel, map);
+  if (!p) return null;
+  const eff = effectiveSelection(g, sel, map);
+  if (isFounding(g)) {
+    if (p.kind === "confirm") return { corp: eff.corp, price: null, city: null };
+    return p.kind === "price" && offers(g).length > 1 ? emptySelection() : null;
+  }
+  return p.kind === "confirm" && homeTargets(g, map).length > 1 ? emptySelection() : null;
+}
+
+// ---- view ---------------------------------------------------------------------------------------
+export interface Handlers {
+  onCorp: (corp: string) => void; onPrice: (corp: string, price: number) => void; onCity: (city: string) => void;
+  /** One step back (#409); the zones and the ladder fold open and shut. */
+  onBack?: () => void; onToggle?: (part: Fold, open: boolean) => void;
+}
+export type Fold = "zones" | "ladder";
+export type Open = Record<Fold, boolean>;
+
+/** A fold the viewer opens on demand (#409): the panel stays short, so it does not scroll. Its state outlives a redraw (`open`). */
+function fold(part: Fold, title: string, open: boolean, h: Handlers, ...content: (VNode | null)[]): VNode {
+  return v("details", { class: "concession-fold", "data-fold": part, open: open ? "" : undefined, ontoggle: (e: Event) => h.onToggle?.(part, (e.currentTarget as HTMLDetailsElement).open) },
+    v("summary", {}, title), ...content);
+}
+
+function zoneRows(g: Game, open: boolean, h: Handlers): VNode {
+  return fold("zones", txt("concession.zones").de, open, h,
     v("ul", { class: "concession-zone-list" }, ...g.state.zones.map((z) => v("li", { "data-zone": z.id, "data-free": String(z.free) },
       fillText("concession.zone_row", { zone: z.id, price: formatGeld(z.price), left: z.chits_left }),
       z.discount > 0 ? ` · ${fillText("concession.zone_discount", { pct: z.discount })}` : "",
@@ -214,40 +260,47 @@ function targetButton(t: HomeTarget, selected: boolean, h: Handlers): VNode {
   }, text);
 }
 
-/** The panel content for the context slot of the frame. Pure apart from reading the theme for seals. */
-export function ConcessionPanel(g: Game, sel: Selection, map: MapGeometry | null, h: Handlers, theme: Theme): VNode {
+/** The panel content for the context slot of the frame: one step at a time (#409), the zones and the ladder folded below. */
+export function ConcessionPanel(g: Game, sel: Selection, map: MapGeometry | null, h: Handlers, theme: Theme, open: Open = { zones: false, ladder: false }): VNode {
   const eff = effectiveSelection(g, sel, map);
   const rows = ladder(g);
   const steps: Step[] = rows.map((r) => ({ label: `${r.label} · ${r.mine ? fillText("concession.owner_mine", { who: r.owner }) : r.owner}`, state: r.state }));
   const p = g.state.prompt;
   const mine = p.viewer_to_act;
   const running = rows.find((r) => r.state === "active");
+  const step = progress(g, sel, map);
+  const back = backSelection(g, sel, map) !== null;
   const body: (VNode | null)[] = [];
+  if (step) {
+    body.push(v("div", { class: "concession-stephead" },
+      v("p", { class: "concession-step", role: "status" }, fillText("concession.step", { n: step.n, total: step.total, title: txt(`concession.step_${step.kind}`).de })),
+      back ? v("button", { type: "button", class: "concession-back", onclick: () => h.onBack?.() }, txt("concession.back").de) : null));
+  }
   if (isFounding(g) && mine) {
     const os = offers(g);
     const parOnly = os.some((o) => o.kind === "par_only");
     const chosen = os.find((o) => o.corp === eff.corp);
     body.push(
-      v("h3", {}, txt("concession.offers").de),
-      v("div", { class: "concession-cards" }, ...os.map((o) => offerCard(g, o, o.corp === eff.corp, h, theme))),
+      // Once a corporation is chosen only its card stays, pressed, above the par values.
+      v("div", { class: "concession-cards" }, ...(chosen ? [chosen] : os).map((o) => offerCard(g, o, o.corp === eff.corp, h, theme))),
       chosen ? priceRow(chosen, eff, h) : null,
       // Assumption: the engine's help text for the step (D7) is not in the view yet; the two cases are told here.
-      v("p", { class: "muted concession-help" }, txt(parOnly ? "concession.help_par_only" : "concession.help_float").de),
-      zoneRows(g));
+      v("p", { class: "muted concession-help" }, txt(step?.kind === "confirm" ? "concession.confirm_hint" : parOnly ? "concession.help_par_only" : "concession.help_float").de));
   } else if (isHomeToken(g) && mine) {
     const corp = String(p.actions[0]?.entity ?? "");
     body.push(
-      v("h3", {}, txt("concession.home_title").de),
       v("p", {}, fillText("concession.home_for", { corp })),
       v("div", { class: "concession-targets" }, ...homeTargets(g, map).map((t) => targetButton(t, t.city === eff.city, h))),
-      v("p", { class: "muted concession-help" }, txt("concession.home_hint").de),
-      zoneRows(g));
+      v("p", { class: "muted concession-help" }, txt(step?.kind === "confirm" ? "concession.confirm_hint" : "concession.home_hint").de));
   } else if (running) {
     body.push(v("p", { class: "concession-running" }, fillText("concession.running", { who: running.owner, n: running.n })));
   }
+  const showZones = mine && (isFounding(g) || isHomeToken(g));
   return v("section", { class: "concession-panel", "aria-label": txt("concession.title").de },
-    // What the viewer must decide comes first; the ladder (context) below it, so it is never pushed out of view.
-    ...body, v("h3", {}, txt("concession.ladder").de), Leiter(steps, txt("concession.ladder").de));
+    // What the viewer must decide comes first; the folds below it never push it out of view.
+    ...body,
+    showZones ? zoneRows(g, open.zones, h) : null,
+    fold("ladder", txt("concession.ladder").de, open.ladder || !mine, h, Leiter(steps, txt("concession.ladder").de)));
 }
 
 // ---- mount --------------------------------------------------------------------------------------
@@ -287,7 +340,10 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
     if (id) choose(id);
   });
 
+  const open: Open = { zones: false, ladder: false };
   const handlers: Handlers = {
+    onBack: () => { if (game) sel = backSelection(game, sel, map()) ?? sel; draw(); },
+    onToggle: (part, isOpen) => { open[part] = isOpen; },
     onCorp: (corp) => { sel = { corp, price: null, city: null }; draw(); },
     onPrice: (corp, price) => { sel = { corp, price, city: null }; draw(); },
     onCity: (city) => { sel = { corp: null, price: null, city }; draw(); },
@@ -310,7 +366,7 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
     owns = true;
     // The claims only hold while this panel owns the step: HomeToken also occurs in other rounds.
     claim(isFounding(g) || isHomeToken(g));
-    frame.slots.context.replaceChildren(toDom(ConcessionPanel(g, sel, map(), listHandlers, choiceFromRoot(document.documentElement).theme)));
+    frame.slots.context.replaceChildren(toDom(ConcessionPanel(g, sel, map(), listHandlers, choiceFromRoot(document.documentElement).theme, open)));
     const home = isHomeToken(g) && g.state.prompt.viewer_to_act;
     if (home && !wasHome) { pick.toMap(); const t = homeTargets(g, map())[0]; if (t) pick.flyTo(t.hex); }
     wasHome = home;

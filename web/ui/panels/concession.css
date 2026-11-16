@@ -14,3 +14,12 @@
 .concession-zone-list li[data-free="false"] { color: var(--ui-faint); text-decoration: line-through; }
 /* Touch: every tappable control is at least 44 px (2.75rem) high; nothing depends on hover (#172). */
 .concession-card, .concession-target, .concession-price { min-height: 2.75rem; min-width: 2.75rem; }
+/* Steps (#409): one decision at a time; the zones and the ladder fold away so the panel does not scroll. */
+.concession-stephead { display: flex; align-items: center; justify-content: space-between; gap: var(--shape-gap); margin-bottom: var(--shape-gap); }
+.concession-step { margin: 0; font-family: var(--font-head); }
+.concession-back { min-height: 2.75rem; min-width: 2.75rem; }
+.concession-fold { margin-top: var(--shape-gap); }
+.concession-fold > summary { cursor: pointer; min-height: 2.75rem; display: flex; align-items: center; gap: 6px; font-family: var(--font-head); font-weight: 700; list-style: none; }
+.concession-fold > summary::before { content: "▸"; }
+.concession-fold[open] > summary::before { content: "▾"; }
+.concession-step { font-weight: 700; }
