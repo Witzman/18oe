@@ -3,15 +3,12 @@
 require_relative "../engine/engine_helper"
 require "oe/fixture_catalog"
 require "oe/invariants"
+require_relative "../engine/g_18_oe/helpers"
 
 # Invariants (#138): rules the engine must never break, run over every catalog state (#117)
 # and over states of a replayed log. Each check also has one deliberately broken state, so
 # the check is proven to see a violation (test of the test).
 RSpec.describe Oe::Invariants do
-  def game(name)
-    Oe::FixtureCatalog.game_at(name)
-  end
-
   def violations(game, check)
     described_class.run(game, only: check)
   end
@@ -45,18 +42,40 @@ RSpec.describe Oe::Invariants do
     end
   end
 
-  # Every example below replays a catalog log (game_at, 1483 to 2531 actions), so the group is
-  # :game_flow (#365). Fast variants that build the state by code come with the scenario helpers (slice 9).
-  describe "each check sees one deliberately broken state", :game_flow do
+  # Each example builds its state by code (scenario building blocks of spec/engine/g_18_oe/helpers.rb, #365):
+  # no catalog log is replayed. The first expectation of every example is that the check is silent on the
+  # sound state, the second that it reports the one violation we introduce.
+  describe "each check sees one deliberately broken state" do
+    include G18OESpecHelpers
+
+    # Two regionals, two share holders, a stock round on turn: every player in the game, no train bought.
+    def stock_state
+      g = new_game
+      start_regional!(g, "LNWR", g.players[0])
+      start_regional!(g, "GWR", g.players[1])
+      stock_round!(g)
+      g
+    end
+
+    # Phase 3, a regional that holds a train, an operating round entered: nothing is pending.
+    def operating_state
+      g = new_game
+      at_phase!(g, "3")
+      corp = operating_regional!(g, "LNWR", g.players[0])
+      fund!(g, corp, 100)
+      operating_round_for!(g, 1, setup: true)
+      [g, corp]
+    end
+
     it "money_conserved: a note out of nowhere" do
-      g = game("operating-dividend")
+      g, = operating_state
       expect(violations(g, :money_conserved)).to be_empty
       g.bank.add_cash(5)
       expect(violations(g, :money_conserved).map(&:message).join).to match(/expected 54000/)
     end
 
     it "money_conserved: allows the remainder cash only once it was added" do
-      g = game("operating-dividend")
+      g, = operating_state
       g.bank.add_cash(described_class::REMAINDER_CASH)
       expect(violations(g, :money_conserved)).not_to be_empty
       g.instance_variable_set(:@remainder_cash_added, true)
@@ -64,68 +83,83 @@ RSpec.describe Oe::Invariants do
     end
 
     it "no_negative_cash: a company in debt (sum unchanged)" do
-      g = game("operating-dividend")
-      corp = g.corporations.find { |c| c.cash.positive? }
-      other = g.players.first
-      corp.spend(corp.cash + 5, other, check_cash: false)
+      g, corp = operating_state
+      expect(corp.cash).to be_positive
+      expect(violations(g, :no_negative_cash)).to be_empty
+      corp.spend(corp.cash + 5, g.players.first, check_cash: false)
       expect(violations(g, :money_conserved)).to be_empty
       expect(violations(g, :no_negative_cash).map(&:message).join).to include("#{corp.name} has -5")
     end
 
     it "shares_total_100: a certificate with the wrong size" do
-      g = game("stock-first")
+      g = stock_state
       share = g.players.flat_map(&:shares).first
+      expect(violations(g, :shares_total_100)).to be_empty
       share.percent += 10
       expect(violations(g, :shares_total_100).map(&:message).join).to include(share.corporation.name)
     end
 
     it "shares_single_holder: one certificate in two portfolios" do
-      g = game("stock-first")
+      g = stock_state
       share = g.players.flat_map(&:shares).first
+      expect(violations(g, :shares_single_holder)).to be_empty
       g.players.find { |pl| pl != share.owner }.shares_by_corporation[share.corporation] << share
       expect(violations(g, :shares_single_holder)).not_to be_empty
     end
 
     it "president_holds_presidency: a president without stock" do
-      g = game("stock-first")
+      g = stock_state
       corp = g.corporations.find { |c| c.ipoed && c.owner&.player? }
+      expect(violations(g, :president_holds_presidency)).to be_empty
       stranger = g.players.find { |pl| pl.percent_of(corp).zero? }
       corp.owner = stranger
       expect(violations(g, :president_holds_presidency).map(&:message).join).to include(corp.name)
     end
 
     it "certificate_limit: a player above the limit while another one acts in a stock round" do
-      g = game("stock-first")
+      g = stock_state
       expect(g.round.stock?).to be(true)
+      holder = g.players[1]
+      take_treasury_shares!(g, holder, g.corporation_by_id("GWR"), 1)
+      expect(g.round.current_entity).not_to eq(holder)
+      expect(g.num_certs(holder)).to be > 1
       expect(violations(g, :certificate_limit)).to be_empty
       g.instance_variable_set(:@cert_limit, 1)
-      expect(violations(g, :certificate_limit)).not_to be_empty
+      expect(violations(g, :certificate_limit).map(&:message).join).to include("#{holder.name} holds")
     end
 
     it "train_supply: a train missing from the Locomotive Works" do
-      g = game("operating-buy-train")
+      g, = operating_state
       expect(violations(g, :train_supply)).to be_empty
-      train = g.depot.trains.first
-      g.depot.trains.delete(train)
+      g.depot.trains.delete(g.depot.trains.find { |t| t.owner == g.depot })
       expect(violations(g, :train_supply).map(&:message).join).to match(/rulebook has/)
     end
 
     it "train_limit: a company with more trains than the phase allows" do
-      g = game("operating-buy-train")
-      corp = g.corporations.find { |c| c.floated? && !c.closed? }
+      g, corp = operating_state
       expect(violations(g, :train_limit)).to be_empty
-      corp.trains.concat(g.depot.upcoming.first(g.train_limit(corp) + 1 - corp.trains.size))
+      with_trains!(g, corp, *(["3"] * g.train_limit(corp)))
+      expect(corp.trains.size).to be > g.train_limit(corp)
       expect(violations(g, :train_limit).map(&:message).join).to include(corp.name)
     end
 
     it "train_limit: a pending discard step may exceed it" do
-      g = game("merge-discard-train")
+      g = new_game
+      at_phase!(g, "3")
+      corp = operating_regional!(g, "LNWR", g.players[0])
+      with_trains!(g, corp, *(["3"] * g.train_limit(corp)))
+      expect(corp.trains.size).to be > g.train_limit(corp)
+      # crowded_corps is read when the round is entered, so the trains come first.
+      operating_round_for!(g, 1, setup: true)
       expect(g.round.active_step.class.name).to include("Discard")
       expect(violations(g, :train_limit)).to be_empty
+      # The same crowd with a step that is not a discard step is the violation (proof the exemption is the step).
+      allow(g.round).to receive(:active_step).and_return(g.round.steps.find { |s| s.class.name.include?("Track") })
+      expect(violations(g, :train_limit)).not_to be_empty
     end
 
     it "tokens_consistent: the same token on two cities" do
-      g = game("operating-token")
+      g, = operating_state
       expect(violations(g, :tokens_consistent)).to be_empty
       cities = g.hexes.flat_map { |h| h.tile.cities }
       tokened = cities.find { |c| c.tokens.compact.any? }
@@ -135,26 +169,33 @@ RSpec.describe Oe::Invariants do
     end
 
     it "tiles_consistent: one tile on two hexes" do
-      g = game("operating-route")
+      g, = operating_state
+      laid = lay_tile!(g, plain_hex(g), "8").hex
       expect(violations(g, :tiles_consistent)).to be_empty
-      laid = g.hexes.find { |h| !h.tile.preprinted }
       other = g.hexes.find { |h| h != laid && !h.tile.cities.empty? }
       other.instance_variable_set(:@tile, laid.tile)
       expect(violations(g, :tiles_consistent).map(&:message).join).to match(/two hexes/)
     end
 
     it "tiles_consistent: more tiles of one kind laid than the supply has" do
-      g = game("merge-discard-train")
+      g, = operating_state
+      lay_tile!(g, plain_hex(g), "8")
       expect(violations(g, :tiles_consistent)).to be_empty
-      stub_const("Engine::Game::G18OE::Game::TILES", g.class::TILES.merge("8" => 1))
+      stub_const("Engine::Game::G18OE::Game::TILES", g.class::TILES.merge("8" => 0))
       expect(violations(g, :tiles_consistent).map(&:message).join).to match(/tiles named 8 laid/)
     end
 
     it "stock_market_positions: a price marker off the market" do
-      g = game("stock-sell")
+      g = stock_state
       corp = g.corporations.find(&:share_price)
+      expect(violations(g, :stock_market_positions)).to be_empty
       corp.share_price.instance_variable_set(:@coordinates, [99, 0])
       expect(violations(g, :stock_market_positions).map(&:message).join).to include("off the market")
+    end
+
+    # A hex with no track at all, where a tile can be put without any legality question.
+    def plain_hex(game)
+      game.hexes.find { |h| h.tile.preprinted && h.tile.paths.empty? && h.tile.cities.empty? && h.tile.towns.empty? }
     end
   end
 end

@@ -135,6 +135,17 @@ module G18OESpecHelpers
     round
   end
 
+  # Lays the first tile named `tile_name` from the supply on `hex` (a Hex or its id), without any
+  # legality check: for states that need a laid tile, not for the rules of laying.
+  def lay_tile!(game, hex, tile_name)
+    hex = game.hex_by_id(hex) if hex.is_a?(String)
+    tile = game.tiles.find { |t| t.name == tile_name && t.hex.nil? }
+    raise ArgumentError, "no tile #{tile_name.inspect} left in the supply" unless tile
+
+    hex.lay(tile)
+    tile
+  end
+
   def round_step(round, klass)
     round.steps.find { |s| s.is_a?(klass) }
   end
