@@ -20,14 +20,17 @@ no process files, no notes, no specs. That's `18oe-workshop`'s job.
    comment here. If you're not sure why something is the way it is, look
    there first.
 
-## Current state
+## Where to look
 
-Walking skeleton only — `app.rb` answers `/healthz`, no game logic yet.
-Ruby/Sinatra/Puma, one Docker image, deployed on Dokploy (`orient18oe`).
-See `18oe-workshop`'s `notes/reference/infrastructure-plan.md` and
-`frontend-plan.md` for where this is going.
+No state is kept in this file. What runs and what is open: `README.md`
+(commands, CI stages, deployment, versions) and the issues in
+`18oe-workshop` (`bin/state` there). Design and plans: `18oe-workshop`'s
+`notes/reference/` (start with `ui-spec.md` for the UI,
+`infrastructure-plan.md` for the deployment).
 
-```sh
-docker compose up --build
-curl http://localhost/healthz
-```
+Ruby/Sinatra/Puma engine and API, TypeScript frontend (`web/`), one Docker
+image, deployed on Dokploy (`orient18oe`).
+
+Browser runs (`bin/shot`, every `*-browser` test) take the machine-wide lock
+`tmp/heavy.lock` of the main checkout; the full suite runs in GitHub Actions,
+locally only targeted tests of the changed files (see the README).
