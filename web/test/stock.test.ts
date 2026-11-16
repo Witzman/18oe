@@ -177,3 +177,12 @@ test("a market offer is labelled as taken from the market", () => {
   assert.match(offerLabel(o, row), /aus dem Markt/);
   assert.match(offerLabel(row.buys[0]!, row), /aus dem Schatzamt/);
 });
+
+test("grid: every market row fills the whole line, so a short row never takes in the cells of the next one (#405)", () => {
+  const tree = sheetNode(input(pool), noop);
+  const lines = find(tree, (n) => n.attrs.class === "stock-grid-row");
+  const cols = Math.max(...pool.state.market.rows.map((l) => l.length));
+  assert.equal(lines.length, pool.state.market.rows.length);
+  assert.ok(pool.state.market.rows.some((l) => l.length < cols), "the fixture needs a short row");
+  for (const l of lines) assert.equal(l.children.length, cols, `row ${l.attrs["data-row"]}`);
+});
