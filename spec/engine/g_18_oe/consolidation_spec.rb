@@ -80,6 +80,17 @@ describe 'G18OE consolidation (§5.1.5, §10.6)' do
     expect(round.active_step.actions(round.current_entity)).to include('pass')
   end
 
+  it 'lets a player with two regionals convert both, one per turn (workshop #401, BUG-046)' do
+    round = consolidation!([%w[LNWR GWR], %w[PLM], %w[SFAI]])
+    owner = round.current_entity
+    convert!(round, game.corporation_by_id('LNWR'))
+    convert!(round, own_regional(round.current_entity)) until round.current_entity == owner
+
+    expect(own_regional(owner)&.id).to eq('GWR')
+    expect(convert!(round, own_regional(owner)).type).to eq(:major)
+    expect(own_regional(owner)).to be_nil
+  end
+
   it 'lets a regional president end the turn after selling (§10)' do
     round = consolidation!([%w[LNWR GWR], %w[PLM], %w[SFAI]])
     seller = round.current_entity
