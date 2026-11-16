@@ -2,7 +2,6 @@
 
 require_relative "../engine/engine_helper"
 require "oe/fixture_catalog"
-require "oe/fixture_builder"
 require "tmpdir"
 
 # Fixture catalog (#117): playable game states from action logs, one or more per rule
@@ -13,22 +12,54 @@ RSpec.describe Oe::FixtureCatalog do
   let(:catalog) { described_class.catalog }
   let(:entries) { described_class.entries }
 
-  it "is well formed: unique names, known logs, positions inside the logs, every entry says where it is" do
-    expect(entries.map(&:name).uniq.size).to eq(entries.size)
-    entries.each do |e|
-      expect(catalog["games"]).to have_key(e.game), e.name
-      expect(e.surface.to_s).not_to be_empty
-      expect(e.slice).to match(/\AS[1-9]\z/)
-      expect(e.expect.keys).to include("round"), "#{e.name} has no expectation"
-      expect(e.position).to be_between(0, catalog["games"][e.game]["actions"]), e.name
-    end
+  it "is well formed without a replay: games, unique names, finders, where names, after references, gaps" do
+    expect(described_class.static_errors).to be_empty
     catalog["games"].each_value { |g| expect(File).to exist(File.join(described_class::DIR, g["file"])) }
-    catalog["gaps"].each { |gap| expect(gap["reason"].to_s).not_to be_empty }
   end
 
-  it "has an entry for every S1 round type of the engine's game flow" do
-    rounds = entries.map { |e| e.expect["round"] }.uniq
-    expect(rounds).to include("Auction", "Concession", "Stock", "Operating")
+  it "reads the finders of the catalog without resolving them" do
+    expect(entries.map(&:finder)).to all(be_a(Hash))
+    expect(entries.map(&:name)).to include("auction-start", "auction-running", "game-end")
+  end
+
+  it "resolves auction-start without a replay (the start state)" do
+    entry = described_class.entry("auction-start")
+
+    expect([entry.position, entry.expect]).to eq([0, { "round" => "Auction", "step" => "WaterfallAuction" }])
+  end
+
+  describe ".static_errors" do
+    let(:good) do
+      { "games" => { "g" => { "file" => "g.json", "players" => 4, "seed" => 1, "player" => "random", "max_actions" => 10 } },
+        "entries" => [{ "name" => "a", "surface" => "x", "slice" => "S1", "game" => "g", "at" => 0 },
+                      { "name" => "b", "surface" => "x", "slice" => "S2", "game" => "g",
+                        "first" => { "round" => "Auction" }, "where" => "bids_open", "after" => "a" }],
+        "gaps" => [{ "surface" => "y", "reason" => "z" }] }
+    end
+
+    def with_entry(extra, index: 1)
+      good.merge("entries" => good["entries"].each_with_index.map { |e, i| i == index ? e.merge(extra) : e })
+    end
+
+    it("accepts a good catalog") { expect(described_class.static_errors(good)).to be_empty }
+
+    it "names each kind of defect" do
+      {
+        with_entry({ "name" => "a" }) => /name missing or twice/,
+        with_entry({ "game" => "h" }) => /unknown game/,
+        with_entry({ "slice" => "S10" }) => /slice/,
+        with_entry({ "at" => 0 }) => /exactly one/,
+        with_entry({ "first" => { "colour" => "red" } }) => /unknown keys/,
+        with_entry({ "where" => "nope" }) => /unknown where/,
+        with_entry({ "after" => "b" }) => /not an earlier entry/,
+        with_entry({ "position" => 3 }) => /has a position/,
+        with_entry({ "at" => 5 }, index: 0) => /at must be 0/,
+        good.merge("gaps" => [{ "surface" => "y" }]) => /no reason/,
+        good.merge("games" => { "g" => { "file" => "g.json" } }) => /no players, seed/,
+      }.each do |catalog, message|
+        expect(described_class.static_errors(catalog).join("\n")).to match(message), message.inspect
+      end
+    end
   end
 
   it "names an unknown entry clearly" do
@@ -81,8 +112,8 @@ RSpec.describe Oe::FixtureCatalog do
     it "says which finder matched nothing" do
       write_catalog([base("never", "first" => { "round" => "Operating" })])
 
-      expect { described_class.entries(@dir) }
-        .to raise_error(RuntimeError, /finder never matched nothing in g \(0 actions\)/)
+      entry = described_class.entries(@dir).first # reading the entry is free, asking for its position replays
+      expect { entry.position }.to raise_error(RuntimeError, /finder never matched nothing in g \(0 actions\)/)
     end
 
     it "finds any state by round and step, or nil" do
@@ -94,28 +125,40 @@ RSpec.describe Oe::FixtureCatalog do
       expect(described_class.find(round: "Stock", dir: @dir)).to be_nil
     end
 
-    it "resolves once per catalog and log" do
-      write_catalog([base("a", "at" => 0)])
-      allow(described_class).to receive(:scan).and_call_original
-      2.times { described_class.entries(@dir) }
+    it "honours where and after (first bid on the auction, first state behind an earlier entry)" do
+      log = JSON.parse(File.read(File.join(described_class::DIR, "strategy-4p-1.json")))
+      File.write(File.join(@dir, "log.json"), JSON.generate(log.merge("actions_log" => log["actions_log"].first(2))))
+      write_catalog([base("start", "at" => 0),
+                     base("bid", "first" => { "round" => "Auction" }, "where" => "bids_open"),
+                     base("later", "first" => { "round" => "Auction" }, "after" => "bid")])
+      start, bid, later = described_class.entries(@dir)
 
-      expect(described_class).to have_received(:scan).once
+      expect([start.position, bid.position, later.position]).to eq([0, 1, 2])
+    end
+
+    it "resolves once per catalog and log" do
+      write_catalog([base("a", "at" => 0), base("b", "first" => { "round" => "Auction" })])
+      allow(described_class).to receive(:scan).and_call_original
+      2.times { described_class.entries(@dir).each(&:position) }
+
+      expect(described_class).to have_received(:scan).twice # the start state, and one scan for the log
     end
   end
 
-  # One-off proof for the move of the definition (#365 B1): resolving the builder's finders on
-  # the stored logs gives the positions and expectations catalog.json holds today.
-  it "resolves every finder of the definition to the stored position", :game_flow do
-    stored = described_class.entries.to_h { |e| [e.name, e] }
-    definition = Oe::FixtureBuilder::DEFINITION["entries"]
-    expect(definition.map { |e| e["name"] }).to eq(stored.keys)
-
-    resolved = definition.group_by { |e| e["game"] }.flat_map do |game_name, list|
-      described_class.scan(described_class.log_file(game_name), list).to_a
-    end.to_h
-    definition.each do |e|
-      expect(resolved[e["name"]]).to include(position: stored[e["name"]].position, expect: stored[e["name"]].expect), e["name"]
+  it "resolves every entry inside its log and says where it is", :game_flow do
+    entries.each do |e|
+      expect(e.expect.keys).to include("round"), "#{e.name} has no expectation"
+      expect(e.position).to be_between(0, catalog["games"][e.game]["actions"]), e.name
     end
+  end
+
+  it "has an entry for every S1 round type of the engine's game flow", :game_flow do
+    rounds = entries.map { |e| e.expect["round"] }.uniq
+    expect(rounds).to include("Auction", "Concession", "Stock", "Operating")
+  end
+
+  it "finds a state by round and step", :game_flow do
+    expect(described_class.find(round: "Operating", step: "Dividend")&.name).to eq("operating-dividend")
   end
 
   Oe::FixtureCatalog.entries.each do |entry|
