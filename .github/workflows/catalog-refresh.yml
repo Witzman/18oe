@@ -1,0 +1,82 @@
+# Catalog refresh (#365 B6): rebuilds the stored fixture-catalog logs (spec/fixtures/games/logs/*) with the CURRENT
+# engine. Manual only, serial (one refresh at a time, never cancelled). It pushes nothing and opens no PR: the
+# rebuilt logs are an artifact; whoever refreshes downloads it, commits it on a branch `refresh/catalog-<date>` and
+# opens the one refresh PR (the only PR that may change logs, see the guard in ci.yml, job `changes`).
+# The step summary shows `bin/fixture-catalog diff` per game: first deviating action, moved entries, finders
+# without a match.
+name: catalog-refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "commit (SHA) to rebuild with; empty = the ref selected above"
+        type: string
+        default: ""
+      games:
+        description: "space-separated catalog games; empty = all of catalog.json"
+        type: string
+        default: ""
+
+concurrency:
+  group: catalog-refresh
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: rebuild logs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: games
+        id: games
+        run: |
+          games="${{ inputs.games }}"
+          if [ -z "$games" ]; then
+            games=$(bundle exec ruby -I lib -e 'require "oe/fixture_catalog"; puts Oe::FixtureCatalog.catalog["games"].keys.join(" ")')
+          fi
+          echo "games=$games" >> "$GITHUB_OUTPUT"
+          echo "$games"
+      # One game per step-slice (a game takes minutes); diff first (against the stored log), then build.
+      - name: diff and build per game
+        env:
+          GAMES: ${{ steps.games.outputs.games }}
+        run: |
+          {
+            echo "## catalog refresh for \`$(git rev-parse HEAD)\`"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          for g in $GAMES; do
+            start=$(date +%s)
+            echo "::group::diff $g"
+            bin/fixture-catalog diff "$g" | tee "$RUNNER_TEMP/diff-$g.txt"
+            echo "::endgroup::"
+            echo "::group::build $g"
+            bin/fixture-catalog build "$g"
+            echo "::endgroup::"
+            {
+              echo "### $g ($(( $(date +%s) - start )) s for diff + build)"
+              echo '```'
+              cat "$RUNNER_TEMP/diff-$g.txt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done
+          git status --short spec/fixtures/games | tee -a "$RUNNER_TEMP/status.txt"
+          { echo "### changed files"; echo '```'; cat "$RUNNER_TEMP/status.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: catalog-logs
+          path: |
+            spec/fixtures/games/logs/
+            spec/fixtures/games/catalog.json
+          if-no-files-found: error
