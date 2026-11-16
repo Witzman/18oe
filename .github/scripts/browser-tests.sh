@@ -3,8 +3,9 @@
 # the first failure's output is kept as annotations (so a flaky test stays visible), and a file that fails twice
 # fails the job. A skipped test is a failure (no browser = no check). Run from web/.
 set -uo pipefail
+# BROWSER_SKIP: regex of files to leave out (pull-request stage: touch-browser; the milestone stage runs all).
 # Shard i of n (#335): BROWSER_SHARD / BROWSER_SHARDS (default 1/1), files dealt round-robin in name order.
-files=$(ls test/*.test.ts | grep -E '(-browser|^test/shot|^test/ipad)' | awk -v s="${BROWSER_SHARD:-1}" -v n="${BROWSER_SHARDS:-1}" '(NR - 1) % n == s - 1')
+files=$(ls test/*.test.ts | grep -E '(-browser|^test/shot|^test/ipad)' | { grep -v -E "${BROWSER_SKIP:-^\$}" || true; } | awk -v s="${BROWSER_SHARD:-1}" -v n="${BROWSER_SHARDS:-1}" '(NR - 1) % n == s - 1')
 echo "$files"
 log="$RUNNER_TEMP/browser-logs"; mkdir -p "$log"
 rc=0; flaky=""; total=0; skipped=0
