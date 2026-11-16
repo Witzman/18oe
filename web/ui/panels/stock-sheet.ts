@@ -161,6 +161,15 @@ function gridNode(i: SheetInput, h: SheetHandlers): VNode {
       v("li", { "data-mark": "preview" }, txt("stock.legend_after").de)));
 }
 
+/** Player order for the head: this round's in a stock round (seat order of the view), else the next stock round's (`meta.priority`, priority deal first; #406). */
+function orderLine(g: Game): VNode | null {
+  if (g.state.meta.finished) return null;
+  const inStock = g.state.meta.round.type === "stock";
+  const ids = inStock ? [...g.state.players].sort((a, b) => a.order - b.order).map((p) => p.id) : g.state.meta.priority;
+  if (ids.length === 0) return null;
+  return v("p", { class: "stock-order muted" }, `${txt(inStock ? "stock.order_now" : "stock.order_next").de}: `, ids.map((id) => playerName(g, id)).join(" → "));
+}
+
 const changesOf = (o: ReturnType<typeof orderModel>) => o.changes.map((c) => ({
   label: c.label,
   before: c.money && typeof c.before === "number" ? Geld(c.before) : String(c.before),
@@ -204,6 +213,7 @@ export function sheetNode(i: SheetInput, h: SheetHandlers): VNode {
       status ? v("p", { class: "stock-status", role: "status" }, status) : v("h2", {}, txt("stock.title").de),
       v("div", { class: "stock-tabs", role: "tablist" },
         ...(["stock", "market"] as const).map((t) => v("button", { type: "button", role: "tab", "data-tab": t, "aria-selected": String(i.tab === t), onclick: () => h.onTab(t) }, txt(`stock.tab_${t}`).de))),
+      orderLine(i.g),
       passButton(i.g, h),
       me ? v("span", { class: "stock-cash" }, `${txt("stock.cash").de} `, Geld(me.cash), ` · ${txt("stock.certs").de} ${fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit })}`) : null),
     i.must ? v("p", { class: "stock-warn", role: "alert" }, fillText("stock.must_sell", { limit: i.must.limit, certs: i.must.certs })) : null,

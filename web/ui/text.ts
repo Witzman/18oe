@@ -611,6 +611,8 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "stock.cash": e("Deine Kasse", "Your cash", "—"),
   "stock.certs": e("Zertifikate", "Certificates", "§2.2.7"),
   "stock.certs_of": e("{n} von {limit}", "{n} of {limit}", "§2.2.7"),
+  "stock.order_now": e("Reihenfolge dieser Aktienrunde", "Order of this stock round", "§10"),
+  "stock.order_next": e("Reihenfolge der nächsten Aktienrunde", "Order of the next stock round", "§10"),
   "stock.status_other": e("{names} ist am Zug.", "{names} to act", "§10"),
   "stock.status_mine": e("Du bist am Zug: wähle eine Gesellschaft und eine Aktion.", "Your turn: choose a corporation and an action", "§10"),
   "stock.col_corp": e("Gesellschaft", "Corporation", "—"),

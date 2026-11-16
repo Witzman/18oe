@@ -3,6 +3,7 @@
 .stock-sheet { color: var(--ui-bar-ink); padding: var(--shape-gap); display: flex; flex-direction: column; gap: var(--shape-gap); min-width: 0; }
 .stock-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--shape-gap); }
 .stock-head h2 { margin: 0; margin-right: auto; font-size: var(--type-xl); border: 0; }
+.stock-order { margin: 0; flex-basis: 100%; order: 9; }
 .stock-cash { font-family: var(--font-head); font-size: var(--type-lg); }
 .stock-status { margin: 0; margin-right: auto; font-size: var(--type-lg); }
 .stock-sheet .muted { color: color-mix(in srgb, var(--ui-bar-ink) 65%, transparent); }
