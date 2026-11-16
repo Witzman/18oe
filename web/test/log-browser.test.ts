@@ -80,9 +80,14 @@ const CHECKS = String.raw`(async () => {
   const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s);
-  const toggle = [...document.querySelectorAll(".frame-toggle")].find((b) => /Protokoll/.test(b.textContent)) || fail("no log toggle");
-  toggle.click();
+  if ([...document.querySelectorAll(".frame-panel .frame-toggle")].some((b) => /Protokoll/.test(b.textContent))) fail("log toggle still in the panel");
+  const link = q(".frame-tabs .frame-log-link") || fail("no log link next to the tabs");
+  link.click();
   await sleep(800);
+  const dlg = q(".kit-dialog") || fail("log is not a dialog");
+  const dr = dlg.getBoundingClientRect(), hr = q(".frame-head").getBoundingClientRect();
+  if (dr.top < hr.bottom - 1) fail("log dialog covers the round bar");
+  if (dr.width < 600 || dr.height < innerHeight * 0.5) fail("log dialog too small: " + dr.width + "x" + dr.height);
   const list = q(".frame-log-scroll") || fail("no log list");
   const lis = () => list.querySelectorAll("li");
   if (lis().length !== 1200) fail("not the whole game: " + lis().length);

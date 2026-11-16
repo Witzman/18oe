@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { COLLAPSED_KEY, readCollapsed, writeCollapsed } from "../ui/frame/panel.ts";
+import { COLLAPSED_KEY, panelIdle, readCollapsed, writeCollapsed } from "../ui/frame/panel.ts";
 
 function memory() {
   const m = new Map<string, string>();
@@ -23,4 +23,10 @@ test("a storage that throws or is missing never breaks the panel", () => {
   assert.doesNotThrow(() => writeCollapsed(true, bad));
   assert.equal(readCollapsed(null), false);
   assert.doesNotThrow(() => writeCollapsed(true, null));
+});
+
+test("panel idle (#370): only when nothing at all would show; any single thing keeps the panel", () => {
+  const none = { order: false, selected: false, generic: false, context: false, message: false, stall: false };
+  assert.equal(panelIdle(none), true);
+  for (const k of Object.keys(none) as (keyof typeof none)[]) assert.equal(panelIdle({ ...none, [k]: true }), false, k);
 });

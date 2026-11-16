@@ -257,3 +257,14 @@ test("sheet (#368): the dialog sits in the tree only while a lot is chosen; pass
   assert.equal(find(withSel, (n) => n.attrs.role === "dialog").length, 1);
   assert.equal(find(withSel, (n) => n.attrs.class === "auction-stage").length, 1);
 });
+
+test("lot dialog (#368/#370): the lot is named in the title, not again in the form", () => {
+  const d = lotDialog(start, { id: "BBBT", amount: "40" }, noop)!;
+  const name = card(start, "BBBT").name;
+  assert.equal(textOf(find(d, (n) => n.tag === "h3")[0]!), name);
+  assert.ok(!textOf(find(d, (n) => String(n.attrs.class ?? "").includes("auction-bidform"))[0]!).includes(name));
+  const fixed = lotDialog(start, { id: "PeC", amount: "20" }, noop)!;
+  assert.ok(!textOf(find(fixed, (n) => String(n.attrs.class ?? "").includes("auction-bidform"))[0]!).includes(card(start, "PeC").name));
+  // the standalone form (named by default) keeps its name
+  assert.ok(textOf(bidForm(start, { id: "BBBT", amount: "40" }, noop)!).includes(name));
+});

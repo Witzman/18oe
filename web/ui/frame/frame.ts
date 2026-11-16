@@ -11,7 +11,7 @@ import type { createSession } from "../../session.ts";
 import type { Game } from "../../types.ts";
 import { connectionBand, messageArea } from "../connection.ts";
 import { h } from "../dom.ts";
-import { Auftrag, Geld, mitTooltip, Siegel, toDom, v, Wimpel, type VNode } from "../kit/index.ts";
+import { Auftrag, Dialog, Geld, mitTooltip, Siegel, toDom, v, Wimpel, type VNode } from "../kit/index.ts";
 import { THEME_CHANGED } from "../theme-switch.ts";
 import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
@@ -20,7 +20,7 @@ import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Acti
 import { OrStripView, orBand } from "./or-band.ts";
 import { opSheet, OpSheetView } from "../panels/op-sheet.ts";
 import { corpColor, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
-import { readCollapsed, writeCollapsed } from "./panel.ts";
+import { panelIdle, readCollapsed, writeCollapsed } from "./panel.ts";
 import { createViews } from "./views.ts";
 import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
 import { versionButton } from "../version.ts";
@@ -45,6 +45,8 @@ export interface GameFrame {
   // A special panel sets the order sentence, main button and side buttons of the action bar (#213);
   // returns the release function to call on unmount.
   setOrder: (spec: OrderSpec) => () => void;
+  // A special panel asks the action panel to stay away while it has nothing to show (#370, the auction); returns the release.
+  hidePanel: () => () => void;
   // Sends an action with the current seq (what the main button of the generic bar does).
   send: (action: Record<string, unknown>) => void;
   hooks: { onFocusCorporation?: (id: string) => void; map?: import("./mapview.ts").FrameMap; onRenderError?: (e: unknown) => void };
@@ -83,6 +85,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   let fullLogSeq = -1;
   let fullLogLoading = false;
   const logList = h("div", { class: "frame-log-scroll", tabindex: "0" });
+  const logHost = h("div", { class: "frame-log-host" });
   let logScroll = { top: 0, atBottom: true };
   logList.addEventListener("scroll", () => { logScroll = { top: logList.scrollTop, atBottom: isAtBottom(logList.scrollTop, logList.scrollHeight, logList.clientHeight) }; });
   function syncFullLog(g: Game) {
@@ -95,6 +98,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       .finally(() => { fullLogLoading = false; if (logOpen && game) { if (fullLogSeq !== game.seq && fullLogSeq === seq) fullLogSeq = -1; drawBar(); } });
   }
   let endOpen = true;
+  let panelHides = 0;
   const frame: GameFrame = {} as GameFrame;
   const listeners = new Set<(g: Game) => void>();
   const disposers: (() => void)[] = [];
@@ -155,7 +159,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   // failed load shows in the band above (reason and "Jetzt"), this line stays until a state arrives.
   const loadingEl = h("p", { class: "muted frame-loading", role: "status" }, txt("frame.loading").de);
   contextEl.append(loadingEl);
-  const body = h("div", { class: "frame-body" }, mainEl, panelEl);
+  const body = h("div", { class: "frame-body" }, mainEl, panelEl, logHost);
+  logHost.hidden = true;
   const headEl = h("header", { class: "frame-head" }, roundEl, playersEl);
   const root = h("div", { class: "frame" }, headEl, band.el, body, versionButton());
 
@@ -235,11 +240,12 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   // ---- main area -------------------------------------------------------------------------------
   function drawMain() {
     const list = views.list;
+    // The log link sits right after the tabs and is always there, also with a single view (#370).
     put(tabsEl, ...(list.length > 1 ? list.map((d) => v("button", {
       type: "button", role: "tab", "aria-selected": String(d.id === views.activeId),
       onclick: () => views.activate(d.id),
-    }, txt(d.labelKey).de)) : []));
-    tabsEl.hidden = list.length <= 1;
+    }, txt(d.labelKey).de)) : []),
+      v("button", { type: "button", class: "frame-log-link", title: txt("frame.log_hint").de, "aria-haspopup": "dialog", onclick: () => { logOpen = true; drawLog(); } }, txt("frame.log").de));
     views.active?.render({ container: viewEl });
   }
   views.onChange(() => { viewEl.replaceChildren(); drawMain(); });
@@ -253,8 +259,32 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       theme: theme(), corpColor: (id) => corpColor(theme(), g, id), open: endOpen,
       onToggle: () => { endOpen = true; drawEnd(); },
       onMap: () => { endOpen = false; drawEnd(); },
-      onLog: () => { logOpen = true; drawBar(); },
+      onLog: () => { logOpen = true; drawLog(); },
     }));
+  }
+
+  // ---- the log as a large dialog over the body (#370; the sheet of #292 moved out of the panel) ----------
+  function closeLog() { logOpen = false; drawLog(); }
+  function drawLog() {
+    const g = game;
+    logHost.hidden = !logOpen || !g;
+    if (!logOpen || !g) { logHost.replaceChildren(); return; }
+    // Until the full log has arrived, show the tail the state carries.
+    const lines: LogLine[] = fullLog.length > 0 ? fullLog : g.state.log;
+    const keep = { ...logScroll };
+    const wasOpen = logHost.childElementCount > 0;
+    logList.replaceChildren(...(lines.length === 0 ? [] : [toDom(v("ol", {}, ...lines.map((l) => v("li", {}, l.text))))]));
+    if (!wasOpen) {
+      logHost.replaceChildren(toDom(Dialog({
+        id: "frame-log", title: txt("frame.log").de, onClose: closeLog,
+        body: [v("div", { class: "frame-log" }, lines.length === 0 ? v("p", { class: "muted" }, txt("frame.log_empty").de) : null)],
+        actions: [v("button", { type: "button", class: "kit-side-btn", "data-action": "close-log", onclick: closeLog }, txt("frame.log_close").de)],
+      })));
+      logHost.querySelector(".frame-log")!.append(logList);
+      logHost.querySelector<HTMLElement>("[data-action='close-log']")!.focus();
+    }
+    logList.scrollTop = nextScrollTop(keep, logList.scrollHeight, logList.clientHeight);
+    syncFullLog(g);
   }
 
   // ---- action bar ------------------------------------------------------------------------------
@@ -303,30 +333,17 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     const open = genericOpen ?? showGeneric;
     put(barTools,
       showGeneric ? v("button", { type: "button", class: "frame-toggle", "aria-expanded": String(open), onclick: () => { genericOpen = !open; drawBar(); } }, fillText("frame.generic_open", { n: m.count })) : null,
-      v("button", { type: "button", class: "frame-toggle", title: txt("frame.log_hint").de, "aria-expanded": String(logOpen), onclick: () => { logOpen = !logOpen; drawBar(); } }, `${txt("frame.log").de} ${logOpen ? "▾" : "▴"}`));
+      null);
     const drawerNodes: VNode[] = [];
     if (showGeneric && open) {
       drawerNodes.push(v("section", { class: "frame-drawer-sheet", "aria-label": txt("frame.generic_title").de },
         v("h3", {}, txt("frame.generic_title").de),
         GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError })));
     }
-    let logSheet: HTMLElement | null = null;
-    if (logOpen) {
-      // Until the full log has arrived, show the tail the state carries.
-      const lines: LogLine[] = fullLog.length > 0 ? fullLog : g.state.log;
-      const sheet = toDom(v("section", { class: "frame-drawer-sheet frame-log", "aria-label": txt("frame.log").de },
-        v("h3", {}, txt("frame.log").de),
-        lines.length === 0 ? v("p", { class: "muted" }, txt("frame.log_empty").de) : null));
-      logList.replaceChildren(...(lines.length === 0 ? [] : [toDom(v("ol", {}, ...lines.map((l) => v("li", {}, l.text))))]));
-      (sheet as HTMLElement).append(logList);
-      logSheet = sheet as HTMLElement;
-      syncFullLog(g);
-    }
-    const keep = { ...logScroll };
     put(drawerEl, ...drawerNodes);
-    if (logSheet) drawerEl.append(logSheet);
-    drawerEl.hidden = drawerNodes.length === 0 && !logSheet;
-    if (logSheet) { logList.scrollTop = nextScrollTop(keep, logList.scrollHeight, logList.clientHeight); }
+    drawerEl.hidden = drawerNodes.length === 0;
+    drawLog();
+    drawLayout();
     applyBusy();
   }
   const genericDetail = (g: Game, a: Action) => {
@@ -336,6 +353,13 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   };
 
   function drawLayout() {
+    // Hidden only while someone asked for it and there is nothing to say (#370); messages and errors always show.
+    const idle = panelIdle({
+      order: orderSlot.spec !== null, selected: selected !== null, generic: barTools.childElementCount > 0,
+      context: contextEl.querySelector(".op-sheet") !== null || contextSlot.childElementCount > 0 || loadingEl.isConnected,
+      message: (message.el.textContent ?? "") !== "", stall: !stallEl.hidden,
+    });
+    panelEl.hidden = panelHides > 0 && idle;
     panelEl.dataset.collapsed = collapsed ? "true" : "false";
     panelToggle.setAttribute("aria-expanded", String(!collapsed));
     const label = txt(collapsed ? "frame.panel_expand" : "frame.panel_collapse").de;
@@ -351,7 +375,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     const t = e.target as HTMLElement | null;
     if (t && t !== document.body && t.closest("input, textarea, select, button, a, summary, [contenteditable], dialog")) return;
     if (document.querySelector("dialog[open]")) return;
-    const main = panelEl.querySelector<HTMLButtonElement>(".kit-main-btn");
+    const main = root.querySelector<HTMLButtonElement>(".kit-dialog .kit-main-btn") ?? panelEl.querySelector<HTMLButtonElement>(".kit-main-btn");
     if (!main || main.disabled) return;
     e.preventDefault();
     main.click();
@@ -366,7 +390,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   document.addEventListener(THEME_CHANGED, () => { if (root.isConnected) drawAll(); });
 
   Object.assign(frame, {
-    root, band, message, claims, views, setOrder: (spec: OrderSpec) => orderSlot.set(spec), send: (a: Action) => send(a), slots: { context: contextSlot, main: viewEl }, hooks: {},
+    root, band, message, claims, views, setOrder: (spec: OrderSpec) => orderSlot.set(spec), hidePanel: () => { panelHides++; drawLayout(); let done = false; return () => { if (done) return; done = true; panelHides--; drawLayout(); }; }, send: (a: Action) => send(a), slots: { context: contextSlot, main: viewEl }, hooks: {},
     onDispose: (fn: () => void) => { disposers.push(fn); },
     dispose: () => { disposers.splice(0).forEach((f) => f()); },
     subscribe: (fn: (g: Game) => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },

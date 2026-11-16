@@ -65,14 +65,14 @@ function rowNode(r: RowModel, g: Game, theme: Theme, h: SheetHandlers): VNode {
 }
 
 /** The form for the amount under the board: field, or fixed price when the range has one value only. */
-export function bidForm(g: Game, sel: Selection | null, h: SheetHandlers): VNode | null {
+export function bidForm(g: Game, sel: Selection | null, h: SheetHandlers, named = true): VNode | null {
   const range = sel ? g.state.prompt.ranges.find((r) => r.type === "bid" && r.company === sel.id) : undefined;
   const card = sel ? g.state.auction?.cards.find((c) => c.id === sel.id) : undefined;
   if (!sel || !range || !card) return g.state.prompt.viewer_to_act ? v("p", { class: "auction-bidform auction-idle muted" }, txt("auction.form_idle").de) : null;
-  if (range.min === range.max) return v("p", { class: "auction-bidform auction-fixed" }, v("strong", {}, card.name), " ", fillText("auction.fixed", { amount: formatGeld(range.min) }));
+  if (range.min === range.max) return v("p", { class: "auction-bidform auction-fixed" }, named ? v("strong", {}, card.name) : null, named ? " " : null, fillText("auction.fixed", { amount: formatGeld(range.min) }));
   const bad = rangeValue(range, sel.amount) === null;
   return v("form", { class: "auction-bidform", onsubmit: (e) => e.preventDefault() },
-    v("strong", {}, card.name),
+    named ? v("strong", {}, card.name) : null,
     v("label", {}, txt("auction.amount").de, v("input", {
       type: "number", name: "amount", min: String(range.min), max: String(range.max), step: String(range.step), value: sel.amount,
       inputmode: "numeric", "aria-invalid": bad ? "true" : "false", "aria-describedby": "auction-amount-hint",
@@ -115,7 +115,7 @@ export function lotDialog(g: Game, sel: Selection | null, h: SheetHandlers): VNo
   return Dialog({
     id: "auction-lot", title: card.name, onClose: h.onCancel,
     body: [
-      bidForm(g, sel, h),
+      bidForm(g, sel, h, false), // the dialog title already names the lot
       Auftrag({
         sentence: o.sentence, changes: o.changes.map((c) => ({ label: c.label, before: Geld(c.before), after: Geld(c.after) })),
         state: o.state, reason: o.reason, confirmLabel: o.confirmLabel, showCancel: true,
