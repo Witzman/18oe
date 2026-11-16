@@ -3,6 +3,8 @@
 require_relative "../engine/engine_helper"
 require "oe/fixture_catalog"
 require "oe/fixture_builder"
+require "digest"
+require "fileutils"
 require "stringio"
 require "tmpdir"
 
@@ -16,7 +18,21 @@ RSpec.describe Oe::FixtureCatalog do
 
   it "is well formed without a replay: games, unique names, finders, where names, after references, gaps" do
     expect(described_class.static_errors).to be_empty
-    catalog["games"].each_value { |g| expect(File).to exist(File.join(described_class::DIR, g["file"])) }
+  end
+
+  # #365 B5: logs are logs/<game>.jsonl, one action per line; the manifest says what they were built with.
+  it "keeps a log and a matching manifest entry (actions, sha256) for every game, one action per line" do
+    manifest = Oe::FixtureBuilder.manifest
+    expect(manifest["logs"].keys.sort).to eq(catalog["games"].keys.sort)
+    catalog["games"].each_key do |name|
+      path = described_class.log_path(name)
+      lines = File.readlines(path)
+
+      expect(lines.size).to eq(manifest["logs"][name]["actions"]), name
+      expect(lines.map { |l| JSON.parse(l)["type"] }).to all(be_a(String)), name
+      expect(Digest::SHA256.file(path).hexdigest).to eq(manifest["logs"][name]["sha256"]), "#{name}: log edited without a refresh"
+    end
+    expect(Dir.children(described_class::DIR).grep(/\.json\z/)).to eq(["catalog.json"])
   end
 
   it "reads the finders of the catalog without resolving them" do
@@ -32,7 +48,7 @@ RSpec.describe Oe::FixtureCatalog do
 
   describe ".static_errors" do
     let(:good) do
-      { "games" => { "g" => { "file" => "g.json", "players" => 4, "seed" => 1, "player" => "random", "max_actions" => 10 } },
+      { "games" => { "g" => { "players" => 4, "seed" => 1, "player" => "random", "max_actions" => 10 } },
         "entries" => [{ "name" => "a", "surface" => "x", "slice" => "S1", "game" => "g", "at" => 0 },
                       { "name" => "b", "surface" => "x", "slice" => "S2", "game" => "g",
                         "first" => { "round" => "Auction" }, "where" => "bids_open", "after" => "a" }],
@@ -55,9 +71,10 @@ RSpec.describe Oe::FixtureCatalog do
         with_entry({ "where" => "nope" }) => /unknown where/,
         with_entry({ "after" => "b" }) => /not an earlier entry/,
         with_entry({ "position" => 3 }) => /has a position/,
+        with_entry({ "expect" => {} }) => /has a position/,
         with_entry({ "at" => 5 }, index: 0) => /at must be 0/,
         good.merge("gaps" => [{ "surface" => "y" }]) => /no reason/,
-        good.merge("games" => { "g" => { "file" => "g.json" } }) => /no players, seed/,
+        good.merge("games" => { "g" => { "player" => "random" } }) => /no players, seed/,
       }.each do |catalog, message|
         expect(described_class.static_errors(catalog).join("\n")).to match(message), message.inspect
       end
@@ -80,13 +97,13 @@ RSpec.describe Oe::FixtureCatalog do
     around do |example|
       Dir.mktmpdir do |dir|
         @dir = dir
-        File.write(File.join(dir, "log.json"), JSON.generate("players" => 4, "seed" => 1, "actions_log" => []))
+        described_class.write_log("g", [], dir)
         example.run
       end
     end
 
     def write_catalog(entries)
-      games = { "g" => { "file" => "log.json", "players" => 4, "seed" => 1, "actions" => 0 } }
+      games = { "g" => { "players" => 4, "seed" => 1, "player" => "random", "max_actions" => 0 } }
       File.write(File.join(@dir, "catalog.json"), JSON.generate("games" => games, "entries" => entries, "gaps" => []))
     end
 
@@ -103,12 +120,11 @@ RSpec.describe Oe::FixtureCatalog do
       expect(auction.finder).to eq("first" => { "round" => "Auction" })
     end
 
-    it "still reads the stored format (position and expect)" do
+    it "no longer reads a stored position: the finder is all an entry has" do
       write_catalog([base("old", "position" => 0, "expect" => { "round" => "Auction" })])
-      old = described_class.entry("old", @dir)
 
-      expect([old.position, old.finder, old.state]).to eq([0, nil, nil])
-      expect(described_class.expectation_errors(old, described_class.game_at(old, @dir))).to be_empty
+      expect(described_class.static_errors(described_class.catalog(@dir)).join).to match(/old: needs exactly one/)
+      expect(described_class.entry("old", @dir).finder).to be_nil
     end
 
     it "says which finder matched nothing" do
@@ -128,8 +144,7 @@ RSpec.describe Oe::FixtureCatalog do
     end
 
     it "honours where and after (first bid on the auction, first state behind an earlier entry)" do
-      log = JSON.parse(File.read(File.join(described_class::DIR, "strategy-4p-1.json")))
-      File.write(File.join(@dir, "log.json"), JSON.generate(log.merge("actions_log" => log["actions_log"].first(2))))
+      described_class.write_log("g", described_class.stored_log("strategy-4p-1")["actions_log"].first(2), @dir)
       write_catalog([base("start", "at" => 0),
                      base("bid", "first" => { "round" => "Auction" }, "where" => "bids_open"),
                      base("later", "first" => { "round" => "Auction" }, "after" => "bid")])
@@ -149,7 +164,7 @@ RSpec.describe Oe::FixtureCatalog do
 
   # #365 B4: stale logs, live mode, rebuild and diff, on a tiny game of a few actions (no whole game).
   describe "stale logs, live mode, build and diff" do
-    let(:game_spec) { { "file" => "log.json", "players" => 4, "seed" => 1, "player" => "random", "max_actions" => 3 } }
+    let(:game_spec) { { "players" => 4, "seed" => 1, "player" => "random", "max_actions" => 3 } }
     let(:definition) do
       { "games" => { "g" => game_spec },
         "entries" => [{ "name" => "start", "surface" => "x", "slice" => "S1", "game" => "g", "at" => 0 },
@@ -165,12 +180,14 @@ RSpec.describe Oe::FixtureCatalog do
     end
 
     def built(dir = @dir)
+      FileUtils.mkdir_p(dir)
+      File.write(File.join(dir, "catalog.json"), JSON.generate(definition))
       Oe::FixtureBuilder.build(dir, definition, out: StringIO.new)
-      JSON.parse(File.read(File.join(dir, "log.json")))
+      described_class.stored_log("g", dir)
     end
 
     def store(log)
-      File.write(File.join(@dir, "log.json"), JSON.generate(log))
+      described_class.write_log("g", log["actions_log"], @dir)
     end
 
     it "builds one game of the catalog, deterministically, and keeps the others as they are" do
@@ -179,9 +196,9 @@ RSpec.describe Oe::FixtureCatalog do
 
       expect(second).to eq(first)
       expect(first["actions_log"].size).to be_between(1, 3)
-      other = definition.merge("games" => definition["games"].merge("h" => game_spec.merge("file" => "h.json")))
+      other = definition.merge("games" => definition["games"].merge("h" => game_spec))
       Oe::FixtureBuilder.build(File.join(@dir, "one"), other, only: ["g"], out: StringIO.new)
-      expect(File).not_to exist(File.join(@dir, "one", "h.json"))
+      expect(File).not_to exist(described_class.log_path("h", File.join(@dir, "one")))
       expect { Oe::FixtureBuilder.build(@dir, other, only: ["x"], out: StringIO.new) }.to raise_error(/unknown game x/)
     end
 
@@ -189,9 +206,9 @@ RSpec.describe Oe::FixtureCatalog do
       log = built.merge("actions_log" => described_class.play(game_spec).log)
       log["actions_log"][1] = log["actions_log"][1].merge("type" => "bid", "company" => "NOPE", "price" => 1)
       store(log)
-      File.write(File.join(@dir, "catalog.json"), JSON.generate(definition.merge("entries" => [{ "name" => "x", "surface" => "x", "slice" => "S1", "game" => "g", "position" => 2, "expect" => {} }])))
+      at_two = described_class::Entry.new(name: "x", game: "g", resolver: -> { { position: 2 } })
 
-      expect { described_class.game_at(described_class.entry("x", @dir), @dir) }
+      expect { described_class.game_at(at_two, @dir) }
         .to raise_error(described_class::StaleLog, /log g stale at action 2 \(bid\).*needs a refresh/)
     end
 
@@ -206,7 +223,8 @@ RSpec.describe Oe::FixtureCatalog do
 
     it "plays a fresh game instead of the stored log in live mode" do
       File.write(File.join(@dir, "catalog.json"), JSON.generate(definition))
-      File.write(File.join(@dir, "log.json"), "not even json")
+      described_class.write_log("g", [], @dir)
+      File.write(described_class.log_path("g", @dir), "not even json")
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:[]).with("OE_CATALOG").and_return("live")
 
@@ -228,7 +246,7 @@ RSpec.describe Oe::FixtureCatalog do
       changed = Oe::FixtureBuilder.diff("g", @dir, definition)
       expect(changed[:first_difference]).to eq(1)
       expect(Oe::FixtureBuilder.report(changed)).to include("first difference at action 2")
-      expect(JSON.parse(File.read(File.join(@dir, "log.json")))).to eq(log)
+      expect(described_class.stored_log("g", @dir)).to eq(log)
     end
 
     it "finds the first differing action of two logs, ignoring ids and times" do
@@ -244,8 +262,15 @@ RSpec.describe Oe::FixtureCatalog do
   it "resolves every entry inside its log and says where it is", :game_flow do
     entries.each do |e|
       expect(e.expect.keys).to include("round"), "#{e.name} has no expectation"
-      expect(e.position).to be_between(0, catalog["games"][e.game]["actions"]), e.name
+      expect(e.position).to be_between(0, Oe::FixtureBuilder.manifest["logs"][e.game]["actions"]), e.name
     end
+  end
+
+  it "resolves every entry to the position the manifest recorded at the last refresh", :game_flow do
+    skip "live mode plays a fresh game, the manifest describes the stored logs" if described_class.live?
+
+    recorded = Oe::FixtureBuilder.manifest["logs"].values.map { |l| l["positions"] }.reduce({}, :merge)
+    expect(entries.to_h { |e| [e.name, e.position] }).to eq(recorded)
   end
 
   it "has an entry for every S1 round type of the engine's game flow", :game_flow do

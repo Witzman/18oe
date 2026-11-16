@@ -100,6 +100,7 @@ changed() {
     base="$(basename "$f")"; base="${base%.*}"
     case "$f" in
       spec/*_spec.rb) [ -f "$f" ] && specs+=("$f") ;;
+      spec/fixtures/games/*) specs+=(spec/oe/fixture_catalog_spec.rb) ;;
       lib/engine/game/g_18_oe/step/*.rb|lib/engine/game/g_18_oe/round/*.rb)
         cc="$(camel "$base")"
         while IFS= read -r s; do specs+=("$s"); done < <( { find spec/engine -name "*${base}*_spec.rb"; grep -rlE "(Step|Round)::${cc}\b" spec/engine --include='*_spec.rb' || true; } | sort -u) ;;
