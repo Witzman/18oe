@@ -9,7 +9,7 @@ import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel, rangeAction } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
 import { AUCTION_STEP, modeFor, openingModel, orderModel, passAction, sheetModel } from "../ui/panels/auction-model.ts";
-import { bidForm, openingNode, sheetNode } from "../ui/panels/auction-sheet.ts";
+import { bidForm, lotDialog, openingNode, sheetNode } from "../ui/panels/auction-sheet.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
 const start = load("auction"), bids = load("auction-bids"), minorTop = load("auction-minor-top"), open = load("auction-open");
@@ -218,4 +218,42 @@ test("api.catalog: one request, cached; a failure is retried", async () => {
   const flaky = createApi(async () => { n++; return n === 1 ? new Response("{}", { status: 500 }) : new Response(JSON.stringify(cat), { status: 200 }); });
   await assert.rejects(flaky.catalog());
   assert.equal((await flaky.catalog()).schema, 1);
+});
+
+test("lot dialog (#368): no selection, no dialog; a chosen lot opens one with form, sentence, confirm, cancel and pass", () => {
+  assert.equal(lotDialog(start, null, noop), null);
+  const idle = { ...start, state: { ...start.state, prompt: { ...start.state.prompt, viewer_to_act: false } } } as Game;
+  assert.equal(lotDialog(idle, { id: "BBBT", amount: "40" }, noop), null); // not my turn: nothing to confirm
+  const calls: string[] = [];
+  const h = { ...noop, onConfirm: () => { calls.push("confirm"); }, onCancel: () => { calls.push("cancel"); }, onPass: () => { calls.push("pass"); } };
+  const d = lotDialog(start, { id: "BBBT", amount: "40" }, h)!;
+  assert.equal(find(d, (n) => n.attrs.role === "dialog").length, 1);
+  assert.equal(find(d, (n) => n.tag === "input").length, 1);
+  assert.match(textOf(d), /Bieten/);
+  find(d, (n) => n.attrs.class === "kit-main-btn")[0]!.on.click!(new Event("click"));
+  const btns = find(d, (n) => n.tag === "button");
+  btns.find((b) => textOf(b) === "Abbrechen")!.on.click!(new Event("click"));
+  btns.find((b) => textOf(b) === "Passen")!.on.click!(new Event("click"));
+  assert.deepEqual(calls, ["confirm", "cancel", "pass"]);
+  // backdrop click and Escape close it, same as Abbrechen
+  find(d, (n) => n.attrs.class === "kit-backdrop")[0]!.on.click!({ target: 1, currentTarget: 1 } as unknown as Event);
+  assert.equal(calls.at(-1), "cancel");
+});
+
+test("lot dialog: a bad amount locks the main button; a fixed price shows no field", () => {
+  const bad = lotDialog(start, { id: "BBBT", amount: "41" }, noop)!;
+  assert.equal(find(bad, (n) => n.attrs.class === "kit-main-btn")[0]!.attrs.disabled, "");
+  const fixed = lotDialog(start, { id: "PeC", amount: "20" }, noop)!;
+  assert.equal(find(fixed, (n) => n.tag === "input").length, 0);
+  assert.equal(find(fixed, (n) => n.attrs.class === "kit-main-btn")[0]!.attrs.disabled, undefined);
+});
+
+test("sheet (#368): the dialog sits in the tree only while a lot is chosen; pass is a button in the head, not in the dialog's way", () => {
+  const without = sheetNode(sheetModel(start, null)!, start, null, theme, noop);
+  assert.equal(find(without, (n) => n.attrs.role === "dialog").length, 0);
+  assert.equal(find(without, (n) => n.attrs["data-action"] === "pass").length, 1);
+  assert.match(textOf(without), /Wähle ein Los/);
+  const withSel = sheetNode(sheetModel(start, "BBBT")!, start, { id: "BBBT", amount: "40" }, theme, noop);
+  assert.equal(find(withSel, (n) => n.attrs.role === "dialog").length, 1);
+  assert.equal(find(withSel, (n) => n.attrs.class === "auction-stage").length, 1);
 });

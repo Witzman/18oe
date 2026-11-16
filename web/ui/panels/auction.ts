@@ -7,7 +7,6 @@ import type { Api } from "../../api.ts";
 import type { Catalog, Game } from "../../types.ts";
 import type { GameFrame } from "../frame/frame.ts";
 import { Geld, toDom } from "../kit/index.ts";
-import { txt } from "../text.ts";
 import { AUCTION_STEP, openingModel, orderModel, passAction, sheetModel, type Selection } from "./auction-model.ts";
 import { openingNode, sheetNode, type SheetHandlers } from "./auction-sheet.ts";
 
@@ -22,7 +21,8 @@ export function mountAuction(frame: GameFrame, api?: Pick<Api, "catalog">): () =
   let seq = -1;
   let sel: Selection | null = null;
   let host: HTMLElement | null = null;
-  let releaseOrder: (() => void) | null = null;
+  // After Abbrechen the running lot is not preselected again for the same state.
+  let dismissedSeq = -1;
   let releaseAuctionView: (() => void) | null = null;
   const releaseClaims = [frame.claims.claim(AUCTION_STEP, "bid"), frame.claims.claim(AUCTION_STEP, "pass")];
 
@@ -32,22 +32,40 @@ export function mountAuction(frame: GameFrame, api?: Pick<Api, "catalog">): () =
       if (!range) return;
       sel = { id, amount: String(range.min) };
       draw();
-      syncOrder();
       host?.querySelector<HTMLInputElement>(".auction-bidform input")?.focus();
     },
     onAmount(value) {
       if (!sel) return;
       sel = { ...sel, amount: value };
-      syncOrder();
-      // Only the hint line follows the input; redrawing the sheet would take the focus from the field.
+      // Only the hint, the order sentence and the main button follow the input; redrawing would take the focus from the field.
       const hint = host?.querySelector<HTMLElement>("#auction-amount-hint");
       const input = host?.querySelector<HTMLInputElement>(".auction-bidform input");
       if (hint && input && game) {
-        const bad = orderModel(game, sel).action === null;
+        const o = orderModel(game, sel);
+        const bad = o.action === null;
         hint.dataset.bad = bad ? "true" : "false";
         hint.className = bad ? "msg-error" : "muted";
         input.setAttribute("aria-invalid", bad ? "true" : "false");
+        const main = host?.querySelector<HTMLButtonElement>(".kit-dialog .kit-main-btn");
+        const sentence = host?.querySelector<HTMLElement>(".kit-dialog .kit-order-sentence");
+        if (main) { main.disabled = bad; main.textContent = o.confirmLabel; }
+        if (sentence) sentence.textContent = o.sentence;
+        const after = host?.querySelector<HTMLElement>(".kit-dialog .kit-after");
+        if (after && o.changes[0]) after.replaceChildren(toDom(Geld(o.changes[0].after)));
       }
+    },
+    onConfirm() {
+      const a = game && sel ? orderModel(game, sel).action : null;
+      if (a) frame.send(a);
+    },
+    onCancel() {
+      sel = null;
+      dismissedSeq = seq;
+      draw();
+    },
+    onPass() {
+      const pass = game ? passAction(game) : null;
+      if (pass) frame.send(pass);
     },
   };
 
@@ -66,26 +84,6 @@ export function mountAuction(frame: GameFrame, api?: Pick<Api, "catalog">): () =
     if (host && frame.views.activeId === "auction") drawSheet(host);
   }
 
-  function syncOrder() {
-    const g = game;
-    const active = g !== null && g.state.prompt.step === AUCTION_STEP && g.state.auction !== null && g.state.prompt.viewer_to_act;
-    if (!g || !active) { releaseOrder?.(); releaseOrder = null; return; }
-    const o = orderModel(g, sel);
-    const pass = passAction(g);
-    const running = g.state.auction?.current != null;
-    releaseOrder = frame.setOrder({
-      sentence: o.sentence,
-      changes: o.changes.map((c) => ({ label: c.label, before: Geld(c.before), after: Geld(c.after) })),
-      state: o.state, reason: o.reason, confirmLabel: o.confirmLabel,
-      onConfirm: () => { if (o.action) frame.send(o.action); },
-      side: pass ? [{
-        label: txt("auction.pass").de,
-        reason: running ? txt("auction.pass_running_tip").de : txt("auction.pass_tip").de,
-        onClick: () => frame.send(pass),
-      }] : [],
-    });
-  }
-
   const stop = frame.subscribe((g) => {
     game = g;
     if (g.seq !== seq) { seq = g.seq; sel = null; }
@@ -93,7 +91,7 @@ export function mountAuction(frame: GameFrame, api?: Pick<Api, "catalog">): () =
     if (sel && !range) sel = null;
     // A running auction has exactly one lot to bid on: preselect it.
     const cur = g.state.auction?.current;
-    if (!sel && cur && g.state.prompt.viewer_to_act) {
+    if (!sel && cur && g.state.prompt.viewer_to_act && dismissedSeq !== g.seq) {
       const r = g.state.prompt.ranges.find((x) => x.type === "bid" && x.company === cur);
       if (r) sel = { id: cur, amount: String(r.min) };
     }
@@ -104,11 +102,10 @@ export function mountAuction(frame: GameFrame, api?: Pick<Api, "catalog">): () =
     } else if (!active && releaseAuctionView) {
       releaseAuctionView(); releaseAuctionView = null;
     }
-    syncOrder();
   });
   const releaseOpening = frame.views.register({ id: "opening", labelKey: "auction.view_opening", render: ({ container }) => drawOpening(container) });
 
   return () => {
-    stop(); releaseOpening(); releaseAuctionView?.(); releaseOrder?.(); releaseClaims.forEach((f) => f());
+    stop(); releaseOpening(); releaseAuctionView?.(); releaseClaims.forEach((f) => f());
   };
 }

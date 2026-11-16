@@ -540,7 +540,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "auction.board": e("Eröffnungspaket", "Opening packet", "§7"),
   "auction.row": e("Reihe {roman}", "Row {roman}", "§7"),
   "auction.rows": e("Reihe {from} bis {to}", "Rows {from} to {to}", "§7"),
-  "auction.form_idle": e("Wähle ein Los mit ◂ und bestätige unten.", "Choose a lot, then confirm below", "—"),
+  "auction.form_idle": e("Wähle ein Los mit ◂; Bieten oder Kaufen bestätigst du im Fenster.", "Choose a lot, then confirm in the window", "—"),
   "auction.row_top": e("oberste Reihe: zum Nennwert kaufen", "Top row: buy at face value", "§7"),
   "auction.row_below": e("Gebote vormerken", "Place bids", "§7"),
   "auction.row_sold": e("verkauft", "sold", "§7"),

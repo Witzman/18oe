@@ -2,16 +2,21 @@
 // kit: no DOM access, so tests inspect the structure under node; the panel turns it into elements.
 import type { Theme } from "../../themes/schema.ts";
 import type { Game } from "../../types.ts";
-import { Geld, mitTooltip, Wimpel, v, type VNode } from "../kit/index.ts";
+import { Auftrag, Dialog, Geld, mitTooltip, Wimpel, v, type VNode } from "../kit/index.ts";
 import { formatGeld } from "../kit/money.ts";
 import { playerName } from "../frame/model.ts";
 import { fillText, txt } from "../text.ts";
-import { amountHint, type CardModel, type OpeningRow, type RowModel, type Selection, type SheetModel } from "./auction-model.ts";
+import { amountHint, orderModel, passAction, type CardModel, type OpeningRow, type RowModel, type Selection, type SheetModel } from "./auction-model.ts";
 import { rangeValue } from "../frame/generic.ts";
 
 export interface SheetHandlers {
   onSelect: (id: string) => void;
   onAmount: (value: string) => void;
+  /** The dialog's main button: sends the chosen order (#368). */
+  onConfirm?: () => void;
+  /** Abbrechen, Escape or a click on the backdrop: drops the choice. */
+  onCancel?: () => void;
+  onPass?: () => void;
 }
 
 const seatOf = (g: Game, id: string): number => g.state.players.findIndex((p) => p.id === id) + 1;
@@ -92,6 +97,35 @@ function rowNodes(rows: RowModel[], g: Game, theme: Theme, h: SheetHandlers): VN
   return out;
 }
 
+/** The pass button, with the same tooltip text the action bar used to carry (#368). */
+function passButton(g: Game, h: SheetHandlers): VNode | null {
+  const pass = passAction(g);
+  if (!pass || !g.state.prompt.viewer_to_act) return null;
+  const running = g.state.auction?.current != null;
+  return v("button", { type: "button", class: "kit-side-btn", "data-action": "pass", title: running ? txt("auction.pass_running_tip").de : txt("auction.pass_tip").de, onclick: () => h.onPass?.() }, txt("auction.pass").de);
+}
+
+/** The centred dialog over the sheet once a lot is chosen (#368): amount, order sentence, confirm, cancel, pass.
+ *  Closing it (cancel, Escape, backdrop) only drops the choice; nothing is sent before the main button. */
+export function lotDialog(g: Game, sel: Selection | null, h: SheetHandlers): VNode | null {
+  const card = sel ? g.state.auction?.cards.find((c) => c.id === sel.id) : undefined;
+  if (!sel || !card || !g.state.prompt.viewer_to_act) return null;
+  const o = orderModel(g, sel);
+  const pass = passButton(g, h);
+  return Dialog({
+    id: "auction-lot", title: card.name, onClose: h.onCancel,
+    body: [
+      bidForm(g, sel, h),
+      Auftrag({
+        sentence: o.sentence, changes: o.changes.map((c) => ({ label: c.label, before: Geld(c.before), after: Geld(c.after) })),
+        state: o.state, reason: o.reason, confirmLabel: o.confirmLabel, showCancel: true,
+        onConfirm: () => h.onConfirm?.(), onCancel: () => h.onCancel?.(),
+      }),
+    ],
+    actions: pass ? [pass] : [],
+  });
+}
+
 export function sheetNode(m: SheetModel, g: Game, sel: Selection | null, theme: Theme, h: SheetHandlers): VNode {
   const status = [
     m.toAct.length > 0 ? fillText("auction.to_act", { names: m.toAct.join(", ") }) : null,
@@ -99,18 +133,21 @@ export function sheetNode(m: SheetModel, g: Game, sel: Selection | null, theme: 
     fillText("auction.open_left", { n: m.left }),
   ].filter((s): s is string => s !== null);
   const run = m.running;
-  return v("div", { class: "auction-sheet" },
+  const dialog = lotDialog(g, sel, h);
+  const sheet = v("div", { class: "auction-sheet" },
     v("header", { class: "auction-head" },
       v("h2", {}, txt("auction.board").de),
-      m.cash !== null ? v("span", { class: "auction-cash" }, `${txt("auction.cash").de} `, Geld(m.cash)) : null),
+      v("span", { class: "auction-head-side" }, passButton(g, h), m.cash !== null ? v("span", { class: "auction-cash" }, `${txt("auction.cash").de} `, Geld(m.cash)) : null)),
     v("p", { class: "auction-status muted", role: "status" }, status.join(" · ")),
     run ? v("section", { class: "auction-running", "aria-label": fillText("auction.running", { name: run.card.name }) },
       v("strong", {}, fillText("auction.running", { name: run.card.name })),
       run.high ? v("span", {}, fillText("auction.running_high", { amount: formatGeld(run.high.price), who: playerName(g, run.high.player) }), " ", pennant(g, run.high.player, theme)) : null,
       v("span", {}, fillText("auction.running_in", { names: run.inNames.join(", ") || "—" })),
       run.outNames.length > 0 ? v("span", { class: "muted" }, fillText("auction.running_out", { names: run.outNames.join(", ") })) : null) : null,
-    bidForm(g, sel, h),
+    dialog ? null : bidForm(g, null, h),
     v("div", { class: "auction-rows" }, ...rowNodes(m.rows, g, theme, h)));
+  // The stage keeps the dialog over the visible part of the main area while the sheet scrolls underneath.
+  return v("div", { class: "auction-stage" }, sheet, dialog);
 }
 
 export function openingNode(rows: OpeningRow[], theme: Theme): VNode {
