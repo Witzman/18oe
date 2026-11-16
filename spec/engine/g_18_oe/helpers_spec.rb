@@ -31,4 +31,12 @@ describe 'G18OE scenario building blocks (#365)' do
     expect(game.round).to be(round)
     expect(round).to be_operating
   end
+
+  it 'lay_tile! puts a supply tile on a hex and rejects an unknown name' do
+    hex = game.hexes.find { |h| h.tile.preprinted && h.tile.paths.empty? && h.tile.cities.empty? && h.tile.towns.empty? }
+    tile = lay_tile!(game, hex.id, '8')
+    expect(hex.tile).to be(tile)
+    expect(tile.hex).to be(hex)
+    expect { lay_tile!(game, hex, 'no-such-tile') }.to raise_error(ArgumentError)
+  end
 end
