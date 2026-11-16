@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # Balanced rspec sharding by measured run time (#279).
 #   shard.rb <shard> <total> <glob-exclude-regex-or-"">   prints the spec files of one shard
+#   SHARD_SKIP_TAG=game_flow shard.rb ...                  leaves out files whose top-level describes ALL carry that tag
+#                                                          (they run no example in that stage; their time must not skew the shards)
 #   shard.rb --report <rspec.json>                         prints per-file seconds as GitHub annotations
 # Times come from .github/rspec-timings.json ({ "spec/x_spec.rb": seconds }); files without an entry get the
 # median. Greedy longest-first assignment to the lightest shard. Every spec file lands in exactly one shard.
@@ -20,6 +22,12 @@ shard, total = ARGV[0].to_i, ARGV[1].to_i
 exclude = ARGV[2].to_s.empty? ? nil : Regexp.new(ARGV[2])
 files = Dir["spec/**/*_spec.rb"].sort
 files = files.reject { |f| f =~ exclude } if exclude
+if (tag = ENV["SHARD_SKIP_TAG"]) && !tag.empty?
+  files = files.reject do |f|
+    tops = File.readlines(f).grep(/\A(?:RSpec\.)?describe\b/) # top-level (unindented) describe lines
+    !tops.empty? && tops.all? { |l| l =~ /[\s,]:#{Regexp.escape(tag)}\b/ }
+  end
+end
 times = File.exist?(TIMINGS) ? JSON.parse(File.read(TIMINGS)) : {}
 known = files.map { |f| times[f] }.compact.sort
 median = known.empty? ? 1.0 : known[known.size / 2]

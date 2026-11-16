@@ -110,6 +110,25 @@ salted scrypt hashes. Set `SESSION_SECRET` and `OE_INVITE_CODE` in Dokploy
 them). Until someone has registered with the code, nobody can log in. No
 confirmation mail and no password reset yet.
 
+## CI stages (#365)
+
+Two stages, one definition of "fast": the RSpec tag `:game_flow` (spec/support/tags.rb).
+
+| Stage | Workflow | When | What |
+|---|---|---|---|
+| fast | `ci.yml` | every pull request | rspec `--tag ~game_flow` (engine specs, contracts; = `bin/test fast`), typecheck, web unit tests, browser tests only if `web/**` changed (`touch-browser` excluded). Target: under 3 min |
+| milestone | `full.yml` | nightly 02:17 UTC, tag `v0.*`, manually for any commit | the complete rspec suite (`:game_flow` included), long whole games uncapped, all browser tests incl. `touch-browser`, scripted game |
+
+`full.yml` does NOT run on every push to `main`. To check `main` after a merge (or a deploy SHA), start it for
+that commit: GitHub UI Actions > full > Run workflow (field `sha`), or
+
+    python3 -c "import sys; sys.path.insert(0,'lib'); import github; github.post('/repos/Witzman/18oe/actions/workflows/full.yml/dispatches', ref='main', inputs={'sha': '<SHA>'})"
+
+(in the workshop checkout). Read the result per job, not only the workflow status. Every example runs in at
+least one stage: fast = `~game_flow`, milestone = all; `view_spec`, `view_order_spec` and `bot_spec` run
+only in the `long games` jobs there (whole files, caps lifted), not additionally in the capped rspec shards.
+The browser job of `ci.yml` always runs (a `changes` job decides), so it can be a required check.
+
 ## Versions, tags and changelog (#271)
 
 The roadmap version (v0.1 to v0.9, see 18oe-workshop#20) lives in ONE file, `VERSION` in the repo
