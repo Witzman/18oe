@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'digest'
 require 'fileutils'
 require 'json'
 require_relative 'fixture_catalog'
@@ -9,20 +10,20 @@ module Oe
   # Builds the fixture logs (#117): plays the games named in catalog.json (the one definition, #365)
   # with Oe::Playthrough, checks that every entry's finder matches in the result (see
   # Oe::FixtureCatalog for the finder kinds), keeps each log up to the last position its entries need
-  # (one more action for an entry that finds the state `before` an action), and writes the logs and
-  # the games' `actions`. Entries, finders and gaps are hand data and are written back unchanged.
-  # Deterministic (players, seed, player kind), so a rebuild after an engine change shows exactly
-  # which entries moved. Only a catalog refresh runs this, never a feature change.
+  # (one more action for an entry that finds the state `before` an action), and writes the logs
+  # (logs/<game>.jsonl) and logs/manifest.json. catalog.json (entries, finders, gaps) is hand data and is
+  # never written. Deterministic (players, seed, player kind), so a rebuild after an engine change shows
+  # exactly which entries moved. Only a catalog refresh runs this, never a feature change.
   module FixtureBuilder
     module_function
 
-    # The catalog as a definition: games (players, seed, player, max_actions, file), entries, gaps.
+    # The catalog as a definition: games (players, seed, player, max_actions), entries, gaps.
     def definition(dir = FixtureCatalog::DIR)
       FixtureCatalog.catalog(dir)
     end
 
     # Plays and writes the logs of the games named in `only` (default: all; one game per call is the
-    # way to run it, a game takes minutes). Games not named keep their entry in catalog.json as it is.
+    # way to run it, a game takes minutes). Games not named keep their log and manifest entry as they are.
     def build(dir = FixtureCatalog::DIR, definition = definition(dir), only: nil, out: $stdout)
       errors = FixtureCatalog.static_errors(definition)
       raise "catalog is not well formed:\n#{errors.join("\n")}" unless errors.empty?
@@ -31,10 +32,9 @@ module Oe
       unknown = names - definition['games'].keys
       raise "unknown game #{unknown.join(', ')} (known: #{definition['games'].keys.join(', ')})" unless unknown.empty?
 
-      FileUtils.mkdir_p(dir)
-      games = definition['games'].to_h do |name, spec|
-        next [name, spec] unless names.include?(name)
-
+      logs = manifest(dir)['logs'] || {}
+      names.each do |name|
+        spec = definition['games'].fetch(name)
         result = FixtureCatalog.play(spec)
         out.puts "#{name}: #{result.status} after #{result.actions} actions"
         entries = definition['entries'].select { |e| e['game'] == name }
@@ -43,14 +43,36 @@ module Oe
         raise "finder never matched: #{missing.join(', ')} (#{name})" unless missing.empty?
 
         last = entries.map { |e| found[e['name']][:position] + (e.key?('before') ? 1 : 0) }.max || 0
-        body = { 'players' => spec['players'], 'seed' => spec['seed'], 'player' => spec['player'],
-                 'actions_log' => result.log.first(last) }
-        File.write(File.join(dir, spec['file']), JSON.generate(body))
-        [name, spec.merge('actions' => last)]
+        FixtureCatalog.write_log(name, result.log.first(last), dir)
+        logs[name] = log_entry(name, last, found, dir)
       end
-      File.write(File.join(dir, 'catalog.json'),
-                 JSON.pretty_generate('games' => games, 'entries' => definition['entries'], 'gaps' => definition['gaps'] || []))
-      out.puts "wrote #{names.join(', ')} to #{dir} (#{definition['entries'].size} entries in the catalog)"
+      write_manifest(dir, logs)
+      out.puts "wrote #{names.join(', ')} to #{dir}/#{FixtureCatalog::LOGS} (#{definition['entries'].size} entries in the catalog)"
+    end
+
+    # What the manifest says about one log: the engine commit it was built with, number of actions, SHA-256 of the file, resolved positions
+    # (information for the refresh diff; the loader resolves the finders itself).
+    def log_entry(name, actions, found, dir)
+      { 'engine_sha' => engine_sha, 'actions' => actions, 'sha256' => Digest::SHA256.file(FixtureCatalog.log_path(name, dir)).hexdigest,
+        'positions' => found.transform_values { |f| f[:position] } }
+    end
+
+    def manifest(dir = FixtureCatalog::DIR)
+      path = File.join(dir, FixtureCatalog::LOGS, 'manifest.json')
+      File.exist?(path) ? JSON.parse(File.read(path)) : {}
+    end
+
+    def write_manifest(dir, logs)
+      File.write(File.join(dir, FixtureCatalog::LOGS, 'manifest.json'),
+                 "#{JSON.pretty_generate('logs' => logs.sort.to_h)}\n")
+    end
+
+    # Commit of the product the logs were built with (nil outside a git checkout).
+    def engine_sha
+      sha = IO.popen(%w[git rev-parse HEAD], chdir: File.expand_path('../..', __dir__), err: File::NULL, &:read).to_s.strip
+      sha.empty? ? nil : sha
+    rescue SystemCallError
+      nil
     end
 
     # What a rebuild of one game would change, without writing anything: size of the stored and the fresh

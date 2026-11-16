@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require 'fileutils'
 require 'json'
 require 'engine'
 require_relative 'legal_actions'
@@ -8,22 +9,22 @@ require_relative 'view'
 module Oe
   # Catalog of playable game states, one or more per rule surface (#117).
   #
-  # A fixture is an *action log* (what bin/playthrough writes: players, seed, accepted
-  # actions), not a view snapshot. An entry names a position in such a log (number of
-  # actions applied), the rule surface (section of the rulebook), the slice (S1..S9) and
-  # what the engine must say at that position (`expect`: round class and active step), so
-  # a drifting engine or log is noticed. Several entries may share one log.
+  # A fixture is an *action log* (the accepted actions of a game of the catalog), not a view
+  # snapshot. An entry names the rule surface (section of the rulebook), the slice (S1..S9) and a
+  # finder (`at`, `first`, `before`, `where`, `after`) that is resolved against the log when the
+  # catalog is loaded (#365), so a drifting engine or log is noticed. Several entries share one log.
+  # `find(round:, step:)` picks a state by property.
   #
-  #   spec/fixtures/games/catalog.json   { "games": { name => {file, players, seed} },
-  #                                        "entries": [ {name, surface, slice, game, position, expect, note} ] }
-  #   spec/fixtures/games/<game>.json    { players, seed, player, actions_log: [...] }
-  #
-  # An entry holds either a stored `position` and `expect` (today's catalog.json) or a finder
-  # (`at`, `first`, `before`, as in Oe::FixtureBuilder), which is resolved against the log when the
-  # catalog is loaded (#365). `find(round:, step:)` picks a state by property.
+  #   spec/fixtures/games/catalog.json          { "games": { name => {players, seed, player, max_actions} },
+  #                                               "entries": [ {name, surface, slice, game, <finder>, note} ], "gaps": [...] }
+  #   spec/fixtures/games/logs/<game>.jsonl     one accepted action per line (JSON); players, seed and player
+  #                                             kind are those of the game in catalog.json
+  #   spec/fixtures/games/logs/manifest.json    what the logs were built with (engine SHA, actions and resolved
+  #                                             positions per log); information for the refresh diff, the loader
+  #                                             does not read it
   #
   # The logs are built (and rebuilt after an engine change that alters play) by
-  # bin/fixture-catalog; `bin/fixture-catalog verify` re-checks every entry.
+  # bin/fixture-catalog, in a catalog refresh only; `bin/fixture-catalog verify` re-checks every entry.
   #
   # Two modes (#365): `stored` (default) replays the log files; `live` (OE_CATALOG=live) plays a fresh
   # game per catalog game with Oe::Playthrough (players, seed, player kind, max_actions of the catalog)
@@ -34,13 +35,16 @@ module Oe
     # The stored log does not fit the engine (or strategy) any more: a catalog refresh is due.
     class StaleLog < RuntimeError; end
 
-    # `position`, `expect` and `state` of an entry with a finder are resolved on first use (a replay of
-    # the log), so reading names, finders and notes costs nothing.
-    Entry = Struct.new(:name, :surface, :slice, :game, :position, :expect, :note, :finder, :resolver, keyword_init: true) do
-      def position = self[:position] || resolved[:position]
-      def expect = self[:expect] || resolved[:expect] || {}
+    # `position`, `expect` and `state` of an entry are resolved on first use (a replay of the log),
+    # so reading names, finders and notes costs nothing.
+    Entry = Struct.new(:name, :surface, :slice, :game, :note, :finder, :resolver, :override, keyword_init: true) do
+      def position = resolved[:position]
+      def expect = override || resolved[:expect] || {}
+      def expect=(value)
+        self.override = value
+      end
       def state = resolved[:state]
-      def resolved = (@resolved ||= resolver ? resolver.call : {})
+      def resolved = (@resolved ||= resolver.call)
     end
 
     # Finder of an entry (see Oe::FixtureBuilder): exactly one of
@@ -64,6 +68,7 @@ module Oe
     }.freeze
 
     DIR = File.expand_path('../../spec/fixtures/games', __dir__)
+    LOGS = 'logs'
 
     module_function
 
@@ -75,16 +80,13 @@ module Oe
       JSON.parse(File.read(File.join(dir, 'catalog.json')))
     end
 
-    # Two formats are read (#365): an entry with `position` (and `expect`) is taken as stored; an
-    # entry with a finder and no position is resolved against the log when first asked for its
-    # position (once per process and log, see `resolutions`).
+    # Every entry is a finder, resolved against the log when first asked for its position (once per
+    # process and log, see `resolutions`).
     def entries(dir = DIR)
       catalog(dir)['entries'].map do |h|
         finder = h.slice(*FINDER_KEYS)
-        Entry.new(name: h['name'], surface: h['surface'], slice: h['slice'], game: h['game'],
-                  position: h['position'], expect: h['expect'], note: h['note'],
-                  finder: finder.empty? ? nil : finder,
-                  resolver: h.key?('position') ? nil : -> { resolution(h, dir) })
+        Entry.new(name: h['name'], surface: h['surface'], slice: h['slice'], game: h['game'], note: h['note'],
+                  finder: finder.empty? ? nil : finder, resolver: -> { resolution(h, dir) })
       end
     end
 
@@ -94,7 +96,7 @@ module Oe
       errors = []
       games = cat['games'] || {}
       games.each do |name, spec|
-        missing = %w[file players seed].reject { |k| spec.key?(k) }
+        missing = %w[players seed].reject { |k| spec.key?(k) }
         errors << "game #{name}: no #{missing.join(', ')}" unless missing.empty?
         errors << "game #{name}: player must be strategy or random" unless %w[strategy random].include?(spec['player'])
         errors << "game #{name}: max_actions missing" unless spec['max_actions'].is_a?(Integer)
@@ -131,7 +133,7 @@ module Oe
         errors << "#{name}: after #{entry['after'].inspect} is not an earlier entry of the same game" unless
           ref && earlier.include?(ref['name']) && ref['game'] == entry['game']
       end
-      errors << "#{name}: has a position (finder entries are resolved, not stored)" if entry.key?('position') && !(entry.keys & FINDER_KEYS).empty?
+      errors << "#{name}: has a position (entries are finders, positions are resolved, not stored)" if entry.key?('position') || entry.key?('expect')
       errors
     end
 
@@ -165,10 +167,10 @@ module Oe
 
     def resolutions(dir, game_name)
       cat = catalog(dir)
-      file = File.join(dir, cat['games'].fetch(game_name)['file'])
-      key = [File.expand_path(dir), game_name, File.mtime(File.join(dir, 'catalog.json')), live? ? :live : File.mtime(file)]
+      cat['games'].fetch(game_name)
+      key = [File.expand_path(dir), game_name, File.mtime(File.join(dir, 'catalog.json')), live? ? :live : File.mtime(log_path(game_name, dir))]
       (@resolutions ||= {})[key] ||= begin
-        finders = cat['entries'].select { |e| e['game'] == game_name && !e.key?('position') }
+        finders = cat['entries'].select { |e| e['game'] == game_name }
         scan(log_file(game_name, dir), finders, name: game_name)
       end
     end
@@ -225,8 +227,22 @@ module Oe
       live? ? live_log(game_name, dir) : stored_log(game_name, dir)
     end
 
+    # The stored log of a game: players, seed and player kind from the catalog, the actions from
+    # logs/<game>.jsonl (one JSON action per line).
     def stored_log(game_name, dir = DIR)
-      JSON.parse(File.read(File.join(dir, catalog(dir)['games'].fetch(game_name)['file'])))
+      spec = catalog(dir)['games'].fetch(game_name)
+      { 'players' => spec['players'], 'seed' => spec['seed'], 'player' => spec['player'],
+        'actions_log' => File.foreach(log_path(game_name, dir)).map { |line| JSON.parse(line) } }
+    end
+
+    def log_path(game_name, dir = DIR)
+      File.join(dir, LOGS, "#{game_name}.jsonl")
+    end
+
+    # One action per line, so `git diff` of a refresh shows the shared start and the first changed action.
+    def write_log(game_name, actions, dir = DIR)
+      FileUtils.mkdir_p(File.join(dir, LOGS))
+      File.write(log_path(game_name, dir), actions.map { |a| "#{JSON.generate(a)}\n" }.join)
     end
 
     # A fresh game of the catalog's definition. Raises when it does not play on (engine or enumerator
