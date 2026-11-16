@@ -8,7 +8,7 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { corpRows, marketModel, presidencies, mustSell, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
+import { corpRows, holdings, inTab, marketModel, mustSell, offersFor, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
 import { offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
@@ -16,10 +16,10 @@ const pool = load("stock-pool"), par = load("stock-par");
 const theme = themes[0]!;
 // The corporation the viewer can sell in the pool fixture (any: the recording is a seeded random game).
 const SELL = corpRows(pool).find((r) => r.sells.length > 0)!.id;
-const noop: SheetHandlers = { onFocus: () => {}, onPick: () => {}, onTab: () => {}, onMap: () => {} };
+const noop: SheetHandlers = { onFocus: () => {}, onSell: () => {}, onPick: () => {}, onTab: () => {} };
 const input = (g: Game, o: Partial<SheetInput> = {}): SheetInput => {
   const rows = corpRows(g);
-  return { g, theme, rows, market: marketModel(g, rows, o.focus ?? null, o.sel ?? null), focus: null, sel: null, tab: "list", must: mustSell(g), ...o };
+  return { g, theme, rows, market: marketModel(g, rows, o.focus ?? null, o.sel ?? null), focus: null, sel: null, tab: "stock", mode: "buy", must: mustSell(g), ...o };
 };
 
 test("rows: a row per offered or running corporation, in tier order, money of every offer from the view", () => {
@@ -119,24 +119,33 @@ test("must sell: no pass but selling offered shows the warning; with a pass ther
   assert.equal(find(sheetNode(input(pool), noop), (n) => n.attrs.class === "stock-warn").length, 0);
 });
 
-test("sheet: offers of the focused row are buttons with the label of the offer; picking calls back with corporation and key", () => {
+test("sheet: the offers of the focused row are buttons with the label of the offer, as many as the mode and tab allow; picking calls back with corporation and key", () => {
   const rows = corpRows(pool);
   const row = rows.find((r) => r.id === SELL)!;
   const picked: [string, string][] = [];
-  const tree = offersNode(input(pool, { focus: SELL }), { ...noop, onPick: (c, k) => picked.push([c, k]) })!;
-  const offers = find(tree, (n) => n.tag === "button" && n.attrs.class === "stock-offer");
-  assert.equal(offers.length, row.buys.length + row.sells.length + row.pars.length);
+  const sell = offersNode(input(pool, { focus: SELL, mode: "sell" }), { ...noop, onPick: (c, k) => picked.push([c, k]) })!;
+  const offers = find(sell, (n) => n.tag === "button" && n.attrs.class === "stock-offer");
+  assert.equal(offers.length, row.sells.length);
+  assert.ok(offers.length > 0);
   for (const b of offers) assert.ok(textOf(b).length > 3);
   offers[0]!.on.click!(new Event("click"));
   assert.deepEqual(picked, [[SELL, offers[0]!.attrs["data-key"]!]]);
   assert.match(offerLabel(row.sells[0]!, row), new RegExp(`^${row.sells[0]!.percent} % verkaufen, £${row.sells[0]!.price}$`));
+  // Buying: the treasury offers and par prices in "Aktienmarkt", the market's shares in "Open Market".
+  for (const r of rows) {
+    const stock = offersFor(r, "stock", "buy"), market = offersFor(r, "market", "buy");
+    assert.ok(stock.buys.every((b) => b.source !== "market") && market.buys.every((b) => b.source === "market"), r.id);
+    assert.equal(stock.buys.length + market.buys.length, r.buys.length, r.id);
+    assert.deepEqual([market.pars, stock.sells, market.sells], [[], [], []]);
+  }
 });
 
 test("sheet: every row opens by a real button; the rows of the whole list are all present; the grid has a cell per market field", () => {
   const rows = corpRows(pool);
   const tree = sheetNode(input(pool), noop);
   const heads = find(tree, (n) => n.tag === "button" && n.attrs.class === "stock-rowbtn");
-  assert.equal(heads.length, rows.length);
+  assert.equal(heads.length, rows.filter((r) => inTab(r, "stock")).length);
+  assert.ok(heads.length > 0);
   const cells = find(tree, (n) => n.attrs.class === "stock-cell");
   assert.equal(cells.length, pool.state.market.rows.flat().filter(Boolean).length);
   // Seals sit on the cells of their corporations.
@@ -144,20 +153,59 @@ test("sheet: every row opens by a real button; the rows of the whole list are al
   assert.ok(seals.length > 0);
 });
 
-test("cards: share bar slices add up to 100, president first and marked; presidencies list the corporations a player presides", () => {
+test("cards: share bar slices add up to 100, president first and marked", () => {
   const rows = corpRows(pool);
   for (const r of rows) {
     assert.equal(r.holders.reduce((n, h) => n + h.percent, 0), 100, r.id);
     if (r.presidentId) assert.ok(r.holders[0]!.president && r.holders[0]!.id === r.presidentId, r.id);
   }
   const tree = sheetNode(input(pool), noop);
-  assert.equal(find(tree, (n) => n.attrs.class === "stock-bar").length, rows.length);
-  const pres = presidencies(pool);
-  assert.equal(pres.length, pool.state.players.length);
-  const total = pres.reduce((n, p) => n + p.corps.length, 0);
-  assert.equal(total, pool.state.corporations.filter((c) => !c.closed && c.president).length);
-  assert.equal(find(tree, (n) => n.attrs.class === "stock-pres-item").length, pres.length);
-  assert.equal(find(offersNode(input(pool), noop) ?? { tag: "i", attrs: {}, on: {}, children: [] } as never, (n) => n.attrs.class === "stock-offer").length, 0);
+  assert.equal(find(tree, (n) => n.attrs.class === "stock-bar").length, rows.filter((r) => inTab(r, "stock")).length);
+});
+
+test("holdings: the viewer's shares are listed in the sheet, one button per corporation that opens the sale (#407); the presidency box is gone", () => {
+  const rows = corpRows(pool);
+  const mine = holdings(rows);
+  assert.ok(mine.length > 0);
+  assert.ok(mine.every((r) => r.mine > 0));
+  const opened: string[] = [];
+  const tree = sheetNode(input(pool), { ...noop, onSell: (c) => opened.push(c) });
+  assert.equal(find(tree, (n) => n.attrs.class === "stock-pres-item").length, 0);
+  const buttons = find(tree, (n) => n.tag === "button" && n.attrs.class === "stock-hold");
+  assert.deepEqual(buttons.map((b) => b.attrs["data-corp"]), mine.map((r) => r.id));
+  buttons[0]!.on.click!(new Event("click"));
+  assert.deepEqual(opened, [mine[0]!.id]);
+});
+
+test("tabs: Aktienmarkt lists what treasuries offer, Open Market what the market holds; the tabs replace the map button (#408)", () => {
+  const rows = corpRows(pool);
+  const heads = (tab: "stock" | "market") => find(sheetNode(input(pool, { tab }), noop), (n) => n.tag === "button" && n.attrs.class === "stock-rowbtn").length;
+  assert.equal(heads("stock"), rows.filter((r) => inTab(r, "stock")).length);
+  assert.equal(heads("market"), rows.filter((r) => r.market > 0).length);
+  assert.ok(rows.some((r) => r.market > 0) && rows.some((r) => r.market === 0 || r.treasury === 0), "the fixture needs both kinds");
+  const tree = sheetNode(input(pool), noop);
+  const tabs = find(tree, (n) => n.tag === "button" && n.attrs.role === "tab");
+  assert.deepEqual(tabs.map((t) => textOf(t)), ["Aktienmarkt", "Open Market"]);
+  assert.equal(find(tree, (n) => n.attrs.class === "stock-map").length, 0);
+});
+
+test("dialog: a focused corporation opens a modal with its offers, the order and Abbrechen once one is chosen; nothing is open without focus (#407, #408)", () => {
+  assert.equal(find(sheetNode(input(pool), noop), (n) => n.attrs.class === "kit-dialog").length, 0);
+  const row = corpRows(pool).find((r) => r.id === SELL)!;
+  const closed: number[] = [], confirmed: number[] = [];
+  const h = { ...noop, onClose: () => closed.push(1), onConfirm: () => confirmed.push(1) };
+  const open = sheetNode(input(pool, { focus: SELL, mode: "sell" }), h);
+  const dlg = find(open, (n) => n.attrs.class === "kit-dialog")[0]!;
+  assert.match(textOf(dlg), new RegExp(SELL));
+  assert.equal(find(dlg, (n) => n.attrs.class === "stock-offer").length, row.sells.length);
+  assert.equal(find(dlg, (n) => n.attrs.class?.includes("kit-main-btn") === true).length, 0, "no order before a choice");
+  const chosen = sheetNode(input(pool, { focus: SELL, mode: "sell", sel: { corp: SELL, key: row.sells[0]!.key } }), h);
+  const dlg2 = find(chosen, (n) => n.attrs.class === "kit-dialog")[0]!;
+  assert.match(textOf(dlg2), /verkaufen/);
+  const main = find(dlg2, (n) => n.attrs.class?.includes("kit-main-btn") === true)[0]!;
+  main.on.click!(new Event("click"));
+  assert.deepEqual(confirmed, [1]);
+  assert.deepEqual(closed, []);
 });
 
 test("claims: buy, sell, par and pass of the stock step are the panel's; convert and choose stay generic", () => {
