@@ -127,7 +127,7 @@ that commit: GitHub UI Actions > full > Run workflow (field `sha`), or
 (in the workshop checkout). Read the result per job, not only the workflow status. Every example runs in at
 least one stage: fast = `~game_flow`, milestone = all; `view_spec`, `view_order_spec` and `bot_spec` run
 only in the `long games` jobs there (whole files, caps lifted), not additionally in the capped rspec shards.
-The browser job of `ci.yml` always runs (a `changes` job decides), so it can be a required check.
+The browser job of `ci.yml` always runs (a `changes` job decides: without a `web/**` change its steps are skipped and it ends green), so it can be a required check. Wall time of the fast stage: about 2 to 3 min (measured, PRs 157 and 159); milestone stage: about 7 to 8 min.
 
 ## Versions, tags and changelog (#271)
 
