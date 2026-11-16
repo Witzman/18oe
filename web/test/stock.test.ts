@@ -178,6 +178,21 @@ test("a market offer is labelled as taken from the market", () => {
   assert.match(offerLabel(row.buys[0]!, row), /aus dem Schatzamt/);
 });
 
+test("order: in a stock round the head names the players in this round's order; outside one, the order of the next stock round (#406)", () => {
+  const names = (g: Game) => find(sheetNode(input(g), noop), (n) => n.attrs.class?.includes("stock-order") === true).map((n) => textOf(n));
+  const now = [...pool.state.players].sort((a, b) => a.order - b.order).map((p) => p.name);
+  const [inStock] = names(pool);
+  assert.ok(inStock, "the order is shown");
+  assert.match(inStock!, /Reihenfolge dieser Aktienrunde/);
+  assert.ok(inStock!.indexOf(now[0]!) < inStock!.indexOf(now[1]!) && inStock!.indexOf(now[1]!) < inStock!.indexOf(now[3]!), inStock);
+  const next = pool.state.meta.priority.map((id) => pool.state.players.find((p) => p.id === id)!.name);
+  assert.notDeepEqual(next, now, "the fixture needs a different next order");
+  const operating: Game = { ...pool, state: { ...pool.state, meta: { ...pool.state.meta, round: { ...pool.state.meta.round, type: "operating" } } } };
+  const [inOperating] = names(operating);
+  assert.match(inOperating!, /Reihenfolge der nächsten Aktienrunde/);
+  assert.ok(inOperating!.indexOf(next[0]!) < inOperating!.indexOf(next[1]!) && inOperating!.indexOf(next[1]!) < inOperating!.indexOf(next[3]!), inOperating!);
+});
+
 test("grid: every market row fills the whole line, so a short row never takes in the cells of the next one (#405)", () => {
   const tree = sheetNode(input(pool), noop);
   const lines = find(tree, (n) => n.attrs.class === "stock-grid-row");
