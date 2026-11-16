@@ -44,11 +44,19 @@ RSpec.describe Oe::ScriptGame, :game_flow do
   # late phases of a whole game (CI runner 1.5 to 2.0 s, up to about 3 s expected). The Route step gets
   # its own limit instead of a silent loosening of the general one; a fast solution (cheaper route
   # suggestion in the prompt, or a lower WALK_LIMIT) follows in the v0.4 issue and removes this exception.
+  #
+  # #373: operating/Track gets its own limit too. The Track prompt computes the upgrade-by-revenue
+  # suggestion (#321) on every GET; measured in the CI script game 0.60 s, 0.87 s, 1.019 s (full run
+  # 43892298545 on a8f0f33 red at 1.0 s). Owner decision 2026-11-16. The fast solution (no computation on
+  # every GET) follows in #373 (v0.4) for both prompts and removes both exceptions.
   GET_LIMIT = 1.0
   ROUTE_GET_LIMIT = 4.0
+  TRACK_GET_LIMIT = 2.0
 
   def get_limit(detail)
-    detail[:round] == "operating" && detail[:step] == "Route" ? ROUTE_GET_LIMIT : GET_LIMIT
+    return GET_LIMIT unless detail[:round] == "operating"
+
+    { "Route" => ROUTE_GET_LIMIT, "Track" => TRACK_GET_LIMIT }.fetch(detail[:step], GET_LIMIT)
   end
 
   # The GET that exceeded its limit by the most (ratio), or nil.
@@ -57,8 +65,8 @@ RSpec.describe Oe::ScriptGame, :game_flow do
   end
 
   def get_breach_message(details, breach)
-    format("GET /games/:id #%<index>d at %<round>s/%<step>s took %<seconds>.3f s, limit %<limit>.1f s (Route step %<route>.1f s, others %<other>.1f s)",
-           breach.merge(limit: get_limit(breach), route: ROUTE_GET_LIMIT, other: GET_LIMIT)) +
+    format("GET /games/:id #%<index>d at %<round>s/%<step>s took %<seconds>.3f s, limit %<limit>.1f s (Route step %<route>.1f s, Track step %<track>.1f s, others %<other>.1f s)",
+           breach.merge(limit: get_limit(breach), route: ROUTE_GET_LIMIT, track: TRACK_GET_LIMIT, other: GET_LIMIT)) +
       "; slowest overall #{details.map { |d| d[:seconds] }.max.round(3)} s"
   end
 
@@ -94,15 +102,27 @@ RSpec.describe Oe::ScriptGame, :game_flow do
     end
 
     it "passes a slow Route GET under its own limit and a fast other GET" do
-      details = [get_at(3.9, "operating", "Route"), get_at(0.99, "operating", "Track")]
+      details = [get_at(3.9, "operating", "Route"), get_at(0.99, "stock", "BuySellParShares")]
       expect(worst_get_breach(details)).to be_nil
     end
 
-    it "fails a GET outside the Route step over 1.0 s, naming its limit" do
-      details = [get_at(1.2, "operating", "Track"), get_at(3.0, "operating", "Route")]
+    it "passes a Track GET of 1.9 s under the Track limit" do
+      expect(worst_get_breach([get_at(1.9, "operating", "Track")])).to be_nil
+    end
+
+    it "fails a Track GET over 2.0 s, naming its limit and all three limits" do
+      details = [get_at(2.1, "operating", "Track"), get_at(0.5, "stock", "BuySellParShares")]
       breach = worst_get_breach(details)
-      expect(breach[:step]).to eq("Track")
-      expect(get_breach_message(details, breach)).to include("operating/Track took 1.200 s, limit 1.0 s")
+      message = get_breach_message(details, breach)
+      expect(message).to include("operating/Track took 2.100 s, limit 2.0 s")
+      expect(message).to include("Track step 2.0 s", "Route step 4.0 s", "others 1.0 s")
+    end
+
+    it "fails a GET outside the Track and Route steps over 1.0 s, naming its limit" do
+      details = [get_at(1.2, "operating", "Token"), get_at(3.0, "operating", "Route")]
+      breach = worst_get_breach(details)
+      expect(breach[:step]).to eq("Token")
+      expect(get_breach_message(details, breach)).to include("operating/Token took 1.200 s, limit 1.0 s")
     end
 
     it "fails a Route GET over 4.0 s, naming its limit" do
