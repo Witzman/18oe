@@ -97,6 +97,7 @@ jobs:
       # iPad profile (viewport, DPR 2, touch, UA); real WebKit (.tools/pw) is not installed here.
       - name: no web/** change
         if: needs.changes.outputs.web != 'true'
+        working-directory: ${{ runner.temp }} # no checkout in this case, so no web/ directory
         run: echo 'no web change, browser tests skipped, this check passes'
       - name: headless Chrome wrapper
         if: needs.changes.outputs.web == 'true'
