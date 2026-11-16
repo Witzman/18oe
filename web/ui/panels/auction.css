@@ -37,3 +37,13 @@
 .auction-card[data-state="selected"] .auction-ability, .auction-card[aria-pressed="true"] .auction-ability,
 .auction-card[data-state="selected"] .auction-home, .auction-card[aria-pressed="true"] .auction-home { color: inherit; opacity: .85; }
 .auction-ability { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* Lot dialog (#368): the stage fills the view; the sheet scrolls inside it, the dialog stays centred over the visible part. */
+.auction-stage { position: absolute; inset: 0; }
+.auction-stage > .auction-sheet { height: 100%; overflow: auto; }
+.auction-head-side { display: inline-flex; gap: var(--shape-gap); align-items: center; }
+.auction-head-side .kit-side-btn { min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); }
+#auction-lot-title { overflow-wrap: anywhere; }
+.auction-stage .kit-dialog .auction-bidform { border: 0; padding: 0; background: transparent; min-height: 0; }
+.auction-stage .kit-dialog .kit-order-sentence { margin: 8px 0 4px; }
+.auction-stage .kit-dialog .kit-order-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.auction-stage .kit-dialog button { min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); }
