@@ -35,6 +35,7 @@ module Engine
                       :consolidation_triggered, :consolidation_complete
         attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation
 
+        FERRY_COLOR = '#0047AB'
         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
                            { group: :white, count: 3 }, { group: :green, count: 8 }].freeze
 
@@ -1369,6 +1370,34 @@ module Engine
           return if route.ordered_paths.each_cons(2).all? { |a, b| wcf_pass?(a, b) || a.connects_to?(b, corporation) }
 
           raise GameError, 'Route is not connected'
+        end
+
+        # §11.3.8: a ferry, and the track section joining it to its city, is sea traffic; any number of trains of
+        # one RR may use it. Everything else keeps the base rule (a track section only once). Both hooks are the
+        # upstream ones (cf. 1817, 1861); the ferry paths are simply left out.
+        def check_overlap(routes)
+          return super unless routes.any? { |route| route.paths.any? { |path| ferry_path?(path) } }
+
+          super(routes.map { |route| RouteWithoutFerries.new(route, self) })
+        end
+
+        def compute_other_paths(routes, route)
+          super.reject { |path| ferry_path?(path) }
+        end
+
+        # A ferry line (blue path in a sea hex) or a path that leaves its hex over a ferry end (PORTS ... ferries:).
+        def ferry_path?(path)
+          return true if path.color.to_s.casecmp?(FERRY_COLOR)
+
+          ports = self.class::PORTS[path.hex.id]
+          !!ports && path.exits.any? { |exit| ports.dig(exit, :ferries) }
+        end
+
+        # What check_overlap sees of a route: its paths minus the ferry paths.
+        RouteWithoutFerries = Struct.new(:route, :game) do
+          def paths
+            route.paths.reject { |path| game.ferry_path?(path) }
+          end
         end
 
         def wcf_pass?(entering, leaving)
