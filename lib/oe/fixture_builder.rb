@@ -153,31 +153,7 @@ module Oe
     end
 
     def scan(_name, spec, log, entries, positions)
-      pending = entries.dup
-      game = Engine::Game::G18OE::Game.new(("A".."Z").first(spec['players']), id: spec['seed'], seed: spec['seed'])
-      next_type = log.first && log.first['type']
-      step_state = lambda do |count|
-        state = FixtureCatalog.describe(game)
-        pending.dup.each do |e|
-          hit = if e.key?('at') then e['at'] == count
-                elsif e.key?('first') then e['first'].all? { |key, want| state[key] == want }
-                else next_type == e['before']['type']
-                end
-          next unless hit
-
-          positions[e['game']][e['name']] = { position: count, expect: (e['first'] || {}).merge(state.slice('round', 'step')) }
-          pending.delete(e)
-        end
-      end
-      step_state.call(0)
-      log.each_with_index do |action, i|
-        game.process_action(action)
-        raise "replay failed at #{i + 1}: #{game.exception.message}" if game.exception
-
-        next_type = log[i + 1] && log[i + 1]['type']
-        step_state.call(i + 1)
-        break if pending.empty?
-      end
+      FixtureCatalog.scan(spec, entries, log).each { |name, found| positions[entries.first['game']][name] = found }
     end
   end
 end

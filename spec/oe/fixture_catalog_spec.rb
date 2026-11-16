@@ -2,6 +2,8 @@
 
 require_relative "../engine/engine_helper"
 require "oe/fixture_catalog"
+require "oe/fixture_builder"
+require "tmpdir"
 
 # Fixture catalog (#117): playable game states from action logs, one or more per rule
 # surface. Each entry is replayed to its position and checked: the engine is where the
@@ -38,6 +40,82 @@ RSpec.describe Oe::FixtureCatalog do
     other = entry.dup
     other.expect = { "round" => "Operating" }
     expect(described_class.expectation_errors(other, described_class.game_at(entry))).not_to be_empty
+  end
+
+  # #365 B1: finders are resolved when the catalog is loaded; both formats are read.
+  describe "finder entries" do
+    around do |example|
+      Dir.mktmpdir do |dir|
+        @dir = dir
+        File.write(File.join(dir, "log.json"), JSON.generate("players" => 4, "seed" => 1, "actions_log" => []))
+        example.run
+      end
+    end
+
+    def write_catalog(entries)
+      games = { "g" => { "file" => "log.json", "players" => 4, "seed" => 1, "actions" => 0 } }
+      File.write(File.join(@dir, "catalog.json"), JSON.generate("games" => games, "entries" => entries, "gaps" => []))
+    end
+
+    def base(name, extra)
+      { "name" => name, "surface" => "x", "slice" => "S1", "game" => "g" }.merge(extra)
+    end
+
+    it "resolves a finder to a position and expectation without replaying a stored position" do
+      write_catalog([base("start", "at" => 0), base("auction", "first" => { "round" => "Auction" })])
+      start, auction = described_class.entries(@dir)
+
+      expect([start.position, auction.position]).to eq([0, 0])
+      expect(auction.expect).to include("round" => "Auction", "step" => "WaterfallAuction")
+      expect(auction.finder).to eq("first" => { "round" => "Auction" })
+    end
+
+    it "still reads the stored format (position and expect)" do
+      write_catalog([base("old", "position" => 0, "expect" => { "round" => "Auction" })])
+      old = described_class.entry("old", @dir)
+
+      expect([old.position, old.finder, old.state]).to eq([0, nil, nil])
+      expect(described_class.expectation_errors(old, described_class.game_at(old, @dir))).to be_empty
+    end
+
+    it "says which finder matched nothing" do
+      write_catalog([base("never", "first" => { "round" => "Operating" })])
+
+      expect { described_class.entries(@dir) }
+        .to raise_error(RuntimeError, /finder never matched nothing in g \(0 actions\)/)
+    end
+
+    it "finds any state by round and step, or nil" do
+      write_catalog([base("a", "first" => { "round" => "Auction", "step" => "WaterfallAuction" })])
+
+      expect(described_class.find(round: "Auction", step: "WaterfallAuction", dir: @dir).name).to eq("a")
+      expect(described_class.find(round: "Auction", phase: described_class.entry("a", @dir).state["phase"], dir: @dir)&.name).to eq("a")
+      expect(described_class.find(round: "Auction", phase: "nope", dir: @dir)).to be_nil
+      expect(described_class.find(round: "Stock", dir: @dir)).to be_nil
+    end
+
+    it "resolves once per catalog and log" do
+      write_catalog([base("a", "at" => 0)])
+      allow(described_class).to receive(:scan).and_call_original
+      2.times { described_class.entries(@dir) }
+
+      expect(described_class).to have_received(:scan).once
+    end
+  end
+
+  # One-off proof for the move of the definition (#365 B1): resolving the builder's finders on
+  # the stored logs gives the positions and expectations catalog.json holds today.
+  it "resolves every finder of the definition to the stored position", :game_flow do
+    stored = described_class.entries.to_h { |e| [e.name, e] }
+    definition = Oe::FixtureBuilder::DEFINITION["entries"]
+    expect(definition.map { |e| e["name"] }).to eq(stored.keys)
+
+    resolved = definition.group_by { |e| e["game"] }.flat_map do |game_name, list|
+      described_class.scan(described_class.log_file(game_name), list).to_a
+    end.to_h
+    definition.each do |e|
+      expect(resolved[e["name"]]).to include(position: stored[e["name"]].position, expect: stored[e["name"]].expect), e["name"]
+    end
   end
 
   Oe::FixtureCatalog.entries.each do |entry|

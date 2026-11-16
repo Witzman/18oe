@@ -18,10 +18,18 @@ module Oe
   #                                        "entries": [ {name, surface, slice, game, position, expect, note} ] }
   #   spec/fixtures/games/<game>.json    { players, seed, player, actions_log: [...] }
   #
+  # An entry holds either a stored `position` and `expect` (today's catalog.json) or a finder
+  # (`at`, `first`, `before`, as in Oe::FixtureBuilder), which is resolved against the log when the
+  # catalog is loaded (#365). `find(round:, step:)` picks a state by property.
+  #
   # The logs are built (and rebuilt after an engine change that alters play) by
   # bin/fixture-catalog; `bin/fixture-catalog verify` re-checks every entry.
   module FixtureCatalog
-    Entry = Struct.new(:name, :surface, :slice, :game, :position, :expect, :note, keyword_init: true)
+    Entry = Struct.new(:name, :surface, :slice, :game, :position, :expect, :note, :finder, :state, keyword_init: true)
+
+    # Finder keys of an entry (see Oe::FixtureBuilder): a fixed position, the first state matching
+    # given keys, or the state just before the first logged action of a type.
+    FINDER_KEYS = %w[at first before].freeze
 
     DIR = File.expand_path('../../spec/fixtures/games', __dir__)
 
@@ -31,11 +39,86 @@ module Oe
       JSON.parse(File.read(File.join(dir, 'catalog.json')))
     end
 
+    # Two formats are read (#365): an entry with `position` (and `expect`) is taken as stored; an
+    # entry with a finder (`at`, `first` or `before`) and no position is resolved against the log
+    # when loaded (once per process and log, see `resolutions`).
     def entries(dir = DIR)
       catalog(dir)['entries'].map do |h|
+        finder = h.slice(*FINDER_KEYS)
+        found = h.key?('position') ? nil : resolution(h, dir)
         Entry.new(name: h['name'], surface: h['surface'], slice: h['slice'], game: h['game'],
-                  position: h['position'], expect: h['expect'] || {}, note: h['note'])
+                  position: h['position'] || found[:position], expect: h['expect'] || found[:expect], note: h['note'],
+                  finder: finder.empty? ? nil : finder, state: found && found[:state])
       end
+    end
+
+    # Any catalog state in the given round/step (and phase): the first entry, in catalog order,
+    # whose state matches. Specs ask by property instead of by entry name. Nil if none.
+    def find(round: nil, step: nil, phase: nil, dir: DIR)
+      want = { 'round' => round, 'step' => step, 'phase' => phase&.to_s }.compact
+      entries(dir).find do |e|
+        state = e.state || describe(game_at(e, dir))
+        want.all? { |key, value| state[key] == value }
+      end
+    end
+
+    def game(name, dir = DIR)
+      game_at(name, dir)
+    end
+
+    # name => { position:, expect:, state: } for the finder entries of the catalog, memoised per
+    # catalog, log file and their modification times.
+    def resolution(hash, dir)
+      resolutions(dir, hash['game']).fetch(hash['name']) do
+        raise "finder #{hash['name']} matched nothing in #{hash['game']} (#{log_file(hash['game'], dir)['actions_log'].size} actions)"
+      end
+    end
+
+    def resolutions(dir, game_name)
+      cat = catalog(dir)
+      file = File.join(dir, cat['games'].fetch(game_name)['file'])
+      key = [File.expand_path(dir), game_name, File.mtime(File.join(dir, 'catalog.json')), File.mtime(file)]
+      (@resolutions ||= {})[key] ||= begin
+        log = JSON.parse(File.read(file))
+        finders = cat['entries'].select { |e| e['game'] == game_name && !e.key?('position') }
+        scan(log, finders)
+      end
+    end
+
+    # Replays `log` once and finds, for each entry hash with a finder, the first position that
+    # satisfies it. Returns name => { position:, expect:, state: } (entries never matched are absent).
+    # `log` is anything with `players` and `seed` (a log file hash, or a game spec of the builder
+    # when the action list is passed as `actions`). The finder semantics are the builder's.
+    def scan(log, entries, actions = nil)
+      actions ||= log['actions_log']
+      found = {}
+      pending = entries.dup
+      game = Engine::Game::G18OE::Game.new(("A".."Z").first(log['players']), id: log['seed'], seed: log['seed'])
+      next_type = actions.first && actions.first['type']
+      visit = lambda do |count|
+        state = describe(game)
+        pending.dup.each do |e|
+          hit = if e.key?('at') then e['at'] == count
+                elsif e.key?('first') then e['first'].all? { |key, want| state[key] == want }
+                else next_type == e['before']['type']
+                end
+          next unless hit
+
+          found[e['name']] = { position: count, expect: (e['first'] || {}).merge(state.slice('round', 'step')), state: state }
+          pending.delete(e)
+        end
+      end
+      visit.call(0)
+      actions.each_with_index do |action, i|
+        break if pending.empty?
+
+        game.process_action(action)
+        raise "replay failed at #{i + 1}: #{game.exception.message}" if game.exception
+
+        next_type = actions[i + 1] && actions[i + 1]['type']
+        visit.call(i + 1)
+      end
+      found
     end
 
     def entry(name, dir = DIR)
