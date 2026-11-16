@@ -20,9 +20,7 @@ describe 'G18OE forming a national (§9.4)' do
   end
 
   def give_train!(corporation, name)
-    train = card(name)
-    game.buy_train(corporation, train, :free)
-    train
+    with_trains!(game, corporation, name).first
   end
 
   # Moves the game to the phase before the one the train `name` begins, without buying trains.

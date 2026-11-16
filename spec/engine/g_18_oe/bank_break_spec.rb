@@ -8,10 +8,7 @@ describe 'G18OE a broken bank ends the game after one OR (§13)' do
 
   let(:game) { new_game }
   let(:regional) do
-    start_regional!(game, 'LNWR', game.players.first).tap do |corporation|
-      game.buy_train(corporation, game.depot.upcoming.first, :free)
-      game.fulfill_train_obligation!(corporation)
-    end
+    operating_regional!(game, 'LNWR', game.players.first)
   end
 
   def break_bank!
