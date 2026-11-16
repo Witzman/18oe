@@ -415,10 +415,14 @@ RSpec.describe "games API with bot seats (#39)" do
 end
 
 # The authorizer decides who may act for which entity. The HTTP specs above stay in
-# the auction (players as entities); this checks a corporation in an operating round,
-# on a real state reached by playing a strategy game directly.
-RSpec.describe "games API authorizer (#36)", :game_flow do
+# the auction (players as entities); this checks a corporation in an operating round.
+# The first example builds that state by code (scenario helpers, #365); the second reaches
+# it by playing a strategy game directly (seed game, :game_flow).
+RSpec.describe "games API authorizer (#36)" do
   require "oe/strategy_player"
+  require_relative "engine/engine_helper"
+  require_relative "engine/g_18_oe/helpers"
+  include G18OESpecHelpers
 
   let(:host) do
     Class.new do
@@ -426,20 +430,10 @@ RSpec.describe "games API authorizer (#36)", :game_flow do
     end.new
   end
 
-  it "lets only the president act for an operating corporation" do
-    game = Engine::Game::G18OE::Game.new(%w[p0 p1 p2 p3], id: 1, seed: 1)
-    rng = Random.new(1)
-    strategist = Oe::StrategyPlayer.new(game, rng: rng)
-    # the OR opens with Minor C's choice of operating position (#70), a player action
-    until Oe::View.round_type(game.round) == "operating" && !game.round.active_step.is_a?(Engine::Game::G18OE::Step::GoldenBellOrder)
-      actions = Oe::LegalActions.new(game, limit: 8, rng: rng).call
-      game.process_action(strategist.choose(actions) || actions.sample(random: rng))
-    end
-
-    corporation = game.round.active_entities.first
+  def expect_president_only(game, corporation, names)
     expect(corporation.player?).to be(false)
     president = corporation.player.id
-    other = (%w[p0 p1 p2 p3] - [president]).first
+    other = (names - [president]).first
     action = { "type" => "pass", "entity" => corporation.id, "entity_type" => "corporation" }
 
     expect { host.authorizer(president, action).call(game) }.not_to raise_error
@@ -449,6 +443,32 @@ RSpec.describe "games API authorizer (#36)", :game_flow do
       .to raise_error(Oe::GameSession::Forbidden) { |e| expect(e.code).to eq("forbidden") }
     expect { host.authorizer(president, action.merge("entity" => "ZZ")).call(game) }
       .to raise_error(Oe::GameSession::Forbidden)
+  end
+
+  it "lets only the president act for an operating corporation (state built by code)" do
+    names = %w[p0 p1 p2]
+    game = new_game(names)
+    start_major!(game, "LNWR", game.players[0])
+    fund!(game, game.corporation_by_id("LNWR"), 700)
+    game.phase.next!
+    operating_round_for!(game, 1)
+
+    corporation = game.round.active_entities.first
+    expect(corporation.id).to eq("LNWR")
+    expect_president_only(game, corporation, names)
+  end
+
+  it "lets only the president act for an operating corporation (strategy game played to the first OR)", :game_flow do
+    game = Engine::Game::G18OE::Game.new(%w[p0 p1 p2 p3], id: 1, seed: 1)
+    rng = Random.new(1)
+    strategist = Oe::StrategyPlayer.new(game, rng: rng)
+    # the OR opens with Minor C's choice of operating position (#70), a player action
+    until Oe::View.round_type(game.round) == "operating" && !game.round.active_step.is_a?(Engine::Game::G18OE::Step::GoldenBellOrder)
+      actions = Oe::LegalActions.new(game, limit: 8, rng: rng).call
+      game.process_action(strategist.choose(actions) || actions.sample(random: rng))
+    end
+
+    expect_president_only(game, game.round.active_entities.first, %w[p0 p1 p2 p3])
   end
 end
 
