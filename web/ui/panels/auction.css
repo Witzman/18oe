@@ -9,8 +9,10 @@
 .auction-row[data-top="true"] { border-color: var(--ui-accent); box-shadow: inset 4px 0 0 var(--ui-accent); }
 .auction-row[data-sold="true"] { background: transparent; border-style: dashed; opacity: .6; }
 .auction-rowhead { display: flex; flex-direction: column; font-family: var(--font-head); }
-.auction-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.auction-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .auction-cards > li { display: block; }
+/* .frame ul (0,1,1) would indent the list by 1.2em; centring needs the full width (#404). */
+.auction-row > .auction-cards { padding-left: 0; }
 .auction-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 11rem; min-height: 6.2rem; padding: 6px 8px; text-align: left; background: var(--ui-panel-alt); color: var(--ui-ink); border: 1px solid var(--ui-faint); border-radius: var(--shape-radius); }
 .auction-card[data-state="pick"] { cursor: pointer; border-color: var(--ui-ink); }
 .auction-card[data-state="selected"], .auction-card[aria-pressed="true"] { background: var(--ui-ink); color: var(--ui-panel); border-color: var(--ui-ink); box-shadow: inset 4px 0 0 var(--ui-accent); }
