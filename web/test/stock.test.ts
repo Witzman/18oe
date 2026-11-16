@@ -191,6 +191,7 @@ test("order: in a stock round the head names the players in this round's order; 
   const [inOperating] = names(operating);
   assert.match(inOperating!, /Reihenfolge der nächsten Aktienrunde/);
   assert.ok(inOperating!.indexOf(next[0]!) < inOperating!.indexOf(next[1]!) && inOperating!.indexOf(next[1]!) < inOperating!.indexOf(next[3]!), inOperating!);
+});
 
 test("grid: every market row fills the whole line, so a short row never takes in the cells of the next one (#405)", () => {
   const tree = sheetNode(input(pool), noop);
