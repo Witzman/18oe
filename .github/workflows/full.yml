@@ -1,22 +1,32 @@
-# Full stage (#269): push to main and manual dispatch. Complete rspec suite, frontend incl. browser
-# tests (Chromium), scripted game. No secrets, no deploy.
+# Milestone stage (#269, #365): the complete suite, i.e. everything the pull-request stage (ci.yml) leaves out.
+# NOT run on every push to main any more (merge chains cancelled 25 runs). Triggers:
+#   - nightly (schedule, 02:17 UTC, default branch)
+#   - tag v0.* (a version milestone)
+#   - workflow_dispatch for any commit: input `sha` (empty = the selected ref). This is how "check full on main
+#     after a merge" and "before a deploy" are started (README, section CI stages).
+# Content: all rspec examples (the :game_flow ones included), the long whole games uncapped, all browser tests
+# (touch-browser included), the scripted game. No secrets, no deploy.
 name: full
 
 on:
   push:
-    branches: [main]
+    tags: ["v0.*"]
   schedule:
     - cron: "17 2 * * *" # nightly (#335)
   workflow_dispatch:
     inputs:
+      sha:
+        description: "commit (SHA) to test; empty = the ref selected above"
+        type: string
+        default: ""
       docker:
         description: "also build the Docker image (no push)"
         type: boolean
         default: false
 
 concurrency:
-  group: full-${{ github.ref }}
-  cancel-in-progress: false # long runs (#335): a later merge must not cancel them
+  group: full-${{ inputs.sha || github.ref }}
+  cancel-in-progress: false # long runs (#335); one group per tested commit, so two SHAs never cancel each other
 
 permissions:
   contents: read
@@ -32,6 +42,8 @@ jobs:
         shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
@@ -45,8 +57,11 @@ jobs:
         working-directory: web
       - name: rspec shard
         run: |
-          # time-balanced shard (.github/scripts/shard.rb); complete suite across the shards
-          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 '')
+          # time-balanced shard (.github/scripts/shard.rb); the complete suite across the shards (all tags, the
+          # :game_flow examples too; :full_game only runs in the long-games job). Excluded here: view_spec,
+          # view_order_spec, bot_spec, because the long-games job below runs those three whole files again with the
+          # caps lifted (OE_FULL_GAME=1: the same examples, only the loop cap differs), so the capped run adds nothing.
+          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 'spec/oe/(view_spec|view_order_spec|bot_spec)\.rb$')
           echo "$files"
           bundle exec rspec $files --format progress --format json --out "$RUNNER_TEMP/rspec.json"
       - name: per-file timings
@@ -81,6 +96,8 @@ jobs:
           - { name: whole bot game, args: "spec/oe/bot_runner_spec.rb --tag full_game" }
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
@@ -102,6 +119,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -133,6 +152,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
@@ -146,4 +167,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
       - run: docker build -t 18oe:ci .
