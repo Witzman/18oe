@@ -1219,7 +1219,6 @@ module Engine
             G18OE::Step::GoldenBellOrder,
             G18OE::Step::ConvertToNational,
             Engine::Step::Bankrupt,
-            Engine::Step::Exchange,
             G18OE::Step::DiscardTrain,
             Engine::Step::HomeToken,
             G18OE::Step::Track,
