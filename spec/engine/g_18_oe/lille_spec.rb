@@ -67,8 +67,8 @@ describe 'G18OE Lille ferry passage (§11.2.2)' do
     token!(west, operator)
     lay_tile!('N31', '201', 0)
     token!(lille, game.corporation_by_id('PLM'))
-    game.phase.next! until game.phase.name == '3'
-    round = enter_round!(game, game.operating_round(1))
+    at_phase!(game, '3')
+    round = operating_round_for!(game, 1)
 
     lay_first_legal!(game, round, 'N31')
     upgraded = lille_hex.tile.cities.first

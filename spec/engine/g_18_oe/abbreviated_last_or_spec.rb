@@ -11,10 +11,7 @@ describe 'G18OE abbreviated last OR (§13)' do
   let(:game) { new_game(optional_rules: optional_rules) }
   let(:president) { game.players.first }
   let(:regional) do
-    start_regional!(game, 'LNWR', president).tap do |corporation|
-      game.buy_train(corporation, game.depot.upcoming.first, :free)
-      game.fulfill_train_obligation!(corporation)
-    end
+    operating_regional!(game, 'LNWR', president)
   end
 
   def final_turn!(operating_rounds)

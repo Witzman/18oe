@@ -52,10 +52,10 @@ describe 'G18OE patronage tiles (§2.9, §3.1, §9.1, §11.1.8)' do
     fund!(game, minor)
     game.hex_by_id('V27').tile.cities.first.place_token(minor, minor.next_token, free: true)
     game.place_patronage_tile!('V27')
-    game.phase.next! until game.phase.name == phase
+    at_phase!(game, phase)
     game.minor_regional_order.delete(minor)
     game.minor_regional_order.unshift(minor)
-    round = enter_round!(game, game.operating_round(1))
+    round = operating_round_for!(game, 1)
     [minor, round]
   end
 

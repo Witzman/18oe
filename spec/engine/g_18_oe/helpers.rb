@@ -96,6 +96,45 @@ module G18OESpecHelpers
     enter_round!(game, game.stock_round)
   end
 
+  # --- Scenario building blocks (#365): reach a rule state by code, no seed game. ---
+
+  # Advances the phase to `name` (a PHASES entry) without buying trains.
+  def at_phase!(game, name)
+    raise ArgumentError, "unknown phase #{name.inspect}" unless game.class::PHASES.any? { |p| p[:name] == name }
+
+    game.phase.next! until game.phase.name == name
+    game
+  end
+
+  # Gives `corporation` free trains from the depot's upcoming cards, one per name
+  # (the first card of that name); with no names, the next card in the depot.
+  # Returns the trains. Does not advance the phase beyond what buy_train triggers.
+  def with_trains!(game, corporation, *names)
+    names = [nil] if names.empty?
+    names.map do |name|
+      train = game.depot.upcoming.find { |t| name.nil? || t.name == name }
+      raise ArgumentError, "no upcoming train #{name.inspect}" unless train
+
+      game.buy_train(corporation, train, :free)
+      train
+    end
+  end
+
+  # A started regional that holds a train and has met its train obligation, so it can operate.
+  def operating_regional!(game, id, player, trains: [], par: 60)
+    start_regional!(game, id, player, par: par).tap do |regional|
+      with_trains!(game, regional, *trains)
+      game.fulfill_train_obligation!(regional)
+    end
+  end
+
+  # Enters operating round `round_num` (optionally running its setup).
+  def operating_round_for!(game, round_num = 1, setup: false)
+    round = enter_round!(game, game.operating_round(round_num))
+    round.setup if setup
+    round
+  end
+
   def round_step(round, klass)
     round.steps.find { |s| s.is_a?(klass) }
   end
