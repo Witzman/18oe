@@ -586,7 +586,7 @@ module Oe
       return true unless step.is_a?(Engine::Game::G18OE::Step::HomeToken) && tokener.type == :minor
 
       region = @game.region_for_hex(city.hex)
-      @game.region_available?(region) && tokener.cash >= @game.track_rights_cost(region)
+      @game.region_available?(region) && tokener.cash >= @game.home_token_cost(tokener, region)
     end
 
     def token_cities(step, entity)

@@ -15,7 +15,7 @@ module Engine
 
               raise GameError, "Region #{region} is not available" unless @game.region_available?(region)
 
-              token.price = @game.track_rights_cost(region)
+              token.price = @game.home_token_cost(action.entity, region)
               @game.claim_region!(action.entity, region)
             end
 

@@ -14,10 +14,10 @@ describe 'G18OE floating minors (§9.1)' do
     minors.find { |m| !m.floated? && !m.owner }
   end
 
-  def par_minor!(minor = unused_minor)
+  def par_minor!(minor = unused_minor, treasury: 120)
     player = round.current_entity
     give_company!(player, game.company_by_id(minor.id))
-    fund!(game, minor, 120)
+    fund!(game, minor, treasury) if treasury.positive?
     price = round.active_step.get_par_prices(player, minor).first
     act!(round, Engine::Action::Par.new(player, corporation: minor, share_price: price))
     minor
@@ -146,5 +146,41 @@ describe 'G18OE floating minors (§9.1)' do
     minor = float_in!('SP')
 
     expect(minor.tokens.reject(&:used).map(&:price)).to eq([20])
+  end
+
+  # A minor bought at a price below every chit cost (a row reduced to 0 is taken
+  # by force, §6.3) cannot pay its home token (§9.1 step 4). Assumption (#367):
+  # it pays what it has, but only when no open zone is affordable in full.
+  describe 'home token of a minor with too little cash (#367)' do
+    def float_poor!(zone, treasury)
+      minor = par_minor!(treasury: treasury)
+      city = game.home_token_locations(minor).find { |h| game.region_for_hex(h) == zone }.tile.cities.first
+      [minor, city]
+    end
+
+    it 'places it for free in a UK zone when the treasury is empty' do
+      minor, city = float_poor!('UK', 0)
+      home!(minor, city)
+
+      expect(minor.cash).to eq(0)
+      expect(game.minor_floated_regions[minor.id]).to eq('UK')
+      expect(round.active_step).not_to be_a(Engine::Game::G18OE::Step::HomeToken)
+    end
+
+    it 'pays only its whole treasury when that is below every zone cost' do
+      minor, city = float_poor!('IT', 5)
+      home!(minor, city)
+
+      expect(minor.cash).to eq(0)
+    end
+
+    it 'still charges the full cost where some zone is affordable' do
+      minor, uk = float_poor!('UK', 25)
+
+      expect { home!(minor, uk) }.to raise_error(Engine::GameError)
+      home!(minor, game.home_token_locations(minor).find { |h| game.region_for_hex(h) == 'IT' }.tile.cities.first)
+
+      expect(minor.cash).to eq(15)
+    end
   end
 end

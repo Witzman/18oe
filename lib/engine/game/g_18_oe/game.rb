@@ -664,6 +664,17 @@ module Engine
           self.class::TRACK_RIGHTS_COST[region] || 0
         end
 
+        # What a minor pays for its home token (§9.1 step 4): the chit's cost. A
+        # minor that cannot afford any open zone in full (bought at a price below
+        # every chit cost, e.g. a row reduced to 0 and taken by force) pays what
+        # its treasury holds, so the float can finish (#367, assumption).
+        def home_token_cost(minor, region)
+          cost = track_rights_cost(region)
+          return cost if @minor_available_regions.keys.any? { |r| track_rights_cost(r) <= minor.cash }
+
+          [cost, minor.cash].min
+        end
+
         def claim_region!(entity, region)
           @minor_floated_regions[entity.id] = region
           @minor_available_regions[region] -= 1
