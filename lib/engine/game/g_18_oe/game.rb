@@ -1386,7 +1386,16 @@ module Engine
         end
 
         # A ferry line (blue path in a sea hex) or a path that leaves its hex over a ferry end (PORTS ... ferries:).
+        # Asked for every path at every overlap check of the route search, so the answer is kept per path object
+        # (a path's colour, hex and exits do not change once the tile is laid; #371: +20% search time without).
         def ferry_path?(path)
+          @ferry_paths ||= {}.compare_by_identity
+          return @ferry_paths[path] if @ferry_paths.key?(path)
+
+          @ferry_paths[path] = ferry_path_uncached?(path)
+        end
+
+        def ferry_path_uncached?(path)
           return true if path.color.to_s.casecmp?(FERRY_COLOR)
 
           ports = self.class::PORTS[path.hex.id]

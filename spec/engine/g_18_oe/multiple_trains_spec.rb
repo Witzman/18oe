@@ -93,6 +93,13 @@ describe 'G18OE running multiple trains of one RR (§11.3.8)' do
     expect(game.ferry_path?(land)).to be(false)
   end
 
+  it 'works out whether a path is a ferry path once, not at every overlap check (route search speed, #371)' do
+    land = lille.paths.find { |path| path.exits.include?(4) }
+    allow(land).to receive(:exits).and_call_original
+    3.times { game.ferry_path?(land) }
+    expect(land).to have_received(:exits).once
+  end
+
   it 'leaves the ferry free for a second train while drawing its route' do
     routes = routes_through([london, lille])
     held = routes.first.paths
