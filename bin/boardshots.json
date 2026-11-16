@@ -1,0 +1,17 @@
+[
+  { "name": "s01-auktion", "title": "Auktion · Übersicht", "fixture": "auction" },
+  { "name": "s02-auktion-los", "title": "Auktion · Los gewählt", "fixture": "auction-minor-top",
+    "eval": "(async()=>{await new Promise(r=>setTimeout(r,600));document.querySelector('.auction-card[data-card=\"A\"]').click();await new Promise(r=>setTimeout(r,400))})()" },
+  { "name": "s03-aktienrunde", "title": "Aktienrunde · Markt", "fixture": "stock-pool",
+    "eval": "(async()=>{await new Promise(r=>setTimeout(r,300));const b=[...document.querySelectorAll('.stock-rowbtn')].find(x=>x.closest('.stock-row').dataset.actionable==='true')||document.querySelector('.stock-rowbtn');b.click();await new Promise(r=>setTimeout(r,400))})()" },
+  { "name": "s04-aktienrunde-par", "title": "Aktienrunde · Par", "fixture": "stock-par" },
+  { "name": "s05-protokoll", "title": "Protokoll", "fixture": "stock-pool",
+    "eval": "(async()=>{await new Promise(r=>setTimeout(r,600));document.querySelector('.frame-log-link').click();await new Promise(r=>setTimeout(r,500))})()" },
+  { "name": "s06-gleis", "title": "Betrieb · Gleis legen", "fixture": "track-lay" },
+  { "name": "s07-marker", "title": "Betrieb · Marker setzen", "fixture": "token-place" },
+  { "name": "s08-zugkauf", "title": "Betrieb · Zug kaufen", "fixture": "buy-train" },
+  { "name": "s09-dividende", "title": "Betrieb · Dividende", "fixture": "dividend" },
+  { "name": "s10-route", "title": "Betrieb · Fahrt", "fixture": "operating-route" },
+  { "name": "s11-konzession", "title": "Konzession", "fixture": "concession" },
+  { "name": "s12-spielende", "title": "Spielende", "fixture": "finished" }
+]
