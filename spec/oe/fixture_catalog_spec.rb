@@ -194,7 +194,7 @@ RSpec.describe Oe::FixtureCatalog do
     "phase-6" => [4065, {"phase" => "6", "round" => "Operating", "step" => "ConvertToNational"}],
     "phase-7" => [4405, {"phase" => "7", "round" => "Operating", "step" => "IssueShares"}],
     "phase-8" => [4709, {"phase" => "8", "round" => "Operating", "step" => "ConvertToNational"}],
-    "game-end" => [4986, {"finished": true, "round" => "Operating", "step": null}],
+    "game-end" => [4986, { "finished" => true, "round" => "Operating", "step" => nil }],
     }
     pins.each do |name, (position, expect)|
       entry = described_class.entry(name)
