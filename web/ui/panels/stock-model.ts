@@ -103,13 +103,21 @@ export function holdersOf(g: Game, c: Corporation): Holder[] {
   return out.sort((a, b) => rank(a) - rank(b) || b.percent - a.percent || a.seat - b.seat);
 }
 
-export interface Presidency { player: string; name: string; seat: number; me: boolean; corps: { id: string; name: string }[] }
-/** Per player the corporations he presides (the strip below the cards, #303); players in seat order. */
-export function presidencies(g: Game): Presidency[] {
-  return g.state.players.map((p, i) => ({
-    player: p.id, name: p.name, seat: i + 1, me: p.id === g.viewer,
-    corps: g.state.corporations.filter((c) => !c.closed && c.president === p.id).map((c) => ({ id: c.id, name: c.name })),
-  }));
+/** The two lists of the sheet (#408): "Aktienmarkt" what the corporations offer, "Open Market" what the market holds. */
+export type Tab = "stock" | "market";
+/** What the open dialog is for: buying (or founding) from the tab, or selling the viewer's own shares (#407). */
+export type Mode = "buy" | "sell";
+
+/** Whether a corporation belongs on a tab: shares in its treasury (or not yet founded), or shares in the Open Market. */
+export const inTab = (r: CorpRow, tab: Tab): boolean => (tab === "market" ? r.market > 0 : r.treasury > 0 || r.state === "open");
+
+/** The corporations the viewer holds shares of (the list left of the cards, #407). */
+export const holdings = (rows: CorpRow[]): CorpRow[] => rows.filter((r) => r.mine > 0);
+
+/** The offers of a row for the dialog: the sales (mode sell), or what the tab buys: treasury shares and par prices, or market shares. */
+export function offersFor(r: CorpRow, tab: Tab, mode: Mode): { buys: BuyOffer[]; sells: SellOffer[]; pars: ParOffer[] } {
+  if (mode === "sell") return { buys: [], sells: r.sells, pars: [] };
+  return { buys: r.buys.filter((b) => (b.source === "market") === (tab === "market")), sells: [], pars: tab === "stock" ? r.pars : [] };
 }
 
 /** The rows of the sheet, in a stable order (tier, then price high to low, unfounded last). */
