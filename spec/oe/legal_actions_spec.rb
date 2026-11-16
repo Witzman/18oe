@@ -103,7 +103,9 @@ RSpec.describe Oe::LegalActions do
     end
   end
 
-  describe "scenarios reached by hand", :game_flow do
+  # Not :game_flow (#365): the start state is built by code (scenario helpers), no seed game
+  # and no recorded log is played; the random moves run from that state with a fixed rng.
+  describe "scenarios reached by hand" do
     # Mutated starts (helpers set up entities directly), so each checkpoint
     # rebuilds the scenario and replays the recorded moves on top of it.
     def operating_build
