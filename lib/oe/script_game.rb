@@ -33,13 +33,14 @@ module Oe
     # What the run saw. `executed` counts accepted actions by key, `offered`
     # what prompts listed (so "offered but never executed" is visible).
     class Ledger
-      attr_reader :executed, :offered, :problems, :get_seconds, :post_seconds, :action_counts, :range_counts, :bytes
+      attr_reader :executed, :offered, :problems, :get_seconds, :get_details, :post_seconds, :action_counts, :range_counts, :bytes
 
       def initialize
         @executed = Hash.new(0)
         @offered = Hash.new(0)
         @problems = []
         @get_seconds = []
+        @get_details = [] # per GET: {index:, seconds:, round:, step:, viewer:} (#371), same order as get_seconds
         @post_seconds = []
         @action_counts = []
         @range_counts = []
@@ -158,6 +159,8 @@ module Oe
 
       status, body, took = client_for(pid).call(:get, "/games/#{@game_id}")
       @ledger.get_seconds << took
+      @ledger.get_details << { index: @ledger.get_seconds.size - 1, seconds: took, viewer: pid, round: state.dig("state", "meta", "round", "type"),
+                               step: state.dig("state", "prompt", "step"), game: @game_id }
       unless status == 200
         @ledger.problem(:get_failed, "GET /games/#{@game_id} as #{pid}: #{status}")
         return state
