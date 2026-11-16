@@ -79,6 +79,40 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # Fixture catalog against the CURRENT engine (#365 B6): OE_CATALOG=live plays fresh games (seed and player kind
+  # from catalog.json) instead of the stored logs, so a stale log never hides a defect and never reds this job. The
+  # rspec shards above still replay the stored logs (a stale log shows there as `log <game> stale at action K`).
+  catalog-live:
+    name: catalog live (fresh games)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --no-progress --no-audit --no-fund && npm run build
+        working-directory: web
+      - name: fixture catalog and invariants, live
+        env:
+          OE_CATALOG: live
+        run: |
+          start=$(date +%s)
+          rc=0
+          bundle exec rspec spec/oe/fixture_catalog_spec.rb spec/oe/invariants_spec.rb --format progress --format json --out "$RUNNER_TEMP/live.json" || rc=$?
+          echo "OE_CATALOG=live: $(( $(date +%s) - start )) s, rspec exit $rc" | tee -a "$GITHUB_STEP_SUMMARY"
+          # job logs are not readable through the API: failures become annotations
+          ruby -rjson -e 'JSON.parse(File.read(ARGV[0]))["examples"].select { |e| e["status"] == "failed" }.each { |e| puts "::error title=#{e["full_description"][0, 120].tr("\n", " ")}::#{e["exception"]["message"].to_s[0, 600].gsub("\n", "%0A")}" }' "$RUNNER_TEMP/live.json"
+          exit $rc
+
   # Long whole-game specs (#314, #335): run here with the caps lifted (OE_FULL_GAME=1, 30000 actions, the game
   # plays to its end, phase 8 included). The pull-request stage runs the same specs with GAME_CAP/STRATEGY_CAP
   # (spec/engine/engine_helper.rb). One runner per spec; fail-fast off so one red run does not hide the others.

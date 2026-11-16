@@ -46,6 +46,21 @@ jobs:
           else
             echo "web=false" >> "$GITHUB_OUTPUT"; echo "::notice::no web/** change: browser tests skipped (they run in the milestone stage)"
           fi
+      # Guard (#365 B6): stored catalog logs change only in a refresh PR (branch refresh/catalog-*), never in a
+      # feature PR. Lives in this job (a required check) so that no new required check is needed.
+      - name: guard (catalog logs only in a refresh PR)
+        if: github.event_name == 'pull_request'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          logs=$(git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" -- spec/fixtures/games/logs/)
+          if [ -z "$logs" ]; then echo "no catalog log changed"; exit 0; fi
+          case "$HEAD_REF" in
+            refresh/catalog-*) echo "refresh PR ($HEAD_REF): log changes allowed"; echo "$logs"; exit 0 ;;
+          esac
+          echo "$logs"
+          echo "::error::this pull request changes stored catalog logs (spec/fixtures/games/logs/*). Logs are written only by a catalog refresh PR (branch refresh/catalog-<date>): run the catalog-refresh workflow, see README 'Fixture catalog'. Write 'Katalog-Refresh noetig' in the PR description instead."
+          exit 1
 
   web:
     name: web (typecheck, unit tests)

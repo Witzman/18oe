@@ -127,6 +127,15 @@ that commit: GitHub UI Actions > full > Run workflow (field `sha`), or
 (in the workshop checkout). Read the result per job, not only the workflow status. Every example runs in at
 least one stage: fast = `~game_flow`, milestone = all; `view_spec`, `view_order_spec` and `bot_spec` run
 only in the `long games` jobs there (whole files, caps lifted), not additionally in the capped rspec shards.
+Two more pieces (#365 B6). `catalog-refresh.yml` (`workflow_dispatch` only, fields `sha` and `games`; `concurrency` group
+`catalog-refresh`, never cancelled, so refreshes run one after the other) rebuilds the stored catalog logs with the
+current engine, writes `bin/fixture-catalog diff` per game into the step summary and uploads the new
+`spec/fixtures/games/logs/` as the artifact `catalog-logs`; it pushes nothing. Download the artifact, commit it on a
+branch `refresh/catalog-<date>`, open the one refresh PR. The milestone stage has a job `catalog live`
+(`OE_CATALOG=live`: fixture catalog and invariants specs against fresh games instead of stored logs). Guard: the `changes`
+job of `ci.yml` (an existing required check, no new check) fails a pull request that changes
+`spec/fixtures/games/logs/*` unless its branch starts with `refresh/catalog-`.
+
 The browser job of `ci.yml` always runs (a `changes` job decides: without a `web/**` change its steps are skipped and it ends green), so it can be a required check. Wall time of the fast stage: about 2 to 3 min (measured, PRs 157 and 159); milestone stage: about 7 to 8 min.
 
 ## Fixture catalog (#365)
