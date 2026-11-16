@@ -132,10 +132,16 @@ function cellNode(c: MarketCellModel, i: SheetInput, h: SheetHandlers): VNode {
   return v("button", { ...attrs, type: "button", "aria-pressed": String(c.chosen), onclick: () => { if (row && offer) h.onPick(row.id, offer.key); } }, ...body);
 }
 
+const emptyCell = () => v("div", { class: "stock-cell stock-cell-empty", "aria-hidden": "true" });
+
+/** The rows are `display: contents` in one grid, so a short row is padded to the full width: otherwise the next row's cells fill the gap (#405). */
 function gridNode(i: SheetInput, h: SheetHandlers): VNode {
+  const cols = Math.max(0, ...i.market.rows.map((l) => l.length));
   return v("section", { class: "stock-grid", "aria-label": txt("stock.tab_grid").de },
-    v("div", { class: "stock-grid-scroll", style: `--cols:${Math.max(0, ...i.market.rows.map((l) => l.length))}` }, ...i.market.rows.map((line, r) =>
-      v("div", { class: "stock-grid-row", "data-row": String(r) }, ...line.map((c) => c ? cellNode(c, i, h) : v("div", { class: "stock-cell stock-cell-empty", "aria-hidden": "true" }))))),
+    v("div", { class: "stock-grid-scroll", style: `--cols:${cols}` }, ...i.market.rows.map((line, r) =>
+      v("div", { class: "stock-grid-row", "data-row": String(r) },
+        ...line.map((c) => c ? cellNode(c, i, h) : emptyCell()),
+        ...Array.from({ length: cols - line.length }, emptyCell)))),
     v("ul", { class: "stock-legend muted" },
       v("li", { "data-type": "par" }, txt("stock.legend_par").de),
       v("li", { "data-type": "convert_range" }, txt("stock.legend_convert").de),
