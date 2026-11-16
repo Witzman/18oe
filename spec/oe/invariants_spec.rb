@@ -45,7 +45,9 @@ RSpec.describe Oe::Invariants do
     end
   end
 
-  describe "each check sees one deliberately broken state" do
+  # Every example below replays a catalog log (game_at, 1483 to 2531 actions), so the group is
+  # :game_flow (#365). Fast variants that build the state by code come with the scenario helpers (slice 9).
+  describe "each check sees one deliberately broken state", :game_flow do
     it "money_conserved: a note out of nowhere" do
       g = game("operating-dividend")
       expect(violations(g, :money_conserved)).to be_empty
