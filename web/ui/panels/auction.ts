@@ -24,6 +24,8 @@ export function mountAuction(frame: GameFrame, api?: Pick<Api, "catalog">): () =
   // After Abbrechen the running lot is not preselected again for the same state.
   let dismissedSeq = -1;
   let releaseAuctionView: (() => void) | null = null;
+  // While the auction step runs the action panel has nothing to say, so it stays away (#370).
+  let releasePanel: (() => void) | null = null;
   const releaseClaims = [frame.claims.claim(AUCTION_STEP, "bid"), frame.claims.claim(AUCTION_STEP, "pass")];
 
   const handlers: SheetHandlers = {
@@ -102,10 +104,12 @@ export function mountAuction(frame: GameFrame, api?: Pick<Api, "catalog">): () =
     } else if (!active && releaseAuctionView) {
       releaseAuctionView(); releaseAuctionView = null;
     }
+    if (active && !releasePanel) releasePanel = frame.hidePanel();
+    else if (!active && releasePanel) { releasePanel(); releasePanel = null; }
   });
   const releaseOpening = frame.views.register({ id: "opening", labelKey: "auction.view_opening", render: ({ container }) => drawOpening(container) });
 
   return () => {
-    stop(); releaseOpening(); releaseAuctionView?.(); releaseClaims.forEach((f) => f());
+    stop(); releaseOpening(); releaseAuctionView?.(); releasePanel?.(); releaseClaims.forEach((f) => f());
   };
 }
