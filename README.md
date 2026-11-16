@@ -9,6 +9,8 @@ the short version and the pointer.
 ```sh
 bin/setup   # gems into vendor/bundle, Node 22 into .tools/node (idempotent)
 bin/test    # runs the test suites (rspec for now)
+bin/test fast     # fast PR stage locally (no seed games, no browser; ~95 s, 3 rspec processes)
+bin/test changed  # only the specs and unit tests of changed files (--list shows the plan)
 bin/script-game --spawn   # scripted game over the real HTTP API, report of executed round/step/action combinations (#132)
 ```
 
