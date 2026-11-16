@@ -3,7 +3,7 @@
   { "name": "s02-auktion-los", "title": "Auktion · Los gewählt", "fixture": "auction-minor-top",
     "eval": "(async()=>{await new Promise(r=>setTimeout(r,600));document.querySelector('.auction-card[data-card=\"A\"]').click();await new Promise(r=>setTimeout(r,400))})()" },
   { "name": "s03-aktienrunde", "title": "Aktienrunde · Markt", "fixture": "stock-pool",
-    "eval": "(async()=>{await new Promise(r=>setTimeout(r,300));const b=[...document.querySelectorAll('.stock-rowbtn')].find(x=>x.closest('.stock-row').dataset.actionable==='true')||document.querySelector('.stock-rowbtn');b.click();await new Promise(r=>setTimeout(r,400))})()" },
+    "eval": "(async()=>{await new Promise(r=>setTimeout(r,300));const w=ms=>new Promise(r=>setTimeout(r,ms));for(const row of [...document.querySelectorAll('.stock-row')].filter(x=>x.dataset.actionable==='true')){row.querySelector('.stock-rowbtn').click();await w(150);if(document.querySelector('.kit-dialog .stock-offer'))break;document.querySelector('.kit-backdrop')?.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));await w(100)}await w(300)})()" },
   { "name": "s04-aktienrunde-par", "title": "Aktienrunde · Par", "fixture": "stock-par" },
   { "name": "s05-protokoll", "title": "Protokoll", "fixture": "stock-pool",
     "eval": "(async()=>{await new Promise(r=>setTimeout(r,600));document.querySelector('.frame-log-link').click();await new Promise(r=>setTimeout(r,500))})()" },

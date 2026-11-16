@@ -7,12 +7,12 @@
 .stock-cash { font-family: var(--font-head); font-size: var(--type-lg); }
 .stock-status { margin: 0; margin-right: auto; font-size: var(--type-lg); }
 .stock-sheet .muted { color: color-mix(in srgb, var(--ui-bar-ink) 65%, transparent); }
-.stock-row, .stock-pres-item, .stock-cell { color: var(--ui-ink); }
-.stock-row .muted, .stock-pres-item .muted { color: var(--ui-faint); }
+.stock-row, .stock-hold, .stock-cell { color: var(--ui-ink); }
+.stock-row .muted, .stock-hold .muted { color: var(--ui-faint); }
 .stock-warn { margin: 0; padding: 8px 12px; border: 2px solid var(--ui-warn); border-left-width: 6px; border-radius: var(--shape-radius); background: var(--ui-panel); color: var(--ui-ink); font-weight: 700; }
 .stock-head button, .stock-rowbtn, .stock-cell:is(button) { min-height: var(--shape-hit); min-width: var(--shape-hit); }
-.stock-tabs { display: none; gap: 4px; }
-.stock-tabs button[aria-selected="true"] { background: var(--ui-ink); color: var(--ui-panel); border-color: var(--ui-ink); }
+.stock-tabs { display: flex; gap: 4px; }
+.stock-tabs button[aria-selected="true"] { background: var(--ui-ink); color: var(--ui-panel); border-color: var(--ui-ink); box-shadow: inset 0 -4px 0 var(--ui-accent); }
 .stock-body { display: flex; flex-direction: column; gap: calc(var(--shape-gap) * 1.5); min-width: 0; }
 
 /* Gesellschaftskarten (#303): one card per corporation, share bar in player colours; the offers are in the action panel. */
@@ -41,7 +41,12 @@
 .stock-swatch[data-kind="market"] { background: color-mix(in srgb, var(--ui-info) 45%, var(--ui-panel)); }
 .stock-swatch[data-kind="ipo"] { background: repeating-linear-gradient(135deg, var(--ui-panel-alt) 0 2px, var(--ui-panel) 2px 4px); }
 
-/* Offers of the chosen corporation, in the action panel */
+/* Offers of the chosen corporation, in the dialog (#407, #408): the stage fills the view, the sheet scrolls inside it, the dialog stays centred. */
+.stock-stage { position: absolute; inset: 0; }
+.stock-stage > .stock-sheet { height: 100%; overflow: auto; }
+.stock-stage .kit-dialog { max-width: 34rem; }
+.stock-stage .kit-dialog button { min-height: var(--shape-hit); min-width: var(--shape-hit); }
+.stock-empty { margin: 0; }
 .stock-detail { display: flex; flex-direction: column; gap: 8px; }
 .stock-detail-head { display: flex; align-items: center; gap: 6px; }
 .stock-detail .stock-idle, .stock-pick { margin: 0; }
@@ -50,13 +55,12 @@
 .stock-offer { padding: 4px 12px; text-align: left; min-height: var(--shape-hit); }
 .stock-offer[aria-pressed="true"] { background: var(--ui-ink); color: var(--ui-panel); border-color: var(--ui-ink); box-shadow: inset 4px 0 0 var(--ui-accent); }
 
-/* Presidencies */
-.stock-pres h3 { color: var(--ui-bar-ink); margin: 0 0 4px; font-size: var(--type-md); }
-.stock-pres-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 4px 8px; }
-.stock-pres-item { display: flex; align-items: center; gap: 6px; padding: 2px 6px; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); background: var(--ui-panel); min-height: 2.2rem; }
-.stock-pres-item[data-me="true"] { border-color: var(--ui-ink); }
-.stock-pres-corps { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; flex: 1; }
-.stock-pres-n { margin-left: auto; }
+/* The viewer's shares (#407): one button per corporation, it opens the sale. */
+.stock-hold-box h3 { color: var(--ui-bar-ink); margin: 0 0 4px; font-size: var(--type-md); }
+.stock-hold-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 4px 8px; }
+.stock-hold { width: 100%; display: flex; align-items: center; gap: 6px; padding: 2px 8px; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); background: var(--ui-panel); min-height: var(--shape-hit); text-align: left; }
+.stock-hold:hover { background: var(--ui-panel-alt); }
+.stock-hold-pct { margin-left: auto; font-variant-numeric: tabular-nums; }
 
 /* Kurstafel */
 .stock-grid { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -75,29 +79,24 @@
 .stock-legend [data-mark="valid"]::before { outline: 2px solid var(--map-valid); }
 .stock-legend [data-mark="preview"]::before { outline: 2px dashed var(--map-preview); }
 
-/* Layout. Wide landscape (PC, iPad landscape): presidencies left above the floating panel, cards (and below them the
+/* Layout. Wide landscape (PC, iPad landscape): the viewer's shares left above the floating panel, cards (and below them the
    market) right of it, nothing scrolls. Portrait and narrow: one column, room for the bottom sheet below. */
 .stock-sheet { --panel-room: calc(var(--shape-panel-width) + 2 * var(--shape-gap)); }
 .stock-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--shape-gap); }
 @media (min-width: 1000px) and (orientation: landscape) {
   .stock-sheet { padding-left: var(--shape-gap); }
   .stock-body { grid-template-columns: var(--panel-room) minmax(0, 1fr); grid-template-rows: auto 1fr; margin-left: calc(-1 * var(--shape-gap)); }
-  .stock-pres { grid-column: 1; grid-row: 1 / 3; padding-left: var(--shape-gap); align-self: start; }
-  .stock-pres-list { grid-template-columns: minmax(0, 1fr); width: var(--shape-panel-width); }
+  .stock-hold-box { grid-column: 1; grid-row: 1 / 3; padding-left: var(--shape-gap); align-self: start; }
+  .stock-hold-list { grid-template-columns: minmax(0, 1fr); width: var(--shape-panel-width); }
   .stock-list { grid-column: 2; grid-row: 1; }
   .stock-grid { grid-column: 2; grid-row: 2; }
 }
 @media (pointer: coarse) { .stock-cell { min-height: var(--shape-hit); } }
 
-/* Below 1280 px only one of cards / market is shown (tabs). */
-@media (max-width: 1279px) {
-  .stock-tabs { display: flex; }
-  .stock-sheet[data-tab="list"] .stock-grid, .stock-sheet[data-tab="grid"] .stock-list, .stock-sheet[data-tab="grid"] .stock-pres { display: none; }
-}
 /* Portrait / narrow: keep the cards clear of the bottom sheet (collapsed height). */
 @media (orientation: portrait) and (max-width: 1100px), (max-width: 700px) {
   .stock-sheet { padding-bottom: 8rem; }
   .stock-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (max-height: 850px) { .stock-pres-item { min-height: 0; padding: 1px 4px; } .stock-pres-list { gap: 3px; } }
+@media (max-height: 850px) { .stock-hold { min-height: var(--shape-hit); padding: 1px 4px; } .stock-hold-list { gap: 3px; } }
 .stock-rowbtn[aria-pressed="true"] { background: var(--ui-panel); color: var(--ui-ink); }

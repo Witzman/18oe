@@ -5,18 +5,22 @@
 import type { Theme } from "../../themes/schema.ts";
 import type { Game } from "../../types.ts";
 import { corpColor, playerName } from "../frame/model.ts";
-import { Geld, inkFor, playerSlot, Siegel, v, Wimpel, type VNode } from "../kit/index.ts";
+import { Auftrag, Dialog, Geld, inkFor, playerSlot, Siegel, v, type VNode } from "../kit/index.ts";
 import { formatGeld } from "../kit/money.ts";
 import { fillText, txt } from "../text.ts";
-import { blockedReason, presidencies, type BuyOffer, type CorpRow, type MarketCellModel, type MarketModel, type MustSell, type Offer, type ParOffer, type SellOffer, type Selection } from "./stock-model.ts";
-
-export type Tab = "list" | "grid";
+import { blockedReason, holdings, inTab, offerOf, offersFor, orderModel, passAction, type BuyOffer, type CorpRow, type MarketCellModel, type MarketModel, type Mode, type MustSell, type Offer, type ParOffer, type SellOffer, type Selection, type Tab } from "./stock-model.ts";
 
 export interface SheetHandlers {
+  /** A corporation card: opens the dialog to buy or found (#408). */
   onFocus: (corp: string) => void;
+  /** A share of the viewer's own: opens the dialog to sell (#407). */
+  onSell: (corp: string) => void;
   onPick: (corp: string, key: string) => void;
   onTab: (tab: Tab) => void;
-  onMap: () => void;
+  /** Dialog: cancel, Escape and the backdrop only drop the choice; the main button sends. */
+  onClose?: () => void;
+  onConfirm?: () => void;
+  onPass?: () => void;
 }
 
 export interface SheetInput {
@@ -27,6 +31,7 @@ export interface SheetInput {
   focus: string | null;
   sel: Selection | null;
   tab: Tab;
+  mode: Mode;
   must: MustSell | null;
 }
 
@@ -91,31 +96,38 @@ function rowNode(r: CorpRow, i: SheetInput, h: SheetHandlers): VNode {
   return v("li", { class: "stock-row", "data-corp": r.id, "data-state": r.state, "data-focus": open ? "true" : "false", "data-actionable": r.actionable ? "true" : "false" }, head);
 }
 
-/** What can be done with the focused corporation: the offers as buttons, for the action panel (#303). */
+/** What can be done with the focused corporation in the open dialog: the sales, or what the tab buys (#407, #408). */
 export function offersNode(i: SheetInput, h: SheetHandlers): VNode | null {
   const r = i.rows.find((x) => x.id === i.focus);
-  if (!r) return i.g.state.prompt.step === "BuySellParShares" && i.g.state.prompt.viewer_to_act ? v("p", { class: "muted stock-pick" }, txt("stock.pick_corp").de) : null;
+  if (!r) return null;
+  const o = offersFor(r, i.tab, i.mode);
+  const any = o.buys.length + o.sells.length + o.pars.length > 0;
   return v("div", { class: "stock-detail", "data-corp": r.id },
-    v("div", { class: "stock-detail-head" }, sealOf(i.g, i.theme, r.id, r.name, "s"), v("strong", {}, `${r.id} `), v("small", { class: "muted" }, r.name)),
-    r.actionable ? null : v("p", { class: "muted stock-idle" }, blockedReason(i.g, r) ?? txt("stock.row_idle").de),
-    group("stock.buy_head", "buy", r.buys, r, i.sel, h),
-    group("stock.sell_head", "sell", r.sells, r, i.sel, h),
-    group("stock.par_head", "par", r.pars, r, i.sel, h));
+    any ? null : v("p", { class: "muted stock-idle" }, blockedReason(i.g, r) ?? txt(i.mode === "sell" ? "stock.row_idle" : "stock.nothing_to_buy").de),
+    group("stock.buy_head", "buy", o.buys, r, i.sel, h),
+    group("stock.sell_head", "sell", o.sells, r, i.sel, h),
+    group("stock.par_head", "par", o.pars, r, i.sel, h));
 }
 
 function listNode(i: SheetInput, h: SheetHandlers): VNode {
+  const rows = i.rows.filter((r) => inTab(r, i.tab));
   return v("section", { class: "stock-list", "aria-label": txt("stock.tab_list").de },
-    v("ul", { class: "stock-rows" }, ...i.rows.map((r) => rowNode(r, i, h))));
+    rows.length === 0 ? v("p", { class: "muted stock-empty" }, txt(`stock.empty_${i.tab}`).de) : v("ul", { class: "stock-rows" }, ...rows.map((r) => rowNode(r, i, h))));
 }
 
-/** The presidencies of every player, in seat order (#303). */
-function presNode(i: SheetInput): VNode {
-  return v("section", { class: "stock-pres", "aria-label": txt("stock.pres_head").de },
-    v("h3", {}, txt("stock.pres_head").de),
-    v("ul", { class: "stock-pres-list" }, ...presidencies(i.g).map((p) => v("li", { class: "stock-pres-item", "data-me": p.me ? "true" : "false" },
-      Wimpel({ seat: p.seat, name: p.name }, { theme: i.theme }),
-      v("span", { class: "stock-pres-corps" }, ...(p.corps.length === 0 ? [v("small", { class: "muted" }, txt("stock.pres_none").de)] : p.corps.map((c) => sealOf(i.g, i.theme, c.id, c.name)))),
-      v("small", { class: "muted stock-pres-n" }, String(p.corps.length))))));
+/** The shares of the viewer, one button per corporation: it opens the sale (#407). */
+function holdingsNode(i: SheetInput, h: SheetHandlers): VNode {
+  const mine = holdings(i.rows);
+  return v("section", { class: "stock-hold-box", "aria-label": txt("stock.hold_head").de },
+    v("h3", {}, txt("stock.hold_head").de),
+    mine.length === 0 ? v("p", { class: "muted" }, txt("stock.hold_none").de)
+      : v("ul", { class: "stock-hold-list" }, ...mine.map((r) => v("li", {},
+        v("button", {
+          type: "button", class: "stock-hold", "data-corp": r.id, title: fillText("stock.hold_item", { corp: r.id, pct: r.mine }), "aria-label": fillText("stock.hold_item", { corp: r.id, pct: r.mine }),
+          onclick: () => h.onSell(r.id),
+        }, sealOf(i.g, i.theme, r.id, r.name), v("strong", { class: "stock-id" }, r.id),
+        v("span", { class: "stock-hold-pct" }, fillText("stock.pct", { n: r.mine })),
+        v("span", { class: "stock-price" }, r.price !== null ? Geld(r.price) : txt("stock.none").de))))));
 }
 
 function cellNode(c: MarketCellModel, i: SheetInput, h: SheetHandlers): VNode {
@@ -158,20 +170,53 @@ function orderLine(g: Game): VNode | null {
   return v("p", { class: "stock-order muted" }, `${txt(inStock ? "stock.order_now" : "stock.order_next").de}: `, ids.map((id) => playerName(g, id)).join(" → "));
 }
 
+const changesOf = (o: ReturnType<typeof orderModel>) => o.changes.map((c) => ({
+  label: c.label,
+  before: c.money && typeof c.before === "number" ? Geld(c.before) : String(c.before),
+  after: c.money && typeof c.after === "number" ? Geld(c.after) : String(c.after),
+}));
+
+/** The pass button in the head: the stock step offers it only when passing is allowed (#407). */
+function passButton(g: Game, h: SheetHandlers): VNode | null {
+  if (!passAction(g) || !g.state.prompt.viewer_to_act) return null;
+  return v("button", { type: "button", class: "kit-side-btn", "data-action": "pass", title: txt("stock.pass_tip").de, onclick: () => h.onPass?.() }, txt("stock.pass").de);
+}
+
+/** The centred dialog of a focused corporation (#407, #408): the offers of the mode and tab, the order once one is chosen.
+ *  Closing it (Abbrechen, Escape, backdrop) only drops the choice; nothing is sent before the main button. */
+export function stockDialog(i: SheetInput, h: SheetHandlers): VNode | null {
+  const r = i.focus ? i.rows.find((x) => x.id === i.focus) : undefined;
+  if (!r) return null;
+  const picked = offerOf(i.rows, i.sel) !== null && i.sel?.corp === r.id;
+  const o = orderModel(i.g, i.rows, i.sel);
+  return Dialog({
+    id: "stock-offer", title: `${r.id} · ${r.name}`, onClose: h.onClose,
+    body: [
+      offersNode(i, h),
+      picked ? Auftrag({
+        sentence: o.sentence, changes: changesOf(o), state: o.state, reason: o.reason, confirmLabel: o.confirmLabel, showCancel: true,
+        onConfirm: () => h.onConfirm?.(), onCancel: () => h.onClose?.(),
+      }) : v("p", { class: "muted stock-pick" }, txt("stock.pick_offer").de),
+    ],
+    actions: picked ? [] : [v("button", { type: "button", class: "kit-side-btn", onclick: () => h.onClose?.() }, txt("stock.close").de)],
+  });
+}
+
 export function sheetNode(i: SheetInput, h: SheetHandlers): VNode {
   const me = i.g.state.players.find((p) => p.id === i.g.viewer);
   const p = i.g.state.prompt;
   const status = i.g.state.meta.finished ? null
     : p.viewer_to_act && p.step === "BuySellParShares" ? txt("stock.status_mine").de
       : fillText("stock.status_other", { names: i.g.state.meta.active_players.map((id) => playerName(i.g, id)).join(", ") });
-  return v("div", { class: "stock-sheet", "data-tab": i.tab },
+  const sheet = v("div", { class: "stock-sheet", "data-tab": i.tab },
     v("header", { class: "stock-head" },
       status ? v("p", { class: "stock-status", role: "status" }, status) : v("h2", {}, txt("stock.title").de),
       v("div", { class: "stock-tabs", role: "tablist" },
-        ...(["list", "grid"] as const).map((t) => v("button", { type: "button", role: "tab", "data-tab": t, "aria-selected": String(i.tab === t), onclick: () => h.onTab(t) }, txt(`stock.tab_${t}`).de))),
+        ...(["stock", "market"] as const).map((t) => v("button", { type: "button", role: "tab", "data-tab": t, "aria-selected": String(i.tab === t), onclick: () => h.onTab(t) }, txt(`stock.tab_${t}`).de))),
       orderLine(i.g),
-      me ? v("span", { class: "stock-cash" }, `${txt("stock.cash").de} `, Geld(me.cash), ` · ${txt("stock.certs").de} ${fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit })}`) : null,
-      v("button", { type: "button", class: "stock-map", onclick: () => h.onMap() }, txt("stock.map").de)),
+      passButton(i.g, h),
+      me ? v("span", { class: "stock-cash" }, `${txt("stock.cash").de} `, Geld(me.cash), ` · ${txt("stock.certs").de} ${fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit })}`) : null),
     i.must ? v("p", { class: "stock-warn", role: "alert" }, fillText("stock.must_sell", { limit: i.must.limit, certs: i.must.certs })) : null,
-    v("div", { class: "stock-body" }, listNode(i, h), presNode(i), gridNode(i, h)));
+    v("div", { class: "stock-body" }, listNode(i, h), holdingsNode(i, h), gridNode(i, h)));
+  return v("div", { class: "stock-stage" }, sheet, stockDialog(i, h));
 }

@@ -79,34 +79,85 @@ const CHECKS_SELL = (corp: string, percent: number, price: number) => String.raw
   if (!/Markt/.test(q(".frame-tabs").textContent)) fail("no tab Markt");
   if (document.querySelectorAll(".stock-row").length < 5) fail("rows " + document.querySelectorAll(".stock-row").length);
   if ([...document.querySelectorAll(".frame-entry")].some((e) => ["buy_shares", "sell_shares", "par", "pass"].includes(e.dataset.type))) fail("generic bar still offers claimed actions");
-  if (!/Wähle eine Gesellschaft/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
-  if (!q(".kit-main-btn").disabled) fail("main button open without a choice");
+  if (q(".kit-dialog")) fail("a dialog is open before any choice");
   // tablet: no target below the hit size
-  const small = [...document.querySelectorAll(".stock-rowbtn, .stock-head button")].filter((b) => b.getBoundingClientRect().height < 43.5 && b.offsetParent !== null);
+  const small = [...document.querySelectorAll(".stock-rowbtn, .stock-head button, .stock-hold")].filter((b) => b.getBoundingClientRect().height < 43.5 && b.offsetParent !== null);
   if (small.length) fail("targets under 44px: " + small.map((b) => b.textContent.slice(0, 20)).join("|"));
-  q('.stock-row[data-corp="${corp}"] .stock-rowbtn').click();
+  q('.stock-hold[data-corp="${corp}"]').click();
   await sleep(50);
-  const offers = [...document.querySelectorAll(".stock-offer")];
-  if (!offers.length) fail("no offers after opening the row");
-  const tiny = offers.filter((b) => b.getBoundingClientRect().height < 43.5);
-  if (tiny.length) fail("offer buttons under 44px");
-  const sell = offers.find((b) => b.dataset.kind === "sell") || fail("no sell offer");
-  sell.click();
+  const dlg = q(".kit-dialog") || fail("no dialog after choosing a share");
+  if (!new RegExp("${corp}").test(dlg.querySelector("h3").textContent)) fail("title " + dlg.querySelector("h3").textContent);
+  const offers = [...dlg.querySelectorAll(".stock-offer")];
+  if (!offers.length) fail("no offers in the dialog");
+  if (offers.some((b) => b.dataset.kind !== "sell")) fail("the sale dialog offers something else");
+  const tiny = [...dlg.querySelectorAll("button")].filter((b) => b.getBoundingClientRect().height < 43.5);
+  if (tiny.length) fail("dialog buttons under 44px");
+  if (dlg.querySelector(".kit-main-btn")) fail("an order before the choice");
+  offers.find((b) => b.dataset.kind === "sell").click();
   await sleep(50);
-  if (!/${corp}: ${percent} % verkaufen, Erlös £${price}\./.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
-  if (q(".kit-main-btn").disabled) fail("main button locked although valid");
+  const sentence = q(".kit-dialog .kit-order-sentence") || fail("no order in the dialog");
+  if (!/${corp}: ${percent} % verkaufen, Erlös £${price}\./.test(sentence.textContent)) fail("sentence: " + sentence.textContent);
+  if (q(".kit-dialog .kit-main-btn").disabled) fail("main button locked although valid");
   if (!q('.stock-cell[data-preview="true"]')) fail("no preview cell for the price after the sale");
-  if (!/Kasse/.test(q(".kit-changes").textContent)) fail("no cash change line");
+  if (!/Kasse/.test(q(".kit-dialog .kit-changes").textContent)) fail("no cash change line");
   if ((await posted()).length !== 0) fail("choosing sent something");
-  q(".kit-main-btn").click();
+  q(".kit-dialog .kit-main-btn").click();
   await sleep(600);
   if ((await posted()).length !== 1) fail("sent " + (await posted()).length);
+})()`;
+
+const CHECKS_CLOSE = (corp: string) => String.raw`(async () => {
+  const fail = (m) => { throw new Error(m); };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const q = (s) => document.querySelector(s);
+  q('.stock-hold[data-corp="${corp}"]').click();
+  await sleep(50);
+  if (!q(".kit-dialog")) fail("no dialog");
+  q(".kit-dialog .stock-offer").click();
+  await sleep(50);
+  ([...q(".kit-dialog").querySelectorAll("button")].find((b) => b.textContent === "Abbrechen") || fail("no Abbrechen once an offer is chosen")).click();
+  await sleep(50);
+  if (q(".kit-dialog")) fail("Abbrechen did not close the dialog");
+  q('.stock-hold[data-corp="${corp}"]').click();
+  await sleep(50);
+  q(".kit-backdrop").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await sleep(50);
+  if (q(".kit-dialog")) fail("Escape did not close the dialog");
+  if ((await (await fetch("/__posted")).json()).length !== 0) fail("closing sent something");
+})()`;
+
+const CHECKS_BUY = String.raw`(async () => {
+  const fail = (m) => { throw new Error(m); };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const q = (s) => document.querySelector(s);
+  const tabs = [...document.querySelectorAll('.stock-tabs [role="tab"]')].map((t) => t.textContent);
+  if (tabs.join("|") !== "Aktienmarkt|Open Market") fail("tabs " + tabs);
+  let offers = [];
+  for (const row of [...document.querySelectorAll(".stock-row")].filter((r) => r.dataset.actionable === "true")) {
+    row.querySelector(".stock-rowbtn").click();
+    await sleep(50);
+    if (!q(".kit-dialog")) fail("no dialog after clicking a corporation");
+    offers = [...q(".kit-dialog").querySelectorAll(".stock-offer")];
+    if (offers.length) break;
+    q(".kit-backdrop").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await sleep(50);
+  }
+  if (!offers.length) fail("no corporation offers anything to buy");
+  if (offers.some((b) => b.dataset.kind === "sell")) fail("the buy dialog offers a sale");
+  if (offers.some((b) => b.dataset.kind === "buy" && /Markt,/.test(b.textContent))) fail("market shares in the Aktienmarkt tab");
+  q(".kit-backdrop").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await sleep(50);
+  document.querySelector('.stock-tabs [data-tab="market"]').click();
+  await sleep(50);
+  const rows = [...document.querySelectorAll(".stock-row")];
+  if (!rows.length) fail("Open Market lists no corporation");
+  if (rows.some((r) => !/Markt \d+/.test(r.textContent))) fail("a corporation without market shares in the Open Market tab");
 })()`;
 
 const CHECKS_PASS = String.raw`(async () => {
   const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const side = document.querySelector(".frame-order-side .kit-side-btn") || fail("no pass button");
+  const side = document.querySelector('.stock-head [data-action="pass"]') || fail("no pass button");
   if (!/Passen/.test(side.textContent)) fail("label " + side.textContent);
   if (side.getBoundingClientRect().height < 43.5) fail("pass button under 44px");
   side.click();
@@ -118,11 +169,11 @@ const CHECKS_PASS = String.raw`(async () => {
 const CHECKS_MAP = String.raw`(async () => {
   const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  document.querySelector(".stock-map").click();
+  const tabs = () => [...document.querySelectorAll(".frame-tabs button")];
+  (tabs().find((b) => b.textContent === "Karte") || fail("no tab Karte")).click();
   await sleep(100);
-  if (document.querySelector(".stock-sheet")) fail("Karte button did not leave the sheet");
-  const tab = [...document.querySelectorAll(".frame-tabs button")].find((b) => b.textContent === "Markt") || fail("tab Markt gone");
-  tab.click();
+  if (document.querySelector(".stock-sheet")) fail("the tab Karte did not leave the sheet");
+  (tabs().find((b) => b.textContent === "Markt") || fail("tab Markt gone")).click();
   await sleep(100);
   if (!document.querySelector(".stock-sheet")) fail("tab Markt does not return to the sheet");
 })()`;
@@ -161,6 +212,19 @@ test("stock sheet in the browser: the pass button sends the offered pass", { ski
   assert.deepEqual(posted[0]!.action, game.state.prompt.actions.find((a: Record<string, unknown>) => a.type === "pass"));
 });
 
-test("stock sheet in the browser: Karte leaves the sheet and the tab Markt returns", { skip }, async () => {
+test("stock sheet in the browser: the tab Karte leaves the sheet and the tab Markt returns", { skip }, async () => {
   await scenario("stock-pool", CHECKS_MAP);
+});
+
+test("stock sheet in the browser: Abbrechen and Escape close the dialog without sending", { skip }, async () => {
+  const g0 = fixture("stock-pool");
+  const first = g0.state.prompt.actions.find((a: Record<string, unknown>) => a.type === "sell_shares")!;
+  const b = g0.state.prompt.context!.stock!.bundles.find((x: StockBundle) => x.type === "sell_shares" && JSON.stringify(x.shares) === JSON.stringify(first.shares))!;
+  const { posted } = await scenario("stock-pool", CHECKS_CLOSE(b.corporation));
+  assert.equal(posted.length, 0);
+});
+
+test("stock sheet in the browser: a corporation opens the buy dialog; the tabs Aktienmarkt and Open Market list their own corporations", { skip }, async () => {
+  const { posted } = await scenario("stock-pool", CHECKS_BUY);
+  assert.equal(posted.length, 0);
 });
