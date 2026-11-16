@@ -94,6 +94,10 @@ RSpec.describe Oe::FixtureCatalog do
 
   # #365 B1: finders are resolved when the catalog is loaded; both formats are read.
   describe "finder entries" do
+    # These examples write their own stored logs in a tmp dir: they test stored mode, whatever OE_CATALOG says
+    # (the milestone job `catalog live` runs this file with OE_CATALOG=live, #365 B6).
+    before { allow(described_class).to receive(:live?).and_return(false) }
+
     around do |example|
       Dir.mktmpdir do |dir|
         @dir = dir
@@ -164,6 +168,10 @@ RSpec.describe Oe::FixtureCatalog do
 
   # #365 B4: stale logs, live mode, rebuild and diff, on a tiny game of a few actions (no whole game).
   describe "stale logs, live mode, build and diff" do
+    # These examples write their own stored logs in a tmp dir: they test stored mode, whatever OE_CATALOG says
+    # (the milestone job `catalog live` runs this file with OE_CATALOG=live, #365 B6).
+    before { allow(described_class).to receive(:live?).and_return(false) }
+
     let(:game_spec) { { "players" => 4, "seed" => 1, "player" => "random", "max_actions" => 3 } }
     let(:definition) do
       { "games" => { "g" => game_spec },
@@ -227,6 +235,7 @@ RSpec.describe Oe::FixtureCatalog do
       File.write(described_class.log_path("g", @dir), "not even json")
       allow(ENV).to receive(:[]).and_call_original
       allow(ENV).to receive(:[]).with("OE_CATALOG").and_return("live")
+      allow(described_class).to receive(:live?).and_call_original
 
       expect(described_class).to be_live
       expect(described_class.entries(@dir).map(&:position)).to eq([0, 1])
