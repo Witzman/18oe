@@ -1,14 +1,32 @@
 # frozen_string_literal: true
 
-# Fixture catalog (#117): bin/fixture-catalog build | verify [name ...] | list | invariants [every]
+# Fixture catalog (#117): bin/fixture-catalog build <game> | diff <game> | verify [name ...] | list | invariants [every]
 ENV['ENGINE_LOG_LEVEL'] ||= '3'
+require 'fileutils'
 require 'oe/fixture_builder'
 require 'oe/invariants'
 
 command = ARGV.shift || 'list'
 case command
 when 'build'
-  Oe::FixtureBuilder.build
+  # build <game> [--to DIR]: one game per call (a game takes minutes); --to writes elsewhere (a check run)
+  to = ARGV.index('--to') && ARGV.slice!(ARGV.index('--to'), 2).last
+  games = ARGV.dup
+  if games.empty?
+    warn "usage: bin/fixture-catalog build <game> [--to DIR]   games: #{Oe::FixtureCatalog.catalog['games'].keys.join(', ')}"
+    exit 2
+  end
+  if to
+    FileUtils.mkdir_p(to)
+    FileUtils.cp(File.join(Oe::FixtureCatalog::DIR, 'catalog.json'), File.join(to, 'catalog.json'))
+    Oe::FixtureBuilder.build(to, Oe::FixtureBuilder.definition, only: games)
+  else
+    Oe::FixtureBuilder.build(only: games)
+  end
+when 'diff'
+  # diff <game>: what a rebuild would change, nothing written (a game takes minutes)
+  games = ARGV.empty? ? (warn('usage: bin/fixture-catalog diff <game>'); exit(2)) : ARGV
+  games.each { |g| puts Oe::FixtureBuilder.report(Oe::FixtureBuilder.diff(g)) }
 when 'list'
   Oe::FixtureCatalog.entries.each { |e| puts format('%-28s %-3s %-14s @%-5d %s', e.name, e.slice, e.game, e.position, e.surface) }
 when 'verify'
@@ -33,6 +51,6 @@ when 'invariants'
   puts Oe::Invariants.report(found.map(&:last))
   exit(Oe::Invariants.failures(found.map(&:last)).empty? ? 0 : 1)
 else
-  warn 'usage: bin/fixture-catalog build | verify [name ...] | list | invariants [every]'
+  warn 'usage: bin/fixture-catalog build <game> [--to DIR] | diff <game> | verify [name ...] | list | invariants [every]'
   exit 2
 end

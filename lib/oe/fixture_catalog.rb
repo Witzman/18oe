@@ -24,7 +24,16 @@ module Oe
   #
   # The logs are built (and rebuilt after an engine change that alters play) by
   # bin/fixture-catalog; `bin/fixture-catalog verify` re-checks every entry.
+  #
+  # Two modes (#365): `stored` (default) replays the log files; `live` (OE_CATALOG=live) plays a fresh
+  # game per catalog game with Oe::Playthrough (players, seed, player kind, max_actions of the catalog)
+  # and resolves the finders on that, so the current engine is checked without a rebuild. In `stored`
+  # mode a log the engine no longer accepts raises StaleLog (log <game> stale at action K ...), which
+  # says "refresh the catalog", as opposed to a finding in a state.
   module FixtureCatalog
+    # The stored log does not fit the engine (or strategy) any more: a catalog refresh is due.
+    class StaleLog < RuntimeError; end
+
     # `position`, `expect` and `state` of an entry with a finder are resolved on first use (a replay of
     # the log), so reading names, finders and notes costs nothing.
     Entry = Struct.new(:name, :surface, :slice, :game, :position, :expect, :note, :finder, :resolver, keyword_init: true) do
@@ -57,6 +66,10 @@ module Oe
     DIR = File.expand_path('../../spec/fixtures/games', __dir__)
 
     module_function
+
+    def live?
+      ENV['OE_CATALOG'] == 'live'
+    end
 
     def catalog(dir = DIR)
       JSON.parse(File.read(File.join(dir, 'catalog.json')))
@@ -153,11 +166,10 @@ module Oe
     def resolutions(dir, game_name)
       cat = catalog(dir)
       file = File.join(dir, cat['games'].fetch(game_name)['file'])
-      key = [File.expand_path(dir), game_name, File.mtime(File.join(dir, 'catalog.json')), File.mtime(file)]
+      key = [File.expand_path(dir), game_name, File.mtime(File.join(dir, 'catalog.json')), live? ? :live : File.mtime(file)]
       (@resolutions ||= {})[key] ||= begin
-        log = JSON.parse(File.read(file))
         finders = cat['entries'].select { |e| e['game'] == game_name && !e.key?('position') }
-        scan(log, finders)
+        scan(log_file(game_name, dir), finders, name: game_name)
       end
     end
 
@@ -172,7 +184,7 @@ module Oe
     # satisfies it. Returns name => { position:, expect:, state: } (entries never matched are absent).
     # `log` is anything with `players` and `seed` (a log file hash, or a game spec of the builder
     # when the action list is passed as `actions`). The finder semantics are the builder's.
-    def scan(log, entries, actions = nil)
+    def scan(log, entries, actions = nil, name: nil)
       actions ||= log['actions_log']
       found = {}
       pending = entries.dup
@@ -196,7 +208,7 @@ module Oe
         break if pending.empty?
 
         game.process_action(action)
-        raise "replay failed at #{i + 1}: #{game.exception.message}" if game.exception
+        raise stale(name, actions, game, i + 1) if game.exception
 
         next_type = actions[i + 1] && actions[i + 1]['type']
         visit.call(i + 1)
@@ -208,8 +220,50 @@ module Oe
       entries(dir).find { |e| e.name == name } || raise(KeyError, "no fixture entry #{name.inspect}")
     end
 
+    # The action log of a catalog game: the stored file, or in live mode a fresh game (once per process).
     def log_file(game_name, dir = DIR)
+      live? ? live_log(game_name, dir) : stored_log(game_name, dir)
+    end
+
+    def stored_log(game_name, dir = DIR)
       JSON.parse(File.read(File.join(dir, catalog(dir)['games'].fetch(game_name)['file'])))
+    end
+
+    # A fresh game of the catalog's definition. Raises when it does not play on (engine or enumerator
+    # defect), since a log cut short would make every later finder fail with a misleading message.
+    def live_log(game_name, dir = DIR)
+      spec = catalog(dir)['games'].fetch(game_name)
+      @live_logs ||= {}
+      @live_logs[[game_name, spec]] ||= begin
+        result = play(spec)
+        unless %i[finished limit].include?(result.status)
+          raise "live game #{game_name} stopped (#{result.status}) after #{result.actions} actions: #{result.stop_point}"
+        end
+
+        { 'players' => spec['players'], 'seed' => spec['seed'], 'player' => spec['player'], 'actions_log' => result.log }
+      end
+    end
+
+    # Plays the game of a catalog game spec with Oe::Playthrough (deterministic: players, seed, player kind).
+    def play(spec)
+      require_relative 'playthrough'
+      Playthrough.run(players: spec['players'], seed: spec['seed'], max_actions: spec['max_actions'], player: spec['player'].to_sym)
+    end
+
+    # StaleLog for the action at which a replaying game refused the log (1-based; `count` defaults to the
+    # game's accepted actions + 1, since the refused action was popped from game.actions).
+    def stale(name, actions, game, count = game.actions.size + 1)
+      refused = actions[count - 1] || {}
+      StaleLog.new("log #{name || '?'} stale at action #{count} (#{refused['type']}): " \
+                   "#{game.exception.class.name.split('::').last}: #{game.exception.message[0, 160]}; the catalog needs a refresh")
+    end
+
+    # First differing action (0-based) of the stored and a fresh action list (ids and times ignored), or nil
+    # if the stored one is a prefix of the fresh one (a stored log is cut after its last needed position).
+    def first_difference(stored, fresh)
+      strip = ->(a) { a.reject { |k, _| %w[id created_at].include?(k) } }
+      common = [stored.size, fresh.size].min
+      (0...common).find { |i| strip.call(stored[i]) != strip.call(fresh[i]) } || (stored.size > fresh.size ? common : nil)
     end
 
     def new_game(file, actions)
@@ -222,8 +276,9 @@ module Oe
     def game_at(entry, dir = DIR, file: nil)
       entry = entry(entry, dir) if entry.is_a?(String)
       file ||= log_file(entry.game, dir)
-      game = new_game(file, file['actions_log'].first(entry.position))
-      raise "fixture #{entry.name}: engine rejected the log: #{game.exception.message}" if game.exception
+      actions = file['actions_log'].first(entry.position)
+      game = new_game(file, actions)
+      raise stale(entry.game, actions, game) if game.exception
 
       game
     end
