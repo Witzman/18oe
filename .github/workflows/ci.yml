@@ -143,9 +143,10 @@ jobs:
       - name: fast specs (--tag ~game_flow), engine specs and contracts included (shard)
         run: |
           # time-balanced shard (.github/scripts/shard.rb, timings in .github/rspec-timings.json). No file
-          # exclusion: the game-playing files are tagged :game_flow and drop out by tag (the same selection as
-          # `bin/test fast`); everything tagged :game_flow runs in full.yml.
-          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 '')
+          # exclusion list: the game-playing examples are tagged :game_flow and drop out by tag (the same selection as
+          # `bin/test fast`); files that are wholly :game_flow are not even handed to rspec (SHARD_SKIP_TAG, so their
+          # time does not skew the shards). Everything tagged :game_flow runs in full.yml.
+          files=$(SHARD_SKIP_TAG=game_flow ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 '')
           echo "$files"
           bundle exec rspec $files --tag ~game_flow --format progress --format json --out "$RUNNER_TEMP/rspec.json"
       - name: per-file timings (to refresh .github/rspec-timings.json)
