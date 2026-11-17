@@ -108,7 +108,7 @@ module Oe
         next unless entity.company? || affordable_lay?(entity, hex)
 
         # legal_rotations is per hex, and one tile object can be offered on several hexes
-        [hex, step.upgradeable_tiles(entity, hex).map { |tile| [tile, tile.legal_rotations.dup] }]
+        [hex, step.upgradeable_tiles(entity, hex).map { |tile| [tile, affordable_rotations(entity, hex, tile)] }]
       end
       @connected = nil
       connected_paths(actor) unless candidates.empty?
@@ -126,10 +126,29 @@ module Oe
     # reserved 2+2 payable (§11.6.4, workshop #352; patronage of the hex counted).
     def affordable_lay?(entity, hex)
       cost = @game.upgrade_cost(hex.tile, hex, entity, entity)
+      # 18OE §11.1.6 (#360): the fee for the sea zones to the hex, the fewest a tile there can cost
+      cost += @game.cross_water_track_fee(entity, hex).to_i if @game.respond_to?(:cross_water_track_fee)
       return false if cost > entity.cash
       return true unless @game.respond_to?(:first_round_spend_allowed?)
 
       @game.first_round_spend_allowed?(entity, cost - @game.patronage_payout(hex))
+    end
+
+    # 18OE §11.1.6 (#360): the fee for the sea zones depends on the sides the tile connects to, so a rotation
+    # whose fee the cash (or the first-OR reserve) cannot pay is left out. On the real map, before any trial lay.
+    def affordable_rotations(entity, hex, tile)
+      rotations = tile.legal_rotations.dup
+      return rotations if entity.company? || !@game.respond_to?(:cross_water_track_fee)
+
+      terrain = @game.upgrade_cost(hex.tile, hex, entity, entity)
+      rotations.select do |rotation|
+        tile.rotate!(rotation)
+        fee = @game.cross_water_track_fee(entity, hex, tile).to_i
+        next true if fee.zero?
+
+        cost = terrain + fee
+        cost <= entity.cash && @game.first_round_spend_allowed?(entity, cost - @game.patronage_payout(hex))
+      end
     end
 
     # The company's connected paths on the real map, taken before any trial lay.
@@ -738,12 +757,14 @@ module Oe
     # [variant name, price] pairs. A depot train is offered once per variant the
     # engine allows (Step::Train#buyable_train_variants): 3 and 3+3, 4 and 4+4,
     # 5 and 5+5, 6 and 6+6, 7+7 and 4D, 8+8 and 5D (RB 11.6, the double-sided
-    # cards), each at its own price. A train of another railroad keeps the side
-    # it was bought with: no variant.
+    # cards), each at its own price (less Minor J's discount, §15.9). A train of
+    # another railroad keeps the side it was bought with: no variant.
     def train_offers(step, entity, train, min, max)
       return other_train_prices(train, min, max).map { |price| [nil, price] } unless train.from_depot?
 
-      step.send(:buyable_train_variants, train, entity).map { |variant| [variant[:name], variant[:price]] }
+      step.send(:buyable_train_variants, train, entity).map do |variant|
+        [variant[:name], step.depot_price(entity, train, variant[:name])]
+      end
     end
 
     # A train from another corporation: the engine's whole span (RB 11.6,

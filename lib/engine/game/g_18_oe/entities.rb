@@ -657,7 +657,11 @@ module Engine
             text_color: 'black',
             abilities: [
               {
-                type: 'description',
+                # §15.9: upstream's train discount; G18OE#setup turns the rate into an amount per side,
+                # fractions in favour of the RR.
+                type: 'train_discount',
+                discount: 0.1,
+                trains: [],
                 description: '10% discount on the purchase price of all trains (including Pullman cars). '\
                              'Minor M still receives the full £15 royalty on Pullman purchases '\
                              'even when this discount applies.',

@@ -478,6 +478,7 @@ module Engine
           @mail_contract_ability = corporation_by_id('K')&.abilities&.first
           # §15.5/§15.6: the ability objects travel with the charter into the major on a merge
           @ef_abilities = %w[E F].to_h { |id| [id, corporation_by_id(id)&.abilities&.first] }
+          setup_minor_j_discount!
           # §15.4: Minor D's token
           setup_green_junction!
           # §15.11: Minor L's +1+1 marker
@@ -655,6 +656,21 @@ module Engine
             @bank.spend(amount, corp)
             @log << "#{corp.name} receives mail contract of #{format_currency(amount)}"
           end
+        end
+
+        # ---- §15.9 Minor J, Grey Locomotive Works (train discount) --------------------------
+
+        # The charter carries upstream's :train_discount (rate 0.1); it travels into the major on a merge
+        # like any minor ability. The rate becomes a whole amount per train side, fractions in favour of
+        # the RR (ASSUMPTION, workshop #74: §11.1.3 says so for construction discounts): the 3+3 (£225)
+        # costs £202.
+        def setup_minor_j_discount!
+          ability = corporation_by_id('J')&.abilities&.find { |a| a.type == :train_discount }
+          return unless ability
+
+          rate = ability.discount.rationalize
+          ability.discount = self.class::TRAINS.flat_map { |t| [t, *Array(t[:variants])] }
+                                                .to_h { |t| [t[:name], (t[:price] * rate).ceil] }
         end
 
         # ---- §14.9 Brandt & Brandau, Engineers ---------------------------------------------
@@ -904,7 +920,9 @@ module Engine
           return false unless corporation&.corporation? && corporation.type == :major
           return false unless corporation.floated? && corporation.trains.empty?
 
-          corporation.cash + player.cash < depot.min_depot_price
+          train = depot.min_depot_train
+          price = train ? train.min_price(ability: abilities(corporation, :train_discount)) : 0
+          corporation.cash + player.cash < price
         end
 
         # §15.2: Orange Scroll Surveyors (or the major holding its charter).

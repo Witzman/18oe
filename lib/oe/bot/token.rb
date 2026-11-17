@@ -32,7 +32,12 @@ module Oe
         return tokens.sample(random: @rng) unless pass && entity.corporation? # forced or not ours to judge
         return pass if price(entity) > entity.cash - @track.reserve(entity)
 
-        Pick.weighted(tokens.map { |a| [score(a.city), a] }, @rng)
+        # 18OE §11.2.1 (#360): a city across the sea costs £40 a zone on top; dear ones score less
+        spend = entity.cash - @track.reserve(entity) - price(entity)
+        tokens = tokens.select { |a| sea_fee(entity, a.city) <= spend }
+        return pass if tokens.empty?
+
+        Pick.weighted(tokens.map { |a| [score(a.city) - (sea_fee(entity, a.city) / 10.0), a] }, @rng)
       end
 
       private
@@ -41,6 +46,10 @@ module Oe
         step = @game.round.active_step
         tokens = step.respond_to?(:available_tokens) ? step.available_tokens(entity) : entity.tokens.reject(&:used)
         tokens.map(&:price).min || 0
+      end
+
+      def sea_fee(entity, city)
+        @game.respond_to?(:cross_water_token_fee) ? @game.cross_water_token_fee(entity, city).to_i : 0
       end
 
       def score(city)

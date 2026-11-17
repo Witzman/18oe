@@ -83,9 +83,14 @@ module Oe
         end
       end
 
-      # Terrain cost before any zone discount (Game#upgrade_cost would log the discount).
+      # Terrain cost before any zone discount (Game#upgrade_cost would log the discount), plus 18OE's fee for the
+      # sea zones to the new track (§11.1.6, #360).
       def cost(action)
-        action.hex.tile.upgrades.sum(&:cost)
+        terrain = action.hex.tile.upgrades.sum(&:cost)
+        return terrain unless @game.respond_to?(:cross_water_track_fee)
+
+        action.tile.rotate!(action.rotation)
+        terrain + @game.cross_water_track_fee(action.entity, action.hex, action.tile).to_i
       end
 
       def score_all(entity, actions)
