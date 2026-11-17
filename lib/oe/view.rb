@@ -581,6 +581,8 @@ module Oe
         if action.target && step.respond_to?(:entity_choices) then safe { step.entity_choices(action.target)[choice] }
         elsif step.respond_to?(:choices) then safe { step.choices[choice] }
         end
+      # A non-blocking step (a private acting during Track, #81) is not the active step: ask the round's steps.
+      label ||= safe { game.round.steps.find { |s| s.respond_to?(:choices) && s.choices.key?(choice) }&.choices&.[](choice) }
       if label.nil? && step.respond_to?(:entity_choices)
         corp = safe { game.corporation_by_id(choice) }
         label = safe { step.entity_choices(corp)[choice] } if corp
