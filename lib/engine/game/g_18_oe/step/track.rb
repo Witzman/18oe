@@ -189,7 +189,11 @@ module Engine
             raise GameError, 'Cannot lay an upgrade now' if tile.color != :yellow && points_cost > points_available
             raise GameError, 'Cannot lay a yellow now' if tile.color == :yellow && points_cost > points_available
 
-            lay_tile(action)
+            sea_fee = cross_water_fee(action)
+            lay_tile(action, extra_cost: sea_fee)
+            if sea_fee.positive?
+              @game.log_cross_water_fee(action.entity, sea_fee, @game.class::CROSS_WATER_TRACK_FEE, 'the new track (§11.1.6)')
+            end
             if right_of_way
               raise GameError, 'The Right-of-Way tile must connect the home station to another town or city' \
                 unless @game.right_of_way_connected?(action.entity)
@@ -198,6 +202,13 @@ module Engine
               @game.log << "#{action.entity.name} uses its Right-of-Way (§11.1.9)"
             end
             record_lay!(action.entity, action, old_tile, points_cost, bonus_id)
+          end
+
+          # §11.1.6 (#360): the fee for the sea zones to the new track, taken before the tile is laid (the lay changes
+          # the graph) and paid with the terrain cost (Tracker#lay_tile's extra cost).
+          def cross_water_fee(action)
+            action.tile.rotate!(action.rotation)
+            @game.cross_water_track_fee(action.entity, action.hex, action.tile).to_i
           end
 
           # Points a private's free lay (§14.9) costs the operating RR, and the E/F bonus it uses; raises

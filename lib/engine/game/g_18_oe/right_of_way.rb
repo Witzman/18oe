@@ -64,7 +64,11 @@ module Engine
         # True when the RR's track (after a trial or real lay) reaches a stop outside its home hexes.
         def right_of_way_connected?(entity)
           homes = right_of_way_home_nodes(entity).map(&:hex)
-          graph_for_entity(entity).connected_nodes(entity).keys.any? { |node| !homes.include?(node.hex) }
+          # "via land or Ferry, without using a sea crossing": nodes reached over the sea (#360) do not count
+          graph = graph_for_entity(entity)
+          graph.connected_nodes(entity).keys.any? do |node|
+            !homes.include?(node.hex) && graph.water_zones_to_node(entity, node).zero?
+          end
         end
 
         # Can the RR reach another town or city with yellow lays, `points` tile points and `cash`?

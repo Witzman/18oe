@@ -81,7 +81,8 @@ RSpec.describe "Oe::View operating context (#123)", :game_flow do
     (track[:hexes] || []).each do |h|
       hex = game.hex_by_id(h[:hex])
       expect(step.available_hex(entity, hex)).to be_truthy
-      expect(h[:cost]).to eq(game.upgrade_cost(hex.tile, hex, entity, entity))
+      # #360: plus the fee for the sea zones to the hex (§11.1.6)
+      expect(h[:cost]).to eq(game.upgrade_cost(hex.tile, hex, entity, entity) + game.cross_water_track_fee(entity, hex).to_i)
       expect(h[:cost_parts].sum { |p| p[:amount] }).to eq(h[:cost])
       expect(h[:points]).to eq(step.points_for_lay(entity, hex)) # #426: with the E/F extra point
       expect(h[:points]).to be <= track[:points][:left]
