@@ -83,7 +83,7 @@ RSpec.describe "Oe::View operating context (#123)", :game_flow do
       expect(step.available_hex(entity, hex)).to be_truthy
       expect(h[:cost]).to eq(game.upgrade_cost(hex.tile, hex, entity, entity))
       expect(h[:cost_parts].sum { |p| p[:amount] }).to eq(h[:cost])
-      expect(h[:points]).to eq(step.points_for_hex(hex))
+      expect(h[:points]).to eq(step.points_for_hex(hex, entity))
       expect(h[:points]).to be <= track[:points][:left]
       expect(h[:tiles].map { |t| t[:name] }.sort).to eq(step.upgradeable_tiles(entity, hex).map { |t| t.name.to_s }.sort)
       h[:tiles].each { |t| expect(t[:rotations]).not_to be_empty }

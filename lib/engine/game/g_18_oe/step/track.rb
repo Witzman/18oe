@@ -34,9 +34,24 @@ module Engine
 
           # Tile points a lay on this hex costs: 1 for a yellow, 2 for an upgrade,
           # doubled on a metropolis hex.
-          def points_for_hex(hex)
+          # §15.2 (Minor B): with the ability an upgrade of a hex without a city costs 1 point; the
+          # real cost of a chosen tile is `points_for_tile`, this is the cheapest it can be.
+          def points_for_hex(hex, entity = nil)
+            return 1 if entity && @game.minor_b?(entity) && hex.tile.color != :white && hex.tile.cities.empty? &&
+                        !@game.metropolis_hex?(hex)
+
             base = hex.tile.color == :white ? 1 : 2
             @game.metropolis_hex?(hex) ? base * 2 : base
+          end
+
+          # Tile points laying `tile` costs: yellow 1, upgrade 2, metropolis tiles double; with
+          # Minor B (§15.2) an upgrade to a tile without a city (towns allowed) costs 1.
+          def points_for_tile(entity, tile)
+            metropolis = @game.metropolis_tile?(tile)
+            return metropolis ? 4 : 2 if tile.color != :yellow && (metropolis || tile.cities.any? || !@game.minor_b?(entity))
+            return 1 if tile.color != :yellow
+
+            metropolis ? 2 : 1
           end
 
           # §15.5/§15.6: Minor E/F (or the major holding their ability) may spend one extra tile
@@ -94,15 +109,8 @@ module Engine
           def lay_tile_action(action)
             tile = action.tile
             old_tile = action.hex.tile
-            metropolis = @game.metropolis_tile?(tile)
             points_available = get_tile_lay(action.entity) - @points_used
-            points_cost = if tile.color != :yellow && metropolis
-                            4
-                          elsif (tile.color == :yellow && metropolis) || tile.color != :yellow
-                            2
-                          else
-                            1
-                          end
+            points_cost = points_for_tile(action.entity, tile)
             bonus_id = ef_bonus_id(action.entity, action.hex, tile)
             points_cost -= 1 if bonus_id
             raise GameError, 'Cannot lay an upgrade now' if tile.color != :yellow && points_cost > points_available
@@ -131,7 +139,7 @@ module Engine
             points_available = get_tile_lay(entity) - @points_used
             return nil if hex.tile.color == :blue
 
-            needed = points_for_hex(hex) - (ef_bonus_id(entity, hex) ? 1 : 0)
+            needed = points_for_hex(hex, entity) - (ef_bonus_id(entity, hex) ? 1 : 0)
             return nil if points_available < needed
 
             connected

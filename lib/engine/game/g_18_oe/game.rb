@@ -451,6 +451,8 @@ module Engine
           setup_patronage_tiles!
           setup_wcf_placeholder!
           @minor_g_ability = corporation_by_id('G')&.abilities&.first
+          # §15.2: the ability object travels with the charter into the major on a merge
+          @minor_b_ability = corporation_by_id('B')&.abilities&.first
           # §15.5/§15.6: the ability objects travel with the charter into the major on a merge
           @ef_abilities = %w[E F].to_h { |id| [id, corporation_by_id(id)&.abilities&.first] }
         end
@@ -725,6 +727,11 @@ module Engine
           return budget if entity.type == :national
 
           entity.abilities.include?(@minor_g_ability) ? budget + 2 : budget
+        end
+
+        # §15.2: Orange Scroll Surveyors (or the major holding its charter).
+        def minor_b?(entity)
+          !@minor_b_ability.nil? && entity.abilities.include?(@minor_b_ability)
         end
 
         def can_buy_train_from_others?
