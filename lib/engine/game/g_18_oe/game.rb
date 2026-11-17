@@ -10,6 +10,7 @@ require_relative 'round/consolidation'
 require_relative 'round/concession'
 require_relative 'golden_bell'
 require_relative 'sea'
+require_relative 'national'
 require_relative 'step/consolidate'
 require_relative 'step/hochberg_token'
 require_relative 'green_junction'
@@ -41,6 +42,7 @@ module Engine
         include G18OE::GreenJunction
         include G18OE::RightOfWay
         include G18OE::Sea
+        include G18OE::National
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
         attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation,
