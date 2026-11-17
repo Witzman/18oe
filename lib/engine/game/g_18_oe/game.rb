@@ -472,6 +472,8 @@ module Engine
           setup_bbe_ability!
           # §15.2: the ability object travels with the charter into the major on a merge
           @minor_b_ability = corporation_by_id('B')&.abilities&.first
+          # §15.10: the mail contract travels with the charter into the major on a merge
+          @mail_contract_ability = corporation_by_id('K')&.abilities&.first
           # §15.5/§15.6: the ability objects travel with the charter into the major on a merge
           @ef_abilities = %w[E F].to_h { |id| [id, corporation_by_id(id)&.abilities&.first] }
           # §15.4: Minor D's token
@@ -630,6 +632,25 @@ module Engine
           change = -replaced.sum { |stop| stop.route_revenue(route.phase, route.train) }
           change += hochberg_token_revenue if route.train.owner&.owner == hochberg_company&.owner
           change
+        end
+
+        # ---- §15.10 Minor K, Vermilion Seal Couriers (mail contract) ------------------------
+
+        # Bank pays per train phase at the start of every OR (Phase 1 pays nothing).
+        MAIL_CONTRACT_REVENUE = { 2 => 20, 3 => 40, 4 => 40, 5 => 50, 6 => 50, 7 => 60, 8 => 60 }.freeze
+
+        # Straight to the treasury, not part of any run's revenue. The holder is whoever carries the
+        # ability object: minor K, or the major it merged into (§10.5).
+        def pay_mail_contract!
+          amount = self.class::MAIL_CONTRACT_REVENUE[@phase.name.to_i]
+          return unless amount && @mail_contract_ability
+
+          @corporations.each do |corp|
+            next if corp.closed? || !corp.floated? || !corp.abilities.include?(@mail_contract_ability)
+
+            @bank.spend(amount, corp)
+            @log << "#{corp.name} receives mail contract of #{format_currency(amount)}"
+          end
         end
 
         # ---- §14.9 Brandt & Brandau, Engineers ---------------------------------------------
@@ -1721,6 +1742,19 @@ module Engine
           start_national_formation!(phase, entity, rusting.reject { |owner, _| owner.type == :national }) if phase
         end
 
+        # §11.6.6: the rusted trains nobody owns, in the Locomotive Works for nationals to claim.
+        def unclaimed_rusted_trains
+          trains.select { |train| train.rusted && train.owner.nil? }
+        end
+
+        # §11.6.6: "Any rusted trains owned by the national may be flipped from their express side to their
+        # local side for free." Done at once: the local side counts as many cities and more towns, so it is
+        # never worse for a national (§11.3.10).
+        def flip_to_local!(train)
+          local = train.variants.keys.find { |name| name.include?('+') && name.to_i == train.sym.to_i }
+          train.variant = local if local && local != train.name
+        end
+
         # The majors the player may convert now (§9.4: "one or more of their majors").
         def national_candidates(player)
           return [] unless player&.player?
@@ -1774,6 +1808,7 @@ module Engine
           kept.each do |train|
             train.owner = corporation
             corporation.trains << train
+            flip_to_local!(train)
           end
           @crowded_corps = nil
           @log << "#{corporation.name} keeps its rusted #{kept.map(&:name).join(', ')}"

@@ -690,7 +690,8 @@ module Oe
 
       def fewest_cities(trains)
         trial = trial_train(trains)
-        routes, = RouteSearch.new(@game).path([trial], @entity, walk_limit: RoutePicker::WALK_LIMIT)
+        routes, = RouteSearch.new(@game).path([trial], @entity, walk_limit: RoutePicker::WALK_LIMIT,
+                                                                sea_walk_limit: RoutePicker::SEA_WALK_LIMIT)
         routes[trial].select { |route| @game.orient_express_run?(route) }
           .map { |route| route.visited_stops.count { |stop| !stop.town? } }.min
       end
@@ -712,6 +713,8 @@ module Oe
     end
 
     def generate_buy_train(step, entity)
+      return national_trains(step, entity) if entity.corporation? && entity.type == :national
+
       budget = train_budget(step, entity)
       step.buyable_trains(entity).flat_map do |train|
         min, max = step.spend_minmax(entity, train)
@@ -719,6 +722,13 @@ module Oe
         train_offers(step, entity, train, min, max).select do |_variant, price|
           price <= max && price.positive? && cheapest_if_contributing?(step, train, price, entity)
         end.map { |variant, price| A::BuyTrain.new(entity, train: train, price: price, variant: variant) }
+      end
+    end
+
+    # §11.6.6 (#64): a national takes trains at price 0; `exchange` is the rusted train it gives back.
+    def national_trains(step, entity)
+      step.national_train_offers(entity).map do |train, exchange|
+        A::BuyTrain.new(entity, train: train, price: 0, exchange: exchange)
       end
     end
 
@@ -774,6 +784,10 @@ module Oe
       # instead of 47 s; revenue equal in 35 of 40, the others -100, -20 (3x)
       # and +300 (the picker is greedy, more candidates are not always better).
       WALK_LIMIT = 10_000
+      # Visits of the second pass, the one that also crosses the sea (#359): it
+      # runs only for an RR whose network reaches a port it may use, after the
+      # land pass, so land routes keep their WALK_LIMIT. Measured in the PR.
+      SEA_WALK_LIMIT = 5_000
 
       def initialize(game, entity)
         @game = game
@@ -782,7 +796,8 @@ module Oe
 
       def call
         router = RouteSearch.new(@game)
-        train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity, walk_limit: WALK_LIMIT)
+        train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity,
+                                    walk_limit: WALK_LIMIT, sea_walk_limit: SEA_WALK_LIMIT)
         chosen = []
         combined_first(train_routes).each do |train, candidates|
           route = candidates.find { |candidate| compatible?(router, chosen, train, candidate) }
