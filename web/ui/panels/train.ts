@@ -76,6 +76,12 @@ function hintFor(g: Game, t: DepotTrain): string | null {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
+/** How many trains of this type the depot still holds (#418): the ones on offer plus the schedule's not yet offered ones. */
+function inDepot(g: Game, name: string): number {
+  const offered = g.state.depot.available.filter((t) => t.owner === null && t.name === name).length;
+  return offered + (g.state.depot.schedule?.find((s) => s.name === name)?.count ?? 0);
+}
+
 export function trainRows(g: Game): TrainRow[] {
   if (!isTrainStep(g)) return [];
   const mine = g.state.prompt.viewer_to_act;
@@ -87,12 +93,11 @@ export function trainRows(g: Game): TrainRow[] {
   const rows = g.state.depot.available.map((t): TrainRow => {
     const options = mine ? optionsOf(g, t) : [];
     const base = { id: t.id, name: t.name, price: t.price, owner: t.owner, reserved: t.id === reservedId };
-    const sched = g.state.depot.schedule?.find((s) => s.name === t.name);
     return {
       ...base, options,
       reason: mine && options.length === 0 ? reasonFor(g, base, corp) : null,
       hint: hintFor(g, t),
-      left: sched ? sched.count : null,
+      left: t.owner === null ? inDepot(g, t.name) : null,
     };
   });
   return [...rows.filter((r) => r.reserved), ...rows.filter((r) => !r.reserved)];
