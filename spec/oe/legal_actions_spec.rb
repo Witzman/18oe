@@ -421,14 +421,14 @@ RSpec.describe Oe::LegalActions, "train from another railroad" do
     expect(sample.all? { |price| price.between?(min, max) }).to be(true)
   end
 
-  it "is capped at face value when the president has to chip in" do
+  it "is capped at the treasury when the treasury is short: the president does not chip in (§11.6.4, #354)" do
     buyer.cash > 120 ? buyer.spend(buyer.cash - 120, game.bank) : fund!(game, buyer, 120 - buyer.cash)
     min, max = engine_span
     all = prices(described_class.new(game, train_span: true))
 
-    expect(max).to be <= train.price # president chips in, EBUY_FROM_OTHERS :value caps at face value
+    expect(max).to eq(buyer.cash) # a train of another railroad is paid from the treasury only
     expect(all.max).to eq(max)
-    expect(all).to include(train.price)
+    expect(all).to include(min, max)
   end
 
   it "has every offered price accepted by the engine" do
