@@ -34,6 +34,11 @@ jobs:
           fetch-depth: 0
       - id: diff
         run: |
+          # The nightly refresh PR (#439) gets this stage by dispatch on its branch (a PR opened with GITHUB_TOKEN
+          # starts no pull_request run); it changes only stored logs, so no browser tests.
+          case "${{ github.event_name }}:${{ github.ref_name }}" in
+            workflow_dispatch:refresh/catalog-*) echo "web=false" >> "$GITHUB_OUTPUT"; echo "refresh branch: logs only, browser tests skipped"; exit 0 ;;
+          esac
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "web=true" >> "$GITHUB_OUTPUT"; echo "not a pull request: browser tests run"; exit 0
           fi
@@ -59,7 +64,7 @@ jobs:
             refresh/catalog-*) echo "refresh PR ($HEAD_REF): log changes allowed"; echo "$logs"; exit 0 ;;
           esac
           echo "$logs"
-          echo "::error::this pull request changes stored catalog logs (spec/fixtures/games/logs/*). Logs are written only by a catalog refresh PR (branch refresh/catalog-<date>): run the catalog-refresh workflow, see README 'Fixture catalog'. Write 'Katalog-Refresh noetig' in the PR description instead."
+          echo "::error::this pull request changes stored catalog logs (spec/fixtures/games/logs/*). Logs are written only by a catalog refresh PR (branch refresh/catalog-*), which the nightly catalog-refresh run opens by itself, see README 'CI stages'. Drop the log changes and write 'Katalog-Refresh noetig' in the PR description instead."
           exit 1
 
   web:

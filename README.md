@@ -125,24 +125,38 @@ Two stages, one definition of "fast": the RSpec tag `:game_flow` (spec/support/t
 | Stage | Workflow | When | What |
 |---|---|---|---|
 | fast | `ci.yml` | every pull request | rspec `--tag ~game_flow` (engine specs, contracts; = `bin/test fast`), typecheck, web unit tests, browser tests only if `web/**` changed (`touch-browser` excluded). Target: under 3 min |
-| milestone | `full.yml` | nightly 02:17 UTC, tag `v0.*`, manually for any commit | the complete rspec suite (`:game_flow` included), long whole games uncapped, all browser tests incl. `touch-browser`, scripted game |
+| milestone | `full.yml` | nightly (cron 02:17 UTC; GitHub starts scheduled runs late, measured 09:37 and 10:41 UTC), tag `v0.*`, manually for any commit | the complete rspec suite (`:game_flow` included), long whole games uncapped, all browser tests incl. `touch-browser`, scripted game, `catalog live` |
 
-`full.yml` does NOT run on every push to `main`. To check `main` after a merge (or a deploy SHA), start it for
-that commit: GitHub UI Actions > full > Run workflow (field `sha`), or
+`full.yml` does NOT run on every push to `main`, and nobody dispatches or waits for it after a merge (#439): a pull
+request is merged on a green fast stage. `full` runs nightly and before a deploy (`bin/deploy-check` in the workshop
+refuses a deploy unless `full` is green for that commit). The first session of the day reads the nightly run, job by
+job: red rule tests there are a P1 fix before new work. To check a deploy SHA (or, on request, a batch of merges),
+start it for that commit: GitHub UI Actions > full > Run workflow (field `sha`), or
 
     python3 -c "import sys; sys.path.insert(0,'lib'); import github; github.post('/repos/Witzman/18oe/actions/workflows/full.yml/dispatches', ref='main', inputs={'sha': '<SHA>'})"
 
 (in the workshop checkout). Read the result per job, not only the workflow status. Every example runs in at
 least one stage: fast = `~game_flow`, milestone = all; `view_spec`, `view_order_spec` and `bot_spec` run
-only in the `long games` jobs there (whole files, caps lifted), not additionally in the capped rspec shards.
-Two more pieces (#365 B6). `catalog-refresh.yml` (`workflow_dispatch` only, fields `sha` and `games`; `concurrency` group
-`catalog-refresh`, never cancelled, so refreshes run one after the other) rebuilds the stored catalog logs with the
-current engine, writes `bin/fixture-catalog diff` per game into the step summary and uploads the new
-`spec/fixtures/games/logs/` as the artifact `catalog-logs`; it pushes nothing. Download the artifact, commit it on a
-branch `refresh/catalog-<date>`, open the one refresh PR. The milestone stage has a job `catalog live`
-(`OE_CATALOG=live`: fixture catalog and invariants specs against fresh games instead of stored logs). Guard: the `changes`
-job of `ci.yml` (an existing required check, no new check) fails a pull request that changes
-`spec/fixtures/games/logs/*` unless its branch starts with `refresh/catalog-`.
+only in the `long games` jobs there (whole files, caps lifted), not additionally in the capped rspec shards;
+`fixture_catalog_spec` and `invariants_spec` run only in the job `catalog live` there (whole files, `OE_CATALOG=live`:
+fresh games of the current engine instead of the stored logs). `catalog live` is the gate of the fixture catalog;
+the stored logs are replayed in no gate (#439), so a stale stored log reds neither a pull request nor `full`.
+
+Catalog refresh (#365 B6, #439). `catalog-refresh.yml` (`concurrency` group `catalog-refresh`, never cancelled)
+rebuilds the stored catalog logs with the current engine, writes `bin/fixture-catalog diff` per game into the step
+summary and uploads the new logs as the artifact `catalog-logs`. It starts by itself after the nightly `full`
+(`workflow_run`, only for the scheduled run) on the tip of `main`, and its job `refresh pull request`
+(`.github/scripts/catalog-refresh-pr.rb`) then opens the refresh PR on a branch `refresh/catalog-nightly-<date>-<run>`
+and dispatches `ci.yml` for it (a PR opened with `GITHUB_TOKEN` starts no `pull_request` run). At most one refresh PR
+is open: no PR when no `*.jsonl` changed, none while a hand-made refresh PR is open, an open nightly PR with the same
+logs stays, an outdated one is closed (branch deleted) when the new one opens. No agent, issue or checkpoint is
+involved; whoever reads the nightly run merges it with `bin/pr merge <n>` (`--update` if `main` moved) once fast is
+green. By hand: Run workflow with fields `sha`, `games`, `pr` (`pr` opens the PR as the nightly run does, all games
+only). Needs the repository setting "Allow GitHub Actions to create and approve pull requests" (Settings > Actions >
+General); without it the job pushes the branch and fails with that hint. Guard: the `changes` job of `ci.yml` (an
+existing required check, no new check) fails a pull request that changes `spec/fixtures/games/logs/*` unless its
+branch starts with `refresh/catalog-`. A feature PR that changes the game log says "Katalog-Refresh nötig" in its
+description, as a note only: the next nightly refresh PR picks it up.
 
 The browser job of `ci.yml` always runs (a `changes` job decides: without a `web/**` change its steps are skipped and it ends green), so it can be a required check. Wall time of the fast stage: about 2 to 3 min (measured, PRs 157 and 159); milestone stage: about 7 to 8 min.
 
@@ -154,10 +168,12 @@ The browser job of `ci.yml` always runs (a `changes` job decides: without a `web
 `spec/fixtures/games/logs/<game>.jsonl` (one accepted action per line) with `logs/manifest.json` (engine commit,
 number of actions, sha256 and resolved positions per log, information for the refresh diff). The loader resolves
 the finders against the log when it is first used. A log is written only by a catalog refresh PR (branch
-`refresh/catalog-*`), never by a feature PR: `bin/fixture-catalog diff <game>` shows what a rebuild changes,
-`bin/fixture-catalog build <game>` writes it (a game takes minutes; one game per call, under `timeout`).
-`OE_CATALOG=live` plays fresh games instead of the stored logs; a stored log the engine no longer accepts raises
-`log <game> stale at action K`.
+`refresh/catalog-*`, opened by the nightly `catalog-refresh` run, see "CI stages"), never by a feature PR:
+`bin/fixture-catalog diff <game>` shows what a rebuild changes, `bin/fixture-catalog build <game>` writes it (a game
+takes minutes; one game per call, under `timeout`). `OE_CATALOG=live` plays fresh games instead of the stored logs; a
+stored log the engine no longer accepts raises `log <game> stale at action K`. The stored logs are a cache for local
+runs and the refresh diff, not a gate (#439): between a rule change and the next nightly refresh a local run of
+`fixture_catalog_spec`/`invariants_spec` may report a stale log; run it with `OE_CATALOG=live` instead.
 
 ## Versions, tags and changelog (#271)
 

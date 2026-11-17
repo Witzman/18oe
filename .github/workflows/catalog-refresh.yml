@@ -1,12 +1,21 @@
-# Catalog refresh (#365 B6): rebuilds the stored fixture-catalog logs (spec/fixtures/games/logs/*) with the CURRENT
-# engine. Manual only, serial (one refresh at a time, never cancelled). It pushes nothing and opens no PR: the
-# rebuilt logs are an artifact; whoever refreshes downloads it, commits it on a branch `refresh/catalog-<date>` and
-# opens the one refresh PR (the only PR that may change logs, see the guard in ci.yml, job `changes`).
-# The step summary shows `bin/fixture-catalog diff` per game: first deviating action, moved entries, finders
-# without a match.
+# Catalog refresh (#365 B6, #439): rebuilds the stored fixture-catalog logs (spec/fixtures/games/logs/*) with the
+# CURRENT engine. Serial (one refresh at a time, never cancelled). The step summary shows `bin/fixture-catalog diff`
+# per game: first deviating action, moved entries, finders without a match. The rebuilt logs are the artifact
+# `catalog-logs`.
+# Triggers:
+#   - after the NIGHTLY run of full.yml (workflow_run, only when full ran by schedule), on the tip of main: the job
+#     `pr` then opens the refresh PR itself (.github/scripts/catalog-refresh-pr.rb: branch refresh/catalog-nightly-*,
+#     at most one open refresh PR, ci.yml dispatched for it). No agent, issue or checkpoint is needed for it.
+#   - workflow_dispatch (fields sha, games, pr): by hand; opens a PR only with `pr` set (and only for a full rebuild).
+# Stored logs are no gate (#439): the gate of the catalog is the job `catalog live` of full.yml. The guard in ci.yml
+# (job `changes`) still lets log changes through only on branches refresh/catalog-*.
 name: catalog-refresh
 
 on:
+  workflow_run:
+    workflows: [full]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       sha:
@@ -17,6 +26,10 @@ on:
         description: "space-separated catalog games; empty = all of catalog.json"
         type: string
         default: ""
+      pr:
+        description: "open the refresh pull request (as the nightly run does); only with all games"
+        type: boolean
+        default: false
 
 concurrency:
   group: catalog-refresh
@@ -28,8 +41,12 @@ permissions:
 jobs:
   refresh:
     name: rebuild logs
+    # after full only for its nightly (scheduled) run, not after a dispatched full (deploy check, batch)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.event == 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
+    outputs:
+      sha: ${{ steps.games.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,6 +63,7 @@ jobs:
             games=$(bundle exec ruby -I lib -e 'require "oe/fixture_catalog"; puts Oe::FixtureCatalog.catalog["games"].keys.join(" ")')
           fi
           echo "games=$games" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "$games"
       # One game per step-slice (a game takes minutes); diff first (against the stored log), then build.
       - name: diff and build per game
@@ -80,3 +98,28 @@ jobs:
             spec/fixtures/games/logs/
             spec/fixtures/games/catalog.json
           if-no-files-found: error
+
+  # Opens the refresh pull request (#439). Own job: only it may write (push a refresh/catalog-nightly-* branch, open
+  # and close refresh PRs, dispatch ci.yml for the new branch); the rebuild above stays read-only.
+  pr:
+    name: refresh pull request
+    needs: refresh
+    if: github.event_name == 'workflow_run' || (inputs.pr && inputs.games == '')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.refresh.outputs.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: catalog-logs
+          path: spec/fixtures/games
+      - name: open, keep or close the refresh pull request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ruby .github/scripts/catalog-refresh-pr.rb
