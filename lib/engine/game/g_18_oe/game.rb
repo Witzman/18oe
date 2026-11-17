@@ -896,6 +896,9 @@ module Engine
         end
 
         def upgrade_cost(tile, hex, entity, spender)
+          # §11.1.5, §11.1.6: "Nationals are exempt from all tile placement expenses" (BUG-011).
+          return 0 if owning_corporation(entity)&.type == :national
+
           base_cost = tile.upgrades.sum(&:cost)
           return super if base_cost.zero?
 
