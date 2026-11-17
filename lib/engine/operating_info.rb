@@ -25,9 +25,20 @@ module Engine
 
     private
 
+    # The paths in order, as Route#ordered_paths. A chain without track between two nodes (a game's
+    # extra_node_chains, e.g. an 18OE sea crossing, #436) stands in with its two end hexes, without exits, so the
+    # segments keep following the run's hexes.
     def run_segments(run)
-      run.ordered_paths.map do |path|
-        { hex: path.hex.id, exits: path.exits, nodes: path.nodes.map(&:index) }
+      run.connection_data.flat_map do |c|
+        paths = c[:chain][:paths]
+        if paths.empty?
+          next [] if c[:left] == c[:right]
+
+          next [c[:left], c[:right]].map { |node| { hex: node.hex.id, exits: [], nodes: [node.index] } }
+        end
+
+        paths = paths.reverse unless paths[0].nodes.include?(c[:left])
+        paths.map { |path| { hex: path.hex.id, exits: path.exits, nodes: path.nodes.map(&:index) } }
       end
     rescue StandardError
       []

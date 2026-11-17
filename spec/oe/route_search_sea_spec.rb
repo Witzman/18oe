@@ -102,6 +102,27 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
       expect(route.connection_hexes.flatten).to include(a_string_starting_with("sea "))
       expect(Oe::View.run_detail(info, train)[:hexes]).to eq(%w[C48 I50])
     end
+
+    # #436: as spec/oe/view_routes_spec.rb checks for a played game, the segments of a run follow its hexes, also
+    # over a crossing (a chain without track): the crossing's port hexes stand in the segments, without exits.
+    it "keeps segments and hexes in step for runs with a crossing, before, after or without track" do
+      lay_tile!("AA20", "5", 4)
+      lay_tile!("AB27", "5", 1)
+      token!("AA20", corp)
+      train = train!(corp, "5")
+      routes = search(corp, train)[train].select { |route| sea?(route) }
+      routes << search(bjv, train!(bjv, "3")).values.flatten.find { |r| stop_hexes(r) == %w[C48 I50] }
+      expect(routes.size).to be > 2
+
+      routes.each do |route|
+        route.routes = [route]
+        info = Engine::OperatingInfo.new([route], nil, route.revenue, [])
+        detail = Oe::View.run_detail(info, route.train)
+
+        expect(detail[:segments]).not_to be_empty
+        expect(detail[:segments].map { |s| s[:hex] }.chunk(&:itself).map(&:first)).to eq(detail[:hexes].uniq)
+      end
+    end
   end
 
   describe "DSJ Kobenhavn to Malmo (PB 4.5)" do
