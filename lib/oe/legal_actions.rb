@@ -69,7 +69,7 @@ module Oe
       actions = step.active_entities.reject(&:closed?).flat_map do |entity|
         step.actions(entity).flat_map { |type| generate(type, step, entity) }
       end
-      actions + acting_for(step) + company_actions(step)
+      actions + acting_for(step) + company_actions(step) + bankrupt_actions
     end
 
     # The whole choice space of a tile lay, not sampled (#123): per affordable
@@ -281,15 +281,24 @@ module Oe
     end
 
     # Actions a non-active entity issues while the step waits for someone else:
-    # a player converts a regional they hold (issued by the corporation), and
-    # the president of a corporation that must buy a train may sell shares.
+    # a player converts a regional they hold (issued by the corporation). The
+    # president of a major that must buy a train may not sell shares (§11.6.4, #354).
     def acting_for(step)
-      step.active_entities.flat_map do |entity|
-        others = entity.player? ? corporations_of(entity) : president_selling(step, entity)
-        others.flat_map do |other|
-          allowed = other.corporation? ? %w[convert] : %w[sell_shares]
-          (step.actions(other) & allowed).flat_map { |type| generate(type, step, other) }
+      step.active_entities.select(&:player?).flat_map do |player|
+        corporations_of(player).flat_map do |corporation|
+          (step.actions(corporation) & %w[convert]).flat_map { |type| generate(type, step, corporation) }
         end
+      end
+    end
+
+    # §11.6.4 (#354): the conversion of a major that cannot pay for its train. Its step does not
+    # block (as in the engine's Bankrupt), so the active step never names it; the round's steps do.
+    def bankrupt_actions
+      entity = @game.round.current_entity
+      return [] unless entity&.corporation?
+
+      @game.round.steps.select { |s| s.is_a?(Engine::Step::Bankrupt) && s.active? }.flat_map do |step|
+        step.actions(entity).include?('bankrupt') ? generate('bankrupt', step, entity) : []
       end
     end
 
@@ -311,10 +320,6 @@ module Oe
           company_step.actions(company).flat_map { |type| generate(type, company_step, company) }
         end
       end
-    end
-
-    def president_selling(step, corporation)
-      step.is_a?(Engine::Step::BuyTrain) && corporation.owner&.player? ? [corporation.owner] : []
     end
 
     def corporations_of(player)
