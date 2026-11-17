@@ -121,6 +121,8 @@ module Oe
     end
 
     def pick_buy_train(trains, by_class)
+      return pick_national_train(trains, by_class) if trains.first.entity.type == :national
+
       # The enumerator offers every side of a double-sided card (#127). Choosing
       # the dearer side is v0.3 (bots on the full rules); until then the bot
       # buys the base side as before.
@@ -132,6 +134,18 @@ module Oe
 
       # Cannot pay: raise money first (issue shares, president sells shares).
       raise_money(by_class) || trains.min_by(&:price)
+    end
+
+    # §11.6.6 (#64): a national claims the highest level unclaimed rusted train, then exchanges its
+    # lowest rusted train for a higher one; it never takes a train from its own majors. Then it passes.
+    def pick_national_train(trains, by_class)
+      level = ->(train) { train.sym.to_i }
+      pool = trains.select { |a| a.train.owner.nil? }
+      claim = pool.select { |a| a.exchange.nil? }.max_by { |a| level.call(a.train) }
+      return claim if claim
+
+      swap = pool.select(&:exchange).max_by { |a| [level.call(a.train) - level.call(a.exchange), -level.call(a.exchange)] }
+      swap || by_class['Pass']&.first
     end
 
     def raise_money(by_class)

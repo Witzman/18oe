@@ -1741,6 +1741,19 @@ module Engine
           start_national_formation!(phase, entity, rusting.reject { |owner, _| owner.type == :national }) if phase
         end
 
+        # §11.6.6: the rusted trains nobody owns, in the Locomotive Works for nationals to claim.
+        def unclaimed_rusted_trains
+          trains.select { |train| train.rusted && train.owner.nil? }
+        end
+
+        # §11.6.6: "Any rusted trains owned by the national may be flipped from their express side to their
+        # local side for free." Done at once: the local side counts as many cities and more towns, so it is
+        # never worse for a national (§11.3.10).
+        def flip_to_local!(train)
+          local = train.variants.keys.find { |name| name.include?('+') && name.to_i == train.sym.to_i }
+          train.variant = local if local && local != train.name
+        end
+
         # The majors the player may convert now (§9.4: "one or more of their majors").
         def national_candidates(player)
           return [] unless player&.player?
@@ -1794,6 +1807,7 @@ module Engine
           kept.each do |train|
             train.owner = corporation
             corporation.trains << train
+            flip_to_local!(train)
           end
           @crowded_corps = nil
           @log << "#{corporation.name} keeps its rusted #{kept.map(&:name).join(', ')}"
