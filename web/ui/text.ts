@@ -49,6 +49,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.HomeToken": e("Heimatstation setzen", "Home token", "§9.3, §11.2"),
   "step.Token": e("Station setzen", "Place token", "§11.2"),
   "step.SpecialToken": e("Sonderstation setzen", "Special token", "§11.2"),
+  "step.SpecialTrack": e("Gratis-Gleis (Privat)", "Free track (private)", "§14.9"),
   "step.Track": e("Gleis legen", "Lay track", "§11.1"),
   "step.HochbergToken": e("Hochberg-Marker setzen", "Place Hochberg token", "§14.8"),
   "step.Route": e("Fahrt", "Run routes", "§11.3"),

@@ -7,6 +7,11 @@ module Engine
     module G18OE
       class Graph < Engine::Graph
         def walk_token(node, skip_paths:, corporation:, **opts)
+          # §14.9: the paths of hexes marked by a Brandt & Brandau token are closed to other players' RRs
+          # (the route search passes its own skip_paths, so the game's graph_skip_paths is merged here)
+          if (blocked = @game.graph_skip_paths(corporation))
+            skip_paths = (skip_paths || {}).merge(blocked)
+          end
           return super unless @game.wcf_placeholder
 
           lille = @game.lille_city
