@@ -21,8 +21,8 @@ describe 'G18OE ferry distance on the city limit (§11.3.3, §11.3.7)' do
     game.hex_by_id(hex_id).tile.cities.first
   end
 
-  def token!(hex_id)
-    city(hex_id).place_token(corp, corp.next_token, free: true, check_tokenable: false)
+  def token!(hex_id, corporation = corp)
+    city(hex_id).place_token(corporation, corporation.next_token, free: true, check_tokenable: false)
   end
 
   def train!(name)
@@ -59,6 +59,9 @@ describe 'G18OE ferry distance on the city limit (§11.3.3, §11.3.7)' do
       lay_tile!('AB27', '5', 1)
       lay_tile!('AA20', '5', 4)
       token!('AA20')
+      # The token that connects the route would take the ferry off again (#358, sea_crossing_spec): this spec
+      # measures the ferry distance alone.
+      allow(game).to receive(:port_token_reducers).and_return([])
       game.graph.clear
     end
 

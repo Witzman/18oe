@@ -40,12 +40,73 @@ module Engine
           !corporation.nil? && node.hex.tile.cities.any? { |city| city.tokened_by?(corporation) }
         end
 
+        # A stretch of a route's sea traffic that counts against the city limit: a sea crossing's zones or a ferry's
+        # distance. hex_ids: the land hexes of its ports or ferry ends, where a token can reach it (assumption A2 of #60).
+        SeaTarget = Struct.new(:units, :hex_ids)
+
+        # What takes units off the targets of one train: up to `amount` units of one target whose hex_ids hold one of
+        # its hex_ids. A port token is one (§11.3.5); Port Authority, Minor H and the Star Harbor token (#56, #73, #79)
+        # join through extra_sea_reducers.
+        SeaReducer = Struct.new(:amount, :hex_ids)
+
         # §11.3.3, §11.3.7: the places a route's sea traffic takes from the city limit. Each ferry the route rides
         # counts its full distance (0 or 1), even when the train rides only part of it; each sea crossing counts
-        # its sea zones (§11.3.4). Port tokens join in with #358.
+        # its sea zones (§11.3.4); the port tokens of the route take units off again (§11.3.5, §11.3.7).
         def sea_units(route)
+          targets = sea_targets(route)
+          return 0 if targets.empty?
+
+          units = targets.map(&:units)
+          units.sum - max_sea_reduction(units.dup, targets, sea_reducers(route))
+        end
+
+        def sea_targets(route)
           ferries = route.paths.filter_map { |path| ferry_component(path) }.uniq(&:object_id)
-          ferries.sum { |ferry| ferry.distance.to_i } + sea_crossings(route).sum { |chain| chain[:sea][:zones] }
+          ferry_targets = ferries.select { |ferry| ferry.distance.to_i.positive? }
+                                 .map { |ferry| SeaTarget.new(ferry.distance, ferry.ends.map(&:first).uniq) }
+          crossing_targets = sea_crossings(route).map do |chain|
+            SeaTarget.new(chain[:sea][:zones], [chain[:sea][:from].hex_id, chain[:sea][:to].hex_id])
+          end
+          ferry_targets + crossing_targets
+        end
+
+        def sea_reducers(route)
+          port_token_reducers(route) + extra_sea_reducers(route)
+        end
+
+        # §11.3.5: a train that runs through a city with a token of its own RR spends that token once, on one
+        # stretch of sea next to the city: 1 unit in phase 2 to 6, 2 in phase 7 and 8. Assumption A2 of #60:
+        # next to the token means a port of the city's hex, also when the train only passes through it by land.
+        def port_token_reducers(route)
+          corporation = route.corporation
+          amount = route.phase.name.to_i >= 7 ? 2 : 1
+          nodes = (route.paths.flat_map(&:nodes) + route.chains.flat_map { |chain| chain[:nodes] }).uniq
+          nodes.select { |node| node.city? && node.tokened_by?(corporation) }
+               .map { |node| SeaReducer.new(amount, [node.hex.id]) }
+        end
+
+        # Hook for reductions that are not a port token (#56 Port Authority, #73 Minor H, #79 Star Harbor token):
+        # return SeaReducer objects for this train. Nothing yet.
+        def extra_sea_reducers(_route)
+          []
+        end
+
+        # The most units the reducers take off the targets, each reducer on one target, each target at most down to
+        # zero. Few tokens and few stretches per route, so every assignment is tried: no greedy argument needed.
+        def max_sea_reduction(left, targets, reducers)
+          reducer, *rest = reducers
+          return 0 unless reducer
+
+          best = max_sea_reduction(left, targets, rest)
+          targets.each_index do |i|
+            next if left[i].zero? || (targets[i].hex_ids & reducer.hex_ids).empty?
+
+            used = [left[i], reducer.amount].min
+            left[i] -= used
+            best = [best, used + max_sea_reduction(left, targets, rest)].max
+            left[i] += used
+          end
+          best
         end
 
         # §11.3.4: a sea crossing is a route chain without track between the port nodes of two hexes. The port
@@ -66,7 +127,9 @@ module Engine
           }]
         end
 
-        # The crossing between usable ports of two nodes with the fewest sea zones (assumption A4 of #60).
+        # The crossing between usable ports of two nodes with the fewest sea zones (assumption A4 of #60). A port
+        # token reduces by the end nodes, not by the port, so the fewest zones is also the cheapest crossing; a
+        # reduction tied to a sea area (#56) has to weigh the candidates here instead.
         def sea_crossing(start_node, end_node, corporation)
           from = port_accesses(start_node).select { |access| usable_port_access?(start_node, access, corporation) }
           return if from.empty?
