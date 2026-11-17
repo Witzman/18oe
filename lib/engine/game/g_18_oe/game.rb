@@ -11,6 +11,7 @@ require_relative 'round/concession'
 require_relative 'golden_bell'
 require_relative 'sea'
 require_relative 'step/consolidate'
+require_relative 'step/hochberg_token'
 require_relative 'step/golden_bell_order'
 require_relative 'step/bankrupt'
 require_relative 'step/convert_to_national'
@@ -36,7 +37,8 @@ module Engine
         include G18OE::Sea
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
-        attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation
+        attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation,
+                    :hochberg_hex
 
         FERRY_COLOR = '#0047AB'
         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
@@ -562,6 +564,57 @@ module Engine
         def remove_private!(company)
           @face_down_privates.delete(company)
           company.close!
+        end
+
+        # ---- §14.8 Hochberg Mining & Lumber Co. --------------------------------------------
+
+        # Revenue of the token per train phase, for every RR of the owner (counted as a town).
+        HOCHBERG_REVENUE = { 2 => 10, 3 => 20, 4 => 20, 5 => 40, 6 => 40, 7 => 60, 8 => 60 }.freeze
+        HOCHBERG_MIN_COST = 45
+        # ASSUMPTION: no artwork yet, placeholder logo path (workshop #81).
+        HOCHBERG_TOKEN_LOGO = '/logos/18_oe/hochberg.svg'
+
+        def hochberg_company
+          company_by_id('HMLC')
+        end
+
+        # Rough (green) terrain with a construction cost of at least 45; the hex may hold track and one
+        # town (which the token replaces), but no city, grand city, metropolis, second town or token.
+        def hochberg_hex?(hex)
+          cost = hex.original_tile.upgrades.sum(&:cost)
+          rough = self.class::EF_TERRAIN_AUGMENT['F']
+          cost >= HOCHBERG_MIN_COST && (hex.original_tile.terrain & rough).any? &&
+            hex.tile.cities.empty? && hex.tile.towns.size <= 1 && !metropolis_hex?(hex) && hex.tokens.empty?
+        end
+
+        def hochberg_hexes
+          hexes.select { |hex| hochberg_hex?(hex) }
+        end
+
+        def hochberg_place_token!(hex)
+          company = hochberg_company
+          token = Engine::Token.new(company, logo: HOCHBERG_TOKEN_LOGO, simple_logo: HOCHBERG_TOKEN_LOGO, type: :hochberg)
+          hex.place_token(token, logo: HOCHBERG_TOKEN_LOGO)
+          @hochberg_hex = hex
+          clear_graph
+          @log << "#{company.name} places its token on #{hex.id}"
+          flip_private!(company)
+        end
+
+        def hochberg_token_revenue
+          current = @phase.name.to_i
+          HOCHBERG_REVENUE.select { |phase, _| phase <= current }.values.last || HOCHBERG_REVENUE.values.first
+        end
+
+        # The token replaces the town of its hex for everyone; the owner's RRs count it as a town (not
+        # against the train's town limit: ASSUMPTION, the rules text does not say).
+        def hochberg_revenue_change(route, stops)
+          return 0 unless @hochberg_hex && route.paths.any? { |path| path.hex == @hochberg_hex }
+
+          replaced = stops.select { |stop| stop.town? && stop.hex == @hochberg_hex }
+          change = -replaced.sum { |stop| stop.route_revenue(route.phase, route.train) }
+          change += hochberg_token_revenue if route.train.owner&.owner == hochberg_company&.owner
+          change
         end
 
         def init_stock_market
@@ -1237,6 +1290,7 @@ module Engine
             G18OE::Step::Bankrupt,
             G18OE::Step::DiscardTrain,
             Engine::Step::HomeToken,
+            G18OE::Step::HochbergToken,
             G18OE::Step::Track,
             G18OE::Step::SpecialToken,
             G18OE::Step::Token,
@@ -1370,7 +1424,7 @@ module Engine
         end
 
         def revenue_for(route, stops)
-          revenue = super
+          revenue = super + hochberg_revenue_change(route, stops)
           revenue += self.class::ORIENT_EXPRESS_BONUS[route.phase.name] if orient_express_bonus_route?(route)
           revenue
         end
