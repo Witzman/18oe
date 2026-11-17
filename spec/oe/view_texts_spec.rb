@@ -6,6 +6,8 @@ require "oe/catalog"
 require "oe/legal_actions"
 require "oe/strategy_player"
 require "json"
+require_relative "../engine/g_18_oe/helpers"
+require_relative "../support/view_checks"
 
 # #124: the step's texts, the labels of the choices, the card catalog and who
 # holds which card.
@@ -76,6 +78,8 @@ RSpec.describe "Oe::View texts and catalog (#124)" do
   end
 
   describe "prompt texts", :game_flow do
+    include OeViewChecks
+
     # A game that takes `choose` whenever it can, so the rarer dialogs come up.
     before(:all) do
       @steps = Hash.new(0)
@@ -100,23 +104,15 @@ RSpec.describe "Oe::View texts and catalog (#124)" do
       end
     end
 
+    # The checks are OeViewChecks#prompt_text_errors (spec/support/view_checks.rb); this counts what they saw.
     def check(game, view)
       prompt = view[:prompt]
-      step = game.round.active_step
       name = prompt[:step]
       @steps[name] += 1
-      @errors << "#{name}: description #{prompt[:description].inspect}" unless prompt[:description].is_a?(String) && !prompt[:description].empty?
-      @errors << "#{name}: pass_description" unless prompt[:pass_description].is_a?(String) && !prompt[:pass_description].empty?
-      @errors << "#{name}: help" unless prompt[:help].nil? || prompt[:help].is_a?(String)
-      @errors << "#{name}: description differs from the step" unless prompt[:description] == step.description
-      chooses = prompt[:actions].select { |a| a["type"] == "choose" }
-      @errors << "#{name}: #{chooses.size} choose actions but #{prompt[:choices].size} choices" unless chooses.size == prompt[:choices].size
+      @errors.concat(prompt_text_errors(game, view))
       prompt[:choices].each do |c|
         @chooses += 1
         @labels[[name, c[:choice]]] = c[:label]
-        @errors << "#{name}: empty label for #{c[:choice]}" if c[:label].to_s.empty?
-        @errors << "#{name}: label of #{c[:choice]} is only its id" if c[:label] == c[:choice]
-        @errors << "#{name}: choice_name" if chooses.any? && step.respond_to?(:choice_name) && prompt[:choice_name] != step.choice_name
       end
     end
 
@@ -137,6 +133,71 @@ RSpec.describe "Oe::View texts and catalog (#124)" do
       expect(Oe::View.choice_label(game, step, act)).to eq("Alpha")
       other = Engine::Action::Choose.new(game.players.first, choice: "zz")
       expect(Oe::View.choice_label(game, step, other)).to eq("zz")
+    end
+  end
+
+  # #438: the same checks over states built by code (fast stage), one per kind of step a seed game passes.
+  describe "prompt texts in states built by code (#438)" do
+    include G18OESpecHelpers
+    include OeViewChecks
+
+    let(:game) { new_game(%w[p0 p1 p2 p3]) }
+
+    def prompt_of(game)
+      view = Oe::View.render(game, viewer: game.active_players.first.id, log: nil)
+      expect(prompt_text_errors(game, view)).to eq([])
+      view[:prompt]
+    end
+
+    it "holds in the opening auction" do
+      expect(prompt_of(game)[:actions]).not_to be_empty
+    end
+
+    it "holds in the initial stock round, with the reserve dialog's labels" do
+      start_regional!(game, "LNWR", game.players[0])
+      stock_round!(game, turn: 1)
+
+      expect(prompt_of(game)[:choices].map { |c| c[:label] }).to include("Reserve share", "Remove from game")
+    end
+
+    it "holds in a later stock round" do
+      start_regional!(game, "LNWR", game.players[0])
+      start_regional!(game, "GWR", game.players[1])
+      stock_round!(game)
+
+      expect(prompt_of(game)[:actions]).not_to be_empty
+    end
+
+    it "holds through a regional's operating turn" do
+      corp = operating_regional!(game, "LNWR", game.players[0])
+      operating_round_for!(game, 1, setup: true)
+      steps = []
+      10.times do
+        break unless game.round.operating? && game.round.active_step&.current_entity == corp
+
+        steps << prompt_of(game)[:step]
+        case game.round.active_step
+        when Engine::Step::Route
+          act!(game, Engine::Action::RunRoutes.new(corp, routes: Oe::LegalActions::RoutePicker.new(game, corp).call))
+        when Engine::Step::Dividend then act!(game, Engine::Action::Dividend.new(corp, kind: "payout"))
+        else act!(game, Engine::Action::Pass.new(corp))
+        end
+      end
+
+      expect(steps).to include("Track", "BuyTrain")
+    end
+
+    # #425: Hochberg's token (§14.8) is the choice of a non-blocking step during Track; its label was looked up
+    # only in the active step, so the view showed the choice's id.
+    it "labels the choice of a non-blocking step: Hochberg's token during Track (#425)" do
+      give_company!(game.players[0], game.company_by_id("HMLC"))
+      start_major!(game, "LNWR", game.players[0])
+      operating_round_for!(game, 1, setup: true)
+
+      prompt = prompt_of(game)
+
+      expect(prompt[:step]).to eq("Track")
+      expect(prompt[:choices].map { |c| c[:label] }.uniq).to eq(["Place token"])
     end
   end
 

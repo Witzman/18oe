@@ -70,6 +70,7 @@
   "spec/oe/map_data_spec.rb": 5.35,
   "spec/oe/playthrough_spec.rb": 214.0,
   "spec/oe/prompt_ranges_spec.rb": 5.74,
+  "spec/oe/seed_smoke_spec.rb": 25.0,
   "spec/oe/strategy_par_spec.rb": 0.28,
   "spec/oe/unsupported_action_spec.rb": 0.65,
   "spec/oe/view_auction_spec.rb": 0.83,
