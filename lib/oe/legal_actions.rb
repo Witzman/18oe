@@ -690,7 +690,8 @@ module Oe
 
       def fewest_cities(trains)
         trial = trial_train(trains)
-        routes, = RouteSearch.new(@game).path([trial], @entity, walk_limit: RoutePicker::WALK_LIMIT)
+        routes, = RouteSearch.new(@game).path([trial], @entity, walk_limit: RoutePicker::WALK_LIMIT,
+                                                                sea_walk_limit: RoutePicker::SEA_WALK_LIMIT)
         routes[trial].select { |route| @game.orient_express_run?(route) }
           .map { |route| route.visited_stops.count { |stop| !stop.town? } }.min
       end
@@ -774,6 +775,10 @@ module Oe
       # instead of 47 s; revenue equal in 35 of 40, the others -100, -20 (3x)
       # and +300 (the picker is greedy, more candidates are not always better).
       WALK_LIMIT = 10_000
+      # Visits of the second pass, the one that also crosses the sea (#359): it
+      # runs only for an RR whose network reaches a port it may use, after the
+      # land pass, so land routes keep their WALK_LIMIT. Measured in the PR.
+      SEA_WALK_LIMIT = 5_000
 
       def initialize(game, entity)
         @game = game
@@ -782,7 +787,8 @@ module Oe
 
       def call
         router = RouteSearch.new(@game)
-        train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity, walk_limit: WALK_LIMIT)
+        train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity,
+                                    walk_limit: WALK_LIMIT, sea_walk_limit: SEA_WALK_LIMIT)
         chosen = []
         combined_first(train_routes).each do |train, candidates|
           route = candidates.find { |candidate| compatible?(router, chosen, train, candidate) }
