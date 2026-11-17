@@ -48,8 +48,11 @@ games:
       - stock/BuySellParShares/buy_shares:regional
       - stock/ReserveShare/choose:reserve
       - stock/ReserveShare/pass
-      # then on, with majors operating: Issue step (§11.7) and the president
-      # selling shares to buy a train
+      # then on, with majors operating: Issue step (§11.7) and a major that
+      # must buy a train but whose treasury and president cannot pay converts
+      # into a national (§11.6.4, `bankrupt`; #354, #421). The president may
+      # not sell shares to buy a train any more, so BuyTrain/sell_shares is no
+      # target.
       - operating/IssueShares/pass
       - operating/IssueShares/sell_shares:major
-      - operating/BuyTrain/sell_shares:major
+      - operating/BuyTrain/bankrupt

@@ -4,7 +4,7 @@
       "players": 4,
       "seed": 1,
       "player": "strategy",
-      "max_actions": 5100
+      "max_actions": 6000
     },
     "strategy-3p-1": {
       "players": 3,
