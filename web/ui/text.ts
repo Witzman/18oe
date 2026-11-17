@@ -69,7 +69,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
 
   // --- Aktionstypen (lib/engine/action/*.rb, ohne base.rb) ------------------
   "action.acquire_company": e("Privat übernehmen", "Acquire company", "§14"),
-  "action.assign": e("Zuweisen (Marker setzen)", "Assign (place marker)", "§14, §15.4"),
+  "action.assign": e("Zuweisen (Marker setzen)", "Assign (place marker)", "§14, §15.4, §15.11"),
   "action.bankrupt": e("In National umwandeln (§11.6.4)", "Convert to national (§11.6.4)", "§11.6.4"),
   "action.bid": e("Gebot abgeben", "Bid", "§7"),
   "action.blind_bid": e("Verdecktes Gebot", "Blind bid", "§7"),

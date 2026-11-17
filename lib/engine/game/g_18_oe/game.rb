@@ -14,6 +14,7 @@ require_relative 'national'
 require_relative 'step/consolidate'
 require_relative 'step/hochberg_token'
 require_relative 'green_junction'
+require_relative 'krasnaya_strela'
 require_relative 'right_of_way'
 require_relative 'step/home_hex_consent'
 require_relative 'step/special_track'
@@ -40,6 +41,7 @@ module Engine
         include G18OE::Map
         include G18OE::GoldenBell
         include G18OE::GreenJunction
+        include G18OE::KrasnayaStrela
         include G18OE::RightOfWay
         include G18OE::Sea
         include G18OE::National
@@ -476,8 +478,11 @@ module Engine
           @mail_contract_ability = corporation_by_id('K')&.abilities&.first
           # §15.5/§15.6: the ability objects travel with the charter into the major on a merge
           @ef_abilities = %w[E F].to_h { |id| [id, corporation_by_id(id)&.abilities&.first] }
+          setup_minor_j_discount!
           # §15.4: Minor D's token
           setup_green_junction!
+          # §15.11: Minor L's +1+1 marker
+          setup_krasnaya_strela!
         end
 
         def setup_wcf_placeholder!
@@ -651,6 +656,21 @@ module Engine
             @bank.spend(amount, corp)
             @log << "#{corp.name} receives mail contract of #{format_currency(amount)}"
           end
+        end
+
+        # ---- §15.9 Minor J, Grey Locomotive Works (train discount) --------------------------
+
+        # The charter carries upstream's :train_discount (rate 0.1); it travels into the major on a merge
+        # like any minor ability. The rate becomes a whole amount per train side, fractions in favour of
+        # the RR (ASSUMPTION, workshop #74: §11.1.3 says so for construction discounts): the 3+3 (£225)
+        # costs £202.
+        def setup_minor_j_discount!
+          ability = corporation_by_id('J')&.abilities&.find { |a| a.type == :train_discount }
+          return unless ability
+
+          rate = ability.discount.rationalize
+          ability.discount = self.class::TRAINS.flat_map { |t| [t, *Array(t[:variants])] }
+                                                .to_h { |t| [t[:name], (t[:price] * rate).ceil] }
         end
 
         # ---- §14.9 Brandt & Brandau, Engineers ---------------------------------------------
@@ -900,7 +920,9 @@ module Engine
           return false unless corporation&.corporation? && corporation.type == :major
           return false unless corporation.floated? && corporation.trains.empty?
 
-          corporation.cash + player.cash < depot.min_depot_price
+          train = depot.min_depot_train
+          price = train ? train.min_price(ability: abilities(corporation, :train_discount)) : 0
+          corporation.cash + player.cash < price
         end
 
         # §15.2: Orange Scroll Surveyors (or the major holding its charter).
@@ -1573,7 +1595,8 @@ module Engine
         end
 
         def revenue_for(route, stops)
-          revenue = super + hochberg_revenue_change(route, stops) + green_junction_revenue(route)
+          revenue = super + hochberg_revenue_change(route, stops) + green_junction_revenue(route) +
+                    krasnaya_revenue_change(route, stops)
           revenue += self.class::ORIENT_EXPRESS_BONUS[route.phase.name] if orient_express_bonus_route?(route)
           revenue
         end

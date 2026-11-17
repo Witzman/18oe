@@ -604,8 +604,11 @@ module Oe
     end
 
     # §15.4: Minor D (or the major holding its charter) places its Green Junction token in any city
-    # except a metropolis or red zone, reachable or not; the target is the hex.
+    # except a metropolis or red zone, reachable or not, in the lay track step; the target is the hex.
+    # §15.11: Minor L (or the major holding its charter) puts its +1+1 marker on one of its trains that
+    # has not run, in the run trains step; the target is the train.
     def generate_assign(step, entity)
+      return step.krasnaya_trains(entity).map { |train| A::Assign.new(entity, target: train) } if step.respond_to?(:krasnaya_trains)
       return [] unless step.respond_to?(:green_junction_hexes)
 
       sample(step.green_junction_hexes(entity)).map { |hex| A::Assign.new(entity, target: hex) }
@@ -754,12 +757,14 @@ module Oe
     # [variant name, price] pairs. A depot train is offered once per variant the
     # engine allows (Step::Train#buyable_train_variants): 3 and 3+3, 4 and 4+4,
     # 5 and 5+5, 6 and 6+6, 7+7 and 4D, 8+8 and 5D (RB 11.6, the double-sided
-    # cards), each at its own price. A train of another railroad keeps the side
-    # it was bought with: no variant.
+    # cards), each at its own price (less Minor J's discount, §15.9). A train of
+    # another railroad keeps the side it was bought with: no variant.
     def train_offers(step, entity, train, min, max)
       return other_train_prices(train, min, max).map { |price| [nil, price] } unless train.from_depot?
 
-      step.send(:buyable_train_variants, train, entity).map { |variant| [variant[:name], variant[:price]] }
+      step.send(:buyable_train_variants, train, entity).map do |variant|
+        [variant[:name], step.depot_price(entity, train, variant[:name])]
+      end
     end
 
     # A train from another corporation: the engine's whole span (RB 11.6,
