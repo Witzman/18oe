@@ -172,6 +172,15 @@ test("portrait: the sheet is in the flow below the map, not over it; order strip
   assert.match(css, /\.order-strip \{[^}]*overflow-x: auto/);
 });
 
+test("view tabs sit in the head bar with 44 px targets, no longer floating over the map (#417)", () => {
+  const css = readFileSync(new URL("../ui/frame/frame.css", import.meta.url), "utf8");
+  const ts = readFileSync(new URL("../ui/frame/frame.ts", import.meta.url), "utf8");
+  assert.match(css, /\.frame-head \.frame-tabs button \{[^}]*min-height: var\(--shape-hit, 44px\)/);
+  assert.doesNotMatch(css, /\.frame-tabs \{ position: absolute/);
+  assert.match(ts, /roundEl\.querySelector\("\.frame-who"\)\?\.before\(tabsEl\)/);
+  assert.match(ts, /mainEl\.append\(endEl, viewEl\)/);
+});
+
 // ---- order interface for special panels (#213) ----------------------------------------------------
 import { createOrderSlot, orderView, type OrderSpec } from "../ui/frame/order.ts";
 
