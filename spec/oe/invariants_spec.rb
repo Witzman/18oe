@@ -185,6 +185,28 @@ RSpec.describe Oe::Invariants do
       expect(violations(g, :tiles_consistent).map(&:message).join).to match(/tiles named 8 laid/)
     end
 
+    it "reserved_shares_consistent: a reserved share left over after the initial stock round" do
+      g = stock_state
+      corp = g.corporation_by_id("LNWR")
+      g.reserve_share!(corp)
+      g.instance_variable_set(:@turn, 1)
+      expect(violations(g, :reserved_shares_consistent)).to be_empty
+      g.instance_variable_set(:@turn, 2)
+      expect(violations(g, :reserved_shares_consistent).map(&:message).join).to match(/outside the initial stock round/)
+    end
+
+    it "reserved_shares_consistent: two shares reserved by one player" do
+      g = stock_state
+      g.instance_variable_set(:@turn, 1)
+      lnwr = g.corporation_by_id("LNWR")
+      gwr = g.corporation_by_id("GWR")
+      g.reserve_share!(lnwr)
+      g.reserve_share!(gwr)
+      expect(violations(g, :reserved_shares_consistent)).to be_empty
+      gwr.owner = lnwr.owner
+      expect(violations(g, :reserved_shares_consistent).map(&:message).join).to match(/more than one/)
+    end
+
     it "stock_market_positions: a price marker off the market" do
       g = stock_state
       corp = g.corporations.find(&:share_price)

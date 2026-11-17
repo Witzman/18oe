@@ -59,6 +59,12 @@ RSpec.describe Oe::Playthrough, :game_flow do
       expect(result.actions).to eq(60)
     end
 
+    it "passes a strategy-player prefix of a 5-player game with every check after each action" do
+      result = described_class.run(players: 5, seed: 2, max_actions: 120, invariants: 1, player: :strategy)
+
+      expect([:limit, :finished]).to include(result.status), result.detail
+    end
+
     it "stops with :invariant when a check fails (test of the test)" do
       broken = Oe::Invariants::Violation.new(check: :money_conserved, rule: "x", message: "planted", pending: nil)
       allow(Oe::Invariants).to receive(:run).and_return([broken])

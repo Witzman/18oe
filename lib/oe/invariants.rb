@@ -107,6 +107,25 @@ module Oe
       end
     end
 
+    check(:reserved_shares_consistent, '8.4 Reserved Shares (initial stock round, more than two players)',
+          'a reserved share is a secondary share of a regional, at most one per player, only in the initial stock round') do |g|
+      list = g.instance_variable_get(:@reserved_shares) || []
+      next [] if list.empty?
+
+      out = []
+      out << 'a share is reserved outside the initial stock round' unless g.round.stock? && g.turn == 1
+      out << 'a share is reserved in a game of two players' if g.players.size <= 2
+      list.each do |share|
+        corp = share.corporation
+        out << "#{share.id} of #{corp.name} is the president's certificate" if share.president
+        out << "#{corp.name} is reserved but no longer a regional" unless corp.type == :regional
+      end
+      owners = list.map { |s| s.corporation.owner }
+      out << 'a player reserved more than one share' if owners.uniq.size != owners.size
+      out << 'a share is reserved twice' if list.map(&:object_id).uniq.size != list.size
+      out
+    end
+
     # --- trains ------------------------------------------------------------------------
 
     check(:train_supply, '3.1 Setup (Locomotive Works), 5 Game Phases',
