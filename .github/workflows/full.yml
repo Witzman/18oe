@@ -2,8 +2,10 @@
 # NOT run on every push to main any more (merge chains cancelled 25 runs). Triggers:
 #   - nightly (schedule, 02:17 UTC, default branch)
 #   - tag v0.* (a version milestone)
-#   - workflow_dispatch for any commit: input `sha` (empty = the selected ref). This is how "check full on main
-#     after a merge" and "before a deploy" are started (README, section CI stages).
+#   - workflow_dispatch for any commit: input `sha` (empty = the selected ref). This is how "before a deploy" (and,
+#     on request, a batch of merges) is started (README, section CI stages). Not dispatched after every merge (#439):
+#     the nightly run is read in the morning; red rule tests there are a P1 fix before new work.
+#   After the nightly run, catalog-refresh.yml rebuilds the stored catalog logs and opens the refresh PR itself.
 # Content: all rspec examples (the :game_flow ones included), the long whole games uncapped, all browser tests
 # (touch-browser included), the scripted game. No secrets, no deploy.
 name: full
@@ -61,7 +63,10 @@ jobs:
           # :game_flow examples too; :full_game only runs in the long-games job). Excluded here: view_spec,
           # view_order_spec, bot_spec, because the long-games job below runs those three whole files again with the
           # caps lifted (OE_FULL_GAME=1: the same examples, only the loop cap differs), so the capped run adds nothing.
-          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 'spec/oe/(view_spec|view_order_spec|bot_spec)\.rb$')
+          # Also excluded: fixture_catalog_spec, invariants_spec. The job `catalog live` runs both whole files against
+          # fresh games of the current engine; here they would only replay the stored logs, and a stored log that is
+          # merely stale is no defect and no gate (#439, refreshed nightly by catalog-refresh.yml).
+          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 'spec/oe/(view_spec|view_order_spec|bot_spec|fixture_catalog_spec|invariants_spec)\.rb$')
           echo "$files"
           bundle exec rspec $files --format progress --format json --out "$RUNNER_TEMP/rspec.json"
       - name: per-file timings
@@ -80,8 +85,9 @@ jobs:
           retention-days: 14
 
   # Fixture catalog against the CURRENT engine (#365 B6): OE_CATALOG=live plays fresh games (seed and player kind
-  # from catalog.json) instead of the stored logs, so a stale log never hides a defect and never reds this job. The
-  # rspec shards above still replay the stored logs (a stale log shows there as `log <game> stale at action K`).
+  # from catalog.json) instead of the stored logs, so a stale log never hides a defect and never reds this job. This
+  # job is the gate of the catalog (#439): the stored logs are replayed in no gate (the rspec shards leave both files
+  # out); a stale stored log becomes the nightly refresh PR of catalog-refresh.yml.
   catalog-live:
     name: catalog live (fresh games)
     runs-on: ubuntu-24.04
