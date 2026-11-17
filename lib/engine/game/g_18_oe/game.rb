@@ -9,6 +9,7 @@ require_relative '../base'
 require_relative 'round/consolidation'
 require_relative 'round/concession'
 require_relative 'golden_bell'
+require_relative 'sea'
 require_relative 'step/consolidate'
 require_relative 'step/golden_bell_order'
 require_relative 'step/convert_to_national'
@@ -31,6 +32,7 @@ module Engine
         include G18OE::Entities
         include G18OE::Map
         include G18OE::GoldenBell
+        include G18OE::Sea
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
         attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation
@@ -1395,7 +1397,7 @@ module Engine
         end
 
         def ferry_path_uncached?(path)
-          return true if path.color.to_s.casecmp?(FERRY_COLOR)
+          return true if ferry_line?(path)
 
           ports = self.class::PORTS[path.hex.id]
           !!ports && path.exits.any? { |exit| ports.dig(exit, :ferries) }
