@@ -113,18 +113,76 @@ module Engine
         # access is checked, not ridden, so ports and zones serve any number of trains of one RR (§11.3.8).
         # The engine hook of Route#get_node_chains; the walked chains come first, a crossing last.
         def extra_node_chains(route, start_node, end_node)
-          return [] if start_node.hex == end_node.hex
+          chain = sea_chain(start_node, end_node, route.corporation)
+          chain ? [chain] : []
+        end
 
-          crossing = sea_crossing(start_node, end_node, route.corporation)
-          return [] unless crossing
+        # The sea crossing chain between two nodes of different hexes, nil if their usable ports do not meet.
+        def sea_chain(start_node, end_node, corporation)
+          return if start_node.hex == end_node.hex
 
-          [{
+          crossing = sea_crossing(start_node, end_node, corporation)
+          return unless crossing
+
+          {
             nodes: [start_node, end_node],
             paths: [],
             hexes: [],
             id: [start_node.hex.id, "sea #{start_node.index}.#{end_node.index}", end_node.hex.id],
             sea: crossing,
-          }]
+          }
+        end
+
+        # A sea crossing in the route search's walk (#359): it stands in the walk's visited paths where a path would,
+        # so the search can cut the walk into chains. nodes: [from, to], as a path's nodes.
+        SeaJump = Struct.new(:chain) do
+          def nodes
+            chain[:nodes]
+          end
+
+          def terminal?
+            false
+          end
+
+          # A jump comes from outside the hex, as a path over a hex side does (DoubleTown::Town#walk asks this:
+          # a train arriving at one town of a double town has to visit the other first).
+          def edges
+            [:sea]
+          end
+        end
+
+        # The nodes (city, town, red zone) of the hexes with a port; tiles change, so this is asked per search.
+        def sea_port_nodes
+          self.class::PORTS.keys.flat_map do |hex_id|
+            tile = hex_by_id(hex_id).tile
+            tile.cities + tile.towns + tile.offboards
+          end
+        end
+
+        # The jumps of the route search from a node (#359): [chain, fewest units] for every crossing to a port node
+        # of another hex. Fewest units: the zones less what port tokens at both ends could take off at most
+        # (§11.3.5, A2 of #60); the search drops a jump whose fewest units no train of the RR can carry. A reducer
+        # that is not a port token (#56, #73, #79, extra_sea_reducers) has to be added here once it exists.
+        def sea_jumps(from_node, corporation, port_nodes = sea_port_nodes)
+          return [] if port_accesses(from_node).empty?
+
+          amount = phase.name.to_i >= 7 ? 2 : 1
+          port_nodes.filter_map do |to_node|
+            chain = sea_chain(from_node, to_node, corporation)
+            next unless chain
+
+            tokens = [from_node, to_node].count { |node| node.hex.tile.cities.any? { |c| c.tokened_by?(corporation) } }
+            [chain, [chain[:sea][:zones] - (tokens * amount), 0].max]
+          end
+        end
+
+        # The most places of the city row a train has for sea units (as check_distance counts them): the bound of
+        # the jumps.
+        def sea_places(train)
+          rows = train.distance
+          return rows if rows.is_a?(Numeric)
+
+          rows.select { |row| row['nodes'].include?('city') }.sum { |row| row['visit'] || row['pay'] }
         end
 
         # The crossing between usable ports of two nodes with the fewest sea zones (assumption A4 of #60). A port
