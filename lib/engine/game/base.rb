@@ -1572,6 +1572,13 @@ module Engine
       # Intended for game specific rules that depend on multiple routes
       def check_route_combination(_routes); end
 
+      # Chains a route may take between two nodes besides the track Route#get_node_chains walks (18OE: sea
+      # crossings without track). Each chain is a hash like a walked one ({ nodes:, paths:, hexes:, id: });
+      # its id must start with the start node's hex id and end with the end node's, for replay.
+      def extra_node_chains(_route, _start_node, _end_node)
+        []
+      end
+
       def compute_stops(route, train = nil)
         train ||= route.train
         visits = revenue_stops(route)
