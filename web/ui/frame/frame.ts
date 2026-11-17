@@ -214,6 +214,14 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     put(orderEl, OrderBandView(b, theme(), { collapsed: orderCollapsed, onToggle: () => { orderCollapsed = !orderCollapsed; writeOrderCollapsed(orderCollapsed); drawOrderBand(); } }));
   }
 
+  // ---- order band (#416): operating order under the head bar; stock round: the order the next OR would have --
+  function drawOrderBand() {
+    const b = game ? orBand(game, theme()) : null;
+    orderEl.hidden = b === null;
+    if (b === null) return orderEl.replaceChildren();
+    put(orderEl, OrderBandView(b, theme(), { collapsed: orderCollapsed, onToggle: () => { orderCollapsed = !orderCollapsed; writeOrderCollapsed(orderCollapsed); drawOrderBand(); } }));
+  }
+
   // ---- player bar ------------------------------------------------------------------------------
   function playerEntry(p: PlayerRow, t: Theme): VNode {
     const btn = v("span", {
