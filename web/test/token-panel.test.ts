@@ -8,7 +8,8 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { TokenPanel, effectiveCity, orderFor, previewFor, sentenceFor, tapMap, targetsFor, tokenTargets } from "../ui/panels/token.ts";
+import type { MapGeometry } from "../render/mapdata.ts";
+import { TokenPanel, cityRowText, effectiveCity, orderFor, previewFor, sentenceFor, tapMap, targetsFor, tokenTargets } from "../ui/panels/token.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
 const noop = { onCity: () => {}, onMap: () => {} };
@@ -70,4 +71,14 @@ test("claims and panel: generic bar empty; rows per city; others only see who pl
   other.state.prompt.actions = [];
   assert.match(textOf(TokenPanel(other, null, noop)), /G setzt eine Station/);
   assert.equal(orderFor(other, null, () => {}), null);
+});
+
+test("#414: city button reads name and zone when the map geometry is there, hex and number otherwise", () => {
+  const g = load("token-place");
+  const ts = tokenTargets(g);
+  const t = ts[0]!;
+  const map = { hexes: [{ id: t.hex, name: "Wien", zone: "B" }] } as unknown as MapGeometry;
+  assert.equal(cityRowText(t, map, 1), `Wien, Zone B · £${t.price}`);
+  assert.equal(cityRowText(t, { hexes: [{ id: t.hex, name: "Wien", zone: null }] } as unknown as MapGeometry, 2), `Wien (Stadt ${(t.city ?? 0) + 1}) · £${t.price}`);
+  assert.match(cityRowText(t, null, 1), new RegExp(`${t.hex} · Stadt ${(t.city ?? 0) + 1}`));
 });
