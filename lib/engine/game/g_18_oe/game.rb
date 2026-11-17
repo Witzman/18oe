@@ -447,6 +447,7 @@ module Engine
           @minor_asterisked_selected = 0
           @minor_floated_regions = {}
           @merged_minors = Hash.new { |hash, corporation| hash[corporation] = [] }
+          @merged_minor_abilities = {}
           @removed_regional_zones = []
           @orient_express_markers = []
           @last_payouts = {}
@@ -1030,6 +1031,8 @@ module Engine
           return unless major.type == :major
 
           pay_minor_a_bonus!(minor, major) if minor.id == 'A'
+          # Remembered per minor: the abilities go back to its charter when it is abandoned (§9.5).
+          @merged_minor_abilities[minor] = minor.abilities.dup
           minor.abilities.dup.each do |ability|
             minor.remove_ability(ability)
             major.add_ability(ability)
@@ -1739,6 +1742,7 @@ module Engine
           national_cash_to_bank!(corporation)
           national_treasury_to_market!(corporation)
           national_tokens_off!(corporation)
+          national_merged_minors_off!(corporation)
           national_charter_assets_off!(corporation)
           corporation.type = :national
           kept = @national_formation&.dig(:rusted)&.delete(corporation)
@@ -1799,6 +1803,39 @@ module Engine
           open_lille! if wcf_token
         end
 
+        # §9.4 step 3: the minors merged with the major are abandoned (§9.5). The charter goes back
+        # into the Open Market as an abandoned minor that a major may buy (§11.7); its trains stay with
+        # the national (§9.5 step 2 exception), its tokens left the map at the merge, the D minor's token
+        # goes back to its charter (step 4; the L minor's marker does not exist yet), the track rights chit stays with the charter (step 5) and
+        # the abilities the major took over at the merge go back to it (workshop #203-205).
+        def national_merged_minors_off!(corporation)
+          (@merged_minors.delete(corporation) || []).each { |minor| abandon_merged_minor!(minor, corporation) }
+          clear_graph
+        end
+
+        # The merge closed the minor (Step::MergeToken); it reopens in the state abandon_minor! leaves.
+        def abandon_merged_minor!(minor, corporation)
+          green_junction_remove!(back_to_charter: true) if minor.id == GREEN_JUNCTION_ID && green_junction_holder?(corporation)
+          (@merged_minor_abilities.delete(minor) || []).each do |ability|
+            next unless corporation.abilities.include?(ability)
+
+            corporation.remove_ability(ability)
+            minor.add_ability(ability)
+          end
+          share = minor.presidents_share
+          holdings = share.owner.shares_by_corporation
+          holdings.delete(minor) if holdings.key?(minor) && holdings[minor] == [share]
+          share.owner = minor
+          minor.shares_by_corporation[minor] = [share]
+          share.buyable = false
+          minor.reopen!
+          minor.ipoed = true
+          minor.floated = true
+          minor.owner = nil
+          @corporations << minor unless @corporations.include?(minor)
+          @log << "#{minor.name} is abandoned (§9.5)"
+        end
+
         # §11.2.2: "If the token on the White Cliffs Ferry token position is removed due to the
         # formation of a national, Lille becomes permanently open for all RRs to pass through."
         # ASSUMPTION (workshop #53): open as before the ferry was used, so the placeholder that
@@ -1809,8 +1846,8 @@ module Engine
         end
 
         # §9.4 step 4: every other asset on the charter except trains goes. Merged-minor track
-        # rights follow in the §9.5 step; port authorities (#56) and private markers (S8) do not
-        # exist yet and join here with their issues.
+        # rights left with the minor charters in step 3; port authorities (#56) and private markers
+        # (S8) do not exist yet and join here with their issues.
         def national_charter_assets_off!(corporation)
           return unless orient_express_marker?(corporation)
 
