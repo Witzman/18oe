@@ -36,7 +36,7 @@ module Engine
 
         def after_end_of_operating_turn(operator)
           super
-          (@operated_railroads ||= Set.new) << operator.id
+          (@operated_railroads ||= Set.new) << operator.id if operator
         end
 
         def first_or_after_floating?(entity)
