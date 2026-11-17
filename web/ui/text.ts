@@ -491,6 +491,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "track.cost": e("Kosten {cost}", "Cost {cost}", "§11.1"),
   "track.cost_part_terrain": e("Gelände", "Terrain", "§11.1"),
   "track.cost_part_discount": e("Nachlass", "Discount", "§11.1"),
+  "track.cost_part_sea": e("Seezonen", "Sea zones", "§11.1.6"),
   "track.none": e("Kein Feld ist jetzt baubar.", "No hex can be built on now.", "§11.1"),
   "track.waiting": e("{corp} baut Gleis.", "{corp} lays track.", "§11.1"),
   "track.hint": e("Tippe ein leuchtendes Feld auf der Karte oder wähle es hier; nochmal Tippen dreht die Kachel.", "Tap a highlighted hex; tap again to rotate", "§11.1"),

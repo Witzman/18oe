@@ -19,9 +19,20 @@ module Engine
             super && @game.first_round_spend_allowed?(entity, min_token_price(available_tokens(entity)))
           end
 
-          def pay_token_cost(entity, cost, city)
-            @game.check_first_round_spend!(entity, cost, what: 'a token')
+          # §11.2.1 (#360): the fee for the sea zones to the city is taken before the token stands (it would make the
+          # city a station of the RR) and paid with the token's price.
+          def place_token(entity, city, token, connected: true, **opts)
+            @water_fee = connected ? @game.cross_water_token_fee(entity, city).to_i : 0
             super
+          ensure
+            @water_fee = nil
+          end
+
+          def pay_token_cost(entity, cost, city)
+            fee = @water_fee.to_i
+            @game.check_first_round_spend!(entity, cost + fee, what: 'a token')
+            super(entity, cost + fee, city)
+            @game.log_cross_water_fee(entity, fee, @game.class::CROSS_WATER_TOKEN_FEE, 'the token (§11.2.1)') if fee.positive?
           end
 
           def available_hex(entity, hex)
@@ -36,9 +47,19 @@ module Engine
               raise GameError, "Cannot place token on #{hex.name} because it is outside #{entity.name}'s track rights zone"
             end
 
-            return if @game.loading || @game.token_graph_for_entity(entity).connected_nodes(entity)[city]
+            return if @game.loading
 
-            raise GameError, "Cannot place token on #{hex.name}#{city_string} because it is not connected"
+            unless @game.token_graph_for_entity(entity).connected_nodes(entity)[city]
+              raise GameError, "Cannot place token on #{hex.name}#{city_string} because it is not connected"
+            end
+
+            # §11.2: "If the RR's treasury has insufficient cash to pay the fees, the token may not be placed."
+            fee = @game.cross_water_token_fee(entity, city).to_i
+            tokens = available_tokens(entity)
+            return if fee.zero? || tokens.empty? || min_token_price(tokens) + fee <= entity.cash
+
+            raise GameError, "#{entity.name} cannot pay the token and #{@game.format_currency(fee)} for the sea zones " \
+                             "to #{hex.name}#{city_string} (§11.2.1)"
           end
         end
       end

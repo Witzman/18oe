@@ -49,7 +49,11 @@ module Oe
       connections = {}
 
       graph = @game.graph_for_entity(corporation)
-      nodes = graph.connected_nodes(corporation).keys.sort_by do |node|
+      nodes = graph.connected_nodes(corporation).keys
+      # Oe (#360): a node the RR reaches only over the sea (G18OE::Graph, for track and tokens) starts no walk; the
+      # sea pass below reaches it from the land network, as before.
+      nodes = nodes.select { |node| graph.water_zones_to_node(corporation, node).zero? } if graph.respond_to?(:water_zones_to_node)
+      nodes = nodes.sort_by do |node|
         revenue = trains
           .map { |train| node.route_revenue(@game.phase, train) }
           .max

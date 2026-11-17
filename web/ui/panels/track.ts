@@ -115,7 +115,8 @@ export function targetsFor(g: Game, tiles?: MapGeometry["tiles"]): MapTargets | 
   return hexes.length > 0 ? { hexes, kind: "track" } : null;
 }
 
-const costLabel = (label: string) => (label === "terrain" || label === "discount" ? txt(`track.cost_part_${label}`).de : label);
+const COST_PARTS = ["terrain", "discount", "sea"];
+const costLabel = (label: string) => (COST_PARTS.includes(label) ? txt(`track.cost_part_${label}`).de : label);
 export const costLine = (h: TrackHex): string | null => {
   if (h.cost === null) return null;
   const parts = h.costParts.map((p) => `${costLabel(p.label)} ${formatGeld(p.amount)}`).join(", ");
