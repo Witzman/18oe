@@ -68,9 +68,10 @@
 .frame-main { position: relative; display: flex; flex: 1 1 auto; flex-direction: column; min-width: 0; min-height: 0; background: var(--ui-bg); overflow: auto; }
 .frame-tabs { display: flex; gap: 4px; padding: 4px; } .frame-tabs[hidden] { display: none; }
 .frame-tabs [aria-selected="true"] { background: var(--ui-ink); color: var(--ui-panel); }
-/* Map view (issue 302): the map fills the main area, the view tabs float over its top left corner; 44 px targets. */
-.frame-main:has(> .frame-view > .frame-map) > .frame-tabs { position: absolute; top: var(--shape-gap); left: var(--shape-gap); z-index: 4; padding: 0; }
-.frame-main:has(> .frame-view > .frame-map) > .frame-tabs button { min-height: var(--shape-hit); box-shadow: var(--shape-shadow); }
+/* View tabs (issue 417, assumption: in the head bar where the order chips were, bar colours, accent for the active tab, 44 px targets). */
+.frame-roundbar > .frame-tabs { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 0; }
+.frame-head .frame-tabs button { min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); background: transparent; color: var(--ui-bar-ink); border-color: color-mix(in srgb, var(--ui-bar-ink) 40%, transparent); font-family: var(--font-head); white-space: nowrap; flex-shrink: 0; }
+.frame-head .frame-tabs [aria-selected="true"] { background: var(--ui-accent); color: var(--ui-accent-ink); border-color: var(--ui-accent); font-weight: 700; }
 .frame-map { position: absolute; inset: 0; background: var(--ui-bg); } .frame-map:focus { outline: none; }
 .frame-map-status { position: absolute; left: var(--shape-gap); top: var(--shape-gap); z-index: 2; color: var(--ui-bar-ink); font-family: var(--font-head); } .frame-map-status[hidden] { display: none; }
 .frame-map-status p { margin: 0 0 6px; } .frame-map-retry { min-height: 44px; min-width: 44px; }

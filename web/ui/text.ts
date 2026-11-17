@@ -52,6 +52,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.SpecialTrack": e("Gratis-Gleis (Privat)", "Free track (private)", "§14.9"),
   "step.Track": e("Gleis legen", "Lay track", "§11.1"),
   "step.HochbergToken": e("Hochberg-Marker setzen", "Place Hochberg token", "§14.8"),
+  "step.HomeHexConsent": e("Gleisbau im Heimathex erlauben", "Home hex permission", "§11.1.9"),
   "step.Route": e("Fahrt", "Run routes", "§11.3"),
   "step.OrientExpressBonus": e("Orient-Express-Bonus", "Orient Express bonus", "§12, §12.2"),
   "step.IssueShares": e("Aktien ausgeben", "Issue shares", "§4"),
@@ -748,6 +749,8 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   // Engine choices (#290): the engine labels are English; the player sees these and a tooltip.
   "choice.flip_private": e("Schließen (umdrehen): kein Einkommen, zählt nicht fürs Zertifikatslimit", "Flip face down", "§3.3, §6.1, §10.4"),
   "choice.flip_private_tip": e("Das Privat wird umgedreht und geschlossen: es zahlt keine Einnahme mehr, zählt nicht mehr zum Zertifikatslimit, ist nicht mehr handelbar und zählt nicht in der Endwertung.", "Close the private: flip its certificate face down", "§3.3, §6.1, §10.4"),
+  "choice.allow_home_lay": e("Erlauben", "Allow", "§11.1.9"),
+  "choice.allow_home_lay_tip": e("Eine andere Bahn darf gelbes Gleis in den Heimathex deiner gegründeten Bahn legen. Passen heißt ablehnen: Das Feld ist ihr dann für diesen Gleisbau gesperrt.", "Allow yellow track in your RR's home hex; passing refuses it", "§11.1.9"),
   "choice.remove_private": e("Aus dem Spiel nehmen", "Remove from game", "§3.3, §6.1"),
   "choice.remove_private_tip": e("Das Privat wird aus dem Spiel genommen und ist danach nicht mehr im Spiel.", "Remove the private from the game", "§3.3, §6.1"),
 };

@@ -172,6 +172,11 @@ module Oe
 
       tile.rotate!(rotation)
       old_tile = hex.tile
+      # §11.1.9 (#63): the Right-of-Way green tile must connect the home station to another stop
+      if step.respond_to?(:right_of_way_lay?) && step.right_of_way_lay?(entity, hex, tile) &&
+         !with_tile_laid(entity, hex, tile) { @game.right_of_way_connected?(entity) }
+        return false
+      end
       # without old track every new path is new track: only the graph-free part can fail
       return towns_kept?(old_tile, tile) if old_tile.paths.empty?
 

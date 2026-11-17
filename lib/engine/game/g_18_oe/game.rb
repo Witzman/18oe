@@ -13,6 +13,8 @@ require_relative 'sea'
 require_relative 'step/consolidate'
 require_relative 'step/hochberg_token'
 require_relative 'green_junction'
+require_relative 'right_of_way'
+require_relative 'step/home_hex_consent'
 require_relative 'step/special_track'
 require_relative 'step/golden_bell_order'
 require_relative 'step/bankrupt'
@@ -37,6 +39,7 @@ module Engine
         include G18OE::Map
         include G18OE::GoldenBell
         include G18OE::GreenJunction
+        include G18OE::RightOfWay
         include G18OE::Sea
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
@@ -1383,6 +1386,7 @@ module Engine
             Engine::Step::HomeToken,
             G18OE::Step::HochbergToken,
             G18OE::Step::SpecialTrack,
+            G18OE::Step::HomeHexConsent,
             G18OE::Step::Track,
             G18OE::Step::SpecialToken,
             G18OE::Step::Token,
