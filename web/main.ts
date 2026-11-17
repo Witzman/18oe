@@ -64,9 +64,9 @@ async function route() {
       const concession = mountConcession(frame, { map: () => mapGeometry });
       mountTrain(frame);
       const track = mountTrack(frame, { map: () => mapGeometry });
-      mountToken(frame);
+      const token = mountToken(frame, { map: () => mapGeometry });
       // Hex names and zones for the home token step; the panel works without them (hex ids only).
-      void loadGeometry(api).then((m) => { mapGeometry = m; concession.refresh(); track.refresh(); }, () => {});
+      void loadGeometry(api).then((m) => { mapGeometry = m; concession.refresh(); track.refresh(); token.refresh(); }, () => {});
       // #294: display errors (a panel, the map or the frame threw on a state) go to the server log once per
       // message, so a failure in a player's browser is visible without their DevTools.
       const reported = new Set<string>();
