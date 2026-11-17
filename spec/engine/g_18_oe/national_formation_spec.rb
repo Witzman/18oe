@@ -230,6 +230,103 @@ describe 'G18OE forming a national (§9.4)' do
     end
   end
 
+  # §9.4 step 3 and §9.5: the minors merged with the forming national are abandoned.
+  describe 'the merged minors (step 3, §9.5)' do
+    let(:minor) { start_minor!(game, 'B', alice, 'SP') }
+    let(:minor_d) { start_minor!(game, 'D', alice, 'UK') }
+    let(:nancy) { game.hex_by_id('Q38') }
+
+    # The state Step::MergeMinor and Step::MergeToken leave: trains and abilities with the major,
+    # the charter merged and closed (§10.5).
+    def merge!(merging, major)
+      game.transfer(:trains, merging, major)
+      merging.presidents_share.counts_for_limit = false
+      game.add_minor_charter!(merging, major)
+      game.minor_regional_order.delete(merging)
+      game.close_corporation(merging, quiet: true)
+    end
+
+    before do
+      give_train!(minor, '2+2')
+      merge!(minor, lnwr)
+    end
+
+    context 'when the major converts' do
+      before do
+        buy_first!(plm, '4')
+        pass!(bob)
+      end
+
+      it 'puts the charter into the Open Market as an abandoned minor (step 1)' do
+        convert!(lnwr)
+
+        expect(minor).not_to be_closed
+        expect(game.corporations).to include(minor)
+        expect(game.abandoned_minors).to eq([minor])
+        expect(minor.owner).to be_nil
+        expect(alice.percent_of(minor)).to eq(0)
+        expect(game.operating_order).not_to include(minor)
+      end
+
+      it 'leaves the trains with the national (step 2: a subsidiary of a converting major)' do
+        convert!(lnwr)
+
+        expect(minor.trains).to be_empty
+        expect(lnwr.trains.map(&:name)).to eq(['2+2'])
+      end
+
+      it 'keeps the track rights chit with the minor charter, not the national (step 5)' do
+        expect(game.track_rights_zones(lnwr)).to include('SP')
+        convert!(lnwr)
+
+        expect(game.minor_floated_regions[minor.id]).to eq('SP')
+        expect(game.track_rights_zones(lnwr)).not_to include('SP')
+        expect(game.merged_minors[lnwr]).to be_empty
+      end
+
+      it 'moves the minor ability back to its charter (workshop #203-205)' do
+        ability = lnwr.abilities.first
+        expect(ability).not_to be_nil
+        convert!(lnwr)
+
+        expect(lnwr.abilities).to be_empty
+        expect(minor.abilities).to eq([ability])
+      end
+
+      it 'lets another major buy the abandoned minor in its Buy or Sell Shares step (§11.7)' do
+        convert!(lnwr)
+        gwr = start_major!(game, 'GWR', carol)
+        fund!(game, gwr, 500)
+        round.instance_variable_set(:@current_operator, gwr)
+
+        expect(round_step(round, Engine::Game::G18OE::Step::IssueShares).choice_corporations(gwr)).to eq([minor])
+      end
+    end
+
+    it 'puts the D minor token back with its charter (step 4)' do
+      merge!(minor_d, lnwr)
+      game.green_junction_place!(lnwr, nancy)
+      buy_first!(plm, '4')
+      pass!(bob)
+      convert!(lnwr)
+
+      expect(game.green_junction_hex).to be_nil
+      expect(nancy.assigned?('D')).to be(false)
+      expect(game.green_junction_holder?(lnwr)).to be(false)
+      expect(game.green_junction_holder?(minor_d)).to be(true)
+      expect(game.abandoned_minors).to contain_exactly(minor, minor_d)
+    end
+
+    it 'leaves the minors of a major that stays a major alone' do
+      buy_first!(plm, '4')
+      pass!(bob)
+      pass!(alice)
+
+      expect(minor).to be_closed
+      expect(game.merged_minors[lnwr]).to eq([minor])
+    end
+  end
+
   it 'lets a national keep the trains that rust at a later phase' do
     give_train!(lnwr, '3')
     buy_first!(plm, '4')

@@ -14,7 +14,8 @@ module Engine
       # markers), placed with the upstream `assign` action in G18OE::Step::Track. The holder is whoever holds
       # the charter's ability object: it moves to the major on a merge (Game#add_minor_charter!).
       #
-      # ASSUMPTION (rules silent): a major that converts to a national keeps the ability and the bonus.
+      # A major that converts to a national abandons the merged minor (§9.4 step 3): the token and the
+      # ability go back to the D charter (Game#abandon_merged_minor!).
       module GreenJunction
         GREEN_JUNCTION_ID = 'D'
         GREEN_JUNCTION_LATE_PHASE = 5
