@@ -108,7 +108,11 @@ RSpec.describe Oe::Bot do
         raise game.exception if game.exception
 
         entity = action.entity
-        @stops_after[entity] = game.graph_for_entity(entity).connected_nodes(entity).size if entity.corporation?
+        next unless entity.corporation?
+
+        # #360: stops reached only over the sea (for track and tokens, §11.1.6) are not stops a train reaches by land
+        graph = game.graph_for_entity(entity)
+        @stops_after[entity] = graph.connected_nodes(entity).count { |node, _| graph.water_zones_to_node(entity, node).zero? }
       end
       [game, log]
     end

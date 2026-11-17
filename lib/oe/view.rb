@@ -787,14 +787,20 @@ module Oe
     def track_hexes(game, step, entity, options)
       options.map do |hex, tiles|
         cost = game.upgrade_cost(hex.tile, hex, entity, entity)
+        sea = sea_fee(game, entity, hex)
         {
           hex: hex.id,
           points: step.points_for_lay(entity, hex),
-          cost: cost,
-          cost_parts: cost_parts(hex.tile, cost),
+          cost: cost + sea,
+          cost_parts: cost_parts(hex.tile, cost) + (sea.positive? ? [{ label: "sea", amount: sea }] : []),
           tiles: tiles.map { |tile, rotations| { name: tile.name.to_s, color: tile.color.to_s, rotations: rotations } },
         }
       end
+    end
+
+    # 18OE §11.1.6 (#360): the fee for the sea zones to the hex, the fewest a tile there can cost.
+    def sea_fee(game, entity, hex)
+      game.respond_to?(:cross_water_track_fee) ? game.cross_water_track_fee(entity, hex).to_i : 0
     end
 
     # Terrain cost per upgrade of the hex's tile (label = its terrains), then
@@ -830,7 +836,9 @@ module Oe
         return city ? game.track_rights_cost(game.region_for_hex(city.hex)) : nil
       end
 
-      token.price
+      return token.price if !city || step.is_a?(Engine::Step::HomeToken) || !game.respond_to?(:cross_water_token_fee)
+
+      token.price + game.cross_water_token_fee(owner, city).to_i # §11.2.1 (#360)
     end
 
     # One entry per dividend option: `per_share` is the rate per share (can be

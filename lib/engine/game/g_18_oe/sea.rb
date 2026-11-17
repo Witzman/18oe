@@ -151,11 +151,12 @@ module Engine
           end
         end
 
-        # The nodes (city, town, red zone) of the hexes with a port; tiles change, so this is asked per search.
+        # The nodes (city, town, red zone) of the hexes with a port; tiles change, so this is asked per search. A
+        # smaller map (18OE UK-FR) lacks most of the hexes.
         def sea_port_nodes
           self.class::PORTS.keys.flat_map do |hex_id|
-            tile = hex_by_id(hex_id).tile
-            tile.cities + tile.towns + tile.offboards
+            tile = hex_by_id(hex_id)&.tile
+            tile ? tile.cities + tile.towns + tile.offboards : []
           end
         end
 
@@ -173,6 +174,67 @@ module Engine
 
             tokens = [from_node, to_node].count { |node| node.hex.tile.cities.any? { |c| c.tokened_by?(corporation) } }
             [chain, [chain[:sea][:zones] - (tokens * amount), 0].max]
+          end
+        end
+
+        # §11.1.6, §11.2.1: what crossing open water adds to a tile or a token, per sea zone (#360, #61). Ferries:
+        # #61. Port Authority (#56) takes two zones off; port tokens and Minor H do not.
+        CROSS_WATER_TRACK_FEE = 10
+        CROSS_WATER_TOKEN_FEE = 40
+
+        # The fee for a tile in the hex: 0 over land, nil if the hex is not connected. With a tile (rotated as it is
+        # to be laid), the zones to the sides it connects to (§11.1.6); without, the fewest zones to the hex (the
+        # least a tile there can cost, for prices shown before a tile is chosen).
+        def cross_water_track_fee(entity, hex, tile = nil)
+          corporation = owning_corporation(entity)
+          return 0 if corporation&.type == :national # §11.1.5: nationals lay track at no cost
+
+          zones = graph_for_entity(corporation).water_zones_to_hex(corporation, hex, tile)
+          zones && zones * self.class::CROSS_WATER_TRACK_FEE
+        end
+
+        def log_cross_water_fee(entity, fee, per_zone, what)
+          zones = fee / per_zone
+          @log << "#{entity.name} pays #{format_currency(fee)} for #{zones} sea zone#{zones == 1 ? '' : 's'} crossed " \
+                  "to #{what}"
+        end
+
+        # The fee for a token in the city (§11.2.1): 0 over land, nil if the city is not connected.
+        def cross_water_token_fee(entity, city)
+          zones = token_graph_for_entity(entity).water_zones_to_node(entity, city)
+          zones && zones * self.class::CROSS_WATER_TOKEN_FEE
+        end
+
+        # The sea zones of the node's usable ports (§11.3.4, §11.3.6).
+        def usable_port_zones(node, corporation)
+          port_accesses(node).select { |access| usable_port_access?(node, access, corporation) }.filter_map(&:zone).uniq
+        end
+
+        def fewest_sea_zones(from_zones, to_zones)
+          from_zones.product(to_zones).filter_map { |a, b| sea_zone_distance(a, b) }.min
+        end
+
+        # The nodes a crossing of the RR's hypothetical train may end at: [node, its usable port zones].
+        def sea_landings(corporation)
+          sea_port_nodes.filter_map do |node|
+            zones = usable_port_zones(node, corporation)
+            [node, zones] unless zones.empty?
+          end
+        end
+
+        # §11.1.3: the port arrows without track into a city or town that a crossing may end at, for a tile that
+        # connects to the arrow: [hex, side, zone]. A private one only with a token of the RR in the city.
+        def sea_arrows(corporation)
+          self.class::PORTS.flat_map do |hex_id, exits|
+            next [] unless (tile = hex_by_id(hex_id)&.tile)
+
+            exits.filter_map do |exit, data|
+              next if !data[:port] || exit == :offshore
+              next if tile.city_towns.any? { |node| node.exits.include?(exit) }
+              next if data[:port] != :public && tile.cities.none? { |city| city.tokened_by?(corporation) }
+
+              [tile.hex, exit, port_sea_zone(hex_id, exit)]
+            end
           end
         end
 
