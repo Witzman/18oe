@@ -40,6 +40,23 @@ module Engine
           !corporation.nil? && node.hex.tile.cities.any? { |city| city.tokened_by?(corporation) }
         end
 
+        # §11.3.3, §11.3.7: the places a route's sea traffic takes from the city limit. Each ferry the route rides
+        # counts its full distance (0 or 1), even when the train rides only part of it. Zones and port tokens
+        # join in with #357/#358.
+        def sea_units(route)
+          route.paths.filter_map { |path| ferry_component(path) }.uniq(&:object_id).sum { |ferry| ferry.distance.to_i }
+        end
+
+        # Assumption A1 of #60: units take places of the row of cities (the row that holds 'city'), for visiting
+        # and for paying. The rows themselves are not changed.
+        def distance_rows_after_sea(rows, units)
+          rows.map do |row|
+            next row unless row['nodes'].include?('city')
+
+            row.merge('pay' => [row['pay'] - units, 0].max, 'visit' => [(row['visit'] || row['pay']) - units, 0].max)
+          end
+        end
+
         def ferry_line?(path)
           path.color.to_s.casecmp?(self.class::FERRY_COLOR)
         end

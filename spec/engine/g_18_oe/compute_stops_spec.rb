@@ -23,7 +23,7 @@ describe 'G18OE compute_stops (#319)' do
 
   def route_with(variant, stops)
     train = double(variant[:name], name: variant[:name], distance: variant[:distance], requires_token: true)
-    route = double('route', train: train, phase: game.phase, corporation: corporation)
+    route = double('route', train: train, phase: game.phase, corporation: corporation, paths: [])
     allow(game).to receive(:revenue_stops).with(route).and_return(stops)
     allow(game).to receive(:orient_express_bonus_route?).and_return(false)
     route
