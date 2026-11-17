@@ -4,7 +4,7 @@ module Engine
   module Game
     module G18OE
       # Ports and ferries as data (§11.3.4, §11.3.6, §11.3.7), read from Map::PORTS and the blue ferry lines
-      # of the map. Queries only: no step and no route uses them yet (sea crossings build on them, #60).
+      # of the map, and sea crossings as route chains without track (§11.3.4, #357).
       module Sea
         # A place where a train may leave a node for a sea zone, or come in from one (§11.3.4).
         # exit: the hex side of the port arrow, or :offshore (§11.3.6: joined to the city without track).
@@ -41,10 +41,92 @@ module Engine
         end
 
         # §11.3.3, §11.3.7: the places a route's sea traffic takes from the city limit. Each ferry the route rides
-        # counts its full distance (0 or 1), even when the train rides only part of it. Zones and port tokens
-        # join in with #357/#358.
+        # counts its full distance (0 or 1), even when the train rides only part of it; each sea crossing counts
+        # its sea zones (§11.3.4). Port tokens join in with #358.
         def sea_units(route)
-          route.paths.filter_map { |path| ferry_component(path) }.uniq(&:object_id).sum { |ferry| ferry.distance.to_i }
+          ferries = route.paths.filter_map { |path| ferry_component(path) }.uniq(&:object_id)
+          ferries.sum { |ferry| ferry.distance.to_i } + sea_crossings(route).sum { |chain| chain[:sea][:zones] }
+        end
+
+        # §11.3.4: a sea crossing is a route chain without track between the port nodes of two hexes. The port
+        # access is checked, not ridden, so ports and zones serve any number of trains of one RR (§11.3.8).
+        # The engine hook of Route#get_node_chains; the walked chains come first, a crossing last.
+        def extra_node_chains(route, start_node, end_node)
+          return [] if start_node.hex == end_node.hex
+
+          crossing = sea_crossing(start_node, end_node, route.corporation)
+          return [] unless crossing
+
+          [{
+            nodes: [start_node, end_node],
+            paths: [],
+            hexes: [],
+            id: [start_node.hex.id, "sea #{start_node.index}.#{end_node.index}", end_node.hex.id],
+            sea: crossing,
+          }]
+        end
+
+        # The crossing between usable ports of two nodes with the fewest sea zones (assumption A4 of #60).
+        def sea_crossing(start_node, end_node, corporation)
+          from = port_accesses(start_node).select { |access| usable_port_access?(start_node, access, corporation) }
+          return if from.empty?
+
+          to = port_accesses(end_node).select { |access| usable_port_access?(end_node, access, corporation) }
+          from.product(to).map { |a, b| { from: a, to: b, zones: sea_zone_distance(a.zone, b.zone) } }
+              .min_by { |crossing| crossing[:zones] }
+        end
+
+        def sea_crossings(route)
+          (route.chains || []).select { |chain| chain[:sea] }
+        end
+
+        # §11.3.4: between two sea crossings the route crosses at least one land hex side (assumption A3 of #60):
+        # a chain of track that leaves its hex. A ferry counts as land here (§11.3.7).
+        def check_sea_crossings!(route)
+          land = true
+          route.chains.each do |chain|
+            if chain[:sea]
+              raise GameError, 'Two sea crossings need a land hex side between them' unless land
+
+              land = false
+            elsif chain[:paths].map(&:hex).uniq.size > 1
+              land = true
+            end
+          end
+        end
+
+        # A route with sea crossings: each stretch of track between them is checked like a route of its own, and
+        # a node where a crossing begins or ends inside the route may not be full of foreign tokens (§11.3.6).
+        def check_sea_route_connected(route, corporation)
+          route.connection_data.slice_when { |a, b| a[:chain][:sea] || b[:chain][:sea] }.each do |segments|
+            next if segments.one? && segments[0][:chain][:sea]
+
+            check_connected(LandStretch.new(segments), corporation)
+          end
+          route.connection_data.each_cons(2) do |before, after|
+            next unless before[:chain][:sea] || after[:chain][:sea]
+            raise GameError, 'Route is not connected' if before[:right].blocks?(corporation)
+          end
+        end
+
+        # What check_connected sees of a stretch of track of a route between sea crossings (cf. Route#ordered_paths).
+        LandStretch = Struct.new(:segments) do
+          def chains
+            []
+          end
+
+          def paths
+            segments.flat_map { |segment| segment[:chain][:paths] }
+          end
+
+          def ordered_paths
+            segments.flat_map do |segment|
+              paths = segment[:chain][:paths]
+              next [] if paths.empty?
+
+              paths[0].nodes.include?(segment[:left]) ? paths : paths.reverse
+            end
+          end
         end
 
         # Assumption A1 of #60: units take places of the row of cities (the row that holds 'city'), for visiting

@@ -8,6 +8,7 @@ require_relative "bot/stock"
 require_relative "bot/track"
 require_relative "bot/token"
 require_relative "bot/dividend"
+require_relative "bot/green_junction"
 
 module Oe
   # Bot v1 (#37): rule-based heuristics with seeded randomness. Local only —
@@ -22,7 +23,7 @@ module Oe
   #
   # Heuristics per action family, one small class each (Bot::Auction with
   # Bot::Valuation for what privates and minors are worth (#313),
-  # Bot::Stock, Bot::Track, Bot::Token, Bot::Dividend). Everything else — train purchases,
+  # Bot::Stock, Bot::Track, Bot::Token, Bot::Dividend, Bot::GreenJunction). Everything else — train purchases,
   # routes, merges, discards — falls back to the rules of
   # Oe::StrategyPlayer (#32), which already carries whole games to the end.
   #
@@ -47,7 +48,7 @@ module Oe
     end
 
     # Families handled here. Anything not listed goes to the fallback.
-    SPECIAL = %w[Bid Par BuyShares SellShares LayTile PlaceToken Dividend].freeze
+    SPECIAL = %w[Bid Par BuyShares SellShares Assign LayTile PlaceToken Dividend].freeze
     # If one of these is on offer, the fallback decides (same order of
     # precedence as StrategyPlayer: train purchase comes first). Dividend: Bot::Dividend (#327).
     FALLBACK_FIRST = %w[BuyTrain RunRoutes].freeze
@@ -70,6 +71,7 @@ module Oe
       @track = Track.new(game, @rng)
       @token = Token.new(game, @rng, @track)
       @dividend = Dividend.new(game, @rng)
+      @green_junction = GreenJunction.new(game, @rng)
     end
 
     # Replace the random stream (see Rng); the same seed gives the same choice for the same state.
@@ -108,6 +110,7 @@ module Oe
       return @dividend.choose(by_class) if by_class["Dividend"]
       return @auction.choose(by_class) if by_class["Bid"]
       return @stock.choose(by_class) if by_class.key?("Par") || by_class.key?("BuyShares") || by_class.key?("SellShares")
+      return @green_junction.choose(by_class["Assign"]) if by_class["Assign"]
       return @track.choose(by_class) if by_class["LayTile"]
       return @token.choose(by_class) if by_class["PlaceToken"]
 

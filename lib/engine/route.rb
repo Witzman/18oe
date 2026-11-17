@@ -128,7 +128,7 @@ module Engine
               }
             end
           end
-          new_chains.sort_by { |chain| chain[:paths].size }
+          new_chains.sort_by { |chain| chain[:paths].size } + @game.extra_node_chains(self, start_node, end_node)
         end
     end
 
@@ -380,7 +380,7 @@ module Engine
       @connection_hexes ||= if @train.local? && connection_data.one? && connection_data[0][:chain][:paths].empty?
                               [['local', connection_data[0][:left].hex.id]]
                             else
-                              chains&.map { |chain| chain_id(chain[:paths]) }
+                              chains&.map { |chain| chain[:id] || chain_id(chain[:paths]) }
                             end
     end
 

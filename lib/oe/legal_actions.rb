@@ -579,6 +579,14 @@ module Oe
       end.map { |hex| A::RemoveHexToken.new(entity, hex: hex) }
     end
 
+    # §15.4: Minor D (or the major holding its charter) places its Green Junction token in any city
+    # except a metropolis or red zone, reachable or not; the target is the hex.
+    def generate_assign(step, entity)
+      return [] unless step.respond_to?(:green_junction_hexes)
+
+      sample(step.green_junction_hexes(entity)).map { |hex| A::Assign.new(entity, target: hex) }
+    end
+
     # A private places the token of the corporation it acts for (#128): the
     # action names it as `tokener`, as the engine's own PlaceToken does.
     def generate_place_token(step, entity)
