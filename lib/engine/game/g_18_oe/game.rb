@@ -1475,6 +1475,9 @@ module Engine
           rows = train.distance
           return super if rows.is_a?(Numeric)
 
+          units = sea_units(route)
+          rows = distance_rows_after_sea(rows, units) if units.positive?
+
           rows = rows.sort_by { |h| h['nodes'].size }
           return super unless rows.each_cons(2).all? { |a, b| (a['nodes'] - b['nodes']).empty? }
 
@@ -1490,6 +1493,27 @@ module Engine
                          .max_by { |stops| stops.sum { |stop| revenue[stop] } } || []
           end
           best.sum { |stop| revenue[stop] }.positive? ? visits & best : []
+        end
+
+        # §11.3.3, §11.3.7: the ferry distance takes places of the cities' row; the base check runs on the rest.
+        def check_distance(route, visits, train = nil)
+          train ||= route.train
+          units = sea_units(route)
+          return super if units.zero? || train.distance.is_a?(Numeric)
+
+          rows = train.distance
+          places = rows.select { |row| row['nodes'].include?('city') }.sum { |row| row['visit'] || row['pay'] }
+          raise RouteTooLong, "Ferry distance #{units} is too much for a #{train.name} train" if units > places
+
+          super(route, visits, SeaTrain.new(distance_rows_after_sea(rows, units)))
+        end
+
+        # What the base distance check sees of a train that rides a ferry: its rows, less the ferry distance.
+        SeaTrain = Struct.new(:distance)
+
+        def route_distance_str(route)
+          units = sea_units(route)
+          units.zero? ? super : "#{super}+#{units}~"
         end
 
         # Places each stop, in the given order, in the first row with room for
