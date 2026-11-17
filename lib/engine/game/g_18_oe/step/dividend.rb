@@ -21,9 +21,14 @@ module Engine
             super.merge(laid_hexes: [])
           end
 
-          # §13 abbreviated OR: the same revenue, paid out the same way.
+          # §13 abbreviated OR: the same revenue, paid out the same way. §11.3.10: a national runs no
+          # routes; its revenue is counted over its home track rights zone (G18OE::National).
           def total_revenue
-            (last = @game.repeated_payout(current_entity, @round)) ? last[:revenue] : super
+            last = @game.repeated_payout(current_entity, @round)
+            return last[:revenue] if last
+            return @game.national_revenue(current_entity) if current_entity.type == :national
+
+            super
           end
 
           def process_dividend(action)
@@ -41,11 +46,20 @@ module Engine
             when :minor
               kind = total_revenue.zero? ? 'withhold' : 'half'
             when :national
+              log_national_run(current_entity)
               kind = total_revenue.zero? ? 'withhold' : 'payout'
             else
               return super
             end
             process_dividend(Action::Dividend.new(current_entity, kind: kind))
+          end
+
+          def log_national_run(entity)
+            revenue = total_revenue
+            return if revenue.zero?
+
+            @log << "#{entity.name} runs its national service for #{@game.format_currency(revenue)} " \
+                    "(#{@game.national_run_str(entity)})"
           end
 
           def half_pay_withhold_amount(_entity, revenue)

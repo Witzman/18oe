@@ -713,6 +713,8 @@ module Oe
     end
 
     def generate_buy_train(step, entity)
+      return national_trains(step, entity) if entity.corporation? && entity.type == :national
+
       budget = train_budget(step, entity)
       step.buyable_trains(entity).flat_map do |train|
         min, max = step.spend_minmax(entity, train)
@@ -720,6 +722,13 @@ module Oe
         train_offers(step, entity, train, min, max).select do |_variant, price|
           price <= max && price.positive? && cheapest_if_contributing?(step, train, price, entity)
         end.map { |variant, price| A::BuyTrain.new(entity, train: train, price: price, variant: variant) }
+      end
+    end
+
+    # §11.6.6 (#64): a national takes trains at price 0; `exchange` is the rusted train it gives back.
+    def national_trains(step, entity)
+      step.national_train_offers(entity).map do |train, exchange|
+        A::BuyTrain.new(entity, train: train, price: 0, exchange: exchange)
       end
     end
 
