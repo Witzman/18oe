@@ -207,8 +207,8 @@ module Oe
     end
 
     # Take a missing target when one is on offer. Some targets need a state a
-    # normal game never reaches on its own (see #rush?); the director then
-    # steers towards it first.
+    # normal game never reaches on its own (see #rush?, #starve_presidents);
+    # the director then steers towards it first.
     def director(round, step, prompt)
       missing = @targets - @ledger.executed.keys
       return nil if missing.empty?
@@ -231,6 +231,9 @@ module Oe
         best = candidates.select { |a| missing.index(key(round, step, a)) == first }
         return reservable(best).sample(random: @rng)
       end
+
+      starve = starve_presidents(round, step, prompt, missing)
+      return starve if starve
 
       range = prompt["ranges"].find { |r| missing.include?(key(round, step, r)) }
       range && { "type" => "bid", "entity" => range["entity"], "entity_type" => "player",
@@ -258,6 +261,31 @@ module Oe
         corporation.owner && corporation.owner.id != a["entity"] && @mirror.can_reserve_regional?(corporation.owner, corporation)
       end
       fitting.empty? ? actions : fitting
+    end
+
+    # §11.6.4 (`bankrupt`, the conversion into a national) needs a major
+    # without a train whose treasury and president together cannot pay the
+    # cheapest train. With the bot's dividends the presidents collect income
+    # and the state comes only by chance; after #71 (Minor D, a new bot move)
+    # changed the seeded course it no longer came at all (#434). While the
+    # target is missing the director starves the presidents instead: majors
+    # withhold (no dividend income for anyone) and issue no shares (no fresh
+    # treasury cash); the bot then spends the treasury on its dearest
+    # affordable train, and when trains rust a major is left without a train
+    # and without the money for one. Both moves are legal and on offer.
+    # (Full payout was tried first: it leaves the treasuries empty but makes
+    # the presidents rich, and the target stayed missing in 2600 actions.)
+    BANKRUPT_TARGET = "operating/BuyTrain/bankrupt"
+
+    def starve_presidents(round, step, prompt, missing)
+      return nil unless round == "operating" && missing.include?(BANKRUPT_TARGET)
+
+      wanted = case step
+               when "Dividend" then ->(a) { a["type"] == "dividend" && a["kind"] == "withhold" }
+               when "IssueShares" then ->(a) { a["type"] == "pass" }
+               else return nil
+               end
+      prompt["actions"].find { |a| wanted.call(a) && corporation_type(a["entity"]) == :major }
     end
 
     def reserve_question?(action)
