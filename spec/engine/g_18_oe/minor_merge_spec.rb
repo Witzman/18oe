@@ -181,6 +181,20 @@ describe 'G18OE merging a minor into a major in a Stock Round (§10.5)' do
     expect(round.merged_majors).to eq([major])
   end
 
+  # #424: the owner receives the share at once, the minor closes only after its tokens; in between the
+  # minor charter must not count as well (§4.1 counts a minor charter, §10.5 exchanges it for the share).
+  it 'exchanges the minor charter for the share without raising the certificate count (§4.1, §10.5)' do
+    major
+    place_minor_token!('Q38')
+    before = game.num_certs(player)
+    merge!
+    expect(round.pending_acquisition).to eq(minor: minor, corporation: major)
+    expect(game.num_certs(player)).to eq(before)
+    pass_tokens!
+    expect(minor).to be_closed
+    expect(game.num_certs(player)).to eq(before)
+  end
+
   it 'closes the minor once its tokens are resolved (§10.5)' do
     major
     merge!
