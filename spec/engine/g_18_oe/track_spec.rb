@@ -268,4 +268,58 @@ describe 'G18OE lay track (§11.1)' do
       end
     end
   end
+  describe 'Minor B (§15.2)' do
+    let(:round) { operating! }
+    let(:step) { round.active_step }
+    let(:major) { start_major!(game, 'LNWR', player) }
+    let(:plain) { start_major!(game, 'CHN', player) }
+
+    def tile_where(color)
+      game.tiles.find { |t| t.color == color && yield(t) }
+    end
+
+    def merge_b!(corp)
+      game.add_minor_charter!(game.corporation_by_id('B'), corp)
+    end
+
+    let(:town_upgrade) { tile_where(:green) { |t| t.cities.empty? && t.towns.any? && !game.metropolis_tile?(t) } }
+    let(:city_upgrade) { tile_where(:green) { |t| t.cities.any? && !game.metropolis_tile?(t) } }
+    let(:metropolis_upgrade) { tile_where(:green) { |t| game.metropolis_tile?(t) } }
+
+    it 'finds the tiles the examples need' do
+      expect([town_upgrade, city_upgrade, metropolis_upgrade]).to all(be_truthy)
+    end
+
+    it 'charges an upgrade to a tile with towns 2 points without the ability' do
+      major
+      expect(step.points_for_tile(major, town_upgrade)).to eq(2)
+    end
+
+    it 'charges an upgrade to a tile with towns 1 point with the ability' do
+      merge_b!(major)
+      expect(step.points_for_tile(major, town_upgrade)).to eq(1)
+    end
+
+    it 'keeps 2 points for a city and 4 for a metropolis' do
+      merge_b!(major)
+      expect([step.points_for_tile(major, city_upgrade), step.points_for_tile(major, metropolis_upgrade)]).to eq([2, 4])
+    end
+
+    it 'charges Minor B itself 1 point for an upgrade to a tile with towns' do
+      major
+      expect(step.points_for_tile(game.corporation_by_id('B'), town_upgrade)).to eq(1)
+    end
+
+    it 'does not give the ability to another major' do
+      merge_b!(major)
+      plain
+      expect(step.points_for_tile(plain, town_upgrade)).to eq(2)
+    end
+
+    it 'charges a yellow tile 1 point as before' do
+      merge_b!(major)
+      yellow = tile_where(:yellow) { |t| t.cities.empty? && !game.metropolis_tile?(t) }
+      expect(step.points_for_tile(major, yellow)).to eq(1)
+    end
+  end
 end

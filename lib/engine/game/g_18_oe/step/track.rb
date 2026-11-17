@@ -34,7 +34,12 @@ module Engine
 
           # Tile points a lay on this hex costs: 1 for a yellow, 2 for an upgrade,
           # doubled on a metropolis hex.
-          def points_for_hex(hex)
+          # §15.2 (Minor B): with the ability an upgrade of a hex without a city costs 1 point; the
+          # real cost of a chosen tile is `points_for_tile`, this is the cheapest it can be.
+          def points_for_hex(hex, entity = nil)
+            return 1 if entity && @game.minor_b?(entity) && hex.tile.color != :white && hex.tile.cities.empty? &&
+                        !@game.metropolis_hex?(hex)
+
             base = hex.tile.color == :white ? 1 : 2
             @game.metropolis_hex?(hex) ? base * 2 : base
           end
@@ -42,13 +47,15 @@ module Engine
           # Tile points a lay on `hex` costs `entity`: points_for_hex less the E/F extra point
           # (§15.5/§15.6) when a yellow lay there may use it.
           def points_for_lay(entity, hex)
-            points_for_hex(hex) - (ef_bonus_id(entity, hex) ? 1 : 0)
+            points_for_hex(hex, entity) - (ef_bonus_id(entity, hex) ? 1 : 0)
           end
 
-          # Tile points laying `tile` costs: yellow 1, upgrade 2, metropolis tiles double.
-          def points_for_tile(_entity, tile)
+          # Tile points laying `tile` costs: yellow 1, upgrade 2, metropolis tiles double; with
+          # Minor B (§15.2) an upgrade to a tile without a city (towns allowed) costs 1.
+          def points_for_tile(entity, tile)
             metropolis = @game.metropolis_tile?(tile)
-            return metropolis ? 4 : 2 if tile.color != :yellow
+            return metropolis ? 4 : 2 if tile.color != :yellow && (metropolis || tile.cities.any? || !@game.minor_b?(entity))
+            return 1 if tile.color != :yellow
 
             metropolis ? 2 : 1
           end
@@ -198,7 +205,7 @@ module Engine
             points_available = get_tile_lay(entity) - @points_used
             return nil if hex.tile.color == :blue
 
-            needed = points_for_hex(hex) - (ef_bonus_id(entity, hex) ? 1 : 0)
+            needed = points_for_lay(entity, hex)
             return nil if points_available < needed
 
             connected
