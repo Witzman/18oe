@@ -39,6 +39,12 @@ module Engine
             @game.metropolis_hex?(hex) ? base * 2 : base
           end
 
+          # Tile points a lay on `hex` costs `entity`: points_for_hex less the E/F extra point
+          # (§15.5/§15.6) when a yellow lay there may use it.
+          def points_for_lay(entity, hex)
+            points_for_hex(hex) - (ef_bonus_id(entity, hex) ? 1 : 0)
+          end
+
           # Tile points laying `tile` costs: yellow 1, upgrade 2, metropolis tiles double.
           def points_for_tile(_entity, tile)
             metropolis = @game.metropolis_tile?(tile)
