@@ -85,9 +85,34 @@ module Engine
           def process_buy_train(action)
             return process_national_train(action) if national?(action.entity)
 
+            check_depot_price!(action)
             reserved = action.train.name == '2+2' && action.train.from_depot?
             super
             @game.fulfill_train_obligation!(action.entity) if reserved
+          end
+
+          # §11.6, §15.9: the price of a side of a Locomotive Works or Open Market card for `entity`:
+          # its face value, less the discount of Minor J's charter (upstream's :train_discount, held by
+          # J or the major it merged into). A train of another RR has a negotiated price instead.
+          def depot_price(entity, train, variant_name = train.name)
+            side = train.clone
+            side.variant = variant_name
+            Array(@game.abilities(entity, :train_discount, time: ability_timing))
+              .map { |ability| ability.discounted_price(side, side.price) }.min || side.price
+          end
+
+          # The engine takes the price of a depot train from the action (as upstream does); it may not
+          # be below the buyer's price. Face value stays accepted (stored logs bought J's trains at it).
+          def check_depot_price!(action)
+            train = action.train
+            return unless train.from_depot?
+
+            variant_name = action.variant || train.name
+            price = depot_price(action.entity, train, variant_name)
+            return if action.price >= price
+
+            raise GameError, "#{action.entity.name} must pay #{@game.format_currency(price)} for the " \
+                             "#{variant_name} train, not #{@game.format_currency(action.price)} (wrong price)"
           end
 
           def reserved_train
