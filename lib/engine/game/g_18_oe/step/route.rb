@@ -8,7 +8,8 @@ module Engine
       module Step
         class Route < Engine::Step::Route
           def actions(entity)
-            return [] if @game.repeated_payout(entity, @round)
+            # §11.3.10: a national runs no routes; Dividend counts its revenue.
+            return [] if (entity.corporation? && entity.type == :national) || @game.repeated_payout(entity, @round)
 
             actions = super
             return actions if actions.empty? || @game.double_head_candidates(entity).size < 2
