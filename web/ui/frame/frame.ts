@@ -114,7 +114,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const tabsEl = h("div", { class: "frame-tabs", role: "tablist" });
   const viewEl = h("div", { class: "frame-view" });
   const endEl = h("div", { class: "frame-end-slot" });
-  mainEl.append(endEl, tabsEl, viewEl);
+  mainEl.append(endEl, viewEl); // the view tabs live in the head bar (#417), see drawRound
   // The action panel (#301): head (collapse button, step title), body (context, slot, generic bar, log), foot
   // (order with the main button, stall line, messages, tools).
   const panelTitle = h("div", { class: "frame-panel-title" });
@@ -202,6 +202,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
         m.who.corp ? Siegel({ sym: m.who.corp.sym, color: m.who.corp.color }, { theme: t, size: "s" }) : null,
         v("span", {}, m.who.text)),
       );
+    // #417: the view tabs and the log link take the place the order chips left (before the "who" marker).
+    roundEl.querySelector(".frame-who")?.before(tabsEl);
   }
 
   // ---- order band (#416): operating order under the head bar; stock round: the order the next OR would have --
