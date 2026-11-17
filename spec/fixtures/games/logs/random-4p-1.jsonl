@@ -1368,7 +1368,7 @@
 {"type":"run_routes","entity":"GWR","entity_type":"corporation","id":1368,"routes":[{"train":"2+2-22","connections":[["L25","M26"],["M26"]],"hexes":["L25","M26","M26"],"revenue":40,"revenue_str":"L25-M26-M26","nodes":["L25-0","M26-2","M26-1"]}],"extra_revenue":0,"subsidy":0}
 {"type":"dividend","entity":"GWR","entity_type":"corporation","id":1369,"kind":"payout"}
 {"type":"pass","entity":"GSWR","entity_type":"corporation","id":1370}
-{"type":"run_routes","entity":"GSWR","entity_type":"corporation","id":1371,"routes":[{"train":"2+2-23","connections":[["J15","J17"],["J17","J19","I18","I20"]],"hexes":["J15","J17","I20"],"revenue":50,"revenue_str":"J15-J17-I20","nodes":["J15-0","J17-0","I20-0"]}],"extra_revenue":0,"subsidy":0}
+{"type":"run_routes","entity":"GSWR","entity_type":"corporation","id":1371,"routes":[{"train":"2+2-23","connections":[["J25","I24","I22","I20"],["I20","I18","J19","J17"]],"hexes":["J25","I20","J17"],"revenue":60,"revenue_str":"J25-I20-J17","nodes":["J25-0","I20-0","J17-0"]}],"extra_revenue":0,"subsidy":0}
 {"type":"dividend","entity":"GSWR","entity_type":"corporation","id":1372,"kind":"payout"}
 {"type":"pass","entity":"MAV","entity_type":"corporation","id":1373}
 {"type":"lay_tile","entity":"KBS","entity_type":"corporation","id":1374,"hex":"P47","tile":"8-26","rotation":3}
@@ -1493,7 +1493,7 @@
 {"type":"pass","entity":"GWR","entity_type":"corporation","id":1493}
 {"type":"pass","entity":"GWR","entity_type":"corporation","id":1494}
 {"type":"pass","entity":"GSWR","entity_type":"corporation","id":1495}
-{"type":"run_routes","entity":"GSWR","entity_type":"corporation","id":1496,"routes":[{"train":"2+2-23","connections":[["J15","J17"],["J17","J19","I18","I20"]],"hexes":["J15","J17","I20"],"revenue":50,"revenue_str":"J15-J17-I20","nodes":["J15-0","J17-0","I20-0"]}],"extra_revenue":0,"subsidy":0}
+{"type":"run_routes","entity":"GSWR","entity_type":"corporation","id":1496,"routes":[{"train":"2+2-23","connections":[["J25","I24","I22","I20"],["I20","I18","J19","J17"]],"hexes":["J25","I20","J17"],"revenue":60,"revenue_str":"J25-I20-J17","nodes":["J25-0","I20-0","J17-0"]}],"extra_revenue":0,"subsidy":0}
 {"type":"dividend","entity":"GSWR","entity_type":"corporation","id":1497,"kind":"payout"}
 {"type":"pass","entity":"GSWR","entity_type":"corporation","id":1498}
 {"type":"sell_shares","entity":"GSWR","entity_type":"corporation","id":1499,"shares":["GSWR_1","GSWR_2"],"percent":20}
@@ -1605,7 +1605,7 @@
 {"type":"lay_tile","entity":"GSWR","entity_type":"corporation","id":1605,"hex":"J17","tile":"142-0","rotation":4}
 {"type":"pass","entity":"GSWR","entity_type":"corporation","id":1606}
 {"type":"pass","entity":"GSWR","entity_type":"corporation","id":1607}
-{"type":"run_routes","entity":"GSWR","entity_type":"corporation","id":1608,"routes":[{"train":"2+2-23","connections":[["J15","J17"],["J17","J19","I18","I20"]],"hexes":["J15","J17","I20"],"revenue":50,"revenue_str":"J15-J17-I20","nodes":["J15-0","J17-0","I20-0"]}],"extra_revenue":0,"subsidy":0}
+{"type":"run_routes","entity":"GSWR","entity_type":"corporation","id":1608,"routes":[{"train":"2+2-23","connections":[["J25","I24","I22","I20"],["I20","I18","J19","J17"]],"hexes":["J25","I20","J17"],"revenue":70,"revenue_str":"J25-I20-J17","nodes":["J25-0","I20-0","J17-0"]}],"extra_revenue":0,"subsidy":0}
 {"type":"dividend","entity":"GSWR","entity_type":"corporation","id":1609,"kind":"withhold"}
 {"type":"buy_train","entity":"GSWR","entity_type":"corporation","id":1610,"train":"3-0","price":61}
 {"type":"pass","entity":"GSWR","entity_type":"corporation","id":1611}
