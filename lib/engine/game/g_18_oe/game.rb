@@ -12,6 +12,7 @@ require_relative 'golden_bell'
 require_relative 'sea'
 require_relative 'step/consolidate'
 require_relative 'step/golden_bell_order'
+require_relative 'step/bankrupt'
 require_relative 'step/convert_to_national'
 require_relative 'step/discard_train'
 require_relative 'step/merge_discard_train'
@@ -279,6 +280,9 @@ module Engine
         ZONE_TERRAIN_DISCOUNT_RATE  = 0.5 # 50% §11.1.5; E/F augment zone discount to this rate
         TILE_POINT_BUDGET = { minor: 3, regional: 3, major: 6, national: 9 }.freeze
         MINOR_MAX_TREASURY = 180
+        # §11.6.4: the president of a major that must buy a train pays the difference from his own cash
+        # and may not sell shares to do it; a major that cannot pay becomes a national (Step::Bankrupt).
+        EBUY_CAN_SELL_SHARES = false
         EF_TERRAIN_COST_FACTOR      = [67, 100].freeze # §15.5/15.6: x 0.67, rounded down
         EF_TERRAIN_AUGMENT          = { 'E' => %i[water river lake], 'F' => %i[mountain hill] }.freeze
 
@@ -727,6 +731,16 @@ module Engine
           return budget if entity.type == :national
 
           entity.abilities.include?(@minor_g_ability) ? budget + 2 : budget
+        end
+
+        # §11.6.4: "bankruptcy" is the conversion of a major without a train into a national, offered
+        # when its treasury and its president's cash (shares do not count, no sale is allowed) do not
+        # reach the cheapest train in the Locomotive Works or the Open Market. Never a player bankruptcy.
+        def can_go_bankrupt?(player, corporation)
+          return false unless corporation&.corporation? && corporation.type == :major
+          return false unless corporation.floated? && corporation.trains.empty?
+
+          corporation.cash + player.cash < depot.min_depot_price
         end
 
         def can_buy_train_from_others?
@@ -1220,7 +1234,7 @@ module Engine
           Round::G18OE::Operating.new(self, [
             G18OE::Step::GoldenBellOrder,
             G18OE::Step::ConvertToNational,
-            Engine::Step::Bankrupt,
+            G18OE::Step::Bankrupt,
             G18OE::Step::DiscardTrain,
             Engine::Step::HomeToken,
             G18OE::Step::Track,

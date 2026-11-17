@@ -61,13 +61,13 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.DiscardTrain": e("Zug abwerfen", "Discard train", "§11.6"),
   "step.ConvertToNational": e("Nationalbildung", "National formation", "§9.4"),
   "step.GoldenBellOrder": e("Betriebsreihenfolge (Golden Bell)", "Operating position (Golden Bell)", "§15.6"),
-  "step.Bankrupt": e("Bankrott", "Bankruptcy", "§11.6.5"),
+  "step.Bankrupt": e("In National umwandeln", "Convert to national", "§11.6.4"),
   "step.Exchange": e("Tausch", "Exchange", "§11"),
 
   // --- Aktionstypen (lib/engine/action/*.rb, ohne base.rb) ------------------
   "action.acquire_company": e("Privat übernehmen", "Acquire company", "§14"),
   "action.assign": e("Zuweisen", "Assign", "§14"),
-  "action.bankrupt": e("Bankrott erklären", "Bankrupt", "§11.6.5"),
+  "action.bankrupt": e("In National umwandeln (§11.6.4)", "Convert to national (§11.6.4)", "§11.6.4"),
   "action.bid": e("Gebot abgeben", "Bid", "§7"),
   "action.blind_bid": e("Verdecktes Gebot", "Blind bid", "§7"),
   "action.borrow_train": e("Zug leihen", "Borrow train", "§11.6"),

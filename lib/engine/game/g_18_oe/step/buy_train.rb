@@ -16,6 +16,26 @@ module Engine
           def actions(entity)
             return [] if first_round_insolvency?(current_entity)
 
+            # §11.6.4: the president may not sell shares to pay for the train.
+            actions = super
+            @game.class::EBUY_CAN_SELL_SHARES ? actions : actions - ['sell_shares']
+          end
+
+          def help
+            entity = current_entity
+            return super unless entity&.corporation? && entity.type == :major && must_buy_train?(entity)
+
+            'A major without a train must buy the cheapest one from the Locomotive Works or the Open Market ' \
+              "(§11.6.4). Its president pays the difference from his own cash and may not sell shares. " \
+              'A train of another railroad may be bought for the treasury only. If treasury and president ' \
+              'cannot pay, the major converts into a national.'
+          end
+
+          # §11.6.4: a train of another railroad is paid from the buyer's treasury only; the president's
+          # cash goes only to the cheapest train of the Locomotive Works or the Open Market.
+          def spend_minmax(entity, train)
+            return [1, buying_power(entity)] if train.owned_by_corporation?
+
             super
           end
 
@@ -37,6 +57,8 @@ module Engine
           end
 
           def must_buy_train?(entity)
+            return false if entity.type == :national
+
             entity.floated? && entity.trains.empty? && (!@game.fulfilled_train_obligation?(entity) || entity.type == :major)
           end
 
