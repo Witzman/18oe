@@ -275,7 +275,7 @@ describe 'G18OE double town tiles (§11.1)' do
       def stubbed(train, *nodes)
         connection_data = nodes.each_cons(2).map { |l, r| { left: l, right: r, chain: { nodes: [l, r], paths: [] } } }
         instance_double(Engine::Route, corporation: corp, phase: game.phase, train: train, connection_data: connection_data,
-                                       paths: [])
+                                       paths: [], chains: connection_data.map { |c| c[:chain] })
       end
 
       it 'counts both towns for a 2+2 (PB 4.3)' do

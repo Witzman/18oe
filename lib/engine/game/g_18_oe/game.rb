@@ -685,6 +685,8 @@ module Engine
         end
 
         def check_connected(route, corporation)
+          return check_sea_route_connected(route, corporation) if sea_crossings(route).any?
+
           if bbe_blocked_for?(corporation) && route.paths.any? { |path| @bbe_token_hexes.include?(path.hex) }
             raise GameError, 'Route uses track marked by a Brandt and Brandau token'
           end
@@ -1411,6 +1413,7 @@ module Engine
         def check_other(route)
           super
 
+          check_sea_crossings!(route)
           hexes = route.visited_stops.reject(&:town?).map(&:hex)
           raise GameError, 'Route visits same city hex twice' if hexes.size != hexes.uniq.size
           return unless combined_train?(route.train)
@@ -1502,7 +1505,8 @@ module Engine
           best.sum { |stop| revenue[stop] }.positive? ? visits & best : []
         end
 
-        # §11.3.3, §11.3.7: the ferry distance takes places of the cities' row; the base check runs on the rest.
+        # §11.3.3, §11.3.4, §11.3.7: sea zones and the ferry distance take places of the cities' row; the base check
+        # runs on the rest.
         def check_distance(route, visits, train = nil)
           train ||= route.train
           units = sea_units(route)
@@ -1510,7 +1514,7 @@ module Engine
 
           rows = train.distance
           places = rows.select { |row| row['nodes'].include?('city') }.sum { |row| row['visit'] || row['pay'] }
-          raise RouteTooLong, "Ferry distance #{units} is too much for a #{train.name} train" if units > places
+          raise RouteTooLong, "Sea distance #{units} is too much for a #{train.name} train" if units > places
 
           super(route, visits, SeaTrain.new(distance_rows_after_sea(rows, units)))
         end
