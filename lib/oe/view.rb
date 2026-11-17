@@ -787,7 +787,7 @@ module Oe
         cost = game.upgrade_cost(hex.tile, hex, entity, entity)
         {
           hex: hex.id,
-          points: step.points_for_hex(hex),
+          points: step.points_for_lay(entity, hex),
           cost: cost,
           cost_parts: cost_parts(hex.tile, cost),
           tiles: tiles.map { |tile, rotations| { name: tile.name.to_s, color: tile.color.to_s, rotations: rotations } },

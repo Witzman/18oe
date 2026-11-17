@@ -116,16 +116,25 @@ RSpec.describe Oe::Invariants do
       expect(violations(g, :president_holds_presidency).map(&:message).join).to include(corp.name)
     end
 
-    it "certificate_limit: a player above the limit while another one acts in a stock round" do
+    # #426: rule 3.3 lets a player be over the limit until their first opportunity in a stock round (another
+    # player's purchase can hand them a presidency swap); at their turn the engine offers only the correction.
+    it "certificate_limit: a player above the limit waits for their turn, then may only correct" do
       g = stock_state
       expect(g.round.stock?).to be(true)
       holder = g.players[1]
       take_treasury_shares!(g, holder, g.corporation_by_id("GWR"), 1)
       expect(g.round.current_entity).not_to eq(holder)
       expect(g.num_certs(holder)).to be > 1
-      expect(violations(g, :certificate_limit)).to be_empty
       g.instance_variable_set(:@cert_limit, 1)
-      expect(violations(g, :certificate_limit).map(&:message).join).to include("#{holder.name} holds")
+      expect(violations(g, :certificate_limit)).to be_empty
+
+      acting = g.round.current_entity
+      take_treasury_shares!(g, acting, g.corporation_by_id("LNWR"), 1)
+      expect(g.num_certs(acting)).to be > 1
+      expect(g.round.active_step.actions(acting) - %w[sell_shares choose]).to eq([])
+      expect(violations(g, :certificate_limit)).to be_empty
+      allow(g.round.active_step).to receive(:actions).and_return(%w[buy_shares sell_shares pass])
+      expect(violations(g, :certificate_limit).map(&:message).join).to include("#{acting.name} holds")
     end
 
     it "train_supply: a train missing from the Locomotive Works" do

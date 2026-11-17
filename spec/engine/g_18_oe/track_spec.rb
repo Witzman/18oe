@@ -248,6 +248,14 @@ describe 'G18OE lay track (§11.1)' do
         expect(step.ef_bonus_id(major, game.hex_by_id('K64'))).to be_nil
       end
 
+      it 'prices a matching hex one point less for the panel, once per OR (#426)' do
+        expect(step.points_for_lay(major, game.hex_by_id('K64'))).to eq(0)
+        expect(step.points_for_lay(major, game.hex_by_id('R39'))).to eq(1)
+
+        step.instance_variable_set(:@ef_bonus_used, ['E'])
+        expect(step.points_for_lay(major, game.hex_by_id('K64'))).to eq(1)
+      end
+
       it 'makes a matching yellow lay cost one point less' do
         step.instance_variable_set(:@points_used, 5)
         allow(step).to receive(:hex_neighbors).and_return([0])

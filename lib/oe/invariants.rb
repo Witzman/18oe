@@ -94,17 +94,23 @@ module Oe
       end
     end
 
-    check(:certificate_limit, '4.1 Certificate Limits (over-limit only while correcting in a stock round)',
-          'no player exceeds the certificate limit, except the player to act in a stock round or between rounds') do |g|
-      next [] if g.finished
+    # #426: rule 3.3 allows a player over the limit (a presidency swap caused by another player's purchase,
+    # a merge) until their first opportunity in a stock round; so a waiting player is not checked, the
+    # player to act is: over the limit they may only sell or reduce their face-up privates.
+    check(:certificate_limit, '4.1 Certificate Limits, 3.3 (correct at the first opportunity in a stock round)',
+          'a player over the certificate limit may, at their turn in a stock round, only sell or reduce privates') do |g|
+      next [] if g.finished || !g.round.stock?
 
-      active = g.round.stock? ? g.round.current_entity : nil
-      g.players.filter_map do |player|
-        next if player == active || g.num_certs(player) <= g.cert_limit(player)
-        next unless g.round.stock?
+      player = g.round.current_entity
+      step = g.round.active_step
+      next [] unless player&.player? && step.is_a?(Engine::Step::BuySellParShares)
+      next [] if g.num_certs(player) <= g.cert_limit(player)
 
-        "#{player.name} holds #{g.num_certs(player)} certificates, limit #{g.cert_limit(player)}"
-      end
+      others = step.actions(player) - %w[sell_shares choose]
+      next [] if others.empty?
+
+      ["#{player.name} holds #{g.num_certs(player)} certificates, limit #{g.cert_limit(player)}, " \
+       "and may #{others.join(', ')}"]
     end
 
     check(:reserved_shares_consistent, '8.4 Reserved Shares (initial stock round, more than two players)',
