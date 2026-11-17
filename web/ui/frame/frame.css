@@ -77,6 +77,8 @@
 .frame-panel { position: absolute; left: var(--shape-gap); bottom: var(--shape-gap); z-index: 5; display: flex; flex-direction: column; width: var(--shape-panel-width); max-width: calc(100% - 2 * var(--shape-gap)); max-height: calc(100% - 2 * var(--shape-gap) - 3rem); background: var(--ui-panel); color: var(--ui-ink); border: 1px solid var(--ui-rule); border-radius: var(--shape-panel-radius); box-shadow: var(--shape-shadow); overflow: hidden; }
 .frame-panel-head { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border-bottom: 1px solid var(--ui-rule); }
 .frame-panel-toggle { flex: none; min-width: var(--shape-hit); min-height: var(--shape-hit); padding: 0; background: transparent; border-color: transparent; font-size: var(--type-lg); }
+.frame-panel-home { flex: none; margin-left: auto; min-width: var(--shape-hit); min-height: var(--shape-hit); padding: 0; background: transparent; border-color: transparent; font-size: var(--type-lg); }
+.frame-panel-home[hidden] { display: none; }
 .frame-panel-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-family: var(--font-head); font-size: var(--type-lg); font-weight: 700; }
 .frame-panel-step { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .frame-panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--shape-gap); }
