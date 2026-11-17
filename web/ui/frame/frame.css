@@ -1,7 +1,7 @@
 /* Game frame (#45, ui-spec 3.1). Sizes from shape.* tokens, colours from ui.* / map.* tokens only. */
-.frame { position: fixed; inset: 0; z-index: 1; display: grid; grid-template-rows: auto auto minmax(0, 1fr); background: var(--ui-bg); color: var(--ui-ink); }
+.frame { position: fixed; inset: 0; z-index: 1; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); background: var(--ui-bg); color: var(--ui-ink); }
 .frame > * { min-width: 0; }
-.frame-head { grid-row: 1; } .frame > .band { grid-row: 2; } .frame-body { grid-row: 3; }
+.frame-head { grid-row: 1; } .frame > .frame-orderband { grid-row: 2; } .frame > .band { grid-row: 3; } .frame-body { grid-row: 4; }
 .frame h2, .frame h3 { border: 0; margin: 0 0 6px; padding: 0; font-family: var(--font-head); letter-spacing: .04em; }
 .frame h2 { font-size: var(--type-xl); } .frame h3 { font-size: var(--type-lg); margin-top: 12px; }
 .frame button { padding: 3px 8px; }
@@ -19,7 +19,7 @@
 .frame-head .frame-tag-act { display: none; } /* "am Zug" is carried by the highlight */
 .frame-head .frame-certs { color: color-mix(in srgb, var(--ui-bar-ink) 65%, transparent); }
 .frame-head > .frame-players { flex-shrink: 0; padding-right: calc(var(--shape-gap) + 5.5rem); } /* the corner holds the dev menu and the version button */
-.head-order-item[data-state="done"] .head-order-owner { display: none; }
+.order-strip-item[data-state="done"] .order-strip-owner { display: none; }
 .frame-head .frame-who { flex-shrink: 0; margin-left: 0; }
 @media (max-width: 1599px) and (min-width: 1280px) { .frame-head .frame-rr { display: none; } }
 /* Below 1700 px the who-text does not fit: the seal stays (accent background when it is you), the text is only for screen readers and the title. */
@@ -31,14 +31,18 @@
 .frame-signet { display: inline-flex; align-items: center; justify-content: center; min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); font-size: var(--type-display); font-weight: 700; letter-spacing: .08em; color: inherit; text-decoration: none; }
 .frame-rr, .frame-phase, .frame-round { padding: 2px 10px; border: 1px solid color-mix(in srgb, var(--ui-bar-ink) 40%, transparent); border-radius: var(--shape-radius); }
 .frame-round { font-weight: 700; }
-/* The order list is the one part that scrolls sideways when it does not fit, so it never runs under the corner (issue 333). */
-.frame-roundbar > .head-order { flex: 0 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-.head-order { display: flex; gap: 4px; list-style: none; margin: 0; padding: 0; }
-.head-order-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border: 1px solid transparent; border-radius: var(--shape-radius); }
-.head-order-item[data-state="done"] { opacity: .45; }
-.head-order-item[data-state="current"] { border-color: var(--ui-accent); background: color-mix(in srgb, var(--ui-accent) 22%, transparent); font-weight: 700; }
-.head-order-item[data-mine="true"] .head-order-owner { text-decoration: underline; }
-.head-order-owner { font-size: var(--type-sm); }
+/* Order band (issue 416, assumption: thin bar under the head bar in the bar colours, fold button 44 px wide, list scrolls sideways). */
+.frame-orderband[hidden] { display: none; }
+.order-band { display: flex; align-items: center; gap: var(--shape-gap); padding: 0 var(--shape-gap); background: color-mix(in srgb, var(--ui-bar) 88%, var(--ui-bg)); color: var(--ui-bar-ink); font-family: var(--font-head); border-top: 1px solid color-mix(in srgb, var(--ui-bar-ink) 20%, transparent); }
+.order-band-toggle { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); background: transparent; color: inherit; border-color: transparent; font-size: var(--type-sm); white-space: nowrap; }
+.order-band-title { color: color-mix(in srgb, var(--ui-bar-ink) 70%, transparent); }
+.order-band[data-collapsed="true"] .order-band-title { color: inherit; }
+.order-strip { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; display: flex; gap: 4px; list-style: none; margin: 0; padding: 2px 0; white-space: nowrap; }
+.order-strip-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border: 1px solid transparent; border-radius: var(--shape-radius); }
+.order-strip-item[data-state="done"] { opacity: .45; }
+.order-strip-item[data-state="current"] { border-color: var(--ui-accent); background: color-mix(in srgb, var(--ui-accent) 22%, transparent); font-weight: 700; }
+.order-strip-item[data-mine="true"] .order-strip-owner { text-decoration: underline; }
+.order-strip-owner { font-size: var(--type-sm); }
 .frame-who { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 4px 14px; border-radius: var(--shape-radius); }
 .frame-who[data-mine="true"] { background: var(--ui-accent); color: var(--ui-accent-ink); font-weight: 700; }
 .frame-roundbar .kit-tip { color: var(--ui-bar-ink); background: var(--ui-bg); color: var(--ui-ink); }
@@ -77,6 +81,8 @@
 .frame-panel { position: absolute; left: var(--shape-gap); bottom: var(--shape-gap); z-index: 5; display: flex; flex-direction: column; width: var(--shape-panel-width); max-width: calc(100% - 2 * var(--shape-gap)); max-height: calc(100% - 2 * var(--shape-gap) - 3rem); background: var(--ui-panel); color: var(--ui-ink); border: 1px solid var(--ui-rule); border-radius: var(--shape-panel-radius); box-shadow: var(--shape-shadow); overflow: hidden; }
 .frame-panel-head { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 4px; border-bottom: 1px solid var(--ui-rule); }
 .frame-panel-toggle { flex: none; min-width: var(--shape-hit); min-height: var(--shape-hit); padding: 0; background: transparent; border-color: transparent; font-size: var(--type-lg); }
+.frame-panel-home { flex: none; margin-left: auto; min-width: var(--shape-hit); min-height: var(--shape-hit); padding: 0; background: transparent; border-color: transparent; font-size: var(--type-lg); }
+.frame-panel-home[hidden] { display: none; }
 .frame-panel-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-family: var(--font-head); font-size: var(--type-lg); font-weight: 700; }
 .frame-panel-step { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .frame-panel-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: var(--shape-gap); }

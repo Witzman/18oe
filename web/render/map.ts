@@ -98,6 +98,8 @@ export interface MapView {
   showRoutes(routes: unknown[], opts?: { animate?: boolean }): void;
   /** Fly to a hex id or a corporation id (its tokens, else its home). False if unknown. */
   flyTo(target: string): boolean;
+  /** Centre on a corporation's home station, zoomed in to at least the theme's homeZoom (#415). */
+  flyHome(corp: string): boolean;
   on(event: MapEvent, handler: (data: MapEventData) => void): () => void;
   /** Whole map in view (key `0`). */
   fit(animate?: boolean): void;
@@ -622,6 +624,16 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     return true;
   }
 
+  /** Centre on the corporation's home station and zoom in to at least theme.camera.homeZoom (#415). False if it has no home hex. */
+  function flyHome(corp: string): boolean {
+    const hex = (geometry.homes ?? []).find((h) => h.corporation === corp)?.hex
+      ?? state?.corporations.find((k) => k.id === corp)?.tokens.find((t) => t.used && t.hex)?.hex;
+    const c = hex ? hexCenter(hex) : null;
+    if (!c) return false;
+    animateTo(centerOn(view, c.p, c.z, vp(), Math.min(maxZoom(baseZoom), Math.max(view.zoom, theme.camera.homeZoom))));
+    return true;
+  }
+
   // ---- input -------------------------------------------------------------------------------
 
   const pos = (e: { clientX: number; clientY: number }): Vec => {
@@ -852,6 +864,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     setLayers(l) { shownLayers = { ...shownLayers, ...l }; render(); },
     showRoutes(r) { routes = r; },
     flyTo,
+    flyHome,
     on(event, handler) {
       let set = handlers.get(event);
       if (!set) handlers.set(event, (set = new Set()));

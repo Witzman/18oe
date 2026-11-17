@@ -128,6 +128,8 @@ export function mountMapView(frame: GameFrame, api: Api): () => void {
   // "Heimat auf der Karte zeigen" (outliner): switch to the map and fly there.
   frame.hooks.onFocusCorporation = (id) => { frame.views.activate("map"); void load().then((m) => m?.flyTo(id)); };
 
+  frame.hooks.onFocusHome = (id) => { frame.views.activate("map"); void load().then((m) => m?.flyHome(id)); };
+
   return () => {
     disposed = true;
     offGame();

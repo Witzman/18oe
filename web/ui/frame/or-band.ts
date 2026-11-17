@@ -13,11 +13,14 @@ export interface OrEntry {
   id: string; name: string; color: string; tier: string; owner: string | null; mine: boolean; bot: boolean;
   state: "done" | "current" | "next";
 }
-export interface OrBand { acting: OrEntry | null; entries: OrEntry[]; sentence: string }
+// `preview`: outside an operating round (stock round, #416) the order the next operating round would have by
+// the current state (the view's `operating_order`); nobody is acting, nothing is done.
+export interface OrBand { acting: OrEntry | null; entries: OrEntry[]; sentence: string; preview?: boolean }
 
 export function orBand(g: Game, theme: Theme): OrBand | null {
   const m = g.state.meta;
-  if (m.finished || m.round.type !== "operating") return null;
+  if (m.finished) return null;
+  if (m.round.type !== "operating") return orPreview(g, theme);
   const botNames = new Set(g.seats.filter((s) => s.kind === "bot").map((s) => s.name));
   const curId = m.current?.kind === "corporation" ? m.current.id : null;
   const firstOpen = (m.operating_order ?? []).findIndex((o) => !o.done);
@@ -37,6 +40,21 @@ export function orBand(g: Game, theme: Theme): OrBand | null {
   const sentence = acting.mine ? fillText("op.acting_mine", { corp: acting.id, name: acting.name })
     : fillText("op.acting_other", { corp: acting.id, name: acting.name, who: `${acting.owner ?? "?"}${acting.bot ? ` (${txt("frame.bot").de})` : ""}` });
   return { acting, entries, sentence };
+}
+
+function orPreview(g: Game, theme: Theme): OrBand | null {
+  const botNames = new Set(g.seats.filter((s) => s.kind === "bot").map((s) => s.name));
+  const entries: OrEntry[] = [];
+  for (const o of g.state.meta.operating_order ?? []) {
+    const c = g.state.corporations.find((x) => x.id === o.id);
+    if (!c) continue;
+    const owner = c.president ? playerName(g, c.president) : null;
+    entries.push({
+      id: c.id, name: c.name, color: corpColor(theme, g, c.id), tier: txt(`tier.${c.type}`).de, owner,
+      mine: c.president !== null && c.president === g.viewer, bot: owner !== null && botNames.has(owner), state: "next",
+    });
+  }
+  return entries.length > 0 ? { acting: null, entries, sentence: "", preview: true } : null;
 }
 
 export function OrBandView(b: OrBand, theme: Theme, opts: { order?: boolean } = {}): VNode {
@@ -62,17 +80,25 @@ export function OrBandView(b: OrBand, theme: Theme, opts: { order?: boolean } = 
   return v("section", { class: "or-band", "aria-label": txt("op.order").de }, card, list ? v("h3", { class: "or-title" }, txt("op.order").de) : null, list);
 }
 
-// Compact strip for the head bar (#300): one chip per company in operating order (seal in company colour,
-// owner), the acting one marked, done ones muted. Not interactive; the title carries the details.
-export function OrStripView(b: OrBand, theme: Theme): VNode {
+// Thin collapsible band under the head bar (#416): one chip per company in operating order (seal in company
+// colour, owner), the acting one marked, done ones muted. In a stock round the preview order. Not interactive
+// except the fold button; the title of a chip carries the details.
+export function OrderBandView(b: OrBand, theme: Theme, opts: { collapsed: boolean; onToggle: () => void }): VNode {
   const ownerText = (e: OrEntry) => e.mine ? txt("op.you").de : `${e.owner ?? "?"}${e.bot ? ` · ${txt("frame.bot").de}` : ""}`;
-  return v("ol", { class: "head-order", "aria-label": txt("frame.head_order").de },
+  const label = txt(b.preview ? "frame.order_band_next" : "frame.head_order").de;
+  const toggleLabel = txt(opts.collapsed ? "frame.order_band_expand" : "frame.order_band_collapse").de;
+  const list = v("ol", { class: "order-strip", "aria-label": label },
     ...b.entries.map((e) => v("li", {
-      class: "head-order-item", "data-id": e.id, "data-state": e.state, "data-mine": e.mine ? "true" : "false",
+      class: "order-strip-item", "data-id": e.id, "data-state": e.state, "data-mine": e.mine ? "true" : "false",
       "aria-current": e.state === "current" ? "step" : undefined,
       title: `${e.id} · ${e.name} · ${e.tier} · ${ownerText(e)} · ${txt(`op.state_${e.state}`).de}`,
     },
     Siegel({ sym: e.id, color: e.color, name: e.name }, { theme, size: "s" }),
-    v("span", { class: "head-order-owner" }, e.mine ? txt("op.you").de : e.owner ?? "?"),
+    v("span", { class: "order-strip-owner" }, e.mine ? txt("op.you").de : e.owner ?? "?"),
     v("span", { class: "or-sr" }, ` ${txt(`op.state_${e.state}`).de}`))));
+  return v("section", { class: "order-band", "data-collapsed": opts.collapsed ? "true" : "false", "data-preview": b.preview ? "true" : "false", "aria-label": label },
+    v("button", { type: "button", class: "order-band-toggle", "aria-expanded": String(!opts.collapsed), title: toggleLabel, "aria-label": toggleLabel, onclick: opts.onToggle },
+      v("span", { "aria-hidden": "true" }, opts.collapsed ? "▸" : "▾"),
+      v("span", { class: "order-band-title" }, label)),
+    opts.collapsed ? null : list);
 }

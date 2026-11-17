@@ -68,7 +68,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
 
   // --- Aktionstypen (lib/engine/action/*.rb, ohne base.rb) ------------------
   "action.acquire_company": e("Privat übernehmen", "Acquire company", "§14"),
-  "action.assign": e("Zuweisen", "Assign", "§14"),
+  "action.assign": e("Zuweisen (Marker setzen)", "Assign (place marker)", "§14, §15.4"),
   "action.bankrupt": e("In National umwandeln (§11.6.4)", "Convert to national (§11.6.4)", "§11.6.4"),
   "action.bid": e("Gebot abgeben", "Bid", "§7"),
   "action.blind_bid": e("Verdecktes Gebot", "Blind bid", "§7"),
@@ -339,6 +339,9 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "frame.stall_waiting": e("Warte auf {names}.", "Waiting for {names}.", "—"),
   "frame.finished": e("Partie beendet, Sieger: {winner}", "Finished, winner: {winner}", "§13"),
   "frame.unknown": e("unbekannt", "unknown", "—"),
+  "frame.order_band_next": e("Reihenfolge der nächsten Betriebsrunde (nach aktuellem Kursstand)", "Order of the next operating round (by current share prices)", "§11"),
+  "frame.order_band_collapse": e("Reihenfolge einklappen", "Collapse the order", "—"),
+  "frame.order_band_expand": e("Reihenfolge ausklappen", "Expand the order", "—"),
   "frame.head_order": e("Betriebsreihenfolge", "Operating order", "§11"),
   "frame.bank": e("Bank", "Bank", "—"),
   "frame.player_bar": e("Spieler", "Players", "—"),
@@ -352,6 +355,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "frame.cash": e("Bargeld", "Cash", "—"),
   "frame.panel": e("Aktionen", "Action panel", "—"),
   "frame.panel_collapse": e("Panel einklappen: die Karte wird frei, die Hauptaktion bleibt in einer Zeile", "Collapse panel", "—"),
+  "frame.home_title": e("Karte auf den Heimatbahnhof des aktiven Unternehmens zentrieren und zoomen", "Centre the map on the active company's home station and zoom in", "—"),
   "frame.panel_expand": e("Panel ausklappen", "Expand panel", "—"),
   "frame.log_hint": e("Protokoll: was in dieser Partie bisher geschah", "Game log", "—"),
   "frame.players": e("Spieler", "Players", "—"),

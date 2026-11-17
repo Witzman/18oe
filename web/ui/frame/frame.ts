@@ -17,10 +17,10 @@ import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
 import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
-import { OrStripView, orBand } from "./or-band.ts";
+import { OrderBandView, orBand } from "./or-band.ts";
 import { opSheet, OpSheetView } from "../panels/op-sheet.ts";
 import { corpColor, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
-import { panelIdle, readCollapsed, writeCollapsed } from "./panel.ts";
+import { panelIdle, readCollapsed, readOrderCollapsed, writeCollapsed, writeOrderCollapsed } from "./panel.ts";
 import { createViews } from "./views.ts";
 import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
 import { versionButton } from "../version.ts";
@@ -49,7 +49,7 @@ export interface GameFrame {
   hidePanel: () => () => void;
   // Sends an action with the current seq (what the main button of the generic bar does).
   send: (action: Record<string, unknown>) => void;
-  hooks: { onFocusCorporation?: (id: string) => void; map?: import("./mapview.ts").FrameMap; onRenderError?: (e: unknown) => void };
+  hooks: { onFocusCorporation?: (id: string) => void; onFocusHome?: (id: string) => void; map?: import("./mapview.ts").FrameMap; onRenderError?: (e: unknown) => void };
   // Runs the cleanups of mounted views and panels when the page leaves the game (the map frees its WebGL context).
   onDispose: (fn: () => void) => void;
   dispose: () => void;
@@ -77,6 +77,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   let busy = false;
   let rangeError: { key: string; text: string } | null = null;
   let collapsed = readCollapsed();
+  let orderCollapsed = readOrderCollapsed();
   let genericOpen: boolean | null = null; // null = automatic (open while there is something to choose)
   let logOpen = false;
   // The full log (#292): fetched from /games/:id/log while the sheet is open; the sheet element lives on
@@ -104,6 +105,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const disposers: (() => void)[] = [];
 
   const roundEl = h("div", { class: "frame-roundbar" });
+  const orderEl = h("div", { class: "frame-orderband" });
+  orderEl.hidden = true;
   const playersEl = h("nav", { class: "frame-players", "aria-label": txt("frame.player_bar").de });
   const contextEl = h("div", { class: "frame-context" });
   const contextSlot = h("div", { class: "frame-context-slot" });
@@ -116,7 +119,9 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   // (order with the main button, stall line, messages, tools).
   const panelTitle = h("div", { class: "frame-panel-title" });
   const panelToggle = h("button", { type: "button", class: "frame-panel-toggle" });
-  const panelHead = h("div", { class: "frame-panel-head" }, panelToggle, panelTitle);
+  const panelHome = h("button", { type: "button", class: "frame-panel-home", title: txt("frame.home_title").de, "aria-label": txt("frame.home_title").de }, "⌂");
+  panelHome.hidden = true;
+  const panelHead = h("div", { class: "frame-panel-head" }, panelToggle, panelTitle, panelHome);
   const drawerEl = h("div", { class: "frame-drawer" });
   const panelBody = h("div", { class: "frame-panel-body" }, contextEl, drawerEl);
   const barEl = h("div", { class: "frame-panel-foot" });
@@ -162,7 +167,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const body = h("div", { class: "frame-body" }, mainEl, panelEl, logHost);
   logHost.hidden = true;
   const headEl = h("header", { class: "frame-head" }, roundEl, playersEl);
-  const root = h("div", { class: "frame" }, headEl, band.el, body, versionButton());
+  const root = h("div", { class: "frame" }, headEl, orderEl, band.el, body, versionButton());
 
   const model = () => (game ? genericModel(game, claims) : null);
 
@@ -186,7 +191,6 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (!game) return put(roundEl);
     const t = theme();
     const m = roundBar(game, t);
-    const strip = orBand(game, t);
     const phase = mitTooltip(v("span", { class: "frame-phase" }, m.phase.label),
       { title: m.phase.label, term: "Train phase", rows: [{ label: txt("frame.phase_tiles").de, value: m.phase.tiles }, { label: txt("frame.phase_ors").de, value: String(m.phase.operatingRounds) }], source: txt("frame.phase_tiles").regel });
     put(roundEl,
@@ -194,11 +198,18 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       v("span", { class: "frame-rr", title: txt(`rrphase.${m.rrPhase}`).en }, txt(`rrphase.${m.rrPhase}`).de),
       phase,
       v("span", { class: "frame-round", "aria-current": "step", title: m.round }, m.roundShort),
-      strip ? OrStripView(strip, t) : null,
       v("div", { class: "frame-who", "data-mine": m.who.mine ? "true" : "false", role: "status", title: m.who.text },
         m.who.corp ? Siegel({ sym: m.who.corp.sym, color: m.who.corp.color }, { theme: t, size: "s" }) : null,
         v("span", {}, m.who.text)),
       );
+  }
+
+  // ---- order band (#416): operating order under the head bar; stock round: the order the next OR would have --
+  function drawOrderBand() {
+    const b = game ? orBand(game, theme()) : null;
+    orderEl.hidden = b === null;
+    if (b === null) return orderEl.replaceChildren();
+    put(orderEl, OrderBandView(b, theme(), { collapsed: orderCollapsed, onToggle: () => { orderCollapsed = !orderCollapsed; writeOrderCollapsed(orderCollapsed); drawOrderBand(); } }));
   }
 
   // ---- player bar ------------------------------------------------------------------------------
@@ -231,6 +242,9 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     put(panelTitle,
       acting ? Siegel({ sym: acting.id, name: acting.name, color: acting.color }, { theme: t, size: "s" }) : null,
       v("span", { class: "frame-panel-step", title: p.step ? txt(`step.${p.step}`).en : undefined }, stepLabel(p.step)));
+    // #415: centre the map on the home station of the acting company.
+    panelHome.hidden = !acting;
+    panelHome.dataset.corp = acting?.id ?? "";
     // Operating round (#302): the compact head of the acting company (numbers, step strip), no rules text.
     const sheet = opSheet(game, t);
     put(contextEl, sheet ? OpSheetView(sheet) : null);
@@ -367,6 +381,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     panelToggle.setAttribute("aria-label", label);
     panelToggle.textContent = collapsed ? "▴" : "▾";
   }
+  panelHome.addEventListener("click", () => { const id = panelHome.dataset.corp; if (id) frame.hooks.onFocusHome?.(id); });
   panelToggle.addEventListener("click", () => { collapsed = !collapsed; writeCollapsed(collapsed); drawLayout(); });
 
   // Enter = the main button (#301), unless the focus is in something that uses Enter itself.
@@ -384,7 +399,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   disposers.push(() => document.removeEventListener("keydown", onKey));
 
   function drawAll() {
-    drawLayout(); drawRound(); drawPlayers(); drawContext(); drawMain(); drawEnd(); drawBar();
+    drawLayout(); drawRound(); drawOrderBand(); drawPlayers(); drawContext(); drawMain(); drawEnd(); drawBar();
   }
 
   document.addEventListener(THEME_CHANGED, () => { if (root.isConnected) drawAll(); });

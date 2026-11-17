@@ -12,6 +12,7 @@ require_relative 'golden_bell'
 require_relative 'sea'
 require_relative 'step/consolidate'
 require_relative 'step/hochberg_token'
+require_relative 'green_junction'
 require_relative 'step/special_track'
 require_relative 'step/golden_bell_order'
 require_relative 'step/bankrupt'
@@ -35,6 +36,7 @@ module Engine
         include G18OE::Entities
         include G18OE::Map
         include G18OE::GoldenBell
+        include G18OE::GreenJunction
         include G18OE::Sea
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
@@ -466,6 +468,8 @@ module Engine
           @minor_b_ability = corporation_by_id('B')&.abilities&.first
           # §15.5/§15.6: the ability objects travel with the charter into the major on a merge
           @ef_abilities = %w[E F].to_h { |id| [id, corporation_by_id(id)&.abilities&.first] }
+          # §15.4: Minor D's token
+          setup_green_junction!
         end
 
         def setup_wcf_placeholder!
@@ -998,6 +1002,8 @@ module Engine
           @log << "#{minor.name} is abandoned"
           minor.trains.dup.each { |train| @depot.reclaim_train(train) }
           minor.placed_tokens.each(&:remove!)
+          # §9.5 step 4: the D minor's tokens go back to its charter
+          green_junction_remove!(back_to_charter: true) if green_junction_holder?(minor)
           minor.spend(minor.cash, @bank) if minor.cash.positive?
           @share_pool.transfer_shares(minor.presidents_share.to_bundle, minor.ipo_owner, allow_president_change: false)
           minor.presidents_share.buyable = false
@@ -1113,6 +1119,7 @@ module Engine
 
         def after_phase_change(name)
           super
+          green_junction_phase_change!
           @national_formation_phase = name if self.class::NATIONAL_FORMATION_PHASES.include?(name)
           return unless name == self.class::PHASES.last[:name]
 
@@ -1532,13 +1539,14 @@ module Engine
         end
 
         def revenue_for(route, stops)
-          revenue = super + hochberg_revenue_change(route, stops)
+          revenue = super + hochberg_revenue_change(route, stops) + green_junction_revenue(route)
           revenue += self.class::ORIENT_EXPRESS_BONUS[route.phase.name] if orient_express_bonus_route?(route)
           revenue
         end
 
         def revenue_str(route)
           str = super
+          str = "#{str} + Green Junction" if green_junction_revenue(route).positive?
           orient_express_bonus_route?(route) ? "#{str} + Orient Express" : str
         end
 

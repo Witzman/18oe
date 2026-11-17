@@ -18,7 +18,15 @@ test("rows: the reserved 2+2 comes first with the mark; the foreign train is inv
   assert.ok(rows[0]!.reserved && rows[0]!.options.length === 1 && rows[0]!.reason === null);
   assert.ok(!rows[1]!.reserved && rows[1]!.options.length === 0);
   assert.match(rows[1]!.reason!, /Pflichtkauf/);
-  assert.equal(rows[0]!.left, 6);
+  // #418: the depot's count of a type is the train on offer plus the not yet offered ones (1 + 6); a corporation's row has none.
+  assert.equal(rows[0]!.left, 7);
+  assert.equal(rows[1]!.left, null);
+});
+
+test("#418: the depot row says how many trains of its type are left, also when no further ones are scheduled", () => {
+  const g = load("buy-train");
+  assert.equal(trainRows(g)[0]!.left, 1, "no schedule in this recording: the one on offer");
+  assert.match(textOf(TrainPanel(g, emptySelection(), noop)), /1 übrig/);
 });
 
 test("rows: without the obligation the reasons are cash, limit or generic", () => {
