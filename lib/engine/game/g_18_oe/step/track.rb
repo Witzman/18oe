@@ -11,9 +11,72 @@ module Engine
             super
             @points_used = 0
             @ef_bonus_used = []
+            @right_of_way_used = false
+            @right_of_way_memo = {}
+            @refused_home_hexes = []
+            @consented_lay = nil
           end
 
           attr_reader :points_used
+
+          # ---- §11.1.9 Right-of-Way (Game::RightOfWay) ----------------------------------------
+
+          # Part 1: may the RR lay its one green non-city tile now? Decided on the map as it is (memo per
+          # lay and cash, so the search runs once per state, live and in a replay alike).
+          def right_of_way_available?(entity)
+            return false if @right_of_way_used || !@game.right_of_way_phase?(entity) || points_left(entity) < 1
+
+            key = [entity.id, @round.num_laid_track, @points_used, entity.cash]
+            return @right_of_way_memo[key] if @right_of_way_memo.key?(key)
+
+            @right_of_way_memo[key] = !@game.right_of_way_connected?(entity) &&
+                                      !@game.right_of_way_yellow_connection?(entity, get_tile_lay(entity), entity.cash)
+          end
+
+          def right_of_way_lay?(entity, hex, tile)
+            !@game.phase.tiles.include?(tile.color) && @game.right_of_way_tile?(tile) && @game.right_of_way_hex?(hex) &&
+              right_of_way_available?(entity)
+          end
+
+          def potential_tile_colors(entity, hex)
+            colors = super
+            return colors unless @game.right_of_way_hex?(hex) && right_of_way_available?(entity)
+
+            colors | [:green]
+          end
+
+          # Part 2: a yellow lay in a floated RR's home hex waits for its president (Step::HomeHexConsent).
+          def process_lay_tile(action)
+            presidents = @consented_lay.equal?(action) ? [] : @game.home_hex_consent_needed(action.entity, action.hex, action.tile)
+            return super if presidents.empty?
+
+            check_home_lay!(action)
+            @round.pending_home_lay = { action: action, presidents: presidents }
+            @game.log << "#{action.entity.name} asks #{presidents.map(&:name).join(', ')} for permission to lay " \
+                         "yellow track in the home hex #{action.hex.id}"
+          end
+
+          def lay_with_consent!(action)
+            @consented_lay = action
+            process_lay_tile(action)
+          ensure
+            @consented_lay = nil
+          end
+
+          def refuse_home_lay!(hex)
+            @refused_home_hexes << hex
+          end
+
+          # The held lay must be one the step would take, so nobody is asked about an impossible lay.
+          def check_home_lay!(action)
+            entity = action.entity
+            hex = action.hex
+            raise GameError, "#{hex.id} is not available to #{entity.name}" unless available_hex(entity, hex)
+
+            tile = upgradeable_tiles(entity, hex).find { |t| t.name == action.tile.name }
+            raise GameError, "#{hex.tile.name} is not upgradeable to #{action.tile.name}" unless tile
+            raise GameError, "#{action.tile.name} is not legally rotated" unless tile.legal_rotations.include?(action.rotation)
+          end
 
           def points_left(entity)
             get_tile_lay(entity) - @points_used
@@ -119,10 +182,20 @@ module Engine
             points_cost = points_for_tile(action.entity, tile)
             bonus_id = ef_bonus_id(action.entity, action.hex, tile)
             points_cost -= 1 if bonus_id
+            right_of_way = right_of_way_lay?(action.entity, action.hex, tile)
+            # §11.1.9: the green tile costs all remaining tile points (at least one)
+            points_cost = points_available if right_of_way
             raise GameError, 'Cannot lay an upgrade now' if tile.color != :yellow && points_cost > points_available
             raise GameError, 'Cannot lay a yellow now' if tile.color == :yellow && points_cost > points_available
 
             lay_tile(action)
+            if right_of_way
+              raise GameError, 'The Right-of-Way tile must connect the home station to another town or city' \
+                unless @game.right_of_way_connected?(action.entity)
+
+              @right_of_way_used = true
+              @game.log << "#{action.entity.name} uses its Right-of-Way (§11.1.9)"
+            end
             record_lay!(action.entity, action, old_tile, points_cost, bonus_id)
           end
 
@@ -225,8 +298,11 @@ module Engine
 
             points_available = get_tile_lay(entity) - @points_used
             return nil if hex.tile.color == :blue
+            # §11.1.9: a president who refused the lay closes the hex to this RR for this step
+            return nil if @refused_home_hexes.include?(hex)
 
             needed = points_for_lay(entity, hex)
+            needed = 1 if needed > points_available && @game.right_of_way_hex?(hex) && right_of_way_available?(entity)
             return nil if points_available < needed
 
             connected
