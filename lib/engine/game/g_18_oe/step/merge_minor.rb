@@ -88,6 +88,9 @@ module Engine
             else
               @log << "#{minor.name} merges into #{major.name} by track connection; #{minor.owner.name} receives no share"
             end
+            # §10.5 exchanges the minor charter: it stops counting towards the limit (§4.1) now, not only when the
+            # minor closes after its tokens are resolved (#424).
+            minor.presidents_share.counts_for_limit = false
             transfer_treasury(minor, cash_recipient)
             @round.merge_trains = { corporation: major, trains: move_trains!(minor, major) }
             @game.add_minor_charter!(minor, major)
