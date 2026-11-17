@@ -37,6 +37,16 @@ describe 'G18OE scenario building blocks (#365)' do
     tile = lay_tile!(game, hex.id, '8')
     expect(hex.tile).to be(tile)
     expect(tile.hex).to be(hex)
+    expect(game.tiles).not_to include(tile) # #438: it left the supply, as in a real lay
+    expect(lay_tile!(game, game.hexes.find { |h| h != hex && h.tile.preprinted && h.tile.paths.empty? && h.tile.cities.empty? && h.tile.towns.empty? }, '9', rotation: 2).rotation).to eq(2)
     expect { lay_tile!(game, hex, 'no-such-tile') }.to raise_error(ArgumentError)
+  end
+
+  it 'place_token! puts a free station of the corporation in the hex (#438)' do
+    corp = game.corporation_by_id('LNWR')
+    city = place_token!(game, 'AA20', corp)
+    expect(city.hex.id).to eq('AA20')
+    expect(city.tokens.compact.map(&:corporation)).to eq([corp])
+    expect(corp.cash).to eq(0)
   end
 end

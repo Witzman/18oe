@@ -5,11 +5,17 @@ require "oe/view"
 require "oe/legal_actions"
 require "oe/strategy_player"
 require "json"
+require_relative "../engine/g_18_oe/helpers"
+require_relative "../support/view_checks"
 
 # #123: the numbers of the operating steps in `prompt.context`, tile supply,
 # phase limits and the train schedule, each checked against the engine method
 # it comes from (and against what the engine does when the action is played).
+# The checks live in spec/support/view_checks.rb; this group runs them over a
+# seed game (full stage), the group below over states built by code (fast, #438).
 RSpec.describe "Oe::View operating context (#123)", :game_flow do
+  include OeViewChecks
+
   G = Engine::Game::G18OE
 
   # One strategy game; yields [game, view] before every action, with the action
@@ -52,12 +58,8 @@ RSpec.describe "Oe::View operating context (#123)", :game_flow do
       entity = step.current_entity
       label = "action #{game.raw_actions.size} #{step.class.name.split('::').last} #{entity.id}"
       @views << [view, game.depot.upcoming.size, game.tiles.size, game.phase.name, game.phase.current[:train_limit]]
-      check(:shape, label) { expect(ctx.keys).to eq(%i[track token dividend train stock]); JSON.generate(ctx) }
-      acting = view[:prompt][:acting_as]
-      check(:acting, label) do
-        expect(acting.map { |a| a[:entity] }).to eq(view[:prompt][:actions].map { |a| a["entity"] }.uniq)
-        expect(acting.select { |a| a[:primary] }.map { |a| a[:entity] } - [entity.id]).to eq([])
-      end
+      check(:shape, label) { check_shape(ctx) }
+      check(:acting, label) { check_acting(view, entity) }
       check(:track, label) { check_track(ctx[:track], view, step, entity, game) } if ctx[:track]
       check(:token, label) { check_token(ctx[:token], step, entity, game) } if ctx[:token]
       check(:train, label) { check_train(ctx[:train], step, entity, game) } if ctx[:train]
@@ -73,91 +75,6 @@ RSpec.describe "Oe::View operating context (#123)", :game_flow do
       check(:dividend, label) { check_dividend(opt, entity, before) }
       :processed
     end
-  end
-
-  def check_track(track, view, step, entity, game)
-    expect(track[:points]).to eq(budget: game.tile_point_budget(entity), used: step.points_used, left: step.points_left(entity))
-    expect(track[:hexes]).not_to be_nil if view[:prompt][:viewer_to_act]
-    (track[:hexes] || []).each do |h|
-      hex = game.hex_by_id(h[:hex])
-      expect(step.available_hex(entity, hex)).to be_truthy
-      # #360: plus the fee for the sea zones to the hex (§11.1.6)
-      expect(h[:cost]).to eq(game.upgrade_cost(hex.tile, hex, entity, entity) + game.cross_water_track_fee(entity, hex).to_i)
-      expect(h[:cost_parts].sum { |p| p[:amount] }).to eq(h[:cost])
-      expect(h[:points]).to eq(step.points_for_lay(entity, hex)) # #426: with the E/F extra point
-      expect(h[:points]).to be <= track[:points][:left]
-      expect(h[:tiles].map { |t| t[:name] }.sort).to eq(step.upgradeable_tiles(entity, hex).map { |t| t.name.to_s }.sort)
-      h[:tiles].each { |t| expect(t[:rotations]).not_to be_empty }
-    end
-    compare_sampled_track(track, game) if track[:hexes] && track[:hexes].size > 2 && @compared < 10
-    return unless track[:hexes] && @enumerated < 15
-
-    @enumerated += 1
-    legal = Oe::LegalActions.new(game, limit: nil).call.grep(Engine::Action::LayTile)
-    from_view = track[:hexes].flat_map { |h| h[:tiles].flat_map { |t| t[:rotations].map { |r| [h[:hex], t[:name], r] } } }
-    expect(from_view.sort).to eq(legal.map { |a| [a.hex.id, a.tile.name.to_s, a.rotation] }.sort)
-  end
-
-  # #340: the track panel regrouped from the unsampled legal set equals the one
-  # from a second enumeration (taken when the prompt is sampled), order included.
-  def compare_sampled_track(track, game)
-    @compared += 1
-    sampled = Oe::View.render(game, viewer: game.active_players.first&.id, log: nil, actions_limit: 1_000_000)
-    expect(sampled[:prompt][:context][:track]).to eq(track)
-  end
-
-  def check_token(token, step, entity, game)
-    tokens = step.available_tokens(entity)
-    expect(token[:tokens_left]).to eq(tokens.size)
-    (token[:cities] || []).each do |c|
-      expect(c[:price]).to be_a(Integer)
-      city = game.city_by_id(c[:id])
-      expect(city.hex.id).to eq(c[:hex])
-      next unless step.is_a?(G::Step::HomeToken) && tokens.first.corporation.type == :minor
-
-      expect(c[:price]).to eq(game.track_rights_cost(game.region_for_hex(city.hex)))
-    end
-    return if step.is_a?(Engine::Step::HomeToken) # also the engine's own home-token step (majors, regionals)
-
-    expect(token[:price]).to eq(tokens.first.price)
-    expect(token[:kind]).to eq("operating")
-  end
-
-  # What the view promised is what the engine did: the treasury grew by `treasury`,
-  # the share price is the predicted one.
-  def check_dividend(opt, entity, before)
-    expect(opt[:price]).to eq(entity.share_price&.price)
-    expect(entity.cash - before[:cash]).to eq(opt[:treasury])
-    # #294: every holder got exactly the announced payout (rounded up per recipient), nobody else got money.
-    # The last dividend of an operating round starts the next one, which pays the private companies' income to
-    # the players (bot games now reach this): the cash comparison only holds while the round is still the same.
-    return unless @game_for_check.round.equal?(before[:round])
-
-    paid = opt[:payouts].to_h { |p| [p[:holder], p[:amount]] }
-    before[:holders].each do |id, cash|
-      next if id == entity.id
-
-      holder = @game_for_check.players.find { |x| x.id == id } || @game_for_check.corporation_by_id(id)
-      expect(holder.cash - cash).to eq(paid.fetch(id, 0)), "#{id}: got #{holder.cash - cash}, view said #{paid[id].inspect}"
-    end
-  end
-
-  # #302: the run being paid out, as the Route step stored it; it never claims more than the revenue.
-  def check_routes(dividend, game)
-    expect(dividend[:routes].map { |r| r[:train] }).to eq(game.round.routes.map { |r| r.train.name })
-    dividend[:routes].each { |r| expect(r[:hexes]).not_to be_empty }
-    expect(dividend[:routes].sum { |r| r[:revenue] }).to be <= dividend[:revenue]
-  end
-
-  def check_train(train, step, entity, game)
-    expect(train[:limit]).to eq(game.train_limit(entity))
-    expect(train[:count]).to eq(entity.trains.size)
-    expect(train[:must_buy]).to eq(step.must_buy_train?(entity) ? true : false)
-    expect(train[:obligation]).to eq(active: game.train_obligation_active?, fulfilled: game.fulfilled_train_obligation?(entity))
-    reserved = game.depot.depot_trains.find { |t| t.name == "2+2" && t.from_depot? }
-    expect(train[:reserved]&.fetch(:price)).to eq(reserved&.price)
-    expect(train[:shortfall]).to eq(train[:must_buy] && train[:cheapest_price] ? [train[:cheapest_price] - entity.cash, 0].max : 0)
-    @short = true if train[:shortfall].positive?
   end
 
   it "saw a fractional dividend rate per share and checked its rounded payouts (#294)" do
@@ -208,5 +125,100 @@ RSpec.describe "Oe::View operating context (#123)", :game_flow do
     expect(nxt).to include(name: "3", on: "3")
     expect(nxt[:train_limits]).to include("major" => 4)
     expect(first[:depot][:schedule].find { |s| s[:name] == "3" }[:phase_on]).to eq("3")
+  end
+end
+
+# #438: the same checks over states built by code (scenario building blocks of spec/engine/g_18_oe/helpers.rb),
+# no seed game: fast stage. Each scenario is one state a seed game reached only late or by chance; a view
+# change that breaks one shows before the merge, not in the full stage.
+RSpec.describe "Oe::View operating context in states built by code (#438)" do
+  include G18OESpecHelpers
+  include OeViewChecks
+
+  before do
+    @enumerated = 0
+    @compared = 0
+  end
+
+  # Renders the view for the player to act and checks every context family it shows against the engine.
+  # Counts the families checked in `seen`; returns the view.
+  def check_view!(game, seen = Hash.new(0))
+    step = game.round.active_step
+    entity = step.current_entity
+    view = Oe::View.render(game, viewer: game.active_players.first&.id, log: nil)
+    ctx = view[:prompt][:context]
+    check_shape(ctx)
+    check_acting(view, entity)
+    if ctx[:track]
+      check_track(ctx[:track], view, step, entity, game)
+      seen[:track] += 1
+    end
+    { token: :check_token, train: :check_train }.each do |family, check|
+      next unless ctx[family]
+
+      send(check, ctx[family], step, entity, game)
+      seen[family] += 1
+    end
+    if ctx[:dividend]
+      check_routes(ctx[:dividend], game)
+      seen[:dividend] += 1
+    end
+    view
+  end
+
+  # Plays `corp`'s operating turn: checks the view before every action, runs the RoutePicker's routes (what
+  # the bots and the UI take), pays out and checks the payout against what the view announced, passes
+  # everything else. Returns the families checked.
+  def operate!(game, corp)
+    seen = Hash.new(0)
+    40.times do
+      break unless game.round.operating? && game.round.active_step&.current_entity == corp
+
+      view = check_view!(game, seen)
+      case game.round.active_step
+      when Engine::Step::Route
+        act!(game, Engine::Action::RunRoutes.new(corp, routes: Oe::LegalActions::RoutePicker.new(game, corp).call))
+      when Engine::Step::Dividend then pay_out!(game, corp, view)
+      else act!(game, Engine::Action::Pass.new(corp))
+      end
+    end
+    seen
+  end
+
+  def pay_out!(game, corp, view)
+    opt = view[:prompt][:context][:dividend][:options].find { |o| o[:kind] == "payout" }
+    before = { round: game.round, cash: corp.cash, holders: (game.players + game.corporations).to_h { |h| [h.id, h.cash] } }
+    act!(game, Engine::Action::Dividend.new(corp, kind: "payout"))
+    @game_for_check = game
+    check_dividend(opt, corp, before)
+  end
+
+  it "checks a regional's whole operating turn, its run crossing the sea from Valencia (#123, #302, #360)" do
+    game = new_game
+    corp = operating_regional!(game, "LNWR", game.players[0], trains: ["5"])
+    lay_tile!(game, "AA20", "5", rotation: 4)
+    lay_tile!(game, "AB27", "5", rotation: 1)
+    place_token!(game, "AA20", corp)
+    operating_round_for!(game, 1, setup: true)
+
+    seen = operate!(game, corp)
+
+    expect(seen.keys).to include(:track, :dividend, :train)
+    expect(corp.operating_history.values.last.revenue).to be_positive
+  end
+
+  # #426: Minor E's extra tile point (§15.5) keeps the Track step open with no regular point left; the panel
+  # priced the hexes at the regular point, more than was left.
+  it "prices the hexes at the extra point of Minor E when no regular point is left (#426)" do
+    game = new_game
+    major = start_major!(game, "GWR", game.players[0])
+    game.add_minor_charter!(game.corporation_by_id("E"), major)
+    step = operating_round_for!(game, 1).active_step
+    step.instance_variable_set(:@points_used, game.tile_point_budget(major))
+
+    view = check_view!(game)
+
+    expect(view[:prompt][:context][:track][:points][:left]).to eq(0)
+    expect(view[:prompt][:context][:track][:hexes]).not_to be_empty
   end
 end

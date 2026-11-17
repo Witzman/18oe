@@ -13,11 +13,14 @@
 #
 # A tag only labels. Without --tag/--tag ~x filters every example runs as before: a stage picks its set
 # with `--tag game_flow` / `--tag ~game_flow`. Untagged = fast: state built by code, no game played.
+# The one exception is labelled (not a stage tag, it runs in fast):
+#   :seed_smoke the short seed game of spec/oe/seed_smoke_spec.rb (#438): ~300 actions after the auction with
+#               invariants and view checks, no expectation on the course of the game, well under 60 s.
 # New tag? Add it to KNOWN here; spec/tags_spec.rb fails on any other bare tag, so that a typo such as
 # :gameflow cannot silently move an example from one stage to the other.
 module OeSpecTags
   STAGE_TAGS = %i[game_flow full_game browser].freeze
   # Other metadata used in the suite (not stage tags).
-  OTHER = %i[].freeze
+  OTHER = %i[seed_smoke].freeze
   KNOWN = (STAGE_TAGS + OTHER).freeze
 end

@@ -135,15 +135,28 @@ module G18OESpecHelpers
     round
   end
 
-  # Lays the first tile named `tile_name` from the supply on `hex` (a Hex or its id), without any
-  # legality check: for states that need a laid tile, not for the rules of laying.
-  def lay_tile!(game, hex, tile_name)
+  # Lays the first tile named `tile_name` from the supply on `hex` (a Hex or its id), turned to `rotation`,
+  # without any legality check: for states that need a laid tile, not for the rules of laying. The tile leaves
+  # the supply as in a real lay (Game#update_tile_lists, #438): left in it, a later tile enumeration would offer
+  # (and turn) the laid tile.
+  def lay_tile!(game, hex, tile_name, rotation: nil)
     hex = game.hex_by_id(hex) if hex.is_a?(String)
     tile = game.tiles.find { |t| t.name == tile_name && t.hex.nil? }
     raise ArgumentError, "no tile #{tile_name.inspect} left in the supply" unless tile
 
+    tile.rotate!(rotation) if rotation
+    game.update_tile_lists(tile, hex.tile)
     hex.lay(tile)
     tile
+  end
+
+  # Places a token of `corporation` in the first city of `hex_id` for free, without any check (#438): a station
+  # a scenario needs, not the rules of placing one. Clears the route graph.
+  def place_token!(game, hex_id, corporation)
+    city = game.hex_by_id(hex_id).tile.cities.first
+    city.place_token(corporation, corporation.next_token, free: true, check_tokenable: false)
+    game.graph.clear
+    city
   end
 
   def round_step(round, klass)
