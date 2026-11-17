@@ -1,7 +1,7 @@
 {
   "logs": {
     "random-4p-1": {
-      "engine_sha": "afcb5c2582c9601999967de0e6d6fcc6195b75a5",
+      "engine_sha": "23e75b66ba7ff81d79ce94c1c32214aefff44e4e",
       "actions": 1766,
       "sha256": "47bf37e173dd077d127526914ad04de7422f08d03b883fbb0c20438e3f472745",
       "positions": {
@@ -14,16 +14,16 @@
       }
     },
     "strategy-3p-1": {
-      "engine_sha": "afcb5c2582c9601999967de0e6d6fcc6195b75a5",
+      "engine_sha": "23e75b66ba7ff81d79ce94c1c32214aefff44e4e",
       "actions": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "positions": {
       }
     },
     "strategy-4p-1": {
-      "engine_sha": "afcb5c2582c9601999967de0e6d6fcc6195b75a5",
-      "actions": 5545,
-      "sha256": "00ec9b4d27ea222a9b5ffa923318df6949b253093b24eb47349044f7958110a2",
+      "engine_sha": "23e75b66ba7ff81d79ce94c1c32214aefff44e4e",
+      "actions": 4994,
+      "sha256": "ac482f21e1cac8f53aa2a6bff96afde9b995f8bf20d2408be5d8899f8016c77f",
       "positions": {
         "auction-start": 0,
         "auction-running": 1,
@@ -38,14 +38,14 @@
         "operating-home-token": 2515,
         "operating-token": 2531,
         "operating-issue-shares": 2998,
-        "phase-5": 3777,
-        "phase-6": 3938,
-        "consolidation-first": 4045,
-        "consolidation-merge-offer": 4094,
-        "consolidation-merge-minor": 4103,
-        "consolidation-merge-token": 4104,
-        "phase-7": 4703,
-        "game-end": 5545
+        "phase-5": 3659,
+        "consolidation-first": 3700,
+        "consolidation-merge-offer": 3851,
+        "consolidation-merge-minor": 3860,
+        "consolidation-merge-token": 3861,
+        "phase-6": 4151,
+        "phase-7": 4484,
+        "game-end": 4994
       }
     }
   }
