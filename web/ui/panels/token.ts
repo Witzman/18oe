@@ -11,6 +11,7 @@ import type { MapPreview, MapTargets } from "../../render/map.ts";
 import type { GameFrame } from "../frame/frame.ts";
 import type { OrderSpec } from "../frame/order.ts";
 import { formatGeld, toDom, v, type Change, type VNode } from "../kit/index.ts";
+import type { MapGeometry } from "../../render/mapdata.ts";
 import type { Corporation, Game } from "../../types.ts";
 import { fillText, txt } from "../text.ts";
 import { mapPick } from "./map-pick.ts";
@@ -98,7 +99,16 @@ export function orderFor(g: Game, sel: string | null, send: (a: Action) => void)
 // ---- view ---------------------------------------------------------------------------------------
 export interface TokenHandlers { onCity: (id: string) => void; onMap: () => void }
 
-export function TokenPanel(g: Game, sel: string | null, h: TokenHandlers): VNode {
+/** Button text of a city (#414): "Name, Zone Z · price"; without the map geometry (names, zones) it falls back to hex and city number. */
+export function cityRowText(t: TokenTarget, map: MapGeometry | null, sameHex: number): string {
+  const info = t.hex ? map?.hexes.find((x) => x.id === t.hex) : undefined;
+  const price = t.price === null ? "–" : formatGeld(t.price);
+  if (!info?.name) return fillText("token.city_row", { hex: t.hex ?? t.id, city: (t.city ?? 0) + 1, price });
+  const place = sameHex > 1 ? fillText("token.place_nth", { place: info.name, city: (t.city ?? 0) + 1 }) : info.name;
+  return info.zone ? fillText("token.city_row_zone", { place, zone: info.zone, price }) : fillText("token.city_row_name", { place, price });
+}
+
+export function TokenPanel(g: Game, sel: string | null, h: TokenHandlers, map: MapGeometry | null = null): VNode {
   const mine = mineToAct(g);
   const ctx = g.state.prompt.context?.token;
   const corp = placer(g);
@@ -114,13 +124,13 @@ export function TokenPanel(g: Game, sel: string | null, h: TokenHandlers): VNode
       : v("div", { class: "token-cities", role: "list", "aria-label": txt("token.targets").de }, ...ts.map((t) => v("button", {
         type: "button", class: "token-city", "data-city": t.id, "aria-pressed": String(t.id === eff), "data-state": t.id === eff ? "selected" : "normal",
         onclick: () => h.onCity(t.id),
-      }, fillText("token.city_row", { hex: t.hex ?? t.id, city: (t.city ?? 0) + 1, price: t.price === null ? "–" : formatGeld(t.price) })))));
+      }, cityRowText(t, map, ts.filter((x) => x.hex === t.hex).length)))));
 }
 
 // ---- mount --------------------------------------------------------------------------------------
-export interface TokenHandle { stop: () => void }
+export interface TokenHandle { /** Redraw, e.g. after the map geometry arrived. */ refresh: () => void; stop: () => void }
 
-export function mountToken(frame: GameFrame): TokenHandle {
+export function mountToken(frame: GameFrame, opts: { map?: () => MapGeometry | null } = {}): TokenHandle {
   let game: Game | null = null;
   let seq = -1;
   let sel: string | null = null;
@@ -170,7 +180,7 @@ export function mountToken(frame: GameFrame): TokenHandle {
     claim(mine);
     if (mine && !wasMine) pick.toMap();
     wasMine = mine;
-    shown = toDom(TokenPanel(g, sel, handlers));
+    shown = toDom(TokenPanel(g, sel, handlers, opts.map?.() ?? null));
     frame.slots.context.replaceChildren(shown);
     pick.show(mine ? targetsFor(g) : null, mine ? previewFor(g, sel) : null);
     const spec = orderFor(g, sel, (a) => frame.send(a));
@@ -182,5 +192,5 @@ export function mountToken(frame: GameFrame): TokenHandle {
     game = g;
     draw();
   });
-  return { stop: () => { off(); releaseOrder?.(); claim(false); pick.stop(); shown?.parentNode?.removeChild(shown); } };
+  return { refresh: draw, stop: () => { off(); releaseOrder?.(); claim(false); pick.stop(); shown?.parentNode?.removeChild(shown); } };
 }

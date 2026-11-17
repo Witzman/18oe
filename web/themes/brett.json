@@ -268,7 +268,8 @@
     "heightToken": 0.16,
     "wallShade": 0.45,
     "lightAzimuth": 315,
-    "shadowAlpha": 0.25
+    "shadowAlpha": 0.25,
+    "homeZoom": 34
   },
   "track": {
     "gauge": 0.11,

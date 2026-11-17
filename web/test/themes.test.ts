@@ -273,3 +273,7 @@ test("scale values must be in range, climb, and touch targets stay at 44 px or m
     "shape.hit: touch targets need at least 44",
   ]);
 });
+
+test("#415: every theme sets camera.homeZoom (zoom of 'centre on the home station')", () => {
+  for (const t of themes) assert.ok(t.camera.homeZoom >= 10 && t.camera.homeZoom <= 60, t.id);
+});
