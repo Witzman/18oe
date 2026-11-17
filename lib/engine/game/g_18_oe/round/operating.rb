@@ -19,6 +19,7 @@ module Engine
         # The abbreviated OR (§13) has no Golden Bell step, so it keeps the normal order.
         def setup
           @game.golden_bell_ask! unless abbreviated?
+          @game.pay_mail_contract!
           super
         end
 
