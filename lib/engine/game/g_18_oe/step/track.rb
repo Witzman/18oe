@@ -173,9 +173,30 @@ module Engine
 
           def actions(entity)
             actions = super
-            return actions unless entity == current_entity && !bbe_removable_hexes(entity).empty?
+            return actions unless entity == current_entity
 
-            actions.empty? ? %w[remove_hex_token pass] : actions + %w[remove_hex_token]
+            extra = []
+            extra << 'remove_hex_token' unless bbe_removable_hexes(entity).empty?
+            # §15.4: Minor D's token is placed in the holder's lay track step (upstream `assign`)
+            extra << 'assign' if @game.green_junction_placeable?(entity)
+            return actions if extra.empty?
+
+            actions.empty? ? extra + %w[pass] : actions + extra
+          end
+
+          # §15.4: any city except a metropolis or red zone, reachable or not.
+          def process_assign(action)
+            entity = action.entity
+            hex = action.target
+            raise GameError, "#{entity.name} cannot place the Green Junction token now" unless entity == current_entity
+            raise GameError, 'The Green Junction token goes on a hex' unless hex.is_a?(Engine::Hex)
+
+            @game.green_junction_place!(entity, hex)
+            pass! if actions(entity).empty?
+          end
+
+          def green_junction_hexes(entity)
+            @game.green_junction_placeable?(entity) ? @game.green_junction_hexes : []
           end
 
           def process_remove_hex_token(action)
