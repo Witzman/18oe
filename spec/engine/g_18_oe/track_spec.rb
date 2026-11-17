@@ -305,6 +305,11 @@ describe 'G18OE lay track (§11.1)' do
       expect([step.points_for_tile(major, city_upgrade), step.points_for_tile(major, metropolis_upgrade)]).to eq([2, 4])
     end
 
+    it 'charges Minor B itself 1 point for an upgrade to a tile with towns' do
+      major
+      expect(step.points_for_tile(game.corporation_by_id('B'), town_upgrade)).to eq(1)
+    end
+
     it 'does not give the ability to another major' do
       merge_b!(major)
       plain
