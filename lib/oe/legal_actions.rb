@@ -101,18 +101,20 @@ module Oe
     # once), then the track restriction, whose trial lays clear the graph; doing
     # them interleaved would recompute the real graph after every trial lay.
     def lay_tile_options_unlogged(step, entity)
+      # a private's lay (§14.9) is the operating RR's: its graph, its tile points; no terrain price
+      actor = entity.company? ? @game.current_entity : entity
       candidates = @game.hexes.filter_map do |hex|
         next unless step.available_hex(entity, hex)
-        next unless affordable_lay?(entity, hex)
+        next unless entity.company? || affordable_lay?(entity, hex)
 
         # legal_rotations is per hex, and one tile object can be offered on several hexes
         [hex, step.upgradeable_tiles(entity, hex).map { |tile| [tile, tile.legal_rotations.dup] }]
       end
       @connected = nil
-      connected_paths(entity) unless candidates.empty?
+      connected_paths(actor) unless candidates.empty?
       candidates.filter_map do |hex, tiles|
         tiles = tiles.map do |tile, legal|
-          rotations = legal.select { |r| track_restriction_ok?(step, entity, hex, tile, r) }
+          rotations = legal.select { |r| track_restriction_ok?(step, actor, hex, tile, r) }
           tile.rotate!(0)
           [tile, rotations]
         end.reject { |_, rotations| rotations.empty? }
@@ -553,6 +555,17 @@ module Oe
       sample(actions).map do |tile, hex, rotation|
         A::LayTile.new(entity, tile: tile, hex: hex, rotation: rotation)
       end
+    end
+
+    # §14.9: another RR removes a Brandt & Brandau token (pays the hex's terrain price and tile points).
+    # Pricing logs the zone discount, which the enumeration must not write (#296).
+    def generate_remove_hex_token(step, entity)
+      without_log do
+        step.bbe_removable_hexes(entity).select do |hex|
+          money = step.bbe_removal_money(entity, hex)
+          money <= entity.cash && @game.first_round_spend_allowed?(entity, money)
+        end
+      end.map { |hex| A::RemoveHexToken.new(entity, hex: hex) }
     end
 
     # A private places the token of the corporation it acts for (#128): the

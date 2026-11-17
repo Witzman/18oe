@@ -39,6 +39,14 @@ module Engine
             @game.metropolis_hex?(hex) ? base * 2 : base
           end
 
+          # Tile points laying `tile` costs: yellow 1, upgrade 2, metropolis tiles double.
+          def points_for_tile(_entity, tile)
+            metropolis = @game.metropolis_tile?(tile)
+            return metropolis ? 4 : 2 if tile.color != :yellow
+
+            metropolis ? 2 : 1
+          end
+
           # §15.5/§15.6: Minor E/F (or the major holding their ability) may spend one extra tile
           # point per OR, only on a yellow tile in a hex with their terrain colour. Returns the
           # charter id whose point it would be, or nil.
@@ -94,32 +102,85 @@ module Engine
           def lay_tile_action(action)
             tile = action.tile
             old_tile = action.hex.tile
-            metropolis = @game.metropolis_tile?(tile)
             points_available = get_tile_lay(action.entity) - @points_used
-            points_cost = if tile.color != :yellow && metropolis
-                            4
-                          elsif (tile.color == :yellow && metropolis) || tile.color != :yellow
-                            2
-                          else
-                            1
-                          end
+            points_cost = points_for_tile(action.entity, tile)
             bonus_id = ef_bonus_id(action.entity, action.hex, tile)
             points_cost -= 1 if bonus_id
             raise GameError, 'Cannot lay an upgrade now' if tile.color != :yellow && points_cost > points_available
             raise GameError, 'Cannot lay a yellow now' if tile.color == :yellow && points_cost > points_available
 
             lay_tile(action)
+            record_lay!(action.entity, action, old_tile, points_cost, bonus_id)
+          end
+
+          # Points a private's free lay (§14.9) costs the operating RR, and the E/F bonus it uses; raises
+          # when the RR cannot pay them.
+          def special_lay_cost(operator, hex, tile)
+            bonus_id = ef_bonus_id(operator, hex, tile)
+            cost = points_for_tile(operator, tile) - (bonus_id ? 1 : 0)
+            raise GameError, 'Cannot lay a yellow now' if cost > points_left(operator)
+
+            [cost, bonus_id]
+          end
+
+          # What follows a lay of `operator`: points, log, patronage and the round's lay counters.
+          def record_lay!(operator, action, old_tile, points_cost, bonus_id)
+            points_available = get_tile_lay(operator) - @points_used
             @ef_bonus_used << bonus_id if bonus_id
             @game.log << "Used #{points_cost} tile point(s) to lay tile#{" (+1 extra point of Minor #{bonus_id})" if bonus_id}"
             @game.log << "#{points_available - points_cost} point(s) remaining"
-            @game.fulfill_patronage!(action.entity, action.hex)
-            if track_upgrade?(old_tile, tile, action.hex)
+            @game.fulfill_patronage!(operator, action.hex)
+            if track_upgrade?(old_tile, action.tile, action.hex)
               @round.upgraded_track = true
               @round.num_upgraded_track += 1
             end
             @round.num_laid_track += 1
             @round.laid_hexes << action.hex
             @points_used += points_cost
+          end
+
+          # §14.9: a token of Brandt & Brandau, Engineers on a hex closes it to this RR's trains. Another
+          # RR may remove the token: it pays the hex's original terrain cost (a national only the points)
+          # and one tile point (two on a metropolis), and lays no track.
+          def bbe_removal_points(hex)
+            @game.metropolis_hex?(hex) ? 2 : 1
+          end
+
+          def bbe_removal_money(entity, hex)
+            return 0 if entity.type == :national
+
+            @game.upgrade_cost(hex.original_tile, hex, entity, entity)
+          end
+
+          def bbe_removable_hexes(entity)
+            return [] unless @game.bbe_blocked_for?(entity)
+
+            @game.bbe_token_hexes.select { |hex| bbe_removal_points(hex) <= points_left(entity) }
+          end
+
+          def actions(entity)
+            actions = super
+            return actions unless entity == current_entity && !bbe_removable_hexes(entity).empty?
+
+            actions.empty? ? %w[remove_hex_token pass] : actions + %w[remove_hex_token]
+          end
+
+          def process_remove_hex_token(action)
+            entity = action.entity
+            hex = action.hex
+            raise GameError, "No Brandt and Brandau token on #{hex.id} to remove" unless bbe_removable_hexes(entity).include?(hex)
+
+            money = bbe_removal_money(entity, hex)
+            raise GameError, "#{entity.name} cannot pay #{@game.format_currency(money)}" if money > entity.cash
+
+            @game.check_first_round_spend!(entity, money)
+            entity.spend(money, @game.bank) if money.positive?
+            points = bbe_removal_points(hex)
+            @points_used += points
+            @game.log << "#{entity.name} pays #{@game.format_currency(money)} and #{points} tile point(s) to remove " \
+                         "the token on #{hex.id}"
+            @game.bbe_remove_token!(hex)
+            pass! unless can_lay_tile?(entity)
           end
 
           def tracker_available_hex(entity, hex)

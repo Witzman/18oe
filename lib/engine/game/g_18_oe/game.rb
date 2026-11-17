@@ -10,6 +10,7 @@ require_relative 'round/consolidation'
 require_relative 'round/concession'
 require_relative 'golden_bell'
 require_relative 'step/consolidate'
+require_relative 'step/special_track'
 require_relative 'step/golden_bell_order'
 require_relative 'step/convert_to_national'
 require_relative 'step/discard_train'
@@ -33,7 +34,8 @@ module Engine
         include G18OE::GoldenBell
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
-        attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation
+        attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation,
+                    :bbe_token_hexes
 
         FERRY_COLOR = '#0047AB'
         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
@@ -451,6 +453,7 @@ module Engine
           setup_patronage_tiles!
           setup_wcf_placeholder!
           @minor_g_ability = corporation_by_id('G')&.abilities&.first
+          setup_bbe_ability!
           # §15.5/§15.6: the ability objects travel with the charter into the major on a merge
           @ef_abilities = %w[E F].to_h { |id| [id, corporation_by_id(id)&.abilities&.first] }
         end
@@ -556,6 +559,75 @@ module Engine
         def remove_private!(company)
           @face_down_privates.delete(company)
           company.close!
+        end
+
+        # ---- §14.9 Brandt & Brandau, Engineers ---------------------------------------------
+
+        # Marker of a Brandt & Brandau token on the map. ASSUMPTION: no artwork yet, the logo path is a
+        # placeholder (workshop #82).
+        BBE_TOKEN_LOGO = '/logos/18_oe/bbe.svg'
+
+        def bbe_company
+          company_by_id('BBE')
+        end
+
+        # The rough (green: hill, mountain) hexes still unbuilt, without a city or metropolis: where the
+        # free yellow lay may go. Set once as the hexes of the private's tile_lay ability.
+        def setup_bbe_ability!
+          @bbe_token_hexes = []
+          ability = bbe_company&.all_abilities&.find { |a| a.type == :tile_lay }
+          return unless ability
+
+          rough = self.class::EF_TERRAIN_AUGMENT['F']
+          ability.hexes = hexes.select do |hex|
+            hex.tile.color == :white && hex.tile.cities.empty? && (hex.tile.terrain & rough).any? && !metropolis_hex?(hex)
+          end.map(&:id)
+        end
+
+        # §14.9: only the RRs of the token owner's player may use the track of a marked hex.
+        def bbe_blocked_for?(corporation)
+          return false if @bbe_token_hexes.empty? || !corporation&.corporation?
+
+          corporation.owner != bbe_company&.owner
+        end
+
+        def graph_skip_paths(corporation)
+          return super unless bbe_blocked_for?(corporation)
+
+          @bbe_token_hexes.flat_map { |hex| hex.tile.paths }.to_h { |path| [path, true] }
+        end
+
+        def bbe_place_token!(hex, company)
+          token = Engine::Token.new(company, logo: BBE_TOKEN_LOGO, simple_logo: BBE_TOKEN_LOGO, type: :bbe)
+          hex.place_token(token, logo: BBE_TOKEN_LOGO)
+          @bbe_token_hexes << hex
+          clear_graph
+          @log << "#{company.name} token placed on #{hex.id}"
+          # after the last token the certificate is turned face down
+          flip_private!(company) if company.all_abilities.none? { |a| a.type == :tile_lay } && !face_down_private?(company)
+        end
+
+        def bbe_remove_token!(hex)
+          token = hex.tokens.find { |t| t.type == :bbe }
+          token.remove!
+          @bbe_token_hexes.delete(hex)
+          clear_graph
+          @log << "Brandt and Brandau token removed from #{hex.id}"
+          return unless @bbe_token_hexes.empty? && bbe_company.all_abilities.none? { |a| a.type == :tile_lay }
+
+          remove_private!(bbe_company)
+          @log << "#{bbe_company.name} is removed from the game"
+        end
+
+        def check_connected(route, corporation)
+          if bbe_blocked_for?(corporation) && route.paths.any? { |path| @bbe_token_hexes.include?(path.hex) }
+            raise GameError, 'Route uses track marked by a Brandt and Brandau token'
+          end
+
+          return super unless wcf_restricted?(corporation)
+          return if route.ordered_paths.each_cons(2).all? { |a, b| wcf_pass?(a, b) || a.connects_to?(b, corporation) }
+
+          raise GameError, 'Route is not connected'
         end
 
         def init_stock_market
@@ -1221,6 +1293,7 @@ module Engine
             Engine::Step::Bankrupt,
             G18OE::Step::DiscardTrain,
             Engine::Step::HomeToken,
+            G18OE::Step::SpecialTrack,
             G18OE::Step::Track,
             G18OE::Step::SpecialToken,
             G18OE::Step::Token,
@@ -1362,13 +1435,6 @@ module Engine
         def revenue_str(route)
           str = super
           orient_express_bonus_route?(route) ? "#{str} + Orient Express" : str
-        end
-
-        def check_connected(route, corporation)
-          return super unless wcf_restricted?(corporation)
-          return if route.ordered_paths.each_cons(2).all? { |a, b| wcf_pass?(a, b) || a.connects_to?(b, corporation) }
-
-          raise GameError, 'Route is not connected'
         end
 
         # §11.3.8: a ferry, and the track section joining it to its city, is sea traffic; any number of trains of
