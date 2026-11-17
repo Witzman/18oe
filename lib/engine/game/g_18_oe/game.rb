@@ -917,6 +917,9 @@ module Engine
         end
 
         def upgrade_cost(tile, hex, entity, spender)
+          # §11.1.5, §11.1.6: "Nationals are exempt from all tile placement expenses" (BUG-011).
+          return 0 if owning_corporation(entity)&.type == :national
+
           base_cost = tile.upgrades.sum(&:cost)
           return super if base_cost.zero?
 
@@ -1488,7 +1491,8 @@ module Engine
           return false unless route.corporation&.type == :major
 
           visited = route.visited_stops.map(&:hex)
-          visited.intersect?(orient_express_destination_hexes) && visited.intersect?(orient_express_origin_hexes)
+          visited.intersect?(orient_express_destination_hexes) && visited.intersect?(orient_express_origin_hexes) &&
+            !sea_only_run?(route)
         end
 
         def orient_express_route(routes)
