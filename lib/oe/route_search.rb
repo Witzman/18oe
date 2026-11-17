@@ -44,6 +44,7 @@ module Oe
       # short: past the limit every visit is aborted.
       walk_limit = opts[:walk_limit]
       walks = @walks = 0
+      pass_walk_limit = walk_limit
 
       connections = {}
 
@@ -78,22 +79,35 @@ module Oe
       skip_trains = static.flat_map(&:train).to_a
       trains -= skip_trains
 
+      # Oe extension (#359): a second pass whose walk also crosses the sea (G18OE::Graph#walk_token), up to the
+      # most sea units a train can carry; a crossing comes back as a G18OE::Sea::SeaJump among the visited paths.
+      # The land pass comes first and is the search as before; the sea pass has its own limit (sea_walk_limit,
+      # default walk_limit), so it never takes visits from land routes, and runs only when the network reaches a
+      # port the RR may use.
+      passes = [{}]
+      passes << { sea: trains.map { |t| @game.sea_places(t) }.max } if sea_pass?(graph, nodes, corporation, trains)
+
       train_routes = Hash.new { |h, k| h[k] = [] }    # map of train to route list
       hexside_bits = Hash.new { |h, k| h[k] = 0 }     # map of hexside_id to bit number
       @next_hexside_bit = 0
 
-      nodes.each do |node|
+      passes.product(nodes).each_with_index do |(pass, node), index|
+        if (index % nodes.size).zero? # a pass begins
+          walks = 0
+          walk_limit = pass[:sea] ? opts.fetch(:sea_walk_limit, pass_walk_limit) : pass_walk_limit
+        end
         if Time.now - now > path_timeout || (walk_limit && walks >= walk_limit)
           ::LOGGER.debug('Path timeout reached')
           path_walk_timed_out = true
-          break
+          next # Oe (#359): on to the next pass (AutoRouter: break)
         else
           ::LOGGER.debug { "Path search: #{nodes.index(node)} / #{nodes.size} - paths starting from #{node.hex.name}" }
         end
 
         walk_corporation = graph.no_blocking? ? nil : corporation
-        graph.walk_token(node, corporation: walk_corporation, skip_paths: skip_paths) do |_, vp|
-          walks = @walks += 1
+        graph.walk_token(node, corporation: walk_corporation, skip_paths: skip_paths, **pass) do |_, vp|
+          walks += 1
+          @walks += 1
           if walk_limit && walks > walk_limit
             path_walk_timed_out = true
             next :abort
@@ -134,6 +148,12 @@ module Oe
           end
 
           paths.each do |path|
+            if path.is_a?(Engine::Game::G18OE::Sea::SeaJump)
+              sea_chain!(chains, path.chain)
+              last_left, last_right = path.chain[:nodes]
+              next
+            end
+
             chain << path
             a, b = path.nodes
 
@@ -153,6 +173,9 @@ module Oe
             id = [left]
           else
             id = chains.flat_map { |c| c[:paths] }.sort!
+            # Oe (#359): a crossing has no paths; its own id tells routes apart that differ only at sea
+            seas = chains.filter_map { |c| c[:sea] && c[:id] }
+            id = [id, seas] unless seas.empty?
           end
 
           next if connections[id]
@@ -211,6 +234,22 @@ module Oe
       end
 
       [train_routes, path_walk_timed_out]
+    end
+
+    # Oe (#359): the sea pass is worth a walk only if a node the walk reaches by land has a usable port.
+    def sea_pass?(graph, nodes, corporation, trains)
+      return false if trains.empty? || !graph.respond_to?(:sea_jumps)
+
+      nodes.any? { |node| !graph.sea_jumps(node, corporation).empty? }
+    end
+
+    # Oe (#359): a crossing begins at the node where the walk arrived, the end of the chain before it; the
+    # chain-cutting above may hold that chain the other way round (a path's nodes are unordered).
+    def sea_chain!(chains, sea_chain)
+      from = sea_chain[:nodes][0]
+      last = chains.last
+      chains[-1] = last.merge(nodes: last[:nodes].reverse) if last && last[:nodes][1] != from && last[:nodes][0] == from
+      chains << sea_chain
     end
 
     # inputs:

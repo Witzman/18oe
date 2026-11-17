@@ -367,7 +367,9 @@ module Oe
         train: train.id,
         name: train.name,
         revenue: info.revenues[train],
-        hexes: info.routes[train].flatten.map(&:to_s),
+        # a sea crossing's id holds "sea a.b" between its port hexes (#357); the
+        # crossing itself is shown with #362, here only the hexes count (#359)
+        hexes: info.routes[train].flatten.map(&:to_s).reject { |id| id.start_with?("sea ") },
         segments: info.segments[train],
         stops: info.stops[train],
       }

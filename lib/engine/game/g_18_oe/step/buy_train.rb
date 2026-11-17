@@ -14,6 +14,7 @@ module Engine
           # president's certificate goes to the Open Market. Resolved
           # automatically (no player decision), so the step offers no action.
           def actions(entity)
+            return national_actions(entity) if national?(entity)
             return [] if first_round_insolvency?(current_entity)
 
             # §11.6.4: the president may not sell shares to pay for the train.
@@ -63,6 +64,8 @@ module Engine
           end
 
           def buyable_trains(entity)
+            return national_train_offers(entity).map(&:first).uniq if national?(entity)
+
             trains = super
 
             # Level 8 trains visible via available_on:'7+7' but gated until 4th L7 purchase (§11.6)
@@ -80,6 +83,8 @@ module Engine
           end
 
           def process_buy_train(action)
+            return process_national_train(action) if national?(action.entity)
+
             reserved = action.train.name == '2+2' && action.train.from_depot?
             super
             @game.fulfill_train_obligation!(action.entity) if reserved
@@ -117,7 +122,96 @@ module Engine
                     "#{corporation.name} will not operate until a player owns it"
           end
 
-          # TODO: Nationals claiming rusted trains for free (openpoints §1.9, §3.7) — deferred
+          # ---- §11.6.6 National Trains ------------------------------------------------------------
+          # A national buys no train. It takes unclaimed rusted trains for free up to its train limit,
+          # exchanges a rusted train for a higher level unclaimed one, and upgrades a rusted train with a
+          # train of a major of its owner (the bank pays that major half the face value). Each is a
+          # BuyTrain at price 0; `exchange` names the rusted train given back (upstream's exchange field).
+
+          def national?(entity)
+            entity&.corporation? && entity.type == :national
+          end
+
+          def national_actions(entity)
+            return [] unless entity == current_entity
+
+            national_train_offers(entity).empty? ? [] : %w[buy_train pass]
+          end
+
+          # [train, exchange] pairs: one unclaimed rusted train per card level, each own rusted train
+          # (one per card) against a higher level unclaimed one and against every train of an own major.
+          def national_train_offers(entity)
+            pool = @game.unclaimed_rusted_trains.uniq(&:sym)
+            offers = []
+            offers.concat(pool.map { |train| [train, nil] }) if @game.num_corp_trains(entity) < @game.train_limit(entity)
+            entity.trains.select(&:rusted).uniq(&:sym).each do |rusted|
+              pool.each { |train| offers << [train, rusted] if train_level(train) > train_level(rusted) }
+              own_major_trains(entity).each { |train| offers << [train, rusted] }
+            end
+            offers
+          end
+
+          def own_major_trains(entity)
+            @game.corporations.select { |c| c.type == :major && !c.closed? && c.owner == entity.owner }
+                 .flat_map { |major| major.trains.reject(&:rusted) }
+          end
+
+          def train_level(train)
+            train.sym.to_i
+          end
+
+          def process_national_train(action)
+            entity = action.entity
+            train = action.train
+            exchange = action.exchange
+            raise GameError, 'A national pays nothing for its trains (§11.6.6)' unless action.price.zero?
+            if exchange && !(exchange.owner == entity && exchange.rusted)
+              raise GameError, 'A national gives back only one of its own rusted trains'
+            end
+
+            if train.rusted && train.owner.nil?
+              national_claim!(entity, train, exchange)
+            elsif own_major_trains(entity).include?(train)
+              national_upgrade!(entity, train, exchange)
+            else
+              raise GameError, "#{entity.name} cannot take the #{train.name} train (§11.6.6)"
+            end
+            pass! if national_train_offers(entity).empty?
+          end
+
+          def national_claim!(entity, train, exchange)
+            if exchange
+              unless train_level(train) > train_level(exchange)
+                raise GameError, 'A rusted train is exchanged only for a higher level one (§11.6.6)'
+              end
+            elsif @game.num_corp_trains(entity) >= @game.train_limit(entity)
+              raise GameError, "#{entity.name} is at its train limit"
+            end
+
+            give_back!(exchange) if exchange
+            @game.buy_train(entity, train, :free)
+            @game.flip_to_local!(train)
+            @log << "#{entity.name} #{exchange ? "exchanges its rusted #{exchange.name} for" : 'claims'} " \
+                    "a rusted #{train.name} train for free"
+          end
+
+          def national_upgrade!(entity, train, exchange)
+            raise GameError, 'A national upgrades only a rusted train it gives back (§11.6.6)' unless exchange
+
+            major = train.owner
+            amount = train.price / 2
+            give_back!(exchange)
+            @game.buy_train(entity, train, :free)
+            @game.bank.spend(amount, major) if amount.positive?
+            @log << "#{entity.name} upgrades its rusted #{exchange.name} with the #{train.name} train of " \
+                    "#{major.name}; the bank pays #{major.name} #{@game.format_currency(amount)}"
+          end
+
+          # The rusted train goes back into the Locomotive Works, unclaimed.
+          def give_back!(train)
+            @game.remove_train(train)
+            train.owner = nil
+          end
         end
       end
     end

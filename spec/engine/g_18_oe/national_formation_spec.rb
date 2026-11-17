@@ -334,7 +334,8 @@ describe 'G18OE forming a national (§9.4)' do
     convert!(lnwr)
     buy_first!(plm, '6')
 
-    expect(lnwr.trains.map(&:name)).to eq(['3'])
+    # §11.6.6 (#64): a national's rusted train is turned to its local side for free.
+    expect(lnwr.trains.map(&:name)).to eq(['3+3'])
     expect(lnwr.trains.first.rusted).to be(true)
   end
 
