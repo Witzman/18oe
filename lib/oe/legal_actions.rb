@@ -604,8 +604,11 @@ module Oe
     end
 
     # §15.4: Minor D (or the major holding its charter) places its Green Junction token in any city
-    # except a metropolis or red zone, reachable or not; the target is the hex.
+    # except a metropolis or red zone, reachable or not, in the lay track step; the target is the hex.
+    # §15.11: Minor L (or the major holding its charter) puts its +1+1 marker on one of its trains that
+    # has not run, in the run trains step; the target is the train.
     def generate_assign(step, entity)
+      return step.krasnaya_trains(entity).map { |train| A::Assign.new(entity, target: train) } if step.respond_to?(:krasnaya_trains)
       return [] unless step.respond_to?(:green_junction_hexes)
 
       sample(step.green_junction_hexes(entity)).map { |hex| A::Assign.new(entity, target: hex) }
