@@ -1467,7 +1467,8 @@ module Engine
           return false unless route.corporation&.type == :major
 
           visited = route.visited_stops.map(&:hex)
-          visited.intersect?(orient_express_destination_hexes) && visited.intersect?(orient_express_origin_hexes)
+          visited.intersect?(orient_express_destination_hexes) && visited.intersect?(orient_express_origin_hexes) &&
+            !sea_only_run?(route)
         end
 
         def orient_express_route(routes)

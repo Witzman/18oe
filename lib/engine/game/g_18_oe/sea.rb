@@ -158,6 +158,16 @@ module Engine
           end
         end
 
+        # §12: "An Orient Express run may not consist entirely of sea crossings. Some land based track in addition
+        # to the start and end cities must be utilized on the route." True for a route with a sea crossing whose track
+        # lies only in the hexes of its first and last stop or on ferries and port stubs in sea hexes (#361).
+        def sea_only_run?(route)
+          return false if sea_crossings(route).empty?
+
+          ends = [route.connection_data.first[:left].hex, route.connection_data.last[:right].hex]
+          route.paths.none? { |path| path.hex.tile.color != :blue && !ends.include?(path.hex) }
+        end
+
         # A route with sea crossings: each stretch of track between them is checked like a route of its own, and
         # a node where a crossing begins or ends inside the route may not be full of foreign tokens (§11.3.6).
         def check_sea_route_connected(route, corporation)

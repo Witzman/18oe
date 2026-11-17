@@ -105,6 +105,59 @@ describe 'G18OE Orient Express (§12)' do
     end
   end
 
+  # #361 (SC7): "An Orient Express run may not consist entirely of sea crossings. Some land based track in
+  # addition to the start and end cities must be utilized on the route." (§12)
+  describe 'not entirely over the sea (§12)' do
+    def lay_tile!(hex_id, name, rotation)
+      tile = game.tiles.find { |t| t.name == name && !t.hex }
+      tile.rotate!(rotation)
+      game.hex_by_id(hex_id).lay(tile)
+    end
+
+    def sea_route(*hex_ids)
+      train = game.trains.find { |t| t.name == '8+8' && !t.owner.is_a?(Engine::Corporation) }
+      game.buy_train(major, train, :free)
+      Engine::Route.new(game, game.phase, train).tap do |route|
+        hex_ids.each { |hex_id| route.touch_node(stop_at(hex_id)) }
+      end
+    end
+
+    def stop_at(hex_id)
+      tile = game.hex_by_id(hex_id).tile
+      tile.cities.first || tile.towns.first
+    end
+
+    before do
+      lay_tile!('X33', '5', 4) # Marseille: its public port arrow (side 5) and track to Toulon (side 4)
+      lay_tile!('X35', '3', 0) # Toulon: track from Marseille (side 1) to its public port arrow (side 0)
+      game.graph.clear
+    end
+
+    it 'is no Orient Express run from London straight over the sea to Constantinople' do
+      route = sea_route('M28', 'AA82')
+
+      expect(route.chains.map { |chain| chain[:sea].nil? }).to eq([false])
+      expect(game.orient_express_run?(route)).to be(false)
+      expect(game.orient_express_route([route])).to be_nil
+    end
+
+    it 'does not let a combined train run London over the sea to Constantinople' do
+      route = sea_route('M28', 'AA82')
+      allow(game).to receive(:combined_train?).with(route.train).and_return(true)
+
+      expect { game.check_other(route) }.to raise_error(Engine::GameError, 'Combined trains may only run an Orient Express route')
+    end
+
+    it 'is an Orient Express run once land track between Marseille and Toulon lies on the way' do
+      route = sea_route('M28', 'X33', 'X35', 'AA82')
+
+      expect(route.chains.map { |chain| chain[:sea].nil? }).to eq([false, true, false])
+      expect(game.orient_express_run?(route)).to be(true)
+      allow(game).to receive(:combined_train?).with(route.train).and_return(true)
+      expect { game.check_other(route) }.not_to raise_error
+    end
+  end
+
   describe 'extra revenue' do
     let(:stops) { [city_at('AA82'), city_at('M50')] }
 
