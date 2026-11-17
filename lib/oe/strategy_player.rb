@@ -40,7 +40,7 @@ module Oe
       method = "choose_#{underscore(actions.first.class.name.split('::').last)}"
       Engine::Action.constants # (autoload no-op)
       # Order matters: first applicable specialised rule wins.
-      %w[BuyTrain Dividend RunRoutes Bid Par Convert Merge DiscardTrain LayTile PlaceToken].each do |name|
+      %w[BuyTrain Dividend Assign RunRoutes Bid Par Convert Merge DiscardTrain LayTile PlaceToken].each do |name|
         group = by_class[name]
         next unless group
 
@@ -114,6 +114,14 @@ module Oe
     def poor?(entity)
       price = @game.depot.upcoming.first&.price || 0
       %i[major national].include?(entity.type) && entity.cash < price && entity.trains.size < @game.train_limit(entity)
+    end
+
+    # §15.11 (workshop #76): Minor L's +1+1 marker goes, before the routes are run, on the train
+    # with the most city places (it reaches the farthest, so the extra stop is most likely there).
+    # Assign actions with another target (Minor D's token, a hex) are left to the other rules.
+    def pick_assign(assigns, _by_class)
+      trains = assigns.select { |a| a.target.is_a?(Engine::Train) }
+      trains.max_by { |a| @game.distance(a.target) }
     end
 
     def pick_run_routes(routes, _by_class)

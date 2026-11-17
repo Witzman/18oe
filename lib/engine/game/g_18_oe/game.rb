@@ -14,6 +14,7 @@ require_relative 'national'
 require_relative 'step/consolidate'
 require_relative 'step/hochberg_token'
 require_relative 'green_junction'
+require_relative 'krasnaya_strela'
 require_relative 'right_of_way'
 require_relative 'step/home_hex_consent'
 require_relative 'step/special_track'
@@ -40,6 +41,7 @@ module Engine
         include G18OE::Map
         include G18OE::GoldenBell
         include G18OE::GreenJunction
+        include G18OE::KrasnayaStrela
         include G18OE::RightOfWay
         include G18OE::Sea
         include G18OE::National
@@ -478,6 +480,8 @@ module Engine
           @ef_abilities = %w[E F].to_h { |id| [id, corporation_by_id(id)&.abilities&.first] }
           # §15.4: Minor D's token
           setup_green_junction!
+          # §15.11: Minor L's +1+1 marker
+          setup_krasnaya_strela!
         end
 
         def setup_wcf_placeholder!
@@ -1573,7 +1577,8 @@ module Engine
         end
 
         def revenue_for(route, stops)
-          revenue = super + hochberg_revenue_change(route, stops) + green_junction_revenue(route)
+          revenue = super + hochberg_revenue_change(route, stops) + green_junction_revenue(route) +
+                    krasnaya_revenue_change(route, stops)
           revenue += self.class::ORIENT_EXPRESS_BONUS[route.phase.name] if orient_express_bonus_route?(route)
           revenue
         end

@@ -12,10 +12,26 @@ module Engine
             return [] if (entity.corporation? && entity.type == :national) || @game.repeated_payout(entity, @round)
 
             actions = super
-            return actions if actions.empty? || @game.double_head_candidates(entity).size < 2
+            return actions if actions.empty?
+
+            # §15.11: Minor L's marker, assigned at the beginning of the run trains step (upstream `assign`)
+            actions += %w[assign] unless @game.krasnaya_trains(entity).empty?
+            return actions if @game.double_head_candidates(entity).size < 2
             return actions if !@game.loading && !@game.orient_express_reachable?(entity)
 
             actions + %w[double_head_trains]
+          end
+
+          def krasnaya_trains(entity)
+            @game.krasnaya_trains(entity)
+          end
+
+          def process_assign(action)
+            entity = action.entity
+            raise GameError, "#{entity.name} cannot assign the Krasnaya Strela marker now" unless entity == current_entity
+            raise GameError, 'The Krasnaya Strela marker goes on a train' unless action.target.is_a?(Engine::Train)
+
+            @game.krasnaya_assign!(entity, action.target)
           end
 
           def help
@@ -88,22 +104,25 @@ module Engine
           def combined_train!(trains)
             sym = trains.map(&:id).sort.join('_')
 
+            # §12.1/§15.11: the rows are the sum of the components' rows as they are now (a component may
+            # carry the Krasnaya Strela marker), also for a combination already made in an earlier OR
+            cities, towns = trains.map { |component| @game.distance(component) }.transpose.map(&:sum)
+            distance = [
+              { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
+              { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
+            ]
             if (train = @game.train_by_id("#{sym}-0"))
               train.operated = false
               train.rusted = false
             else
-              cities, towns = trains.map { |component| @game.distance(component) }.transpose.map(&:sum)
-              distance = [
-                { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
-                { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
-              ]
               train = Engine::Train.new(name: sym, distance: distance, price: 0)
-              train.name = "#{cities}+#{towns}"
 
               @game.depot.add_train(train)
               @game.update_trains_cache
               @game.remove_train(train)
             end
+            train.distance = distance
+            train.name = "#{cities}+#{towns}"
 
             train.reserved = true
             train
