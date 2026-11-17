@@ -17,10 +17,10 @@ import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
 import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
-import { OrStripView, orBand } from "./or-band.ts";
+import { OrderBandView, orBand } from "./or-band.ts";
 import { opSheet, OpSheetView } from "../panels/op-sheet.ts";
 import { corpColor, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
-import { panelIdle, readCollapsed, writeCollapsed } from "./panel.ts";
+import { panelIdle, readCollapsed, readOrderCollapsed, writeCollapsed, writeOrderCollapsed } from "./panel.ts";
 import { createViews } from "./views.ts";
 import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
 import { versionButton } from "../version.ts";
@@ -77,6 +77,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   let busy = false;
   let rangeError: { key: string; text: string } | null = null;
   let collapsed = readCollapsed();
+  let orderCollapsed = readOrderCollapsed();
   let genericOpen: boolean | null = null; // null = automatic (open while there is something to choose)
   let logOpen = false;
   // The full log (#292): fetched from /games/:id/log while the sheet is open; the sheet element lives on
@@ -104,6 +105,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const disposers: (() => void)[] = [];
 
   const roundEl = h("div", { class: "frame-roundbar" });
+  const orderEl = h("div", { class: "frame-orderband" });
+  orderEl.hidden = true;
   const playersEl = h("nav", { class: "frame-players", "aria-label": txt("frame.player_bar").de });
   const contextEl = h("div", { class: "frame-context" });
   const contextSlot = h("div", { class: "frame-context-slot" });
@@ -164,7 +167,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const body = h("div", { class: "frame-body" }, mainEl, panelEl, logHost);
   logHost.hidden = true;
   const headEl = h("header", { class: "frame-head" }, roundEl, playersEl);
-  const root = h("div", { class: "frame" }, headEl, band.el, body, versionButton());
+  const root = h("div", { class: "frame" }, headEl, orderEl, band.el, body, versionButton());
 
   const model = () => (game ? genericModel(game, claims) : null);
 
@@ -188,7 +191,6 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (!game) return put(roundEl);
     const t = theme();
     const m = roundBar(game, t);
-    const strip = orBand(game, t);
     const phase = mitTooltip(v("span", { class: "frame-phase" }, m.phase.label),
       { title: m.phase.label, term: "Train phase", rows: [{ label: txt("frame.phase_tiles").de, value: m.phase.tiles }, { label: txt("frame.phase_ors").de, value: String(m.phase.operatingRounds) }], source: txt("frame.phase_tiles").regel });
     put(roundEl,
@@ -196,11 +198,18 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       v("span", { class: "frame-rr", title: txt(`rrphase.${m.rrPhase}`).en }, txt(`rrphase.${m.rrPhase}`).de),
       phase,
       v("span", { class: "frame-round", "aria-current": "step", title: m.round }, m.roundShort),
-      strip ? OrStripView(strip, t) : null,
       v("div", { class: "frame-who", "data-mine": m.who.mine ? "true" : "false", role: "status", title: m.who.text },
         m.who.corp ? Siegel({ sym: m.who.corp.sym, color: m.who.corp.color }, { theme: t, size: "s" }) : null,
         v("span", {}, m.who.text)),
       );
+  }
+
+  // ---- order band (#416): operating order under the head bar; stock round: the order the next OR would have --
+  function drawOrderBand() {
+    const b = game ? orBand(game, theme()) : null;
+    orderEl.hidden = b === null;
+    if (b === null) return orderEl.replaceChildren();
+    put(orderEl, OrderBandView(b, theme(), { collapsed: orderCollapsed, onToggle: () => { orderCollapsed = !orderCollapsed; writeOrderCollapsed(orderCollapsed); drawOrderBand(); } }));
   }
 
   // ---- player bar ------------------------------------------------------------------------------
@@ -390,7 +399,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   disposers.push(() => document.removeEventListener("keydown", onKey));
 
   function drawAll() {
-    drawLayout(); drawRound(); drawPlayers(); drawContext(); drawMain(); drawEnd(); drawBar();
+    drawLayout(); drawRound(); drawOrderBand(); drawPlayers(); drawContext(); drawMain(); drawEnd(); drawBar();
   }
 
   document.addEventListener(THEME_CHANGED, () => { if (root.isConnected) drawAll(); });

@@ -10,6 +10,15 @@ export function writeCollapsed(collapsed: boolean, storage: Pick<Storage, "setIt
   try { if (collapsed) storage?.setItem(COLLAPSED_KEY, "1"); else storage?.removeItem(COLLAPSED_KEY); } catch { /* per-viewer convenience only */ }
 }
 
+// Collapsed state of the order band under the head bar (#416): same convenience, own key.
+export const ORDER_COLLAPSED_KEY = "oe.orderband.collapsed";
+export function readOrderCollapsed(storage: Pick<Storage, "getItem"> | null = safeStorage()): boolean {
+  try { return storage?.getItem(ORDER_COLLAPSED_KEY) === "1"; } catch { return false; }
+}
+export function writeOrderCollapsed(collapsed: boolean, storage: Pick<Storage, "setItem" | "removeItem"> | null = safeStorage()): void {
+  try { if (collapsed) storage?.setItem(ORDER_COLLAPSED_KEY, "1"); else storage?.removeItem(ORDER_COLLAPSED_KEY); } catch { /* per-viewer convenience only */ }
+}
+
 function safeStorage(): Storage | null {
   try { return typeof localStorage === "undefined" ? null : localStorage; } catch { return null; }
 }
