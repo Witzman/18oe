@@ -352,6 +352,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "frame.cash": e("Bargeld", "Cash", "—"),
   "frame.panel": e("Aktionen", "Action panel", "—"),
   "frame.panel_collapse": e("Panel einklappen: die Karte wird frei, die Hauptaktion bleibt in einer Zeile", "Collapse panel", "—"),
+  "frame.home_title": e("Karte auf den Heimatbahnhof des aktiven Unternehmens zentrieren und zoomen", "Centre the map on the active company's home station and zoom in", "—"),
   "frame.panel_expand": e("Panel ausklappen", "Expand panel", "—"),
   "frame.log_hint": e("Protokoll: was in dieser Partie bisher geschah", "Game log", "—"),
   "frame.players": e("Spieler", "Players", "—"),

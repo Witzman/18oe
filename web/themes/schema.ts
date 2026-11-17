@@ -43,6 +43,8 @@ export const NUMBER_RANGES = {
   camera: {
     pitch: [0, 65], yaw: [-45, 45], heightLand: [0, 0.6], heightHill: [0, 1], heightMountain: [0, 1.5],
     heightTile: [0, 0.3], heightToken: [0, 0.6], wallShade: [0, 1], lightAzimuth: [0, 360], shadowAlpha: [0, 1],
+    // Zoom (px per hex side) of "centre on the home station" (#415): at least this close, never zoomed out by it.
+    homeZoom: [10, 60],
   },
   track: {
     gauge: [0.02, 0.3], railWidth: [0.005, 0.08], sleeperSpacing: [0.03, 0.3],
