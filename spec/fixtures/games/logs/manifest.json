@@ -1,30 +1,29 @@
 {
   "logs": {
     "random-4p-1": {
-      "engine_sha": "802de03f562ba43f975bacbab7d7b52ec0a9be3f",
-      "actions": 1806,
-      "sha256": "4200209a9732cda0ed39f695e3a5a62cbc314c3d2fb3c4f548f2c21df38a9db0",
+      "engine_sha": "afcb5c2582c9601999967de0e6d6fcc6195b75a5",
+      "actions": 1766,
+      "sha256": "47bf37e173dd077d127526914ad04de7422f08d03b883fbb0c20438e3f472745",
       "positions": {
         "stock-par": 638,
-        "stock-convert": 1427,
-        "stock-sell": 1432,
-        "merge-minor": 1804,
-        "merge-token": 1805,
-        "merge-discard-train": 1806
+        "stock-convert": 1431,
+        "stock-sell": 1450,
+        "merge-minor": 1764,
+        "merge-token": 1765,
+        "merge-discard-train": 1766
       }
     },
     "strategy-3p-1": {
-      "engine_sha": "802de03f562ba43f975bacbab7d7b52ec0a9be3f",
-      "actions": 3160,
-      "sha256": "e07d211e59dc5b9876d0b618fb53f4e82b0b4074d4896eb51328b2528880ea24",
+      "engine_sha": "afcb5c2582c9601999967de0e6d6fcc6195b75a5",
+      "actions": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "positions": {
-        "consolidation-discard-train": 3160
       }
     },
     "strategy-4p-1": {
-      "engine_sha": "802de03f562ba43f975bacbab7d7b52ec0a9be3f",
-      "actions": 5398,
-      "sha256": "d0350a2bcdc7099589a3e4e01ecb9408bf363f80d2f7367a8d2c735465b2037f",
+      "engine_sha": "afcb5c2582c9601999967de0e6d6fcc6195b75a5",
+      "actions": 5545,
+      "sha256": "00ec9b4d27ea222a9b5ffa923318df6949b253093b24eb47349044f7958110a2",
       "positions": {
         "auction-start": 0,
         "auction-running": 1,
@@ -39,15 +38,14 @@
         "operating-home-token": 2515,
         "operating-token": 2531,
         "operating-issue-shares": 2998,
-        "phase-5": 3771,
-        "consolidation-first": 4025,
-        "consolidation-merge-minor": 4070,
-        "consolidation-merge-token": 4071,
-        "consolidation-merge-offer": 4101,
-        "phase-6": 4351,
-        "phase-7": 4777,
-        "phase-8": 5136,
-        "game-end": 5398
+        "phase-5": 3777,
+        "phase-6": 3938,
+        "consolidation-first": 4045,
+        "consolidation-merge-offer": 4094,
+        "consolidation-merge-minor": 4103,
+        "consolidation-merge-token": 4104,
+        "phase-7": 4703,
+        "game-end": 5545
       }
     }
   }
