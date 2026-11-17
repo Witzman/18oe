@@ -754,12 +754,14 @@ module Oe
     # [variant name, price] pairs. A depot train is offered once per variant the
     # engine allows (Step::Train#buyable_train_variants): 3 and 3+3, 4 and 4+4,
     # 5 and 5+5, 6 and 6+6, 7+7 and 4D, 8+8 and 5D (RB 11.6, the double-sided
-    # cards), each at its own price. A train of another railroad keeps the side
-    # it was bought with: no variant.
+    # cards), each at its own price (less Minor J's discount, §15.9). A train of
+    # another railroad keeps the side it was bought with: no variant.
     def train_offers(step, entity, train, min, max)
       return other_train_prices(train, min, max).map { |price| [nil, price] } unless train.from_depot?
 
-      step.send(:buyable_train_variants, train, entity).map { |variant| [variant[:name], variant[:price]] }
+      step.send(:buyable_train_variants, train, entity).map do |variant|
+        [variant[:name], step.depot_price(entity, train, variant[:name])]
+      end
     end
 
     # A train from another corporation: the engine's whole span (RB 11.6,
