@@ -34,9 +34,15 @@ describe 'G18OE national trains (§11.6.6)' do
     unclaimed!(name, variant: variant).tap { |train| game.buy_train(corporation, train, :free) }
   end
 
+  # The corporation operates and has reached its Buy Trains step (a national lays track first, #64 part d).
   def operate!(corporation)
     round.instance_variable_set(:@entity_index, round.entities.index(corporation))
     round.instance_variable_set(:@current_operator, corporation)
+    round.steps.each do |s|
+      break if s.is_a?(Engine::Game::G18OE::Step::BuyTrain)
+
+      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::ConvertToNational) || s.is_a?(Engine::Step::Bankrupt)
+    end
   end
 
   def take!(train, exchange: nil)

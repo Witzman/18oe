@@ -147,7 +147,8 @@ module Engine
             points_available = get_tile_lay(entity) - @points_used
             return false unless points_available.positive? || ef_bonus_lay_possible?(entity)
 
-            !entity.tokens.empty?
+            # ANNAHME A (#64): a national lays track from its virtual tokens (Game#for_graph_city_tokened_by?).
+            !entity.tokens.empty? || entity.type == :national
           end
 
           def get_tile_lay(entity)

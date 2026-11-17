@@ -105,6 +105,17 @@ module Engine
           hexes.select { |hex| region_for_hex(hex) == zone }.flat_map { |hex| hex.tile.cities + hex.tile.offboards + hex.tile.towns }
         end
 
+        # ANNAHME A (workshop #64, open owner question): the virtual tokens of §11.3.10 also count as the
+        # token a laid tile must connect to (§11.1), so a national lays track from every city of its home
+        # zone. Not built: B (nationals lay no track), C (anywhere in the zone without a connection).
+        # Upstream hook of Engine::Graph#compute.
+        def for_graph_city_tokened_by?(city, corporation, graph)
+          return super unless corporation&.corporation? && corporation.type == :national
+
+          zone = entity_track_rights_zone(corporation)
+          !zone.nil? && region_for_hex(city.hex) == zone
+        end
+
         # A city's or red zone's value in the current phase; a town's printed on its tile.
         def national_stop_value(stop)
           stop.route_base_revenue(@phase, NationalTrain)
