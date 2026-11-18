@@ -28,6 +28,17 @@ module Engine
           cross_water(corporation, &block)
         end
 
+        # #446: a graph that is computed only to learn which nodes are connected (the trial lays of the Track
+        # enumeration, Oe::LegalActions#with_tile_laid) needs no ferry prices: they only matter for the cost of a lay or
+        # a token, never for the connection. The extra walks of #price_ferries are skipped inside the block.
+        def without_ferry_prices
+          before = @skip_ferry_prices
+          @skip_ferry_prices = true
+          yield
+        ensure
+          @skip_ferry_prices = before
+        end
+
         # What the hypothetical train crosses to reach the node: nothing over land, nil if it is not reached.
         def water_cost_to_node(corporation, node)
           return unless connected_nodes(corporation)[node]
@@ -155,6 +166,7 @@ module Engine
         # walk is put back afterwards.
         def price_ferries(corporation)
           costs = (@ferry_costs ||= {})[corporation] = { nodes: {}, edges: {} }
+          return if @skip_ferry_prices
           return unless @connected_paths[corporation].each_key.any? { |path| paid_ferry_line?(path) }
 
           saved = [@connected_hexes[corporation], @connected_nodes[corporation], @connected_paths[corporation],

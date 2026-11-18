@@ -2,6 +2,7 @@
 
 require_relative '../engine_helper'
 require_relative 'helpers'
+require 'oe/legal_actions'
 
 # #61: the ferry part of the cross-water fees. A tile (§11.1.6) or a token (§11.2.1) the hypothetical train reaches
 # over a ferry costs £5 (tile) or £20 (token) times the ferry's distance; the sea zone part is in cross_water_spec.
@@ -122,6 +123,37 @@ describe 'G18OE ferry fees for track and tokens (§11.1.6, §11.2.1)' do
       lay!('Z41', '57', 2)
 
       expect(game.cross_water_token_fee(lnwr, hex('Z41').tile.cities.first)).to eq(0)
+    end
+  end
+  # #446: the trial lays of the Track enumeration (Oe::LegalActions#with_tile_laid) only ask which nodes are connected
+  # (right of way, semi-restrictive track); they never read a price. The ferry walks of #price_ferries (one more walk
+  # per set of paid ferries) are skipped there, and the real graph computed afterwards is priced as before.
+  describe 'trial lays of the enumeration (#446)' do
+    let(:legal) { Oe::LegalActions.new(game, limit: nil) }
+
+    before do
+      lnwr
+      lay!('K60', '57', 2)
+      token!('K60', lnwr)
+    end
+
+    def ferry_walks
+      walks = 0
+      allow(game.graph).to receive(:record_ferry_costs).and_wrap_original { |m, *a| walks += 1; m.call(*a) }
+      yield
+      walks
+    end
+
+    it 'does not run the ferry walks inside a trial lay' do
+      trial = rotated('57', 2)
+      inside = ferry_walks { legal.send(:with_tile_laid, lnwr, hex('K60'), trial) { game.graph.connected_nodes(lnwr) } }
+      expect(inside).to eq(0)
+    end
+
+    it 'still prices the real graph computed after the trial lay' do
+      game.graph.clear
+      outside = ferry_walks { game.graph.connected_nodes(lnwr) }
+      expect(outside).to be >= 2
     end
   end
 end

@@ -280,7 +280,8 @@ module Oe
       old_tile.hex = nil
       tile.hex = hex
       @game.clear_graph_for_entity(entity)
-      yield
+      graph = @game.graph_for_entity(entity)
+      graph.respond_to?(:without_ferry_prices) ? graph.without_ferry_prices { yield } : yield # #446: only connection is asked
     ensure
       if old_tile
         tile.hex = tile_hex
