@@ -476,6 +476,8 @@ module Engine
           @minor_b_ability = corporation_by_id('B')&.abilities&.first
           # §15.10: the mail contract travels with the charter into the major on a merge
           @mail_contract_ability = corporation_by_id('K')&.abilities&.first
+          # §15.8: Minor H's reduction of the sea zones and ferries on the city limit, likewise
+          @steamship_ability = corporation_by_id('H')&.abilities&.first
           # §15.5/§15.6: the ability objects travel with the charter into the major on a merge
           @ef_abilities = %w[E F].to_h { |id| [id, corporation_by_id(id)&.abilities&.first] }
           setup_minor_j_discount!
@@ -1543,7 +1545,8 @@ module Engine
           rows = train.distance
           return super if rows.is_a?(Numeric)
 
-          units = sea_units(route)
+          # the stops are chosen with the whole reduction of Minor H; check_distance then takes what the route needs
+          units = sea_units(route, steamship_allowance(route.corporation, route.phase))
           rows = distance_rows_after_sea(rows, units) if units.positive?
 
           rows = rows.sort_by { |h| h['nodes'].size }
@@ -1565,23 +1568,38 @@ module Engine
 
         # §11.3.3, §11.3.4, §11.3.7: sea zones and the ferry distance take places of the cities' row; the base check
         # runs on the rest.
+        # §15.8 (#73): a route takes as little of Minor H's reduction as it needs (the fewest units that let it pass);
+        # the units are remembered on the route for the RR's total (#check_overlap) and for what the route shows.
         def check_distance(route, visits, train = nil)
           train ||= route.train
-          units = sea_units(route)
-          return super if units.zero? || train.distance.is_a?(Numeric)
+          allowance = train.distance.is_a?(Numeric) ? 0 : steamship_allowance(route.corporation, route.phase)
+          error = nil
+          (0..allowance).each do |used|
+            units = sea_units(route, used)
+            begin
+              if units.zero? || train.distance.is_a?(Numeric)
+                super(route, visits, train)
+              else
+                rows = train.distance
+                places = rows.select { |row| row['nodes'].include?('city') }.sum { |row| row['visit'] || row['pay'] }
+                raise RouteTooLong, "Sea distance #{units} is too much for a #{train.name} train" if units > places
 
-          rows = train.distance
-          places = rows.select { |row| row['nodes'].include?('city') }.sum { |row| row['visit'] || row['pay'] }
-          raise RouteTooLong, "Sea distance #{units} is too much for a #{train.name} train" if units > places
-
-          super(route, visits, SeaTrain.new(distance_rows_after_sea(rows, units)))
+                super(route, visits, SeaTrain.new(distance_rows_after_sea(rows, units)))
+              end
+              route.instance_variable_set(:@steamship_use, used)
+              return
+            rescue RouteTooLong => e
+              error = e
+            end
+          end
+          raise error
         end
 
         # What the base distance check sees of a train that rides a ferry: its rows, less the ferry distance.
         SeaTrain = Struct.new(:distance)
 
         def route_distance_str(route)
-          units = sea_units(route)
+          units = route_sea_units(route)
           units.zero? ? super : "#{super}+#{units}~"
         end
 
@@ -1613,9 +1631,22 @@ module Engine
         # one RR may use it. Everything else keeps the base rule (a track section only once). Both hooks are the
         # upstream ones (cf. 1817, 1861); the ferry paths are simply left out.
         def check_overlap(routes)
+          check_steamship_total(routes)
           return super unless routes.any? { |route| route.paths.any? { |path| ferry_path?(path) } }
 
           super(routes.map { |route| RouteWithoutFerries.new(route, self) })
+        end
+
+        # §11.3.5, §15.8: the reduction of Minor H belongs to the RR, so the trains share it.
+        def check_steamship_total(routes)
+          corporation = routes.first&.corporation
+          return unless corporation
+
+          used = routes.sum { |route| route.instance_variable_get(:@steamship_use).to_i }
+          allowance = steamship_allowance(corporation, routes.first.phase)
+          return if used <= allowance
+
+          raise RouteTooLong, "The Great Western Steamship reduction of #{allowance} is used #{used} times by the routes"
         end
 
         def compute_other_paths(routes, route)
