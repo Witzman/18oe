@@ -17,3 +17,13 @@ export function portMarks(ports: readonly PortEntry[] | undefined): PortMark[] {
   }
   return out;
 }
+
+/**
+ * The side whose corner with `side` holds the mark (#459): a mark sits at a corner of its hex side, between the possible
+ * tracks (which run through the side middles), on the corner whose other hex is water. With both or neither corner at
+ * water, the corner to the higher side (ASSUMPTION: no rule, only a stable choice).
+ */
+export function portCornerSide(side: number, kindOf: (side: number) => string | undefined): number {
+  const prev = (side + 5) % 6, next = (side + 1) % 6;
+  return kindOf(prev) === "sea" && kindOf(next) !== "sea" ? prev : next;
+}

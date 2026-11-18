@@ -37,3 +37,16 @@ test("a ferry end or dead end without a kind makes no mark; a port that is also 
 test("an unknown kind is ignored, so a new kind in the data cannot draw a wrong anchor", () => {
   assert.deepEqual(portMarks([{ hex: "A1", edge: 2, port: "royal" }]), []);
 });
+
+// #459: the mark sits at a corner of its side, the one whose other hex is water (so it lies between possible tracks).
+import { portCornerSide } from "../render/ports.ts";
+
+test("the corner next to the sea hex is chosen; with both or neither, the higher side", () => {
+  const kinds = (sea: number[]) => (i: number) => (sea.includes(((i % 6) + 6) % 6) ? "sea" : "land");
+  assert.equal(portCornerSide(2, kinds([1])), 1);
+  assert.equal(portCornerSide(2, kinds([3])), 3);
+  assert.equal(portCornerSide(2, kinds([1, 3])), 3);
+  assert.equal(portCornerSide(2, kinds([])), 3);
+  assert.equal(portCornerSide(5, kinds([0])), 0);
+  assert.equal(portCornerSide(0, kinds([5])), 5);
+});
