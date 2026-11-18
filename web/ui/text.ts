@@ -191,6 +191,13 @@ export const TEXT: Readonly<Record<string, Entry>> = {
 
   // --- Zugang: Anmelden und Registrieren (#210) -----------------------------
   "access.game_title": e("On the Rails of the Orient Express", "On the Rails of the Orient Express", "—"),
+  "access.slide_map": e("Die Karte mit Gleisen, Häfen und Grenzen", "The map with tracks, ports and borders", "—"),
+  "access.slide_ports": e("Ausschnitt der Karte mit Häfen und Ortsnamen", "Map detail with ports and place names", "—"),
+  "access.slide_auction": e("Die Auktion mit einem gewählten Los", "The auction with a chosen lot", "—"),
+  "access.slide_stock": e("Die Aktienrunde mit dem Markt", "The stock round with the market", "—"),
+  "access.slide_run": e("Eine Fahrt im Betrieb", "A train run in operation", "—"),
+  "access.slide_end": e("Das Spielende", "The end of the game", "—"),
+  "access.slides_nav": e("Bilder", "Pictures", "—"),
   "access.title_login": e("Anmelden", "Log in", "—"),
   "access.title_register": e("Registrieren", "Register", "—"),
   "access.login_label": e("E-Mail oder Name", "E-mail or name", "—"),

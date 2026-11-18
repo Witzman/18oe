@@ -57,9 +57,9 @@ export function titleStage(): HTMLElement {
   const still = root.getPropertyValue("--motion-enabled").trim() === "0" || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const every = num("--motion-title-slide-ms", 8000);
   const images = SLIDES.map((s, i) => h("img", { class: "title-slide", src: `title/${s.scene}.png`, alt: "", width: "1747", height: "923", loading: i === 0 ? "eager" : "lazy", draggable: "false" }));
-  const dots = SLIDES.map((s, i) => h("button", { type: "button", class: "title-dot", "aria-label": s.alt }, h("i", {})));
+  const dots = SLIDES.map((s, i) => h("button", { type: "button", class: "title-dot", "aria-label": txt(s.alt).de }, h("i", {})));
   const slides = h("div", { class: "title-slides", "aria-hidden": "true" }, ...images);
-  const stage = h("div", { class: "title-stage" }, slides, h("nav", { class: "title-dots", "aria-label": "Bilder" }, ...dots));
+  const stage = h("div", { class: "title-stage" }, slides, h("nav", { class: "title-dots", "aria-label": txt("access.slides_nav").de }, ...dots));
   let at = 0, hover = false, pressed = false, timer = 0;
   const show = (i: number) => {
     at = i;
