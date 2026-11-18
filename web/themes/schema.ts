@@ -70,6 +70,9 @@ export const NUMBER_RANGES = {
     // Soft terrain blobs on the land (hills, mountains, water terrain): factor on their alpha, 0 = none (the terrain
     // signs of the board carry the information instead, #450).
     terrainBlobAlpha: [0, 1],
+    // Red hexes (#453): 1 = the revenue box of the board (a white box with the values, the name below), 0 = the wedge
+    // and the text mark.
+    offboardBox: [0, 1],
     // Sea (#449): 1 = the sea tinted by its sea (seaNorth, seaMed), 0 = the gradient seaDeep to seaShallow; factor on the
     // alpha of the hex lines between sea hexes (0 = none); sea zone boundary dashes, gap and width and the radius of the
     // zone circles, in side lengths.

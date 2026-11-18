@@ -158,6 +158,52 @@ export function offboardWedges(node: NodeGeom, axes: readonly Axis[], frame: Hex
 
 const PHASE_ORDER = ["yellow", "green", "brown", "gray"];
 
+/** One line of a revenue box (#453): the value, and the train phase from which it applies where the board prints it. */
+export interface RevenueRow { value: number; phase?: string }
+
+/** Where the revenue box of a red hex sits (hex coordinates, side length 1), as map.jpg prints it. */
+export interface RevenueBoxLayout {
+  /** Centre, width and height of the white box. */
+  box: { x: number; y: number; w: number; h: number };
+  rowH: number;
+  /** Centre of the first row; the others follow every rowH. */
+  first: Vec;
+  /** Centre of the name, below the box. */
+  name: Vec;
+  /** x of the phase numbers beside the box. */
+  phaseX: number;
+  /** Whether the phase numbers 3, 5, 7 fit beside the box (not on a red city, where the circles are next to it). */
+  phases: boolean;
+}
+
+/**
+ * The box of a true off-board sits a little left of the centre (the track ends under it); the box of a red city leaves
+ * the middle to the city circles and sits at the upper left. The name goes below.
+ */
+export function revenueBoxLayout(rows: number, city: boolean): RevenueBoxLayout {
+  const rowH = city ? 0.16 : 0.2;
+  const w = city ? 0.36 : 0.5;
+  const h = rows * rowH + 0.08;
+  const cx = city ? -0.55 : -0.1, cy = city ? -0.3 : -0.08;
+  return {
+    box: { x: cx, y: cy, w, h }, rowH,
+    first: { x: cx, y: cy - h / 2 + 0.04 + rowH / 2 },
+    name: { x: city ? -0.1 : 0, y: city ? 0.56 : cy + h / 2 + 0.17 },
+    phaseX: cx + w / 2 + 0.07,
+    phases: !city,
+  };
+}
+
+/** The phase numbers map.jpg prints beside the revenue of a red hex: green from phase 3, brown from 5, gray from 7. */
+const PHASE_LABEL: Record<string, string> = { green: "3", brown: "5", gray: "7" };
+
+/** The lines of a red hex's revenue box: one per tile colour in play order, or the single number. */
+export function revenueRows(rev: Revenue | undefined): RevenueRow[] {
+  if (rev === undefined) return [];
+  if (typeof rev === "number") return [{ value: rev }];
+  return PHASE_ORDER.filter((c) => c in rev).map((c) => ({ value: rev[c]!, phase: PHASE_LABEL[c] }));
+}
+
 /** The revenue a node shows: a plain number, or the value of the newest tile colour in play. */
 export function revenueNow(rev: Revenue | undefined, colors: readonly string[]): number | null {
   if (rev === undefined) return null;
