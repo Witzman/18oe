@@ -31,6 +31,7 @@ import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
 import { findFerries, type Ferry } from "./ferries.ts";
 import { drawFerryLine } from "./layers/ferry.ts";
 import { drawPortMark } from "./layers/port.ts";
+import { nameLabels, nameVisible } from "./names.ts";
 import { portMarks, type PortMark } from "./ports.ts";
 import { drawNodes, drawTargetCity, inkOn, makeToken, type Ring } from "./layers/nodes.ts";
 import { citySlots, companyIndex, labelAt, revenueAll, revenueNow, shieldAt, medallionExtent, slotsNear, type Slot } from "./stones.ts";
@@ -179,6 +180,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let targetG: Graphics[] = [];
   let hoverG!: Graphics;
   let costs: { id: string; text: Text; at: Vec; z: number }[] = [];
+  /** Place names (#455), screen space like the costs. */
+  let names: { id: string; text: Text; at: Vec; z: number }[] = [];
   let printed = new Map<string, string>();
 
   // Session state.
@@ -281,6 +284,20 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       text.anchor.set(0, 0.5);
       layers.labels.addChild(text);
       costs.push({ id: g.id, text, at: { x: g.x + COST_AT.x, y: g.y + COST_AT.y }, z: g.z });
+    }
+    // Place names (#455): below the city, from the name zoom and for the hovered hex.
+    names = [];
+    for (const l of nameLabels(geometry.hexes)) {
+      const g = scene.grid.byId.get(l.id);
+      if (!g) continue;
+      const text = new Text({
+        text: l.name, resolution: dpr,
+        style: { fontFamily, fontSize: 10, fontWeight: "600", fill: theme.map.label, stroke: { color: theme.map.labelHalo, width: 3, join: "round" } },
+      });
+      text.anchor.set(0.5, 0);
+      text.visible = false;
+      layers.labels.addChild(text);
+      names.push({ id: l.id, text, at: { x: g.x, y: g.y }, z: g.z });
     }
     app.renderer.background.color = theme.ui.bg;
   }
@@ -565,6 +582,12 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       const on = showCosts && !entries.has(c.id) && p.x > -40 && p.x < width + 40 && p.y > -20 && p.y < height + 20;
       c.text.visible = on;
       if (on) c.text.position.set(Math.round(p.x), Math.round(p.y));
+    }
+    for (const n of names) {
+      const p = project(view, n.at, n.z);
+      const on = nameVisible({ zoom: view.zoom, nameZoom: theme.nameZoom, hovered: n.id === hover }) && p.x > -60 && p.x < width + 60 && p.y > -20 && p.y < height + 20;
+      n.text.visible = on;
+      if (on) n.text.position.set(Math.round(p.x), Math.round(p.y + theme.nameOffset * view.zoom));
     }
     for (const list of tokenObjs.values()) {
       for (const t of list) {

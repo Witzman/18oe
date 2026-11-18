@@ -32,7 +32,7 @@ async function one(web, out, fixture, catalog, evalJs) {
   const zones = new Map(read("map-zones.json").hexes.map((h) => [h.id, h]));
   const tracks = read("map-tiles.json");
   const printed = new Map(tracks.hexes.map((h) => [h.id, h]));
-  const parts = ({ paths, cities, towns, double_towns, offboards, junction } = {}) => ({ paths, cities, towns, double_towns, offboards, junction });
+  const parts = ({ paths, cities, towns, double_towns, offboards, junction, name, color } = {}) => ({ paths, cities, towns, double_towns, offboards, junction, name, color });
   geometry.hexes = geometry.hexes.map((h) => ({ ...h, ...zones.get(h.id), ...parts(printed.get(h.id)) }));
   geometry.tiles = tracks.tiles;
   const MAP = JSON.stringify(geometry);
