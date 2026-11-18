@@ -299,6 +299,47 @@ export function terrainGlyph(kind: TerrainKind): Vec[][] {
 export const GLYPH_AT: Vec = { x: -0.22, y: -0.42 };
 export const COST_AT: Vec = { x: 0.16, y: -0.42 };
 
+/** A terrain sign as the board prints it (#450): a filled shape with the cost in it, in hex coordinates. */
+export interface TerrainShape {
+  kind: TerrainKind;
+  /** Closed outline. */
+  polygon: Vec[];
+  /** Where the cost number sits, and its size in side lengths. */
+  number: Vec;
+  size: number;
+  /** 0..1 within the kind: the dearer the sign, the darker its fill (30 lime, 45 greener; 60 and 120 mountains). */
+  depth: number;
+}
+
+/** Centre of the signs, near the top of the hex. */
+export const SIGN_AT: Vec = { x: 0, y: -0.5 };
+
+/**
+ * The sign of a terrain: a dome for hills (30 small and light, 45 larger and greener), two peaks for mountains (60) or one
+ * large mountain (120), a shield for water (30, 45, 60). Shapes only; the colours are the theme's hill, mountain, water.
+ */
+export function terrainShape(kind: TerrainKind, cost: number): TerrainShape {
+  const at = (x: number, y: number): Vec => ({ x: SIGN_AT.x + x, y: SIGN_AT.y + y });
+  if (kind === "hill") {
+    const r = cost >= 45 ? 0.27 : 0.23;
+    const arc = Array.from({ length: 13 }, (_, i) => {
+      const a = Math.PI + (Math.PI * i) / 12;
+      return at(Math.cos(a) * r, Math.sin(a) * r * 0.95 + 0.12);
+    });
+    return { kind, polygon: arc, number: at(0, 0.05), size: 0.17, depth: cost >= 45 ? 1 : 0 };
+  }
+  if (kind === "mountain") {
+    const k = cost >= 120 ? 1.25 : 1;
+    const p = [[-0.3, 0.17], [-0.13, -0.13], [-0.05, -0.02], [0.1, -0.27], [0.3, 0.17]] as const;
+    return { kind, polygon: p.map(([x, y]) => at(x * k, y * k)), number: at(0.03 * k, 0.08 * k), size: cost >= 120 ? 0.17 : 0.15, depth: cost >= 120 ? 1 : 0 };
+  }
+  const half = Array.from({ length: 11 }, (_, i) => {
+    const a = (Math.PI * i) / 10;
+    return at(Math.cos(a) * 0.26, -0.09 + Math.sin(a) * 0.3);
+  });
+  return { kind, polygon: [at(-0.26, -0.09), at(0.26, -0.09), ...half.slice(1, -1)], number: at(0, -0.01), size: 0.16, depth: cost >= 60 ? 1 : cost >= 45 ? 0.5 : 0 };
+}
+
 // ---------------------------------------------------------------------------
 // Culling
 

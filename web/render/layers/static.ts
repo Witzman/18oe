@@ -5,12 +5,13 @@ import { Container, FillGradient, Graphics } from "pixi.js";
 import { blob, landRings, landShapes } from "../coast.ts";
 import { worldCorners, type Vec, type View } from "../projection.ts";
 import {
-  BLOCK, blockKey, GLYPH_AT, gridEdges, terrainGlyph, terrainMark, topColor, zoneSegments,
+  BLOCK, blockKey, GLYPH_AT, gridEdges, terrainGlyph, terrainMark, terrainShape, topColor, zoneSegments,
   mix, wallFaces, type Plate, type Scene,
 } from "../scene.ts";
 import type { RenderTheme } from "../theme.ts";
 import type { Box } from "../projection.ts";
 import { dashes, seaOfHex, zoneBorders, zoneMarks } from "../sea-zones.ts";
+import { worldText } from "../world-text.ts";
 
 export interface Block {
   /** Index into Scene.levels. */
@@ -18,7 +19,7 @@ export interface Block {
   box: Box;
   node: Container;
   /** Parts shown only from zoom stage Z1 (hex lines, terrain signs). */
-  detail?: Graphics;
+  detail?: Container;
 }
 
 const flat = (ps: Vec[]) => ps.flatMap((p) => [p.x, p.y]);
@@ -72,6 +73,7 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
   for (const { level, ids } of groups.values()) {
     const node = new Container();
     const detail = new Graphics();
+    const signs = new Container(); // terrain signs with the cost in them (#450)
     const zone = new Graphics();
     const seaLines: [Vec, Vec][] = []; // hex sides between two sea hexes (#449: their own alpha, none on the board)
     const box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
@@ -110,6 +112,7 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
       const mark = terrainMark(scene.hexById.get(id)!);
       if (!mark) continue;
       const h = scene.grid.byId.get(id)!;
+      if (theme.terrainSymbols > 0) { drawSign(signs, mark, h, theme); continue; }
       for (const line of terrainGlyph(mark.kind)) {
         line.forEach((p, i) => {
           const x = h.x + GLYPH_AT.x + p.x, y = h.y + GLYPH_AT.y + p.y;
@@ -120,8 +123,10 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
     }
     detail.stroke({ width: theme.zoneLine, color: theme.map.label, cap: "round", join: "round" });
     if (zoneLines) zone.stroke({ width: theme.zoneLine, color: theme.map.zoneBorder, cap: "round" });
-    node.addChild(detail, zone);
-    out.push({ level, box, node, detail });
+    const group = new Container();
+    group.addChild(detail, signs);
+    node.addChild(group, zone);
+    out.push({ level, box, node, detail: group });
   }
   return out;
 }
@@ -219,4 +224,16 @@ function drawSeaZones(sea: Graphics, scene: Scene, theme: RenderTheme): void {
     sea.moveTo(m.x + r * 0.3, m.y - r * 0.42).lineTo(m.x + r * 0.3, m.y + r * 0.42).moveTo(m.x + r * 0.3, m.y - r * 0.42).lineTo(m.x + r * 0.1, m.y - r * 0.26);
     sea.stroke({ width: w, color: map.seaZoneLine, cap: "round", join: "round" });
   }
+}
+
+/** A terrain sign of the board (#450): a filled shape in the colour of its kind, darker the dearer it is, with the cost in it. */
+function drawSign(into: Container, mark: { kind: "mountain" | "hill" | "water"; cost: number }, h: { x: number; y: number }, theme: RenderTheme): void {
+  const shape = terrainShape(mark.kind, mark.cost);
+  const base = theme.map[mark.kind];
+  const fill = shape.depth >= 1 ? mix(base, 0x000000, 0.2) : mix(base, 0xffffff, 0.35 * (1 - shape.depth));
+  const g = new Graphics();
+  g.poly(flat(shape.polygon.map((p) => ({ x: h.x + p.x, y: h.y + p.y }))), true)
+    .fill({ color: fill }).stroke({ width: 0.025, color: mix(fill, 0x000000, 0.5), join: "round" });
+  into.addChild(g);
+  into.addChild(worldText(String(mark.cost), shape.size, theme.map.label, theme, { x: h.x + shape.number.x, y: h.y + shape.number.y }));
 }

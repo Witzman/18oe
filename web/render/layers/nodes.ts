@@ -3,9 +3,10 @@
 // the tiles layer, in flat hex coordinates like the track. Tokens are standing cylinders: drawn once in
 // units of the side length (token.ts is pure maths, here only PixiJS) and placed in the objects layer
 // by map.ts, which sets position and scale (= zoom) on every frame.
-import { Container, Graphics, Text } from "pixi.js";
+import { Container, Graphics } from "pixi.js";
 import { citySlots, homeRingColor, junctionArrows, medallionExtent, offboardWedges, revenueBoxLayout, revenueRows, townBars, type Slot } from "../stones.ts";
 import { contrast } from "../../themes/color.ts";
+import { worldText } from "../world-text.ts";
 import type { RenderTheme } from "../theme.ts";
 import type { Axis, HexFrame, NodeGeom, Revenue, TileParts, Vec } from "../track-axes.ts";
 
@@ -117,21 +118,6 @@ export function drawNodes(input: NodesInput, theme: RenderTheme): Container {
   node.addChild(crests);
   if (theme.offboardBox > 0 && input.redHex) node.addChild(drawRevenueBox(input.redHex, origin, theme));
   return node;
-}
-
-/** Text pixels per font unit: drawn big and scaled down into the hex, so it stays sharp when the map is zoomed in. */
-const FONT_PX = 32, TEXT_RES = 3;
-
-function worldText(text: string, size: number, color: number, theme: RenderTheme, at: Vec, halo?: number): Text {
-  const anchor = 0.5;
-  const t = new Text({
-    text, resolution: TEXT_RES,
-    style: { fontFamily: theme.font.body, fontSize: FONT_PX, fontWeight: "700", fill: color, align: "center", ...(halo === undefined ? {} : { stroke: { color: halo, width: 7, join: "round" as const } }) },
-  });
-  t.anchor.set(anchor, 0.5);
-  t.scale.set(size / FONT_PX);
-  t.position.set(at.x, at.y);
-  return t;
 }
 
 /**

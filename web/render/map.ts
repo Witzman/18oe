@@ -269,7 +269,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     const fontFamily = theme.font.body;
     for (const g of scene.grid.hexes) {
       const mark = terrainMark(scene.hexById.get(g.id)!);
-      if (!mark) continue;
+      if (!mark || theme.terrainSymbols > 0) continue; // #450: the signs carry the cost
       const text = new Text({
         text: String(mark.cost), resolution: dpr,
         style: { fontFamily, fontSize: 11, fontWeight: "600", fill: theme.map.label, stroke: { color: theme.map.labelHalo, width: 3, join: "round" } },

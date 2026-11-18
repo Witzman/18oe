@@ -265,3 +265,23 @@ test("tile diff: only hexes whose tile, rotation, colour, tokens or builder chan
   const built = signatures([{ hex: "Q30", tile: { name: "57", rotation: 0, color: "yellow", laid_by: "PLM" } as HexChange["tile"] }]);
   assert.deepEqual(changedHexes(a, built).includes("Q30"), true, "builder (laid_by, #150) counts");
 });
+
+test("terrainShape: a dome for hills, peaks for mountains, a shield for water, darker when dearer; the number sits in the shape (#450)", async () => {
+  const { terrainShape, SIGN_AT } = await import("../render/scene.ts");
+  const inside = (s: { polygon: { x: number; y: number }[]; number: { x: number; y: number } }) => {
+    const xs = s.polygon.map((p) => p.x), ys = s.polygon.map((p) => p.y);
+    return s.number.x > Math.min(...xs) && s.number.x < Math.max(...xs) && s.number.y > Math.min(...ys) && s.number.y < Math.max(...ys);
+  };
+  for (const [kind, cost] of [["hill", 30], ["hill", 45], ["mountain", 60], ["mountain", 120], ["water", 30], ["water", 45], ["water", 60]] as const) {
+    const s = terrainShape(kind, cost);
+    assert.equal(s.kind, kind);
+    assert.ok(s.polygon.length >= 5, `${kind} ${cost} has a shape`);
+    assert.ok(inside(s), `${kind} ${cost}: the number is inside the shape`);
+    assert.ok(s.polygon.every((p) => Math.abs(p.x - SIGN_AT.x) < 0.5 && p.y > -0.866 && p.y < 0.2), `${kind} ${cost} stays at the top of the hex`);
+  }
+  assert.ok(terrainShape("hill", 45).depth > terrainShape("hill", 30).depth);
+  assert.ok(terrainShape("mountain", 120).depth > terrainShape("mountain", 60).depth);
+  assert.ok(terrainShape("water", 60).depth > terrainShape("water", 30).depth);
+  const w = (k: "hill" | "mountain", c: number) => { const xs = terrainShape(k, c).polygon.map((p) => p.x); return Math.max(...xs) - Math.min(...xs); };
+  assert.ok(w("hill", 45) > w("hill", 30) && w("mountain", 120) > w("mountain", 60), "the dearer sign is larger");
+});
