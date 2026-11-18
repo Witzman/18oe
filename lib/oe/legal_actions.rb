@@ -163,7 +163,7 @@ module Oe
       extra_slot = company_extra_slot?(step, entity)
       token_cities(step, entity).select do |city|
         city.tokenable?(tokener, free: false, tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
-          token_spend_ok?(step, tokener, tokens) && connected_for_token?(step, entity, city)
+          token_spend_ok?(step, tokener, tokens, city) && connected_for_token?(step, entity, city)
       end
     end
 
@@ -633,11 +633,13 @@ module Oe
     end
 
     # 18OE first OR: a bought token must leave the reserved 2+2 payable (§11.6.4,
-    # workshop #352). Home tokens are paid at floating, not here.
-    def token_spend_ok?(step, tokener, tokens)
+    # workshop #352). Home tokens are paid at floating, not here. The spend is the token's price plus the
+    # fee for the ferries and sea zones to the city (§11.2.1, #61), as the engine's Token step charges it (#457).
+    def token_spend_ok?(step, tokener, tokens, city)
       return true if step.is_a?(Engine::Step::HomeToken) || !@game.respond_to?(:first_round_spend_allowed?)
 
-      @game.first_round_spend_allowed?(tokener, tokens.map(&:price).min.to_i)
+      fee = @game.respond_to?(:cross_water_token_fee) ? @game.cross_water_token_fee(tokener, city).to_i : 0
+      @game.first_round_spend_allowed?(tokener, tokens.map(&:price).min.to_i + fee)
     end
 
     # 18OE: a minor's home token claims a track-rights region and pays for it.
