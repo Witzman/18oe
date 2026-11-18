@@ -13,5 +13,7 @@
   { "name": "s09-dividende", "title": "Betrieb · Dividende", "fixture": "dividend" },
   { "name": "s10-route", "title": "Betrieb · Fahrt", "fixture": "operating-route" },
   { "name": "s11-konzession", "title": "Konzession", "fixture": "concession" },
-  { "name": "s12-spielende", "title": "Spielende", "fixture": "finished" }
+  { "name": "s12-spielende", "title": "Spielende", "fixture": "finished" },
+  { "name": "s13-karte-haefen", "title": "Karte · Häfen", "fixture": "track-lay",
+    "eval": "(async()=>{const w=ms=>new Promise(r=>setTimeout(r,ms));await w(800);window.oeMap.flyTo('AA20');await w(4000);await window.oeMap.rendered()})()" }
 ]

@@ -30,6 +30,8 @@ import { drawTileSurface } from "./layers/tiles.ts";
 import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
 import { findFerries, type Ferry } from "./ferries.ts";
 import { drawFerryLine } from "./layers/ferry.ts";
+import { drawPortMark } from "./layers/port.ts";
+import { portMarks, type PortMark } from "./ports.ts";
 import { drawNodes, drawTargetCity, inkOn, makeToken, type Ring } from "./layers/nodes.ts";
 import { citySlots, companyIndex, labelAt, revenueAll, revenueNow, shieldAt, medallionExtent, slotsNear, type Slot } from "./stones.ts";
 import { hexesNear, hexIsFingerSized, inertiaStep, INERTIA_STOP, pushSample, releaseVelocity, type Sample } from "./touch.ts";
@@ -402,6 +404,16 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     return ferryMap;
   };
 
+  // #451: the port marks per hex, from `ports`
+  let portMap: Map<string, PortMark[]> | undefined;
+  const portsOf = (id: string): PortMark[] => {
+    if (!portMap) {
+      portMap = new Map();
+      for (const m of portMarks(geometry.ports)) portMap.set(m.hex, [...(portMap.get(m.hex) ?? []), m]);
+    }
+    return portMap.get(id) ?? [];
+  };
+
   function drawTile(id: string) {
     const g = scene.grid.byId.get(id);
     if (!g) return;
@@ -415,7 +427,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     const isFerry = (a: { path: number }) => !entries.get(id)?.tile && ferryOfPath().has(`${id}#${a.path}`);
     const axes = (geom?.axes ?? []).filter((a) => !isFerry(a));
     const ferryAxes = (geom?.axes ?? []).filter(isFerry);
-    if (!surface && !geom) return;
+    const ports = portsOf(id);
+    if (!surface && !geom && !ports.length) return;
     const node = new Container({ label: id });
     const origin = { x: g.x, y: g.y };
     if (surface) node.addChild(surface);
@@ -466,6 +479,12 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     if (parts?.labels?.length) {
       const at = labelAt(frame3);
       mark(id, parts.labels.join(""), { x: g.x + at.x, y: g.y + at.y }, g.z);
+    }
+    // Port marks: on the land side of the hex side the entry names (ASSUMPTION: 0.36 of the way to the neighbour), an
+    // offshore port in the middle of its sea hex. Above the track, so a laid tile does not hide them.
+    for (const m of ports) {
+      const v = m.side === "offshore" ? [0, 0] : geometry.layout.edge_vectors[m.side];
+      if (v) node.addChild(drawPortMark(m.kind, { x: g.x + v[0]! * 0.36, y: g.y + v[1]! * 0.36 }, theme));
     }
     levelNodes.tiles[scene.levelOf.get(id)!]!.addChild(node);
     tileNodes.set(id, node);

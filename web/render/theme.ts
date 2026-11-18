@@ -51,6 +51,7 @@ export interface RenderTheme {
   /** Arrow at the middle end of a port stub in a sea hex, in side lengths (#444). */
   portArrowLength: number;
   portArrowWidth: number;
+  portMark: number;
   /** Hit radius and drag threshold in px, mouse and touch (#259). */
   hitPx: number;
   hitTouchPx: number;
@@ -105,6 +106,7 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     townWidth: t.shape.townWidth,
     portArrowLength: t.shape.portArrowLength,
     portArrowWidth: t.shape.portArrowWidth,
+    portMark: t.shape.portMark,
     hitPx: t.shape.hitPx,
     hitTouchPx: t.shape.hitTouchPx,
     dragPx: t.shape.dragPx,
