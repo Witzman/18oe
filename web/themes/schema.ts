@@ -65,6 +65,9 @@ export const NUMBER_RANGES = {
     zoneLine: [0.01, 0.3], focusLine: [0.01, 0.3], targetAlpha: [0, 1],
     // Soft coast (#100): Chaikin cut ratio (0 = hard hex outline) and noise amplitude in side lengths.
     coastRound: [0, 0.5], coastNoise: [0, 0.3],
+    // Soft terrain blobs on the land (hills, mountains, water terrain): factor on their alpha, 0 = none (the terrain
+    // signs of the board carry the information instead, #450).
+    terrainBlobAlpha: [0, 1],
     // Cities, towns and tokens (#147), in side lengths: slot circle, token cylinder, town bar.
     slotRadius: [0.05, 0.35], tokenRadius: [0.04, 0.3], townLength: [0.1, 0.6], townWidth: [0.02, 0.2],
     // Arrow at the middle end of a port stub in a sea hex (#444), in side lengths: length along the stub, width across.

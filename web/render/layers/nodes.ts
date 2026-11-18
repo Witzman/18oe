@@ -4,7 +4,7 @@
 // units of the side length (token.ts is pure maths, here only PixiJS) and placed in the objects layer
 // by map.ts, which sets position and scale (= zoom) on every frame.
 import { Container, Graphics } from "pixi.js";
-import { citySlots, junctionArrows, medallionExtent, offboardWedges, townBars, type Slot } from "../stones.ts";
+import { citySlots, homeRingColor, junctionArrows, medallionExtent, offboardWedges, townBars, type Slot } from "../stones.ts";
 import { contrast } from "../../themes/color.ts";
 import type { RenderTheme } from "../theme.ts";
 import type { Axis, HexFrame, NodeGeom, TileParts, Vec } from "../track-axes.ts";
@@ -94,7 +94,7 @@ export function drawNodes(input: NodesInput, theme: RenderTheme): Container {
   const rings = new Graphics();
   for (const ring of input.rings ?? []) {
     const [x, y] = flat(ring.slot.pos, origin);
-    if (ring.kind === "home") rings.circle(x, y, theme.tokenRadius * RING_GAP).stroke({ width: EDGE_LINE * 1.4, color: theme.map.city });
+    if (ring.kind === "home") rings.circle(x, y, theme.tokenRadius * RING_GAP).stroke({ width: EDGE_LINE * 1.4, color: homeRingColor(theme.map, (a, b) => contrast(hex(a), hex(b))) });
     else {
       dashedCircle(rings, x, y, r * 0.78);
       rings.stroke({ width: EDGE_LINE * 1.6, color: ring.color, cap: "round" });

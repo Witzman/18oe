@@ -158,10 +158,10 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
   for (const r of rings) land.poly(flat(r.points), true).stroke({ width: 0.035, color: map.landLow, alpha: 0.8, join: "round" });
   // Soft terrain: the strongest type of a hex decides the colour (terrainMark).
   const colorOf = { hill: map.landHigh, mountain: map.mountain, water: map.water } as const;
-  for (const kind of ["water", "hill", "mountain"] as const) {
+  for (const kind of theme.terrainBlobAlpha > 0 ? (["water", "hill", "mountain"] as const) : []) {
     for (const hex of scene.geometry.hexes) {
       if ((scene.levelOf.get(hex.id) ?? 0) === 0 || terrainMark(hex)?.kind !== kind) continue;
-      for (const l of BLOB_LAYERS) land.poly(flat(blob(scene, hex.id, l.scale, BLOB_ROUND, 1)), true).fill({ color: colorOf[kind], alpha: l.alpha });
+      for (const l of BLOB_LAYERS) land.poly(flat(blob(scene, hex.id, l.scale, BLOB_ROUND, 1)), true).fill({ color: colorOf[kind], alpha: l.alpha * theme.terrainBlobAlpha });
     }
   }
   return { sea, land };
