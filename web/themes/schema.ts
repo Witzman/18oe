@@ -10,7 +10,7 @@ export const COLOR_KEYS = {
     "track", "city", "cityEdge", "edgeDot",
     "hill", "mountain", "water",
     "rail", "sleeper", "bed",
-    "zoneBorder", "seaZoneLine", "ferry", "port", "portPublic", "portPrivate", "oeRoute",
+    "zoneBorder", "seaZoneLine", "ferry", "port", "impassable", "portPublic", "portPrivate", "oeRoute",
     // The two seas of the board (#449): north seas, Mediterranean and Black Sea; the circles of the sea zones.
     "seaNorth", "seaMed", "seaMarkNorth", "seaMarkMed",
     "label", "labelHalo", "valid", "selected", "invalid", "preview", "shadow",

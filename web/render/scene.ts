@@ -264,6 +264,28 @@ export function zoneSegments(scene: Scene): Segment[] {
   return out;
 }
 
+/** Impassable hex sides (#454, red on map.jpg), each shared side once, drawn on the higher of the two hexes. */
+export function impassableSegments(scene: Scene): Segment[] {
+  const out: Segment[] = [];
+  const seen = new Set<string>();
+  const { grid } = scene;
+  for (const hex of scene.geometry.hexes) {
+    const g = grid.byId.get(hex.id)!;
+    for (const b of hex.borders ?? []) {
+      if (b.type !== "impassable") continue;
+      const nid = hex.neighbors[b.edge] ?? null;
+      const pair = nid ? [hex.id, nid].sort().join("|") : `${hex.id}|-${b.edge}`;
+      if (seen.has(pair)) continue;
+      seen.add(pair);
+      const n = nid ? grid.byId.get(nid) : undefined;
+      const owner = n && n.z > g.z ? n : g;
+      const corners = worldCorners(grid, g);
+      out.push({ hex: owner.id, a: corners[(b.edge + 5) % 6]!, b: corners[b.edge]! });
+    }
+  }
+  return out;
+}
+
 /** Each hex outline edge once per level: an edge shared by two hexes on the same level is drawn by one of them. */
 export function gridEdges(scene: Scene, h: GridHex): number[] {
   const out: number[] = [];
