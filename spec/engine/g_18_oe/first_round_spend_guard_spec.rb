@@ -11,7 +11,8 @@ describe 'G18OE first-round spend guard (§11.6.4 para. 2)' do
 
   let(:game) { new_game }
   let(:president) { game.players.first }
-  # GSWR (home I20) can lay on I26 for £30 terrain in its first OR and token J25 for £20.
+  # GSWR (home I20) can lay on I26 for £30 terrain and token J25 for £20 in its first OR; both lie across the Irish Sea
+  # ferry from Dublin (distance 1), which adds £5 to the tile and £20 to the token (§11.1.6, §11.2.1, #61).
   let(:gswr) { start_regional!(game, 'GSWR', president) }
   let(:reserve) { 100 }
 
@@ -55,13 +56,13 @@ describe 'G18OE first-round spend guard (§11.6.4 para. 2)' do
     expect(round.active_step).to be_a(Engine::Game::G18OE::Step::BuyTrain)
     expect(round.current_entity).to eq(gswr)
     expect([gswr.cash, president.cash]).to eq(before)
-    expect(before).to eq([150, 50])
+    expect(before).to eq([125, 50]) # 200 less the lay (£30 + £5 ferry) and the token (£20 + £20 ferry)
   end
 
   context 'with a paid lay at the limit' do
     it 'allows the lay when exactly the 2+2 stays covered' do
       round = operating!
-      gswr.set_cash(80, game.bank)
+      gswr.set_cash(85, game.bank)
       president.set_cash(50, game.bank)
 
       expect(legal(round)).to include('I26')
@@ -71,7 +72,7 @@ describe 'G18OE first-round spend guard (§11.6.4 para. 2)' do
 
     it 'refuses the lay one pound below, and the enumerator does not offer it' do
       round = operating!
-      gswr.set_cash(79, game.bank)
+      gswr.set_cash(84, game.bank)
       president.set_cash(50, game.bank)
 
       expect(legal(round)).not_to include('I26')
@@ -90,7 +91,7 @@ describe 'G18OE first-round spend guard (§11.6.4 para. 2)' do
 
   it 'refuses the token after a paid lay used up the margin' do
     round = operating!
-    gswr.set_cash(90, game.bank)
+    gswr.set_cash(95, game.bank)
     president.set_cash(50, game.bank)
     lay!(round, 'I26')
     act!(round, Engine::Action::Pass.new(gswr)) if round.active_step.is_a?(Engine::Game::G18OE::Step::Track)
@@ -119,7 +120,7 @@ describe 'G18OE first-round spend guard (§11.6.4 para. 2)' do
 
   it 'does not guard once the 2+2 obligation is fulfilled' do
     round = operating!
-    gswr.set_cash(40, game.bank)
+    gswr.set_cash(45, game.bank)
     president.set_cash(0, game.bank)
     game.fulfill_train_obligation!(gswr)
 
@@ -151,6 +152,6 @@ describe 'G18OE first-round spend guard (§11.6.4 para. 2)' do
     expect(game.patronage_payout(game.hex_by_id('I26'))).to eq(20)
     expect(legal(round)).to include('I26')
     lay!(round, 'I26')
-    expect(cash_total).to eq(119)
+    expect(cash_total).to eq(114) # 129 less the lay (£30 + £5 ferry) plus the patronage payout of £20
   end
 end
