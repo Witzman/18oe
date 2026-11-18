@@ -6,7 +6,7 @@ import { blob, landRings, landShapes } from "../coast.ts";
 import { worldCorners, type Vec, type View } from "../projection.ts";
 import {
   BLOCK, blockKey, GLYPH_AT, gridEdges, terrainGlyph, terrainMark, terrainShape, topColor, zoneSegments,
-  mix, wallFaces, type Plate, type Scene,
+  mix, wallFaces, impassableSegments, type Plate, type Scene,
 } from "../scene.ts";
 import type { RenderTheme } from "../theme.ts";
 import type { Box } from "../projection.ts";
@@ -61,6 +61,12 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
     if (list) list.push(s);
     else zones.set(s.hex, [s]);
   }
+  const impassable = new Map<string, { a: Vec; b: Vec }[]>();
+  for (const s of impassableSegments(scene)) {
+    const list = impassable.get(s.hex);
+    if (list) list.push(s);
+    else impassable.set(s.hex, [s]);
+  }
   const groups = new Map<string, { level: number; ids: string[] }>();
   for (const h of scene.grid.hexes) {
     const level = scene.levelOf.get(h.id)!;
@@ -77,7 +83,8 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
     const zone = new Graphics();
     const seaLines: [Vec, Vec][] = []; // hex sides between two sea hexes (#449: their own alpha, none on the board)
     const box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-    let zoneLines = 0;
+    const wall = new Graphics();
+    let zoneLines = 0, walls = 0;
     for (const id of ids) {
       const h = scene.grid.byId.get(id)!;
       const corners = worldCorners(scene.grid, h);
@@ -98,9 +105,14 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
         const a = corners[(i + 5) % 6]!, b = corners[i]!;
         detail.moveTo(a.x, a.y).lineTo(b.x, b.y);
       }
+      // Track-rights boundaries as dashes, in the style of the sea zone lines (#454); impassable sides solid red.
       for (const s of zones.get(id) ?? []) {
-        zone.moveTo(s.a.x, s.a.y).lineTo(s.b.x, s.b.y);
+        for (const [a, c] of dashes(s.a, s.b, theme.seaZoneDash, theme.seaZoneGap)) zone.moveTo(a.x, a.y).lineTo(c.x, c.y);
         zoneLines++;
+      }
+      for (const s of impassable.get(id) ?? []) {
+        wall.moveTo(s.a.x, s.a.y).lineTo(s.b.x, s.b.y);
+        walls++;
       }
     }
     detail.stroke({ width: 1, pixelLine: true, color: theme.map.hexLine, alpha: theme.hexLineAlpha });
@@ -122,10 +134,11 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
       }
     }
     detail.stroke({ width: theme.zoneLine, color: theme.map.label, cap: "round", join: "round" });
-    if (zoneLines) zone.stroke({ width: theme.zoneLine, color: theme.map.zoneBorder, cap: "round" });
+    if (zoneLines) zone.stroke({ width: theme.zoneLine, color: theme.map.zoneBorder, cap: "butt" });
+    if (walls) wall.stroke({ width: theme.zoneLine, color: theme.map.impassable, cap: "round" });
     const group = new Container();
     group.addChild(detail, signs);
-    node.addChild(group, zone);
+    node.addChild(group, zone, wall);
     out.push({ level, box, node, detail: group });
   }
   return out;
