@@ -11,6 +11,8 @@ export const COLOR_KEYS = {
     "hill", "mountain", "water",
     "rail", "sleeper", "bed",
     "zoneBorder", "seaZoneLine", "ferry", "port", "oeRoute",
+    // The two seas of the board (#449): north seas, Mediterranean and Black Sea; the circles of the sea zones.
+    "seaNorth", "seaMed", "seaMarkNorth", "seaMarkMed",
     "label", "labelHalo", "valid", "selected", "invalid", "preview", "shadow",
   ],
   ui: ["bg", "panel", "panelAlt", "ink", "faint", "rule", "accent", "accentInk", "bar", "barInk", "error", "ok", "warn", "info", "overlay"],
@@ -68,6 +70,10 @@ export const NUMBER_RANGES = {
     // Soft terrain blobs on the land (hills, mountains, water terrain): factor on their alpha, 0 = none (the terrain
     // signs of the board carry the information instead, #450).
     terrainBlobAlpha: [0, 1],
+    // Sea (#449): 1 = the sea tinted by its sea (seaNorth, seaMed), 0 = the gradient seaDeep to seaShallow; factor on the
+    // alpha of the hex lines between sea hexes (0 = none); sea zone boundary dashes, gap and width and the radius of the
+    // zone circles, in side lengths.
+    seaTint: [0, 1], seaHexLineAlpha: [0, 1], seaZoneDash: [0.05, 1], seaZoneGap: [0.05, 1], seaZoneWidth: [0.005, 0.2], seaMarkRadius: [0.15, 1],
     // Cities, towns and tokens (#147), in side lengths: slot circle, token cylinder, town bar.
     slotRadius: [0.05, 0.35], tokenRadius: [0.04, 0.3], townLength: [0.1, 0.6], townWidth: [0.02, 0.2],
     // Arrow at the middle end of a port stub in a sea hex (#444), in side lengths: length along the stub, width across.

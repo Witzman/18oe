@@ -29,6 +29,13 @@ export interface RenderTheme {
   coastNoise: number;
   /** Factor on the alpha of the soft terrain blobs on the land, 0 = none. */
   terrainBlobAlpha: number;
+  /** Sea (#449): tint by sea, factor on the sea hex line alpha, sea zone dashes and circle, in side lengths. */
+  seaTint: number;
+  seaHexLineAlpha: number;
+  seaZoneDash: number;
+  seaZoneGap: number;
+  seaZoneWidth: number;
+  seaMarkRadius: number;
   /** Cities, towns and tokens in side lengths (#147). */
   slotRadius: number;
   tokenRadius: number;
@@ -75,6 +82,12 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     coastRound: t.shape.coastRound,
     coastNoise: t.shape.coastNoise,
     terrainBlobAlpha: t.shape.terrainBlobAlpha,
+    seaTint: t.shape.seaTint,
+    seaHexLineAlpha: t.shape.seaHexLineAlpha,
+    seaZoneDash: t.shape.seaZoneDash,
+    seaZoneGap: t.shape.seaZoneGap,
+    seaZoneWidth: t.shape.seaZoneWidth,
+    seaMarkRadius: t.shape.seaMarkRadius,
     slotRadius: t.shape.slotRadius,
     tokenRadius: t.shape.tokenRadius,
     townLength: t.shape.townLength,

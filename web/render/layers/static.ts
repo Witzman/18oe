@@ -10,6 +10,7 @@ import {
 } from "../scene.ts";
 import type { RenderTheme } from "../theme.ts";
 import type { Box } from "../projection.ts";
+import { dashes, seaOfHex, zoneBorders, zoneMarks } from "../sea-zones.ts";
 
 export interface Block {
   /** Index into Scene.levels. */
@@ -72,6 +73,7 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
     const node = new Container();
     const detail = new Graphics();
     const zone = new Graphics();
+    const seaLines: [Vec, Vec][] = []; // hex sides between two sea hexes (#449: their own alpha, none on the board)
     const box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
     let zoneLines = 0;
     for (const id of ids) {
@@ -86,6 +88,10 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
         if (flat) {
           const nid = h.neighbors[i], n = nid ? scene.grid.byId.get(nid) : undefined;
           if (n && (n.z > 0) !== (h.z > 0)) continue;
+          if (h.z === 0 && (!n || n.z === 0)) { // between two sea hexes, or on the edge of the map
+            if (theme.seaHexLineAlpha > 0) seaLines.push([corners[(i + 5) % 6]!, corners[i]!]);
+            continue;
+          }
         }
         const a = corners[(i + 5) % 6]!, b = corners[i]!;
         detail.moveTo(a.x, a.y).lineTo(b.x, b.y);
@@ -96,6 +102,10 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
       }
     }
     detail.stroke({ width: 1, pixelLine: true, color: theme.map.hexLine, alpha: theme.hexLineAlpha });
+    if (seaLines.length) {
+      for (const [a, b] of seaLines) detail.moveTo(a.x, a.y).lineTo(b.x, b.y);
+      detail.stroke({ width: 1, pixelLine: true, color: theme.map.hexLine, alpha: theme.hexLineAlpha * theme.seaHexLineAlpha });
+    }
     for (const id of ids) {
       const mark = terrainMark(scene.hexById.get(id)!);
       if (!mark) continue;
@@ -139,11 +149,16 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
   const { map } = theme;
   const b = scene.bounds;
   const sea = new Graphics();
-  const grad = new FillGradient({
-    type: "linear", start: { x: 0, y: 0 }, end: { x: 1, y: 1 }, textureSpace: "local",
-    colorStops: [{ offset: 0, color: map.seaDeep }, { offset: 1, color: map.seaShallow }],
-  });
-  sea.rect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY).fill(grad);
+  const tinted = theme.seaTint > 0 && !!scene.geometry.sea_zones?.length;
+  if (tinted) drawTintedSea(sea, scene, theme);
+  else {
+    const grad = new FillGradient({
+      type: "linear", start: { x: 0, y: 0 }, end: { x: 1, y: 1 }, textureSpace: "local",
+      colorStops: [{ offset: 0, color: map.seaDeep }, { offset: 1, color: map.seaShallow }],
+    });
+    sea.rect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY).fill(grad);
+  }
+  drawSeaZones(sea, scene, theme);
 
   const land = new Graphics();
   const rings = landRings(scene, { round: theme.coastRound, noise: theme.coastNoise });
@@ -165,4 +180,43 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
     }
   }
   return { sea, land };
+}
+
+/** The sea as one surface (#449): the north seas in map.seaNorth over the whole map, the Mediterranean and the Black Sea in map.seaMed on top. */
+function drawTintedSea(sea: Graphics, scene: Scene, theme: RenderTheme): void {
+  const { map } = theme;
+  const b = scene.bounds;
+  sea.rect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY).fill({ color: map.seaNorth });
+  const seas = seaOfHex(scene.geometry.sea_zones);
+  for (const [id, group] of seas) {
+    if (group !== "mediterranean") continue;
+    const h = scene.grid.byId.get(id);
+    if (!h) continue;
+    // a hairline in the same colour closes the seams between hexes under anti-aliasing
+    sea.poly(flat(worldCorners(scene.grid, h))).fill({ color: map.seaMed }).stroke({ width: 0.03, color: map.seaMed, join: "round" });
+  }
+}
+
+/** Sea zone boundaries as white dashes, and a circle with the city limit "-1" in every zone (#449). */
+function drawSeaZones(sea: Graphics, scene: Scene, theme: RenderTheme): void {
+  const { map } = theme;
+  const hexes = scene.geometry.hexes;
+  for (const border of zoneBorders(hexes)) {
+    const h = scene.grid.byId.get(border.hex);
+    if (!h) continue;
+    const corners = worldCorners(scene.grid, h);
+    for (const [a, c] of dashes(corners[(border.edge + 5) % 6]!, corners[border.edge]!, theme.seaZoneDash, theme.seaZoneGap)) sea.moveTo(a.x, a.y).lineTo(c.x, c.y);
+  }
+  sea.stroke({ width: theme.seaZoneWidth, color: map.seaZoneLine, cap: "butt" });
+  const seas = seaOfHex(scene.geometry.sea_zones);
+  const r = theme.seaMarkRadius;
+  for (const m of zoneMarks(hexes)) {
+    const color = seas.get(m.hex) === "mediterranean" ? map.seaMarkMed : map.seaMarkNorth;
+    sea.circle(m.x, m.y, r).fill({ color }).stroke({ width: r * 0.1, color: map.seaZoneLine });
+    // "-1": a minus and a one, in strokes (the circle scales with the map like a printed mark)
+    const w = r * 0.14;
+    sea.moveTo(m.x - r * 0.62, m.y + r * 0.02).lineTo(m.x - r * 0.18, m.y + r * 0.02);
+    sea.moveTo(m.x + r * 0.3, m.y - r * 0.42).lineTo(m.x + r * 0.3, m.y + r * 0.42).moveTo(m.x + r * 0.3, m.y - r * 0.42).lineTo(m.x + r * 0.1, m.y - r * 0.26);
+    sea.stroke({ width: w, color: map.seaZoneLine, cap: "round", join: "round" });
+  }
 }
