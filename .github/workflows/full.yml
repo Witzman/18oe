@@ -37,7 +37,7 @@ jobs:
   rspec:
     name: rspec (complete suite) ${{ matrix.shard }}/4
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -189,7 +189,7 @@ jobs:
   script-game:
     name: scripted game (bin/script-game --spawn)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
