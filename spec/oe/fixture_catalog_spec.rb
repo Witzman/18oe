@@ -271,7 +271,7 @@ RSpec.describe Oe::FixtureCatalog do
   it "resolves every entry inside its log and says where it is", :game_flow do
     entries.each do |e|
       expect(e.expect.keys).to include("round"), "#{e.name} has no expectation"
-      expect(e.position).to be_between(0, Oe::FixtureBuilder.manifest["logs"][e.game]["actions"]), e.name
+      expect(e.position).to be_between(0, described_class.log_file(e.game)["actions_log"].size), e.name # live: the fresh game, not the stored manifest
     end
   end
 
