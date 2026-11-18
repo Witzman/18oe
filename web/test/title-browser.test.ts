@@ -1,5 +1,5 @@
 // Titel- und Anmeldebildschirm im Browser (#280): Formular sofort bedienbar (Felder >= 44 px, nicht von der
-// Szene verdeckt), Versionsfuß bleibt, Animation läuft, statischer Fall (data-still / prefers-reduced-motion).
+// Szene verdeckt), Versionsfuß bleibt, Slider (#460: sechs Bilder, Punkte >= 44 px, Punkt wählt Bild), statischer Fall (data-still / prefers-reduced-motion).
 // Ohne Browser übersprungen. bin/shot kann prefers-reduced-motion nicht emulieren: der CSS-Block wird
 // deshalb in den Stylesheets geprüft und der Fall data-still (Theme-Token motion.enabled = 0) direkt.
 import assert from "node:assert/strict";
@@ -33,17 +33,26 @@ const CHECKS = String.raw`(async () => {
   if (document.activeElement !== login || login.value !== "anna") throw new Error("form not usable");
   if (!q(".version-note").textContent.includes("Version")) throw new Error("version footer missing");
   if (!q(".game-title").textContent.includes("Orient Express")) throw new Error("title missing");
-  const train = q(".title-stage .train");
-  if (getComputedStyle(train).animationName !== "oe-train") throw new Error("animation not running: " + getComputedStyle(train).animationName);
+  const slides = [...document.querySelectorAll(".title-stage .title-slide")];
+  if (slides.length !== 6) throw new Error("slides: " + slides.length);
+  if (slides.filter((s) => s.hasAttribute("data-active")).length !== 1) throw new Error("not exactly one active slide");
+  const dots = [...document.querySelectorAll(".title-stage .title-dot")];
+  if (dots.length !== 6) throw new Error("dots: " + dots.length);
+  for (const d of dots) { const r = d.getBoundingClientRect(); if (r.width < 43.5 || r.height < 43.5) throw new Error("dot too small: " + r.width + "x" + r.height); }
+  const last = dots[dots.length - 1];
+  const at = last.getBoundingClientRect();
+  if (document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2) !== last && !last.contains(document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2))) throw new Error("dot is covered");
+  last.click();
+  if (!slides[slides.length - 1].hasAttribute("data-active") || slides.filter((s) => s.hasAttribute("data-active")).length !== 1) throw new Error("dot does not choose its slide");
   const stage = q(".title-stage");
   stage.setAttribute("data-still", "");
-  if (getComputedStyle(train).animationName !== "none") throw new Error("data-still does not stop the animation");
+  if (parseFloat(getComputedStyle(slides[0]).transitionDuration) !== 0) throw new Error("data-still keeps the fade");
   stage.removeAttribute("data-still");
   const rules = [...document.styleSheets].flatMap((s) => [...s.cssRules]).filter((r) => r.type === CSSRule.MEDIA_RULE && /prefers-reduced-motion: reduce/.test(r.conditionText));
-  if (!rules.some((r) => [...r.cssRules].some((c) => c.selectorText && c.selectorText.includes(".title-stage") && c.style.animationName === "none"))) throw new Error("no reduced-motion rule for the stage");
+  if (!rules.some((r) => [...r.cssRules].some((c) => c.selectorText && c.selectorText.includes(".title-slide") && c.style.transition === "none"))) throw new Error("no reduced-motion rule for the slides");
 })()`;
 
-test("title screen: form usable above the scene, animation and static case", { skip: browser ? false : "no headless browser installed" }, async () => {
+test("title screen: form usable above the slider, dots and static case", { skip: browser ? false : "no headless browser installed" }, async () => {
   const dir = mkdtempSync(join(tmpdir(), "oe-title-test-"));
   try {
     await build({ entryPoints: [join(web, "main.ts")], bundle: true, format: "esm", target: "es2022", outfile: join(dir, "main.js"), logLevel: "silent", define: { __OE_VERSION__: JSON.stringify("0.1.0-dev") } });
@@ -51,6 +60,7 @@ test("title screen: form usable above the scene, animation and static case", { s
     copyFileSync(join(web, "ui", "kit", "kit.css"), join(dir, "kit.css"));
     copyFileSync(join(web, "ui", "frame", "frame.css"), join(dir, "frame.css"));
     cpSync(join(web, "fonts"), join(dir, "fonts"), { recursive: true });
+    cpSync(join(web, "title"), join(dir, "title"), { recursive: true });
     copyFileSync(join(web, "fonts", "fonts.css"), join(dir, "fonts.css"));
     const { themesCss } = await import("../themes/css.ts");
     const { DEFAULT_THEME_ID, themes } = await import("../themes/index.ts");

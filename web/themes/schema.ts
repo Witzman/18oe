@@ -54,7 +54,9 @@ export const NUMBER_RANGES = {
   },
   motion: { runMsPerHex: [50, 1000], runMaxMs: [500, 20000], queueMaxMs: [500, 30000], flashMs: [100, 2000], flyMs: [0, 3000],
     // Touch (#259): decay time constant of the pan inertia, window of a double tap (ms).
-    inertiaMs: [0, 2000], doubleTapMs: [100, 800] },
+    inertiaMs: [0, 2000], doubleTapMs: [100, 800],
+    // Title screen slider (#460): time per picture and the fade between two, ms.
+    titleSlideMs: [2000, 30000], titleFadeMs: [0, 4000] },
   type: { xs: [9, 14], sm: [10, 16], md: [11, 18], lg: [12, 22], xl: [14, 26], heading: [14, 30], display: [16, 36] },
   space: { xxs: [1, 8], xs: [2, 12], sm: [4, 16], md: [4, 20], lg: [6, 24], xl: [8, 32], xxl: [8, 48] },
   shape: {

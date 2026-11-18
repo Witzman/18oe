@@ -28,6 +28,8 @@ await build({
 for (const file of ["index.html", "theme.css"]) copyFileSync(join(root, file), join(dist, file));
 // Theme fonts: @font-face (fonts.css) and the woff2 files, served from our own origin (#98).
 cpSync(join(root, "fonts"), join(dist, "fonts"), { recursive: true });
+// Title screen slides (#460): screenshots of the feedback board scenes.
+cpSync(join(root, "title"), join(dist, "title"), { recursive: true });
 copyFileSync(join(root, "fonts", "fonts.css"), join(dist, "fonts.css"));
 copyFileSync(join(root, "ui", "kit", "kit.css"), join(dist, "kit.css"));
 copyFileSync(join(root, "ui", "frame", "frame.css"), join(dist, "frame.css"));
