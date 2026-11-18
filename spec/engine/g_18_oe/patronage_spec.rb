@@ -94,8 +94,8 @@ describe 'G18OE patronage tiles (§2.9, §3.1, §9.1, §11.1.8)' do
     end
   end
 
-  context 'when a minor places its home token on a patronage city (designer ruling over §9.1)' do
-    it 'removes the tile without paying anyone' do
+  context 'when a minor places its home token on a patronage city (§9.1)' do
+    it 'fulfills the tile at once: the treasury receives the lowest payout and the tile is removed' do
       round = enter_round!(game, game.stock_round)
       player = round.current_entity
       minor = game.corporation_by_id('A')
@@ -105,11 +105,15 @@ describe 'G18OE patronage tiles (§2.9, §3.1, §9.1, §11.1.8)' do
       price = round.active_step.get_par_prices(player, minor).first
       act!(round, Engine::Action::Par.new(player, corporation: minor, share_price: price))
       city = game.hex_by_id('V27').tile.cities.first
+      bank = game.bank.cash
 
-      expect { act!(round, Engine::Action::PlaceToken.new(minor, city: city, slot: 0)) }.to change { minor.cash }.by(-20)
+      act!(round, Engine::Action::PlaceToken.new(minor, city: city, slot: 0))
 
+      # Toulouse pays 20/30/40/50 by track colour; the lowest (20) is paid whatever the phase, the token costs 20.
+      expect(minor.cash).to eq(120)
+      expect(game.bank.cash).to eq(bank)
       expect(patronage(game, 'V27')).to be_nil
-      expect(game.log.map(&:message)).to include('The Toulouse patronage tile is removed')
+      expect(game.log.map(&:message)).to include('A fulfills the Toulouse patronage tile and receives £20')
       expect { game.fulfill_patronage!(minor, game.hex_by_id('V27')) }.not_to(change { minor.cash })
     end
   end
