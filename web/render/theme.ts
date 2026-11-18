@@ -31,6 +31,8 @@ export interface RenderTheme {
   terrainBlobAlpha: number;
   /** Red hexes: 1 = revenue box like the board, 0 = wedge and text mark (#453). */
   offboardBox: number;
+  /** Terrain: 1 = coloured signs with the cost in them, 0 = line glyph and text mark (#450). */
+  terrainSymbols: number;
   /** Sea (#449): tint by sea, factor on the sea hex line alpha, sea zone dashes and circle, in side lengths. */
   seaTint: number;
   seaHexLineAlpha: number;
@@ -85,6 +87,7 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     coastNoise: t.shape.coastNoise,
     terrainBlobAlpha: t.shape.terrainBlobAlpha,
     offboardBox: t.shape.offboardBox,
+    terrainSymbols: t.shape.terrainSymbols,
     seaTint: t.shape.seaTint,
     seaHexLineAlpha: t.shape.seaHexLineAlpha,
     seaZoneDash: t.shape.seaZoneDash,
