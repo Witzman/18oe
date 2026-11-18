@@ -52,6 +52,9 @@ export interface RenderTheme {
   portArrowLength: number;
   portArrowWidth: number;
   portMark: number;
+  /** Place names (#455): zoom (hex side in px) from which they show, and their offset below the hex centre in side lengths. */
+  nameZoom: number;
+  nameOffset: number;
   /** Hit radius and drag threshold in px, mouse and touch (#259). */
   hitPx: number;
   hitTouchPx: number;
@@ -107,6 +110,8 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     portArrowLength: t.shape.portArrowLength,
     portArrowWidth: t.shape.portArrowWidth,
     portMark: t.shape.portMark,
+    nameZoom: t.shape.nameZoom,
+    nameOffset: t.shape.nameOffset,
     hitPx: t.shape.hitPx,
     hitTouchPx: t.shape.hitTouchPx,
     dragPx: t.shape.dragPx,

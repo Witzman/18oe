@@ -16,7 +16,7 @@ import type { MapGeometry, MapHex } from "../render/mapdata.ts";
 import { levelMatrix, mapCenter, pick, project, unproject, worldCorners, type View } from "../render/projection.ts";
 import {
   BLOCK, blockKey, boxOnScreen, buildScene, engineVertexToCorner, gridEdges, mix, seaT, shade,
-  terrainGlyph, terrainMark, topColor, zoneSegments,
+  terrainGlyph, terrainMark, topColor, zoneSegments, impassableSegments,
 } from "../render/scene.ts";
 import { renderTheme } from "../render/theme.ts";
 import { changedHexes, signatures } from "../render/tilestate.ts";
@@ -284,4 +284,20 @@ test("terrainShape: a dome for hills, peaks for mountains, a shield for water, d
   assert.ok(terrainShape("water", 60).depth > terrainShape("water", 30).depth);
   const w = (k: "hill" | "mountain", c: number) => { const xs = terrainShape(k, c).polygon.map((p) => p.x); return Math.max(...xs) - Math.min(...xs); };
   assert.ok(w("hill", 45) > w("hill", 30) && w("mountain", 120) > w("mountain", 60), "the dearer sign is larger");
+});
+
+// #454: impassable hex sides (red on map.jpg), each shared side once, drawn on the higher hex
+test("impassable lines: each impassable hex side once", () => {
+  const expected = new Set<string>();
+  for (const h of geometry.hexes) {
+    for (const b of h.borders ?? []) {
+      if (b.type !== "impassable") continue;
+      expected.add(h.neighbors[b.edge] ? [h.id, h.neighbors[b.edge]!].sort().join("|") : `${h.id}|-${b.edge}`);
+    }
+  }
+  const segs = impassableSegments(scene);
+  assert.ok(expected.size > 20, `${expected.size} impassable sides`);
+  assert.equal(segs.length, expected.size);
+  const r = scene.grid.shape.radius;
+  for (const s of segs) assert.ok(Math.abs(Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) - r) < 0.05 * r, `${s.hex} is one hex side long`);
 });

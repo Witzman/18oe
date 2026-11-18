@@ -31,7 +31,8 @@ import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
 import { findFerries, type Ferry } from "./ferries.ts";
 import { drawFerryLine } from "./layers/ferry.ts";
 import { drawPortMark } from "./layers/port.ts";
-import { portMarks, type PortMark } from "./ports.ts";
+import { nameLabels, nameVisible } from "./names.ts";
+import { portCornerSide, portMarks, type PortMark } from "./ports.ts";
 import { drawNodes, drawTargetCity, inkOn, makeToken, type Ring } from "./layers/nodes.ts";
 import { citySlots, companyIndex, labelAt, revenueAll, revenueNow, shieldAt, medallionExtent, slotsNear, type Slot } from "./stones.ts";
 import { hexesNear, hexIsFingerSized, inertiaStep, INERTIA_STOP, pushSample, releaseVelocity, type Sample } from "./touch.ts";
@@ -179,6 +180,8 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let targetG: Graphics[] = [];
   let hoverG!: Graphics;
   let costs: { id: string; text: Text; at: Vec; z: number }[] = [];
+  /** Place names (#455), screen space like the costs. */
+  let names: { id: string; text: Text; at: Vec; z: number }[] = [];
   let printed = new Map<string, string>();
 
   // Session state.
@@ -281,6 +284,20 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       text.anchor.set(0, 0.5);
       layers.labels.addChild(text);
       costs.push({ id: g.id, text, at: { x: g.x + COST_AT.x, y: g.y + COST_AT.y }, z: g.z });
+    }
+    // Place names (#455): below the city, from the name zoom and for the hovered hex.
+    names = [];
+    for (const l of nameLabels(geometry.hexes)) {
+      const g = scene.grid.byId.get(l.id);
+      if (!g) continue;
+      const text = new Text({
+        text: l.name, resolution: dpr,
+        style: { fontFamily, fontSize: 10, fontWeight: "600", fill: theme.map.label, stroke: { color: theme.map.labelHalo, width: 3, join: "round" } },
+      });
+      text.anchor.set(0.5, 0);
+      text.visible = false;
+      layers.labels.addChild(text);
+      names.push({ id: l.id, text, at: { x: g.x, y: g.y }, z: g.z });
     }
     app.renderer.background.color = theme.ui.bg;
   }
@@ -480,11 +497,19 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       const at = labelAt(frame3);
       mark(id, parts.labels.join(""), { x: g.x + at.x, y: g.y + at.y }, g.z);
     }
-    // Port marks: on the land side of the hex side the entry names (ASSUMPTION: 0.36 of the way to the neighbour), an
-    // offshore port in the middle of its sea hex. Above the track, so a laid tile does not hide them.
+    // Port marks (#459): at the corner of the hex side the entry names that faces water, between the tracks that run
+    // through the side middles (a corner lies at (v_a + v_b) / 3 from the centre; ASSUMPTION: drawn at 0.72 of that),
+    // an offshore port in the middle of its sea hex.
     for (const m of ports) {
-      const v = m.side === "offshore" ? [0, 0] : geometry.layout.edge_vectors[m.side];
-      if (v) node.addChild(drawPortMark(m.kind, { x: g.x + v[0]! * 0.36, y: g.y + v[1]! * 0.36 }, theme));
+      const ev = geometry.layout.edge_vectors;
+      let at = { x: g.x, y: g.y };
+      if (m.side !== "offshore") {
+        const other = portCornerSide(m.side, (s) => { const n = scene.hexById.get(id)?.neighbors[s]; return n ? scene.hexById.get(n)?.kind : undefined; });
+        const a = ev[m.side], b = ev[other];
+        if (!a || !b) continue;
+        at = { x: g.x + (a[0] + b[0]) * 0.24, y: g.y + (a[1] + b[1]) * 0.24 };
+      }
+      node.addChild(drawPortMark(m.kind, at, theme));
     }
     levelNodes.tiles[scene.levelOf.get(id)!]!.addChild(node);
     tileNodes.set(id, node);
@@ -565,6 +590,12 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       const on = showCosts && !entries.has(c.id) && p.x > -40 && p.x < width + 40 && p.y > -20 && p.y < height + 20;
       c.text.visible = on;
       if (on) c.text.position.set(Math.round(p.x), Math.round(p.y));
+    }
+    for (const n of names) {
+      const p = project(view, n.at, n.z);
+      const on = nameVisible({ zoom: view.zoom, nameZoom: theme.nameZoom, hovered: n.id === hover }) && p.x > -60 && p.x < width + 60 && p.y > -20 && p.y < height + 20;
+      n.text.visible = on;
+      if (on) n.text.position.set(Math.round(p.x), Math.round(p.y + theme.nameOffset * view.zoom));
     }
     for (const list of tokenObjs.values()) {
       for (const t of list) {

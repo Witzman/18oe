@@ -10,7 +10,7 @@ export const COLOR_KEYS = {
     "track", "city", "cityEdge", "edgeDot",
     "hill", "mountain", "water",
     "rail", "sleeper", "bed",
-    "zoneBorder", "seaZoneLine", "ferry", "port", "portPublic", "portPrivate", "oeRoute",
+    "zoneBorder", "seaZoneLine", "ferry", "port", "impassable", "portPublic", "portPrivate", "oeRoute",
     // The two seas of the board (#449): north seas, Mediterranean and Black Sea; the circles of the sea zones.
     "seaNorth", "seaMed", "seaMarkNorth", "seaMarkMed",
     "label", "labelHalo", "valid", "selected", "invalid", "preview", "shadow",
@@ -88,6 +88,8 @@ export const NUMBER_RANGES = {
     portArrowLength: [0.1, 0.6], portArrowWidth: [0.08, 0.5],
     // Port badge with the anchor (#451), radius in side lengths.
     portMark: [0.08, 0.4],
+    // Place names (#455): zoom from which they show (hex side in px), offset below the hex centre in side lengths.
+    nameZoom: [4, 80], nameOffset: [0, 1],
     // Hit radius and drag threshold in px (#259): mouse and touch. 22 px radius = Apple's 44 px minimum target.
     hitPx: [4, 40], hitTouchPx: [16, 48], dragPx: [1, 20], dragTouchPx: [4, 30],
   },
