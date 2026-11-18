@@ -33,6 +33,9 @@ export interface RenderTheme {
   offboardBox: number;
   /** Terrain: 1 = coloured signs with the cost in them, 0 = line glyph and text mark (#450). */
   terrainSymbols: number;
+  /** Ferry line width and half width of the distance oval, in side lengths (#452). */
+  ferryWidth: number;
+  ferryOval: number;
   /** Sea (#449): tint by sea, factor on the sea hex line alpha, sea zone dashes and circle, in side lengths. */
   seaTint: number;
   seaHexLineAlpha: number;
@@ -88,6 +91,8 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     terrainBlobAlpha: t.shape.terrainBlobAlpha,
     offboardBox: t.shape.offboardBox,
     terrainSymbols: t.shape.terrainSymbols,
+    ferryWidth: t.shape.ferryWidth,
+    ferryOval: t.shape.ferryOval,
     seaTint: t.shape.seaTint,
     seaHexLineAlpha: t.shape.seaHexLineAlpha,
     seaZoneDash: t.shape.seaZoneDash,
