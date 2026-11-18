@@ -335,6 +335,8 @@
     "portArrowLength": 0.3,
     "portArrowWidth": 0.26,
     "portMark": 0.24,
+    "nameZoom": 24,
+    "nameOffset": 0.42,
     "hitPx": 12,
     "hitTouchPx": 22,
     "dragPx": 4,
