@@ -17,6 +17,7 @@ const CHECKS = String.raw`(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s) || (() => { throw new Error("missing " + s); })();
   await sleep(300);
+  q(".login-open").click(); // #462: the form sits in the dialog
   const link = q('a[href="#/reset"]');
   if (link.getBoundingClientRect().height < 43.5) throw new Error("reset link too small");
   link.click();

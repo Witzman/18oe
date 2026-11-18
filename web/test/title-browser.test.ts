@@ -19,6 +19,26 @@ const CHECKS = String.raw`(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await sleep(300);
   const q = (s) => document.querySelector(s) || (() => { throw new Error("missing " + s); })();
+  // #462: the form is hidden until the "Login" button (top right) opens the dialog
+  const dialog = q(".login-dialog");
+  if (dialog.open) throw new Error("dialog open at the start");
+  if (q(".access form").getBoundingClientRect().height !== 0) throw new Error("form visible without the dialog");
+  const opener = q(".login-open");
+  const ob = opener.getBoundingClientRect();
+  if (ob.height < 43.5 || ob.width < 43.5) throw new Error("login button too small");
+  if (ob.right < innerWidth * 0.8 || ob.top > innerHeight * 0.2) throw new Error("login button not top right: " + JSON.stringify(ob) + " in " + innerWidth + "x" + innerHeight);
+  opener.click();
+  if (!dialog.open) throw new Error("login button does not open the dialog");
+  dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+  dialog.close(); // headless: Escape is not delivered as a cancel; closing must work and the button reopen it
+  opener.click();
+  if (!dialog.open) throw new Error("dialog does not reopen");
+  q(".login-close").click();
+  if (dialog.open) throw new Error("close button does not close");
+  opener.click();
+  dialog.dispatchEvent(new MouseEvent("click", { bubbles: true })); // click on the backdrop = target is the dialog
+  if (dialog.open) throw new Error("click beside the form does not close");
+  opener.click();
   const form = q(".access form");
   const fields = [...form.querySelectorAll("input, button")];
   if (fields.length < 3) throw new Error("form incomplete");
@@ -31,6 +51,7 @@ const CHECKS = String.raw`(async () => {
   const login = form.querySelector("input[name=login]");
   login.focus(); login.value = "anna";
   if (document.activeElement !== login || login.value !== "anna") throw new Error("form not usable");
+  dialog.close(); // the modal would cover the dots below
   if (!q(".version-note").textContent.includes("Version")) throw new Error("version footer missing");
   if (!q(".game-title").textContent.includes("Orient Express")) throw new Error("title missing");
   const slides = [...document.querySelectorAll(".title-stage .title-slide")];

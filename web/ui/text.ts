@@ -198,6 +198,8 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "access.slide_run": e("Eine Fahrt im Betrieb", "A train run in operation", "—"),
   "access.slide_end": e("Das Spielende", "The end of the game", "—"),
   "access.slides_nav": e("Bilder", "Pictures", "—"),
+  "access.open_login": e("Login", "Log in", "—"),
+  "access.dialog_close": e("Schließen", "Close", "—"),
   "access.title_login": e("Anmelden", "Log in", "—"),
   "access.title_register": e("Registrieren", "Register", "—"),
   "access.login_label": e("E-Mail oder Name", "E-mail or name", "—"),

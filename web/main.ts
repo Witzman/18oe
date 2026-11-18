@@ -105,7 +105,7 @@ async function route() {
     }
   } catch (e) {
     // Session ended while the lobby loaded: back to the login page.
-    if (e instanceof ApiError && e.status === 401) { ctx.me = null; mount(root, accessPage(api, "login", (me: Account) => { ctx.me = me; void route(); })); return; }
+    if (e instanceof ApiError && e.status === 401) { ctx.me = null; mount(root, accessPage(api, "login", (me: Account) => { ctx.me = me; void route(); }, true)); return; }
     mount(root, h("p", { class: "error" }, e instanceof Error ? e.message : String(e)));
   }
 }

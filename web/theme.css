@@ -67,6 +67,12 @@ body:has(.access) #app { max-width: none; margin: 0; min-height: 100vh; backgrou
 @media (prefers-reduced-motion: reduce) { .title-stage .title-slide { transition: none; } }
 .title-stage[data-still] .title-slide { transition: none; }
 .access { padding: 24px 16px 64px; }
+.access > div.title-bar { position: fixed; top: max(12px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); z-index: 3; }
+.access .login-open { min-height: 44px; min-width: 44px; padding: 0 20px; }
+.login-dialog { background: var(--ui-panel); color: var(--ui-ink); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); width: min(26rem, calc(100vw - 32px)); max-height: calc(100vh - 32px); padding: 0 0 12px; }
+.login-dialog::backdrop { background: color-mix(in srgb, var(--ui-bg) 70%, transparent); }
+.login-dialog .panel { margin: 0; border: 0; box-shadow: none; background: transparent; }
+.login-dialog > .row { justify-content: center; }
 .access > :not(.title-stage) { position: relative; z-index: 1; }
 .access .title { text-align: center; color: var(--ui-bar-ink); }
 .access .title h1 { margin: 0; border: 0; font-size: clamp(3rem, 12vw, 5.5rem); letter-spacing: .18em; text-shadow: 0 2px 0 var(--ui-bar); }
