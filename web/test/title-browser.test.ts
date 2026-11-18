@@ -26,7 +26,7 @@ const CHECKS = String.raw`(async () => {
   const opener = q(".login-open");
   const ob = opener.getBoundingClientRect();
   if (ob.height < 43.5 || ob.width < 43.5) throw new Error("login button too small");
-  if (ob.right < innerWidth * 0.8 || ob.top > innerHeight * 0.2) throw new Error("login button not top right");
+  if (ob.right < innerWidth * 0.8 || ob.top > innerHeight * 0.2) throw new Error("login button not top right: " + JSON.stringify(ob) + " in " + innerWidth + "x" + innerHeight);
   opener.click();
   if (!dialog.open) throw new Error("login button does not open the dialog");
   dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
