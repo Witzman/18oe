@@ -46,6 +46,8 @@ export interface MapGeometry {
   homes?: { corporation: string; type: string; hex: string }[];
   /** Tile catalog by tile name: colour and track parts (laid tiles are drawn from these, #146). */
   tiles?: Record<string, TileParts & { color?: string }>;
+  /** Sea zones with the sea each belongs to (north_sea, mediterranean) and their hexes (#449). */
+  sea_zones?: { name: string; sea: string; hexes: string[] }[];
 }
 
 type Heights = Pick<Theme["camera"], "heightLand" | "heightHill" | "heightMountain" | "heightTile">;
