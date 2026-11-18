@@ -4,13 +4,13 @@
       "players": 4,
       "seed": 1,
       "player": "strategy",
-      "max_actions": 6000
+      "max_actions": 5300
     },
     "strategy-3p-1": {
       "players": 3,
       "seed": 1,
       "player": "strategy",
-      "max_actions": 4000
+      "max_actions": 5600
     },
     "random-4p-1": {
       "players": 4,
@@ -246,38 +246,19 @@
       }
     },
     {
-      "name": "consolidation-merge-offer",
-      "surface": "§10.6 Konsolidierung: Merge-Angebot an die Spieler",
-      "slice": "S3",
-      "game": "strategy-4p-1",
-      "first": {
-        "round": "Consolidation",
-        "step": "MergeOffer"
-      }
-    },
-    {
       "name": "phase-6",
       "surface": "Zugphase 6",
       "slice": "S3",
-      "game": "strategy-4p-1",
+      "game": "strategy-3p-1",
       "first": {
         "phase": "6"
-      }
-    },
-    {
-      "name": "phase-7",
-      "surface": "Zugphase 7",
-      "slice": "S3",
-      "game": "strategy-4p-1",
-      "first": {
-        "phase": "7"
       }
     },
     {
       "name": "game-end",
       "surface": "§13 Spielende durch gesprengte Bank (Endstand, View ohne Betrachter)",
       "slice": "S1",
-      "game": "strategy-4p-1",
+      "game": "strategy-3p-1",
       "first": {
         "finished": true
       }
@@ -333,6 +314,16 @@
       "surface": "Auktion mit Pass-Pass bei Preis 0 (Waterfall)",
       "slice": "S1",
       "reason": "DEFEKT, kein Katalogeintrag: Zufallspartie 3 Spieler/Seed 5 wird in der Auktion mit Pass abgelehnt (GameError Cannot spend zero or negative money in Spender.spend(0), Aktion 531); als eigenes Issue zu melden."
+    },
+    {
+      "surface": "§10.6 Konsolidierung: Merge-Angebot an die Spieler",
+      "slice": "S3",
+      "reason": "Seit den Faehrkosten (#61, #73) zeigt keine Katalogpartie diesen Fall: strategy-4p-1 erreicht ihn in 6000 Aktionen nicht (28 min Lauf), strategy-3p-1 endet nach 5432 Aktionen ohne MergeOffer. Eintrag, sobald eine Partie ihn zeigt (#442). Regel durch Engine-Specs gedeckt."
+    },
+    {
+      "surface": "Zugphase 7",
+      "slice": "S3",
+      "reason": "Seit den Faehrkosten (#61, #73) zeigt keine Katalogpartie diesen Fall: strategy-4p-1 erreicht ihn in 6000 Aktionen nicht (28 min Lauf), strategy-3p-1 endet nach 5432 Aktionen ohne Phase 7. Eintrag, sobald eine Partie ihn zeigt (#442). Regel durch Engine-Specs gedeckt."
     }
   ]
 }
