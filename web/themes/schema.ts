@@ -76,6 +76,8 @@ export const NUMBER_RANGES = {
     // Terrain signs (#450): 1 = the signs of the board (a coloured dome, mountain or shield with the cost in it), 0 = the
     // line glyph and the cost beside it.
     terrainSymbols: [0, 1],
+    // Ferry lines (#452), in side lengths: width of the blue line, half width of the oval with the distance.
+    ferryWidth: [0.02, 0.25], ferryOval: [0.06, 0.4],
     // Sea (#449): 1 = the sea tinted by its sea (seaNorth, seaMed), 0 = the gradient seaDeep to seaShallow; factor on the
     // alpha of the hex lines between sea hexes (0 = none); sea zone boundary dashes, gap and width and the radius of the
     // zone circles, in side lengths.

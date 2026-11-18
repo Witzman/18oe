@@ -28,6 +28,8 @@ import { between, centerOn, clampPan, fit, frame, maxZoom, panBy, zoomAt, zoomSt
 import { drawCoast, drawGrid, drawPlate, drawWalls, type Block } from "./layers/static.ts";
 import { drawTileSurface } from "./layers/tiles.ts";
 import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
+import { findFerries, type Ferry } from "./ferries.ts";
+import { drawFerryLine } from "./layers/ferry.ts";
 import { drawNodes, drawTargetCity, inkOn, makeToken, type Ring } from "./layers/nodes.ts";
 import { citySlots, companyIndex, labelAt, revenueAll, revenueNow, shieldAt, medallionExtent, slotsNear, type Slot } from "./stones.ts";
 import { hexesNear, hexIsFingerSized, inertiaStep, INERTIA_STOP, pushSample, releaseVelocity, type Sample } from "./touch.ts";
@@ -390,6 +392,16 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     return revenue === undefined ? undefined : { name: scene.hexById.get(id)?.name, revenue, city: !off };
   }
 
+  // #452: the ferry lines are found once from `ports` and the paths of the sea hexes
+  let ferryMap: Map<string, Ferry> | undefined;
+  const ferryOfPath = (): Map<string, Ferry> => {
+    if (!ferryMap) {
+      ferryMap = new Map();
+      for (const f of findFerries([...scene.hexById.values()], geometry.ports)) for (const k of f.paths) ferryMap.set(k, f);
+    }
+    return ferryMap;
+  };
+
   function drawTile(id: string) {
     const g = scene.grid.byId.get(id);
     if (!g) return;
@@ -399,11 +411,19 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     const color = entries.get(id)?.tile.color ?? printed.get(id);
     const surface = drawTileSurface(scene.grid, g, color, theme);
     const geom = geomOf(id);
-    const axes = geom?.axes ?? [];
+    // the ferry lines of a printed sea hex are drawn as a blue line, not as track
+    const isFerry = (a: { path: number }) => !entries.get(id)?.tile && ferryOfPath().has(`${id}#${a.path}`);
+    const axes = (geom?.axes ?? []).filter((a) => !isFerry(a));
+    const ferryAxes = (geom?.axes ?? []).filter(isFerry);
     if (!surface && !geom) return;
     const node = new Container({ label: id });
     const origin = { x: g.x, y: g.y };
     if (surface) node.addChild(surface);
+    if (ferryAxes.length) {
+      const ferry = ferryOfPath().get(`${id}#${ferryAxes[0]!.path}`)!;
+      const at = ferryAxes.findIndex((a) => ferry.label === `${id}#${a.path}`);
+      node.addChild(drawFerryLine(ferryAxes, origin, theme, at >= 0 ? { axis: at, distance: ferry.distance } : undefined));
+    }
     if (axes.length) {
       const t = drawTrack(axes, origin, theme);
       setTrackStage(t, zoomStage(view.zoom));

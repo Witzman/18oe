@@ -33,6 +33,15 @@ export interface MapHex extends TileParts {
   partitions?: { a: number; b: number; type: string; length?: number | null }[];
 }
 
+/** One entry of `ports` in /map (Oe::MapData#ports): a hex side or the offshore port, its kind, and ferry ends. */
+export interface PortEntry {
+  hex: string;
+  edge: number | string;
+  port?: string;
+  ferries?: { hex: string; exit: number | string; distance: number }[];
+  dead_end?: boolean;
+}
+
 export interface MapLayout {
   orientation: string;
   /** Centre-to-neighbour vector per edge 0..5 (edge i points to neighbors[i]). */
@@ -46,6 +55,8 @@ export interface MapGeometry {
   homes?: { corporation: string; type: string; hex: string }[];
   /** Tile catalog by tile name: colour and track parts (laid tiles are drawn from these, #146). */
   tiles?: Record<string, TileParts & { color?: string }>;
+  /** Ports and ferry ends (#452). */
+  ports?: PortEntry[];
   /** Sea zones with the sea each belongs to (north_sea, mediterranean) and their hexes (#449). */
   sea_zones?: { name: string; sea: string; hexes: string[] }[];
 }

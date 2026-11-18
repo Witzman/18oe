@@ -317,6 +317,8 @@
     "terrainBlobAlpha": 1,
     "offboardBox": 0,
     "terrainSymbols": 0,
+    "ferryWidth": 0.07,
+    "ferryOval": 0.2,
     "seaTint": 0,
     "seaHexLineAlpha": 1,
     "seaZoneDash": 0.3,
