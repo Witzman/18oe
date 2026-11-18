@@ -111,6 +111,29 @@ export function townBars(nodes: readonly NodeGeom[], axes: readonly Axis[], leng
   return out;
 }
 
+/**
+ * Arrow heads at the junction of a sea hex (#444): a port stub runs from a land side into the middle of the hex
+ * and ends in an arrow. One triangle per stub, the tip at the junction, pointing along the stub, `length` long and
+ * `width` wide across it. Nothing for a junction without a stub.
+ */
+export function junctionArrows(nodes: readonly NodeGeom[], axes: readonly Axis[], length: number, width: number): number[][] {
+  const out: number[][] = [];
+  for (const g of nodes) {
+    if (g.kind !== "junction") continue;
+    for (const a of axes) {
+      const atEnd = "node" in a.b && a.b.node === g.node, atStart = "node" in a.a && a.a.node === g.node;
+      if (!atEnd && !atStart) continue;
+      const t = atEnd ? a.endTangent : { x: -a.startTangent.x, y: -a.startTangent.y }; // pointing into the junction
+      const n = norm(t);
+      if (!(n > 0)) continue;
+      const u = { x: t.x / n, y: t.y / n }, across = { x: -u.y, y: u.x };
+      const bx = g.pos.x - u.x * length, by = g.pos.y - u.y * length;
+      out.push([g.pos.x, g.pos.y, bx + across.x * width / 2, by + across.y * width / 2, bx - across.x * width / 2, by - across.y * width / 2]);
+    }
+  }
+  return out;
+}
+
 /** Off-board wedges: the tip at the node, the base across the hex edge the track enters through. */
 export function offboardWedges(node: NodeGeom, axes: readonly Axis[], frame: HexFrame, halfBase = 0.22): number[][] {
   const out: number[][] = [];

@@ -4,7 +4,7 @@
 // units of the side length (token.ts is pure maths, here only PixiJS) and placed in the objects layer
 // by map.ts, which sets position and scale (= zoom) on every frame.
 import { Container, Graphics } from "pixi.js";
-import { citySlots, medallionExtent, offboardWedges, townBars, type Slot } from "../stones.ts";
+import { citySlots, junctionArrows, medallionExtent, offboardWedges, townBars, type Slot } from "../stones.ts";
 import { contrast } from "../../themes/color.ts";
 import type { RenderTheme } from "../theme.ts";
 import type { Axis, HexFrame, NodeGeom, TileParts, Vec } from "../track-axes.ts";
@@ -64,6 +64,12 @@ export function drawNodes(input: NodesInput, theme: RenderTheme): Container {
     }
   }
   g.beginPath(); // a fill or stroke without a new shape would paint the last one again
+  // Port stubs in sea hexes end in an arrow in the middle of the hex (#444).
+  for (const arrow of junctionArrows(nodes, axes, theme.portArrowLength, theme.portArrowWidth)) {
+    g.poly(arrow.map((v, i) => v + (i % 2 === 0 ? origin.x : origin.y)), true)
+      .fill({ color: theme.map.ferry }).stroke({ width: EDGE_LINE, color: theme.map.cityEdge, join: "round" });
+  }
+  g.beginPath();
   // Towns: bars across the track.
   for (const bar of townBars(nodes, axes, theme.townLength, theme.townWidth)) {
     g.poly(bar.map((v, i) => v + (i % 2 === 0 ? origin.x : origin.y)), true).fill({ color: theme.map.cityEdge });

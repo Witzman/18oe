@@ -291,7 +291,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     return out;
   }
 
-  const hasNodes = (p: TileParts) => !!(p.cities?.length || p.towns?.length || p.double_towns?.length || p.offboards?.length);
+  const hasNodes = (p: TileParts) => !!(p.cities?.length || p.towns?.length || p.double_towns?.length || p.offboards?.length || p.junction !== undefined);
 
   /** Parts of the tile on hex id: the laid tile from the catalog, else the printed one (rotation 0). */
   function partsOf(id: string): TileParts | undefined {

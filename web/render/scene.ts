@@ -6,6 +6,7 @@
 // top of the hexes of one height level in one block. The walls (#145, wallFaces) are the front
 // faces between a hex and its lower neighbours, drawn per level so a higher hex covers them.
 import { hexHeight, type MapGeometry, type MapHex } from "./mapdata.ts";
+import { landSideStubs } from "./sea-stubs.ts";
 import { apply, buildGrid, levelMatrix, walls, worldCorners, type Box, type GridHex, type HexGrid, type Vec, type View } from "./projection.ts";
 import type { RenderTheme } from "./theme.ts";
 
@@ -58,7 +59,8 @@ function grow(box: Box, p: Vec): void {
 
 /** Heights from the theme camera (ui-spec 2.4); `tiled` = hexes with a laid tile, which stand heightTile higher. */
 export function buildScene(geometry: MapGeometry, theme: Pick<RenderTheme, "camera">, tiled: ReadonlyMap<string, string> = new Map()): Scene {
-  const hexById = new Map(geometry.hexes.map((h) => [h.id, h]));
+  // #444: a port stub that faces open water starts on a side that borders land (display only)
+  const hexById = new Map(landSideStubs(geometry.hexes).map((h) => [h.id, h]));
   const grid = buildGrid(geometry.hexes, geometry.layout.edge_vectors, (id) => hexHeight(hexById.get(id)!, theme.camera, tiled.has(id)));
   const levels = [...grid.levels].sort((a, b) => a - b);
   if (levels[0] !== 0) levels.unshift(0);
