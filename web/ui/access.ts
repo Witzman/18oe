@@ -124,7 +124,10 @@ export function resetPage(api: Api): HTMLElement {
     versionFooter());
 }
 
-export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => void): HTMLElement {
+// Anmelden (#462): auf der Titelseite steht nur der Slider mit einem Knopf "Login" oben rechts; das Formular liegt in einem
+// Dialog (natives <dialog>: Escape, Fokus hinein und zurück). `open` öffnet ihn gleich (abgelaufene Sitzung, 401).
+// Registrieren (#/register) zeigt das Formular wie bisher auf der Seite.
+export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => void, open = false): HTMLElement {
   const reg = mode === "register";
   const error = h("p", { class: "error", role: "alert" });
   // Status line (#286): shows which step runs or succeeded, so a failure is never silent.
@@ -178,13 +181,30 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
        field(txt("access.code_label").de, code, txt("access.hint_code").de)]
     : [field(txt("access.login_label").de, login), field(txt("access.password_label").de, password)];
 
+  const panel = h("div", { class: "panel" },
+    h("h2", {}, txt(reg ? "access.title_register" : "access.title_login").de),
+    h("form", { onsubmit, novalidate: true }, ...fields, h("div", { class: "row" }, submit), status, error),
+    h("p", {}, h("a", { href: reg ? "#/login" : "#/register" }, txt(reg ? "access.to_login" : "access.to_register").de)),
+    reg ? null : h("p", {}, h("a", { href: "#/reset" }, txt("access.to_reset").de)));
+  let bar: HTMLElement | null = null;
+  let body: HTMLElement = panel;
+  if (!reg) {
+    const dialog = h("dialog", { class: "login-dialog", "aria-label": txt("access.title_login").de }) as HTMLDialogElement;
+    const close = h("button", { type: "button", class: "login-close" }, txt("access.dialog_close").de);
+    const show = () => { if (typeof dialog.showModal === "function" && !dialog.open) dialog.showModal(); else dialog.setAttribute("open", ""); };
+    close.onclick = () => dialog.close();
+    dialog.addEventListener("click", (ev) => { if (ev.target === dialog) dialog.close(); }); // Tipp neben das Formular
+    dialog.append(panel, h("div", { class: "row" }, close));
+    const opener = h("button", { type: "button", class: "login-open" }, txt("access.open_login").de);
+    opener.onclick = show;
+    bar = h("div", { class: "title-bar" }, opener);
+    body = dialog;
+    if (open) queueMicrotask(() => { if (dialog.isConnected) show(); });
+  }
   return h("div", { class: "access" },
     titleStage(),
+    bar,
     h("header", { class: "title" }, h("h1", {}, "18OE"), h("p", { class: "game-title" }, txt("access.game_title").de)),
-    h("div", { class: "panel" },
-      h("h2", {}, txt(reg ? "access.title_register" : "access.title_login").de),
-      h("form", { onsubmit, novalidate: true }, ...fields, h("div", { class: "row" }, submit), status, error),
-      h("p", {}, h("a", { href: reg ? "#/login" : "#/register" }, txt(reg ? "access.to_login" : "access.to_register").de)),
-      reg ? null : h("p", {}, h("a", { href: "#/reset" }, txt("access.to_reset").de))),
+    body,
     versionFooter());
 }
