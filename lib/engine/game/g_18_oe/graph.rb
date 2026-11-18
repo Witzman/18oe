@@ -11,10 +11,12 @@ module Engine
           @sea_jumps = nil
           @sea_port_nodes = nil
           @water = nil
+          @ferry_costs = nil
         end
 
-        # §11.1.6, §11.2 (#360): the hypothetical train that connects a tile or a token to a station token of the RR
-        # also crosses the sea. After the walk over land (super), Sea crossings extend the result: see #cross_water.
+        # §11.1.6, §11.2 (#360, #61): the hypothetical train that connects a tile or a token to a station token of the
+        # RR also crosses ferries and the sea. The walk over land (super) takes ferries as land (§11.3.7), so they are
+        # free there; #price_ferries then counts the paid ones, and Sea crossings extend the result: see #cross_water.
         # The merge graph is an Engine::Graph and stays off the sea (§10.5).
         def compute(corporation, routes_only: false, one_token: nil, &block)
           before = @connected_nodes[corporation]
@@ -22,26 +24,34 @@ module Engine
           nodes = @connected_nodes[corporation]
           return if one_token || nodes.nil? || nodes.equal?(before)
 
+          price_ferries(corporation)
           cross_water(corporation, &block)
         end
 
-        # The fewest sea zones the hypothetical train crosses to reach the node: 0 over land, nil if it is not reached.
-        def water_zones_to_node(corporation, node)
+        # What the hypothetical train crosses to reach the node: nothing over land, nil if it is not reached.
+        def water_cost_to_node(corporation, node)
           return unless connected_nodes(corporation)[node]
 
-          water(corporation)[:nodes].fetch(node, 0)
+          water(corporation)[:nodes][node] || ferry_cost(corporation, :nodes, node)
         end
 
-        # The fewest sea zones to reach the hex: over one of its connected sides or to one of its stops. With a tile
-        # to be laid there (rotated), only the connected sides it has count: the zones to its track (§11.1.6).
-        # Approximation: a side of the tile counts even when the new track does not join the track to that side.
-        def water_zones_to_hex(corporation, hex, tile = nil)
+        # The cheapest way (ferries and sea zones) to reach the hex: over one of its connected sides or to one of its
+        # stops. With a tile to be laid there (rotated), only the connected sides it has count: the way to its track
+        # (§11.1.6). Approximation: a side of the tile counts even when the new track does not join the track to that
+        # side.
+        def water_cost_to_hex(corporation, hex, tile = nil)
           edges = connected_hexes(corporation)[hex] || []
           edges &= tile.exits if tile
           costs = water(corporation)[:edges][hex] || {}
-          zones = edges.map { |edge| costs.fetch(edge, 0) }
-          zones += hex.tile.city_towns.filter_map { |node| water_zones_to_node(corporation, node) } unless tile
-          zones.min
+          found = edges.map { |edge| costs[edge] || ferry_cost(corporation, :edges, hex, edge) }
+          found += hex.tile.city_towns.filter_map { |node| water_cost_to_node(corporation, node) } unless tile
+          found.min_by(&:units)
+        end
+
+        # The fewest sea zones the hypothetical train crosses to reach the node: 0 over land (also over a ferry,
+        # §11.3.7), nil if it is not reached.
+        def water_zones_to_node(corporation, node)
+          water_cost_to_node(corporation, node)&.zones
         end
 
         # sea: only the route search passes it (#359): the most sea units a train of the RR can carry
@@ -55,6 +65,7 @@ module Engine
           if (blocked = @game.graph_skip_paths(corporation))
             skip_paths = (skip_paths || {}).merge(blocked)
           end
+          skip_paths = (skip_paths || {}).merge(@ferry_skip) if @ferry_skip # #61: the walk that prices ferries
           wcf = @game.wcf_placeholder
           return super(node, skip_paths: skip_paths, corporation: corporation, **opts, &block) if !wcf && !sea
 
@@ -117,16 +128,18 @@ module Engine
           queue = Hash.new { |h, k| h[k] = [] }
           landings = @game.sea_landings(corporation)
           arrows = @game.sea_arrows(corporation)
-          sources.each { |node| sea_crossings_from(node, 0, landings, arrows, corporation, queue) }
+          sources.each do |node|
+            sea_crossings_from(node, ferry_cost(corporation, :nodes, node), landings, arrows, corporation, queue)
+          end
 
           until queue.empty?
-            zones = queue.keys.min
-            queue.delete(zones).each do |target|
+            units = queue.keys.min
+            queue.delete(units).each do |target, cost|
               if target.is_a?(Array)
-                mark_water_edge(corporation, *target, zones)
+                mark_water_edge(corporation, *target, cost)
               elsif !@connected_nodes[corporation][target]
-                land_over_water(corporation, target, zones, &block).each do |node|
-                  sea_crossings_from(node, zones, landings, arrows, corporation, queue)
+                land_over_water(corporation, target, cost, &block).each do |node|
+                  sea_crossings_from(node, cost, landings, arrows, corporation, queue)
                 end
               end
             end
@@ -134,7 +147,78 @@ module Engine
           water
         end
 
-        def sea_crossings_from(node, zones, landings, arrows, corporation, queue)
+        # #61: the paid ferries (§11.1.6, §11.2.1) are crossed free by the walk of super, so the cost of reaching a
+        # node or a side of a hex over them is found here, in a few more walks of the corporation's graph: first with
+        # every paid ferry shut, then with the ferries that touch what was reached, the cheapest sets of ferries first
+        # (Dijkstra over sets of ferries, each ferry at its distance). What a walk reaches first is what the ferries of
+        # that set cost. Only graphs whose walk touches a paid ferry pay for the extra walks; the result of the plain
+        # walk is put back afterwards.
+        def price_ferries(corporation)
+          costs = (@ferry_costs ||= {})[corporation] = { nodes: {}, edges: {} }
+          return unless @connected_paths[corporation].each_key.any? { |path| paid_ferry_line?(path) }
+
+          saved = [@connected_hexes[corporation], @connected_nodes[corporation], @connected_paths[corporation],
+                   @reachable_hexes[corporation]]
+          walk = Engine::Graph.instance_method(:compute)
+          queue = { 0 => [[]] }
+          seen = { [] => true }
+          until queue.empty?
+            price = queue.keys.min
+            queue.delete(price).each do |allowed|
+              @ferry_skip = @game.paid_ferry_skip(allowed)
+              walk.bind_call(self, corporation)
+              record_ferry_costs(corporation, costs, price)
+              adjacent_paid_ferries(@connected_paths[corporation], allowed).each do |ferry|
+                set = allowed + [ferry]
+                next if seen[(key = set.map(&:object_id).sort)]
+
+                seen[key] = true
+                (queue[price + ferry.distance] ||= []) << set
+              end
+            end
+          end
+        ensure
+          @ferry_skip = nil
+          if saved
+            @connected_hexes[corporation], @connected_nodes[corporation], @connected_paths[corporation],
+              @reachable_hexes[corporation] = saved
+          end
+        end
+
+        def paid_ferry_line?(path)
+          (ferry = @game.ferry_component(path)) && ferry.distance.to_i.positive?
+        end
+
+        def record_ferry_costs(corporation, costs, price)
+          @connected_nodes[corporation].each_key { |node| costs[:nodes][node] = price unless costs[:nodes].key?(node) }
+          @connected_hexes[corporation].each do |hex, edges|
+            known = (costs[:edges][hex] ||= {})
+            edges.each { |edge| known[edge] = price unless known.key?(edge) }
+          end
+        end
+
+        # The paid ferries (not yet allowed) that have an end where the walk has track: a path of the end's hex that
+        # leaves it over the end's side.
+        def adjacent_paid_ferries(paths, allowed)
+          found = []
+          paths.each_key do |path|
+            @game.paid_ferries_at(path.hex.id).each do |ferry|
+              next if allowed.include?(ferry) || found.include?(ferry)
+
+              ends = ferry.ends.select { |id, _| id == path.hex.id }
+              found << ferry if ends.any? { |_, exit| exit == :offshore || path.exits.include?(exit) }
+            end
+          end
+          found
+        end
+
+        # The ferries on the way to a node (kind :nodes, key node) or a side of a hex (kind :edges, key hex and side):
+        # none unless #price_ferries found some.
+        def ferry_cost(corporation, kind, *key)
+          Sea::WaterCost.new(@ferry_costs&.[](corporation)&.dig(kind, *key).to_i, 0)
+        end
+
+        def sea_crossings_from(node, cost, landings, arrows, corporation, queue)
           from = @game.usable_port_zones(node, corporation)
           return if from.empty?
 
@@ -142,32 +226,32 @@ module Engine
             next if to.hex == node.hex || @connected_nodes[corporation][to]
 
             crossed = @game.fewest_sea_zones(from, to_zones)
-            queue[zones + crossed] << to if crossed
+            queue[cost.units + (2 * crossed)] << [to, cost.plus_zones(crossed)] if crossed
           end
           arrows.each do |hex, exit, zone|
             next if hex == node.hex
 
             crossed = @game.fewest_sea_zones(from, [zone])
-            queue[zones + crossed] << [hex, exit] if crossed
+            queue[cost.units + (2 * crossed)] << [[hex, exit], cost.plus_zones(crossed)] if crossed
           end
         end
 
         # The train arrives at the node over the sea: as at a token, every side of its hex may take new track; unless
         # the city is full of other RRs' tokens, the walk goes on over land (as in super). Returns the nodes reached
         # that may start another crossing.
-        def land_over_water(corporation, landing, zones)
+        def land_over_water(corporation, landing, cost)
           nodes = @connected_nodes[corporation]
           water = @water[corporation]
           nodes[landing] = true
-          water[:nodes][landing] = zones
+          water[:nodes][landing] = cost
           @reachable_hexes[corporation][landing.hex] = true
           yield landing if block_given?
           if landing.blocks?(corporation)
-            landing.exits.each { |edge| mark_water_edge(corporation, landing.hex, edge, zones) }
+            landing.exits.each { |edge| mark_water_edge(corporation, landing.hex, edge, cost) }
             return []
           end
 
-          landing.hex.neighbors.each_key { |edge| mark_water_edge(corporation, landing.hex, edge, zones) }
+          landing.hex.neighbors.each_key { |edge| mark_water_edge(corporation, landing.hex, edge, cost) }
           reached = []
           paths = @connected_paths[corporation]
           walk_token(landing, visited: nodes.reject { |node, _| node == landing }, corporation: corporation,
@@ -181,25 +265,25 @@ module Engine
               next if nodes[node]
 
               nodes[node] = true
-              water[:nodes][node] = zones
+              water[:nodes][node] = cost
               yield node if block_given?
               reached << node if node.hex != landing.hex && !node.blocks?(corporation)
             end
             path.exits.each do |edge|
-              mark_water_edge(corporation, path.hex, edge, zones)
+              mark_water_edge(corporation, path.hex, edge, cost)
               neighbor = path.hex.neighbors[edge]
-              mark_water_edge(corporation, neighbor, path.hex.invert(edge), zones) if neighbor
+              mark_water_edge(corporation, neighbor, path.hex.invert(edge), cost) if neighbor
             end
           end
           reached
         end
 
-        def mark_water_edge(corporation, hex, edge, zones)
+        def mark_water_edge(corporation, hex, edge, cost)
           edges = (@connected_hexes[corporation][hex] ||= [])
           return if edges.include?(edge)
 
           edges << edge
-          (@water[corporation][:edges][hex] ||= {})[edge] = zones
+          (@water[corporation][:edges][hex] ||= {})[edge] = cost
         end
 
         def sea_walk(from, visited, visited_paths, corporation, skip_paths, limit, opts, block, walker)

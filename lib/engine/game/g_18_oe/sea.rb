@@ -177,32 +177,95 @@ module Engine
           end
         end
 
-        # §11.1.6, §11.2.1: what crossing open water adds to a tile or a token, per sea zone (#360, #61). Ferries:
-        # #61. Port Authority (#56) takes two zones off; port tokens and Minor H do not.
+        # §11.1.6, §11.2.1: what crossing open water adds to a tile or a token, per sea zone (#360) and per unit of
+        # ferry distance (#61). Port categories do not change a ferry fee. Port Authority (#56) takes two zones or
+        # ferry distance off; port tokens and Minor H do not.
         CROSS_WATER_TRACK_FEE = 10
         CROSS_WATER_TOKEN_FEE = 40
+        FERRY_TRACK_FEE = 5
+        FERRY_TOKEN_FEE = 20
 
-        # The fee for a tile in the hex: 0 over land, nil if the hex is not connected. With a tile (rotated as it is
-        # to be laid), the zones to the sides it connects to (§11.1.6); without, the fewest zones to the hex (the
-        # least a tile there can cost, for prices shown before a tile is chosen).
-        def cross_water_track_fee(entity, hex, tile = nil)
-          corporation = owning_corporation(entity)
-          return 0 if corporation&.type == :national # §11.1.5: nationals lay track at no cost
+        # The ferries (distance) and sea zones the hypothetical train crosses to a tile or a token; see
+        # Graph#water_cost_to_hex. A ferry of distance 1 is half a sea zone in price (£5 against £10, £20 against £40).
+        WaterCost = Struct.new(:ferries, :zones) do
+          def units
+            ferries + (2 * zones)
+          end
 
-          zones = graph_for_entity(corporation).water_zones_to_hex(corporation, hex, tile)
-          zones && zones * self.class::CROSS_WATER_TRACK_FEE
+          def plus_zones(count)
+            WaterCost.new(ferries, zones + count)
+          end
+
+          def plus_ferries(count)
+            WaterCost.new(ferries + count, zones)
+          end
         end
 
-        def log_cross_water_fee(entity, fee, per_zone, what)
-          zones = fee / per_zone
-          @log << "#{entity.name} pays #{format_currency(fee)} for #{zones} sea zone#{zones == 1 ? '' : 's'} crossed " \
-                  "to #{what}"
+        # What the hypothetical train crosses to a tile in the hex: no ferry and no zone over land, nil if the hex is
+        # not connected. With a tile (rotated as it is to be laid), the cheapest of the sides it connects to (§11.1.6);
+        # without, the cheapest way to the hex (the least a tile there can cost, for prices shown before a tile is
+        # chosen). A national pays nothing (§11.1.5).
+        def cross_water_track_cost(entity, hex, tile = nil)
+          corporation = owning_corporation(entity)
+          return WaterCost.new(0, 0) if corporation&.type == :national
+
+          graph_for_entity(corporation).water_cost_to_hex(corporation, hex, tile)
+        end
+
+        def cross_water_token_cost(entity, city)
+          token_graph_for_entity(entity).water_cost_to_node(entity, city)
+        end
+
+        # The fee for the crossing: nil without a cost (not connected).
+        def cross_water_fee_of(cost, kind)
+          return unless cost
+
+          track = kind == :track
+          (cost.ferries * (track ? self.class::FERRY_TRACK_FEE : self.class::FERRY_TOKEN_FEE)) +
+            (cost.zones * (track ? self.class::CROSS_WATER_TRACK_FEE : self.class::CROSS_WATER_TOKEN_FEE))
+        end
+
+        # The fee for a tile in the hex: 0 over land, nil if the hex is not connected.
+        def cross_water_track_fee(entity, hex, tile = nil)
+          cross_water_fee_of(cross_water_track_cost(entity, hex, tile), :track)
         end
 
         # The fee for a token in the city (§11.2.1): 0 over land, nil if the city is not connected.
         def cross_water_token_fee(entity, city)
-          zones = token_graph_for_entity(entity).water_zones_to_node(entity, city)
-          zones && zones * self.class::CROSS_WATER_TOKEN_FEE
+          cross_water_fee_of(cross_water_token_cost(entity, city), :token)
+        end
+
+        def log_cross_water_fee(entity, cost, kind, what)
+          parts = []
+          parts << "#{cost.ferries} ferr#{cost.ferries == 1 ? 'y' : 'ies'}" if cost.ferries.positive?
+          parts << "#{cost.zones} sea zone#{cost.zones == 1 ? '' : 's'}" if cost.zones.positive?
+          @log << "#{entity.name} pays #{format_currency(cross_water_fee_of(cost, kind))} for #{parts.join(' and ')} " \
+                  "crossed to #{what}"
+        end
+
+        # The ferries with a distance of 1 or more: only they cost money (§11.1.6, §11.2.1); a ferry of distance 0
+        # is free.
+        def paid_ferry_components
+          @paid_ferry_components ||= ferry_components.select { |ferry| ferry.distance.to_i.positive? }
+        end
+
+        # The paid ferries that have an end in the hex.
+        def paid_ferries_at(hex_id)
+          @paid_ferries_by_hex ||= paid_ferry_components.each_with_object(Hash.new { |h, k| h[k] = [] }) do |ferry, by_hex|
+            ferry.ends.map(&:first).uniq.each { |id| by_hex[id] << ferry }
+          end
+          @paid_ferries_by_hex.key?(hex_id) ? @paid_ferries_by_hex[hex_id] : []
+        end
+
+        # The ferry lines of the paid ferries, except those of the ferries in `allowed`: the paths a graph walk that
+        # prices ferries must not cross.
+        def paid_ferry_skip(allowed)
+          paid_ferry_components
+          skip = {}
+          @ferry_component_by_path.each do |path, ferry|
+            skip[path] = true if ferry.distance.to_i.positive? && !allowed.include?(ferry)
+          end
+          skip
         end
 
         # The sea zones of the node's usable ports (§11.3.4, §11.3.6).
@@ -413,9 +476,11 @@ module Engine
         # The blue paths a ferry end touches: over its hex side, or anywhere in the offshore port hex.
         def ferry_end_paths(hex_id, exit)
           if exit == :offshore
-            hex_by_id(self.class::PORTS[hex_id][:offshore][:hex]).tile.paths.select { |path| ferry_line?(path) }
+            hex = hex_by_id(self.class::PORTS[hex_id][:offshore][:hex])
+            hex ? hex.tile.paths.select { |path| ferry_line?(path) } : []
           else
-            ferry_lines_at(hex_by_id(hex_id).all_neighbors[exit], Hex.invert(exit))
+            # a variant map (UK-France) lacks some of the hexes of PORTS
+            (hex = hex_by_id(hex_id)) ? ferry_lines_at(hex.all_neighbors[exit], Hex.invert(exit)) : []
           end
         end
       end

@@ -19,20 +19,21 @@ module Engine
             super && @game.first_round_spend_allowed?(entity, min_token_price(available_tokens(entity)))
           end
 
-          # §11.2.1 (#360): the fee for the sea zones to the city is taken before the token stands (it would make the
-          # city a station of the RR) and paid with the token's price.
+          # §11.2.1 (#360, #61): the fee for the ferries and sea zones to the city is taken before the token stands (it
+          # would make the city a station of the RR) and paid with the token's price.
           def place_token(entity, city, token, connected: true, **opts)
-            @water_fee = connected ? @game.cross_water_token_fee(entity, city).to_i : 0
+            @water_cost = connected ? @game.cross_water_token_cost(entity, city) : nil
+            @water_fee = @game.cross_water_fee_of(@water_cost, :token).to_i
             super
           ensure
-            @water_fee = nil
+            @water_cost = @water_fee = nil
           end
 
           def pay_token_cost(entity, cost, city)
             fee = @water_fee.to_i
             @game.check_first_round_spend!(entity, cost + fee, what: 'a token')
             super(entity, cost + fee, city)
-            @game.log_cross_water_fee(entity, fee, @game.class::CROSS_WATER_TOKEN_FEE, 'the token (§11.2.1)') if fee.positive?
+            @game.log_cross_water_fee(entity, @water_cost, :token, 'the token (§11.2.1)') if fee.positive?
           end
 
           def available_hex(entity, hex)
@@ -58,7 +59,7 @@ module Engine
             tokens = available_tokens(entity)
             return if fee.zero? || tokens.empty? || min_token_price(tokens) + fee <= entity.cash
 
-            raise GameError, "#{entity.name} cannot pay the token and #{@game.format_currency(fee)} for the sea zones " \
+            raise GameError, "#{entity.name} cannot pay the token and #{@game.format_currency(fee)} for the ferries and sea zones " \
                              "to #{hex.name}#{city_string} (§11.2.1)"
           end
         end
