@@ -91,7 +91,7 @@ describe 'G18OE ferry distance on the city limit (§11.3.3, §11.3.7)' do
       route = double('route', train: train!('4'), phase: game.phase, corporation: corp)
       allow(game).to receive(:revenue_stops).with(route).and_return(stops)
       allow(game).to receive(:orient_express_bonus_route?).and_return(false)
-      allow(game).to receive(:sea_units).with(route).and_return(1)
+      allow(game).to receive(:sea_units).with(route, 0).and_return(1) # no Minor H: nothing of its reduction
 
       expect(game.compute_stops(route).size).to eq(3)
     end

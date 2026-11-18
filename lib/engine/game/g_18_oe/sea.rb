@@ -52,12 +52,35 @@ module Engine
         # §11.3.3, §11.3.7: the places a route's sea traffic takes from the city limit. Each ferry the route rides
         # counts its full distance (0 or 1), even when the train rides only part of it; each sea crossing counts
         # its sea zones (§11.3.4); the port tokens of the route take units off again (§11.3.5, §11.3.7).
-        def sea_units(route)
+        # `steamship`: how many units of Minor H's reduction the route takes (§15.8, #73); see #steamship_allowance.
+        def sea_units(route, steamship = 0)
           targets = sea_targets(route)
           return 0 if targets.empty?
 
           units = targets.map(&:units)
-          units.sum - max_sea_reduction(units.dup, targets, sea_reducers(route))
+          reducers = sea_reducers(route) + steamship_reducers(targets, steamship)
+          units.sum - max_sea_reduction(units.dup, targets, reducers)
+        end
+
+        # §11.3.5, §15.8: Minor H reduces the sea zones and ferry distance that count against the city limit of its
+        # RR's trains by 1 (Train Phases 2 to 6) or 2 (Phases 7 and 8). The reduction belongs to the RR, not to each
+        # train (the trains share it, Game#check_overlap); it does not change what crossing water costs (§11.1.6,
+        # §11.2.1). The ability object travels with the charter into the major on a merge (§10.5).
+        def steamship_allowance(corporation, phase)
+          return 0 unless @steamship_ability && corporation&.abilities&.include?(@steamship_ability)
+
+          phase.name.to_i >= 7 ? 2 : 1
+        end
+
+        # Each unit of the reduction takes one unit off any one stretch of the route's sea traffic.
+        def steamship_reducers(targets, count)
+          hex_ids = targets.flat_map(&:hex_ids).uniq
+          Array.new(count) { SeaReducer.new(1, hex_ids) }
+        end
+
+        # The units a route takes from the city limit, with the reduction it was found to use (check_distance).
+        def route_sea_units(route)
+          sea_units(route, route.instance_variable_get(:@steamship_use).to_i)
         end
 
         def sea_targets(route)
@@ -85,8 +108,9 @@ module Engine
                .map { |node| SeaReducer.new(amount, [node.hex.id]) }
         end
 
-        # Hook for reductions that are not a port token (#56 Port Authority, #73 Minor H, #79 Star Harbor token):
-        # return SeaReducer objects for this train. Nothing yet.
+        # Hook for reductions that are not a port token (#56 Port Authority, #79 Star Harbor token): return
+        # SeaReducer objects for this train. Nothing yet. Minor H (#73) is not one: its reduction is shared by the
+        # trains of the RR, see #steamship_allowance.
         def extra_sea_reducers(_route)
           []
         end

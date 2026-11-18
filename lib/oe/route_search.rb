@@ -89,7 +89,9 @@ module Oe
       # default walk_limit), so it never takes visits from land routes, and runs only when the network reaches a
       # port the RR may use.
       passes = [{}]
-      passes << { sea: trains.map { |t| @game.sea_places(t) }.max } if sea_pass?(graph, nodes, corporation, trains)
+      # (Minor H's reduction, §15.8, lets a crossing that is one or two units over the places still pass.)
+      sea_limit = trains.map { |t| @game.sea_places(t) }.max.to_i + @game.steamship_allowance(corporation, @game.phase)
+      passes << { sea: sea_limit } if sea_pass?(graph, nodes, corporation, trains)
 
       train_routes = Hash.new { |h, k| h[k] = [] }    # map of train to route list
       hexside_bits = Hash.new { |h, k| h[k] = 0 }     # map of hexside_id to bit number
