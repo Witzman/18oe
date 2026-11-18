@@ -310,6 +310,7 @@
     "targetAlpha": 0.3,
     "coastRound": 0.35,
     "coastNoise": 0.25,
+    "terrainBlobAlpha": 1,
     "slotRadius": 0.2,
     "tokenRadius": 0.165,
     "townLength": 0.34,

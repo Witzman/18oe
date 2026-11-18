@@ -134,6 +134,14 @@ export function junctionArrows(nodes: readonly NodeGeom[], axes: readonly Axis[]
   return out;
 }
 
+/**
+ * Colour of the home ring at the foot of a token (#448): light (map.city) on dark land, but on light land (the board
+ * of map.jpg) a light ring would vanish, so the dark map.cityEdge is taken when the light one has too little contrast.
+ */
+export function homeRingColor(map: { city: number; cityEdge: number; land: number }, ratio: (a: number, b: number) => number, min = 1.5): number {
+  return ratio(map.city, map.land) >= min ? map.city : map.cityEdge;
+}
+
 /** Off-board wedges: the tip at the node, the base across the hex edge the track enters through. */
 export function offboardWedges(node: NodeGeom, axes: readonly Axis[], frame: HexFrame, halfBase = 0.22): number[][] {
   const out: number[][] = [];

@@ -99,3 +99,13 @@ test("revenue: a number, the value of the newest open colour, or all phases for 
   assert.equal(revenueAll({ green: 60, gray: 160 }), "60/160");
   assert.equal(revenueAll(0), "0");
 });
+
+test("homeRingColor: the light ring on dark land, the dark edge colour on light land (#448)", async () => {
+  const { homeRingColor } = await import("../render/stones.ts");
+  const { contrast } = await import("../themes/color.ts");
+  const hex = (n: number) => `#${n.toString(16).padStart(6, "0")}`;
+  const ratio = (a: number, b: number) => contrast(hex(a), hex(b));
+  const map = { city: 0xffffff, cityEdge: 0x2a2a2a };
+  assert.equal(homeRingColor({ ...map, land: 0x7f8a4f }, ratio), 0xffffff); // olive land: the ring is light
+  assert.equal(homeRingColor({ ...map, land: 0xffffff }, ratio), 0x2a2a2a); // white land: the ring is dark
+});
