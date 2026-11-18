@@ -3,11 +3,11 @@
 // the tiles layer, in flat hex coordinates like the track. Tokens are standing cylinders: drawn once in
 // units of the side length (token.ts is pure maths, here only PixiJS) and placed in the objects layer
 // by map.ts, which sets position and scale (= zoom) on every frame.
-import { Container, Graphics } from "pixi.js";
-import { citySlots, homeRingColor, junctionArrows, medallionExtent, offboardWedges, townBars, type Slot } from "../stones.ts";
+import { Container, Graphics, Text } from "pixi.js";
+import { citySlots, homeRingColor, junctionArrows, medallionExtent, offboardWedges, revenueBoxLayout, revenueRows, townBars, type Slot } from "../stones.ts";
 import { contrast } from "../../themes/color.ts";
 import type { RenderTheme } from "../theme.ts";
-import type { Axis, HexFrame, NodeGeom, TileParts, Vec } from "../track-axes.ts";
+import type { Axis, HexFrame, NodeGeom, Revenue, TileParts, Vec } from "../track-axes.ts";
 
 /** Edge line of medallions and bars in side lengths. */
 export const EDGE_LINE = 0.025;
@@ -28,6 +28,8 @@ export interface NodesInput {
   rings?: readonly Ring[];
   /** Cities that carry a patronage crest (city index). */
   patronage?: readonly number[];
+  /** A red hex (#453): its name and revenue for the revenue box, and whether it is a red city (circles) or a true off-board. */
+  redHex?: { name?: string; revenue?: Revenue; city: boolean };
 }
 
 const flat = (p: Vec, o: Vec): [number, number] => [o.x + p.x, o.y + p.y];
@@ -52,7 +54,7 @@ export function drawNodes(input: NodesInput, theme: RenderTheme): Container {
   const node = new Container({ label: "nodes" });
   const g = new Graphics();
   // Off-board: the wedges to the map edge; one medallion-less mark when no track arrives.
-  for (const n of nodes.filter((x) => x.kind === "offboard")) {
+  for (const n of theme.offboardBox > 0 ? [] : nodes.filter((x) => x.kind === "offboard")) {
     const wedges = offboardWedges(n, axes, frame);
     if (wedges.length === 0) {
       const [x, y] = flat(n.pos, origin);
@@ -113,7 +115,47 @@ export function drawNodes(input: NodesInput, theme: RenderTheme): Container {
   }
   crests.fill({ color: theme.map.selected }).stroke({ width: EDGE_LINE * 0.7, color: theme.map.cityEdge, join: "round" });
   node.addChild(crests);
+  if (theme.offboardBox > 0 && input.redHex) node.addChild(drawRevenueBox(input.redHex, origin, theme));
   return node;
+}
+
+/** Text pixels per font unit: drawn big and scaled down into the hex, so it stays sharp when the map is zoomed in. */
+const FONT_PX = 32, TEXT_RES = 3;
+
+function worldText(text: string, size: number, color: number, theme: RenderTheme, at: Vec, halo?: number): Text {
+  const anchor = 0.5;
+  const t = new Text({
+    text, resolution: TEXT_RES,
+    style: { fontFamily: theme.font.body, fontSize: FONT_PX, fontWeight: "700", fill: color, align: "center", ...(halo === undefined ? {} : { stroke: { color: halo, width: 7, join: "round" as const } }) },
+  });
+  t.anchor.set(anchor, 0.5);
+  t.scale.set(size / FONT_PX);
+  t.position.set(at.x, at.y);
+  return t;
+}
+
+/**
+ * The revenue box of a red hex as map.jpg prints it (#453): a white box with the value of every tile colour in a line,
+ * the phase numbers 3, 5, 7 small beside it, the name below. Sizes in side lengths (hex coordinates + origin).
+ */
+export function drawRevenueBox(red: NonNullable<NodesInput["redHex"]>, origin: Vec, theme: RenderTheme): Container {
+  const out = new Container({ label: "revenue-box" });
+  const rows = revenueRows(red.revenue);
+  if (rows.length === 0) return out;
+  const L = revenueBoxLayout(rows.length, red.city);
+  const g = new Graphics();
+  g.rect(origin.x + L.box.x - L.box.w / 2, origin.y + L.box.y - L.box.h / 2, L.box.w, L.box.h)
+    .fill({ color: theme.map.city }).stroke({ width: EDGE_LINE, color: theme.map.cityEdge });
+  out.addChild(g);
+  const size = red.city ? 0.14 : 0.18;
+  rows.forEach((row, i) => {
+    const y = origin.y + L.first.y + i * L.rowH;
+    out.addChild(worldText(String(row.value), size, theme.map.label, theme, { x: origin.x + L.first.x, y }));
+    if (row.phase && L.phases) out.addChild(worldText(row.phase, size * 0.75, theme.map.cityEdge, theme, { x: origin.x + L.phaseX, y }));
+  });
+  // the name gets a rim in the colour of the hex, so a track that runs under it does not cut it
+  if (red.name) out.addChild(worldText(red.name, red.city ? 0.14 : 0.15, theme.map.label, theme, { x: origin.x + L.name.x, y: origin.y + L.name.y }, theme.map.tileRed));
+  return out;
 }
 
 /** Ring marking the valid city targets (setTargets({ cities })), over the whole medallion. */

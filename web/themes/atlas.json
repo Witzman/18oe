@@ -315,6 +315,7 @@
     "coastRound": 0.35,
     "coastNoise": 0.25,
     "terrainBlobAlpha": 1,
+    "offboardBox": 0,
     "seaTint": 0,
     "seaHexLineAlpha": 1,
     "seaZoneDash": 0.3,

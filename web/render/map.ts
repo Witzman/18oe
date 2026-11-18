@@ -33,7 +33,7 @@ import { citySlots, companyIndex, labelAt, revenueAll, revenueNow, shieldAt, med
 import { hexesNear, hexIsFingerSized, inertiaStep, INERTIA_STOP, pushSample, releaseVelocity, type Sample } from "./touch.ts";
 import { h as el_ } from "../ui/dom.ts";
 import { txt } from "../ui/text.ts";
-import { hexFrame, tileGeometry, type TileGeometry, type TileParts } from "./track-axes.ts";
+import { hexFrame, tileGeometry, type Revenue, type TileGeometry, type TileParts } from "./track-axes.ts";
 import type { MapGeometry } from "./mapdata.ts";
 import { levelMatrix, mapCenter, pick, project, unproject, worldCorners, type Vec, type View } from "./projection.ts";
 import { boxOnScreen, buildScene, COST_AT, terrainMark, type Scene } from "./scene.ts";
@@ -382,6 +382,14 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     tokenObjs.delete(id);
   }
 
+  /** A red hex (printed tile colour red, no laid tile): name and revenue for the revenue box (#453). */
+  function redHexOf(id: string, parts: TileParts): { name?: string; revenue?: Revenue; city: boolean } | undefined {
+    if (entries.get(id)?.tile || printed.get(id) !== "red") return undefined;
+    const off = parts.offboards?.[0], city = parts.cities?.[0];
+    const revenue = off?.revenue ?? city?.revenue;
+    return revenue === undefined ? undefined : { name: scene.hexById.get(id)?.name, revenue, city: !off };
+  }
+
   function drawTile(id: string) {
     const g = scene.grid.byId.get(id);
     if (!g) return;
@@ -406,7 +414,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     if (geom && parts && hasNodes(parts)) {
       const slots = slotsOf(id);
       const patronage = Object.keys(entries.get(id)?.patronage ?? {}).length ? (parts.cities ?? []).map((_, i) => i) : [];
-      node.addChild(drawNodes({ parts, nodes: geom.nodes, axes, frame: frame3, origin, rings: ringsOf(id, slots), patronage, minSlots: minSlotsOf(id) }, theme));
+      node.addChild(drawNodes({ parts, nodes: geom.nodes, axes, frame: frame3, origin, rings: ringsOf(id, slots), patronage, minSlots: minSlotsOf(id), redHex: redHexOf(id, parts) }, theme));
       // Tokens: standing cylinders in the objects layer, symbol on top from Z2.
       const objs: TokenObj[] = [];
       for (const t of tokensOf(id)) {
@@ -425,7 +433,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       if (objs.length) tokenObjs.set(id, objs);
       // Revenue shields (from Z2): cities and towns by the phase now, double towns on revenue_loc, off-boards all phases.
       const colors = phaseColors();
-      for (const n of geom.nodes) {
+      for (const n of redHexOf(id, parts) && theme.offboardBox > 0 ? [] : geom.nodes) {
         const part = [...(parts.cities ?? []), ...(parts.towns ?? []), ...(parts.double_towns ?? []), ...(parts.offboards ?? [])].find((x) => x.node === n.node);
         const v = revenueNow(part?.revenue, colors);
         const text = n.kind === "offboard" ? revenueAll(part?.revenue) : v ? String(v) : null;

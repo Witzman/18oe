@@ -29,6 +29,8 @@ export interface RenderTheme {
   coastNoise: number;
   /** Factor on the alpha of the soft terrain blobs on the land, 0 = none. */
   terrainBlobAlpha: number;
+  /** Red hexes: 1 = revenue box like the board, 0 = wedge and text mark (#453). */
+  offboardBox: number;
   /** Sea (#449): tint by sea, factor on the sea hex line alpha, sea zone dashes and circle, in side lengths. */
   seaTint: number;
   seaHexLineAlpha: number;
@@ -82,6 +84,7 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     coastRound: t.shape.coastRound,
     coastNoise: t.shape.coastNoise,
     terrainBlobAlpha: t.shape.terrainBlobAlpha,
+    offboardBox: t.shape.offboardBox,
     seaTint: t.shape.seaTint,
     seaHexLineAlpha: t.shape.seaHexLineAlpha,
     seaZoneDash: t.shape.seaZoneDash,

@@ -109,3 +109,30 @@ test("homeRingColor: the light ring on dark land, the dark edge colour on light 
   assert.equal(homeRingColor({ ...map, land: 0x7f8a4f }, ratio), 0xffffff); // olive land: the ring is light
   assert.equal(homeRingColor({ ...map, land: 0xffffff }, ratio), 0x2a2a2a); // white land: the ring is dark
 });
+
+test("revenueRows: a line per tile colour, the phase numbers of the board beside green, brown and gray (#453)", async () => {
+  const { revenueRows } = await import("../render/stones.ts");
+  assert.deepEqual(revenueRows({ yellow: 30, green: 50, brown: 80, gray: 100 }), [
+    { value: 30, phase: undefined }, { value: 50, phase: "3" }, { value: 80, phase: "5" }, { value: 100, phase: "7" },
+  ]);
+  assert.deepEqual(revenueRows(40), [{ value: 40 }]);
+  assert.deepEqual(revenueRows(undefined), []);
+  assert.deepEqual(revenueRows({ green: 20, yellow: 10 }).map((r) => r.value), [10, 20], "in the order of the tile colours, not of the keys");
+});
+
+test("revenueBoxLayout: the box grows with its lines and the name sits below it; the red city's box leaves the middle (#453)", async () => {
+  const { revenueBoxLayout } = await import("../render/stones.ts");
+  const off = revenueBoxLayout(4, false), one = revenueBoxLayout(1, false), city = revenueBoxLayout(4, true);
+  assert.ok(off.box.h > one.box.h);
+  assert.ok(Math.abs(off.box.h - (4 * off.rowH + 0.08)) < 1e-12);
+  assert.ok(off.name.y > off.box.y + off.box.h / 2, "the name is below the box");
+  assert.ok(off.first.y > off.box.y - off.box.h / 2 && off.first.y < off.box.y, "the first line is at the top");
+  assert.ok(city.box.x < -0.3 && city.box.y < 0, "the red city's box sits at the upper left");
+  assert.ok(city.box.x + city.box.w / 2 < -0.2, "and clear of the circles in the middle");
+});
+
+test("revenueBoxLayout: no phase numbers beside the box of a red city (#453)", async () => {
+  const { revenueBoxLayout } = await import("../render/stones.ts");
+  assert.equal(revenueBoxLayout(4, true).phases, false);
+  assert.equal(revenueBoxLayout(4, false).phases, true);
+});
