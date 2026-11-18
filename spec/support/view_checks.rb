@@ -57,14 +57,20 @@ module OeViewChecks
       expect(h[:cost_parts].sum { |p| p[:amount] }).to eq(h[:cost])
       expect(h[:points]).to be <= track[:points][:left], "#{h[:hex]}: #{h[:points]} points, #{track[:points][:left]} left"
       expect(h[:points]).to eq(step.points_for_lay(entity, hex)) # #426: with the E/F extra point
-      expect(h[:tiles].map { |t| t[:name] }.sort).to eq(step.upgradeable_tiles(entity, hex).map { |t| t.name.to_s }.sort)
+      # #360: a tile none of whose rotations the cash can pay (the sea zone fee depends on the sides) is left out of the
+      # panel, so the panel lists a subset of the engine's upgradeable tiles; the enumeration check below compares the
+      # rotations (and so the omitted tiles) with the legal actions (#458)
+      engine_tiles = step.upgradeable_tiles(entity, hex).map { |t| t.name.to_s }
+      expect(engine_tiles).to include(*h[:tiles].map { |t| t[:name] })
       h[:tiles].each { |t| expect(t[:rotations]).not_to be_empty }
     end
     compare_sampled_track(track, game) if track[:hexes] && track[:hexes].size > 2 && @compared < 10
     return unless track[:hexes] && @enumerated < 15
 
     @enumerated += 1
-    legal = Oe::LegalActions.new(game, limit: nil).call.grep(Engine::Action::LayTile)
+    # the track panel lists the lays of the acting corporation (View#lay_options keeps only these); a private's own
+    # tile lay (§14.9, e.g. BBE) is another entity's action and not part of the panel (#458)
+    legal = Oe::LegalActions.new(game, limit: nil).call.grep(Engine::Action::LayTile).select { |a| a.entity.equal?(entity) }
     from_view = track[:hexes].flat_map { |h| h[:tiles].flat_map { |t| t[:rotations].map { |r| [h[:hex], t[:name], r] } } }
     expect(from_view.sort).to eq(legal.map { |a| [a.hex.id, a.tile.name.to_s, a.rotation] }.sort)
   end
