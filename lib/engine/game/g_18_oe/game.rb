@@ -519,11 +519,13 @@ module Engine
           payouts
         end
 
-        def fulfill_patronage!(entity, hex)
+        # `lowest`: a minor's home token on the city (§9.1) pays the lowest payout shown on the tile, whatever
+        # the track colour; a laid tile (§11.1.8) pays the amount of the highest colour of the current phase.
+        def fulfill_patronage!(entity, hex, lowest: false)
           payouts = remove_patronage!(hex)
           return unless payouts
 
-          amount = payouts[patronage_color]
+          amount = lowest ? payouts.values.min : payouts[patronage_color]
           @bank.spend(amount, entity)
           @log << "#{entity.name} fulfills the #{hex.location_name} patronage tile and receives #{format_currency(amount)}"
         end

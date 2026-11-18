@@ -24,6 +24,9 @@ describe 'G18OE floating minors (§9.1)' do
   end
 
   def home!(minor, city)
+    # These examples measure the token cost. A patronage tile drawn onto the chosen city would pay the minor
+    # (§9.1) and hide that cost; it is covered in patronage_spec.rb.
+    city.hex.tile.patronage = nil
     act!(round, Engine::Action::PlaceToken.new(minor, city: city, slot: 0))
     minor
   end
