@@ -296,6 +296,8 @@
     "flyMs": 500,
     "inertiaMs": 350,
     "doubleTapMs": 300,
+    "titleSlideMs": 8000,
+    "titleFadeMs": 1200,
     "enabled": true
   },
   "shape": {

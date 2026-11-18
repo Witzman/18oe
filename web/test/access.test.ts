@@ -50,7 +50,7 @@ test("title screen (#280): game title text exists, the scene styles use theme to
   assert.ok(section.includes(".title-stage"));
   assert.ok(section.includes("prefers-reduced-motion: reduce"));
   assert.deepEqual(section.replace(/\/\*[^]*?\*\//g, "").match(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g) ?? [], [], "no literal colours");
-  assert.ok(section.includes("--motion-run-ms-per-hex"), "duration comes from the theme");
+  assert.ok(section.includes("--motion-title-fade-ms"), "duration comes from the theme");
 });
 
 test("reset validation (#282): e-mail required and well-formed", () => {

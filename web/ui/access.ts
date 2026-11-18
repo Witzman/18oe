@@ -4,6 +4,7 @@
 import { ApiError, type Api } from "../api.ts";
 import type { Account } from "../types.ts";
 import { h } from "./dom.ts";
+import { SLIDES, nextSlide } from "./title-slides.ts";
 import { txt } from "./text.ts";
 import { versionFooter } from "./version.ts";
 
@@ -45,21 +46,42 @@ function field(label: string, input: HTMLInputElement, hint?: string): HTMLEleme
   return h("label", { class: "field" }, h("span", {}, label), input, hint ? h("small", { class: "muted" }, hint) : null);
 }
 
-// Hintergrund des Titelbilds (#280): reine CSS-Animation, rein dekorativ. Stilisierter Zug mit Dampf auf
-// Schienen vor Abendhimmel; Farben, Dauer und Takt kommen aus den Theme-Tokens (theme.css). Die Seite
-// hängt nicht davon ab: das Formular steht im normalen Fluss darüber. Steht das Theme-Token
-// motion.enabled auf 0, bleibt das Bild statisch (data-still); prefers-reduced-motion regelt das CSS.
+// Hintergrund des Titelbilds (#460, ersetzt die Zug-Animation aus #280): ein Slider durch Screenshots der laufenden
+// Oberfläche (ui/title-slides.ts), alle motion.titleSlideMs mit Überblenden (motion.titleFadeMs). Punkte unter dem Bild
+// wählen ein Bild (Ziele >= 44 px); der Wechsel pausiert, solange die Maus über dem Bild steht oder es berührt wird. Bei
+// prefers-reduced-motion und motion.enabled = 0 gibt es keinen Automatik-Wechsel, die Punkte bleiben. Die Seite hängt
+// nicht davon ab: das Formular steht im normalen Fluss darüber.
 export function titleStage(): HTMLElement {
-  const still = getComputedStyle(document.documentElement).getPropertyValue("--motion-enabled").trim() === "0";
-  const puffs = [0, 1, 2, 3].map(() => h("i", { class: "puff" }));
-  const wheels = [0, 1, 2].map(() => h("i", { class: "wheel" }));
-  const train = h("div", { class: "train" },
-    h("div", { class: "loco" }, h("i", { class: "chimney" }), h("div", { class: "steam" }, ...puffs), ...wheels),
-    h("div", { class: "car" }), h("div", { class: "car" }));
-  const stage = h("div", { class: "title-stage", "aria-hidden": "true" },
-    h("i", { class: "sun" }), h("div", { class: "hills" }), train,
-    h("div", { class: "track" }, h("i", { class: "rail" }), h("i", { class: "sleepers" })));
+  const root = getComputedStyle(document.documentElement);
+  const num = (name: string, fallback: number) => { const v = Number.parseFloat(root.getPropertyValue(name)); return Number.isFinite(v) ? v : fallback; };
+  const still = root.getPropertyValue("--motion-enabled").trim() === "0" || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const every = num("--motion-title-slide-ms", 8000);
+  const images = SLIDES.map((s, i) => h("img", { class: "title-slide", src: `title/${s.scene}.png`, alt: "", width: "1747", height: "923", loading: i === 0 ? "eager" : "lazy", draggable: "false" }));
+  const dots = SLIDES.map((s, i) => h("button", { type: "button", class: "title-dot", "aria-label": txt(s.alt).de }, h("i", {})));
+  const slides = h("div", { class: "title-slides", "aria-hidden": "true" }, ...images);
+  const stage = h("div", { class: "title-stage" }, slides, h("nav", { class: "title-dots", "aria-label": txt("access.slides_nav").de }, ...dots));
+  let at = 0, hover = false, pressed = false, timer = 0;
+  const show = (i: number) => {
+    at = i;
+    images.forEach((img, k) => img.toggleAttribute("data-active", k === i));
+    dots.forEach((d, k) => d.toggleAttribute("aria-current", k === i));
+  };
+  const restart = () => {
+    clearInterval(timer);
+    if (still) return;
+    timer = window.setInterval(() => {
+      if (!stage.isConnected) { clearInterval(timer); return; }
+      if (!hover && !pressed) show(nextSlide(at, SLIDES.length));
+    }, every);
+  };
+  dots.forEach((d, k) => { d.onclick = () => { show(k); restart(); }; });
+  slides.addEventListener("pointerenter", (e) => { hover = e.pointerType === "mouse"; });
+  slides.addEventListener("pointerleave", () => { hover = false; });
+  slides.addEventListener("pointerdown", () => { pressed = true; });
+  for (const end of ["pointerup", "pointercancel"]) slides.addEventListener(end, () => { pressed = false; });
   if (still) stage.setAttribute("data-still", "");
+  show(0);
+  restart();
   return stage;
 }
 
