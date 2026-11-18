@@ -153,7 +153,9 @@ module Oe
     check(:train_limit, '11.6 Buy Trains, 5.2 Train Phases (excess goes in the discard step)',
           'no company holds more trains than the phase allows, unless a discard step is pending') do |g|
       next [] if g.finished
-      next [] if g.round.active_step.class.name.to_s.include?('Discard')
+      # 9.4: the national formation window (ConvertToNational) comes before the discard step, because a new
+      # national keeps even the rusting trains; a major over the new limit is only due once that window is over.
+      next [] if g.round.active_step.class.name.to_s.match?(/Discard|ConvertToNational/)
 
       g.corporations.filter_map do |corp|
         next unless corp.floated? && !corp.closed?

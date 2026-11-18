@@ -167,6 +167,23 @@ RSpec.describe Oe::Invariants do
       expect(violations(g, :train_limit)).not_to be_empty
     end
 
+    it "train_limit: the national formation window may exceed it (9.4 comes before the discard)" do
+      g = new_game
+      at_phase!(g, "3")
+      corp = operating_regional!(g, "LNWR", g.players[0])
+      with_trains!(g, corp, *(["3"] * (g.train_limit(corp) + 1)))
+      operating_round_for!(g, 1, setup: true)
+      track = g.round.steps.find { |s| s.class.name.include?("Track") }
+      convert = g.round.steps.find { |s| s.class.name.include?("ConvertToNational") }
+      expect(convert).not_to be_nil
+      # The step order is ConvertToNational, then DiscardTrain: while players may still form nationals,
+      # a major over the new limit is not yet a violation (it keeps even the rusting trains, 9.4).
+      allow(g.round).to receive(:active_step).and_return(convert)
+      expect(violations(g, :train_limit)).to be_empty
+      allow(g.round).to receive(:active_step).and_return(track)
+      expect(violations(g, :train_limit)).not_to be_empty
+    end
+
     it "tokens_consistent: the same token on two cities" do
       g, = operating_state
       expect(violations(g, :tokens_consistent)).to be_empty
