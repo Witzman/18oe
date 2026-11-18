@@ -25,6 +25,8 @@ export interface MapHex extends TileParts {
   /** Track-rights zone (Oe::MapData, game.region_for_hex). */
   zone?: string;
   name?: string;
+  /** Icons of the printed tile (image name as the engine has it, e.g. `18_oe/offshore_docks`). */
+  icons?: { image: string; name?: string }[];
   /** Edge borders; type "province" separates track-rights zones. */
   borders?: { edge: number; type: string; cost?: number }[];
   /** Line inside the hex between two vertices a, b (engine: 0 = bottom vertex, clockwise). */

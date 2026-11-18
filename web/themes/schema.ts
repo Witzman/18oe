@@ -67,6 +67,8 @@ export const NUMBER_RANGES = {
     coastRound: [0, 0.5], coastNoise: [0, 0.3],
     // Cities, towns and tokens (#147), in side lengths: slot circle, token cylinder, town bar.
     slotRadius: [0.05, 0.35], tokenRadius: [0.04, 0.3], townLength: [0.1, 0.6], townWidth: [0.02, 0.2],
+    // Arrow at the middle end of a port stub in a sea hex (#444), in side lengths: length along the stub, width across.
+    portArrowLength: [0.1, 0.6], portArrowWidth: [0.08, 0.5],
     // Hit radius and drag threshold in px (#259): mouse and touch. 22 px radius = Apple's 44 px minimum target.
     hitPx: [4, 40], hitTouchPx: [16, 48], dragPx: [1, 20], dragTouchPx: [4, 30],
   },

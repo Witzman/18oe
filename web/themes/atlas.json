@@ -314,6 +314,8 @@
     "tokenRadius": 0.165,
     "townLength": 0.34,
     "townWidth": 0.07,
+    "portArrowLength": 0.3,
+    "portArrowWidth": 0.26,
     "hitPx": 12,
     "hitTouchPx": 22,
     "dragPx": 4,
