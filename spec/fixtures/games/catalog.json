@@ -10,7 +10,7 @@
       "players": 3,
       "seed": 1,
       "player": "strategy",
-      "max_actions": 4000
+      "max_actions": 9000
     },
     "random-4p-1": {
       "players": 4,
@@ -249,7 +249,7 @@
       "name": "consolidation-merge-offer",
       "surface": "§10.6 Konsolidierung: Merge-Angebot an die Spieler",
       "slice": "S3",
-      "game": "strategy-4p-1",
+      "game": "strategy-3p-1",
       "first": {
         "round": "Consolidation",
         "step": "MergeOffer"
@@ -259,7 +259,7 @@
       "name": "phase-6",
       "surface": "Zugphase 6",
       "slice": "S3",
-      "game": "strategy-4p-1",
+      "game": "strategy-3p-1",
       "first": {
         "phase": "6"
       }
@@ -268,7 +268,7 @@
       "name": "phase-7",
       "surface": "Zugphase 7",
       "slice": "S3",
-      "game": "strategy-4p-1",
+      "game": "strategy-3p-1",
       "first": {
         "phase": "7"
       }
@@ -277,7 +277,7 @@
       "name": "game-end",
       "surface": "§13 Spielende durch gesprengte Bank (Endstand, View ohne Betrachter)",
       "slice": "S1",
-      "game": "strategy-4p-1",
+      "game": "strategy-3p-1",
       "first": {
         "finished": true
       }
