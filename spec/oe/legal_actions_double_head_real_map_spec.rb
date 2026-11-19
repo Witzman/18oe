@@ -26,7 +26,7 @@ RSpec.describe Oe::LegalActions, "double_head_trains on the real map (#411)" do
       hex = queue.shift
       break if hex == to
 
-      hex.neighbors.each do |edge, other|
+      hex.neighbors.each_value do |other|
         next if prev.key?(other) || other.tile.color != :white
 
         prev[other] = hex
