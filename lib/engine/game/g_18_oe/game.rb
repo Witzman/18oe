@@ -17,6 +17,7 @@ require_relative 'step/hochberg_token'
 require_relative 'step/sml_train'
 require_relative 'green_junction'
 require_relative 'krasnaya_strela'
+require_relative 'port_authority'
 require_relative 'pullman'
 require_relative 'right_of_way'
 require_relative 'step/home_hex_consent'
@@ -50,6 +51,7 @@ module Engine
         include G18OE::RightOfWay
         include G18OE::Sea
         include G18OE::National
+        include G18OE::PortAuthority
         include G18OE::Pullman
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
@@ -494,6 +496,7 @@ module Engine
           # §15.11: Minor L's +1+1 marker
           setup_krasnaya_strela!
           setup_pullmans!
+          setup_port_authorities!
         end
 
         def setup_wcf_placeholder!
@@ -1953,6 +1956,7 @@ module Engine
           national_cash_to_bank!(corporation)
           national_treasury_to_market!(corporation)
           pullman_to_market!(corporation)
+          port_authority_off!(corporation)
           national_tokens_off!(corporation)
           national_merged_minors_off!(corporation)
           national_charter_assets_off!(corporation)

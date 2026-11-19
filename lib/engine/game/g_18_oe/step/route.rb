@@ -16,7 +16,7 @@ module Engine
 
             # §15.11: Minor L's marker, assigned at the beginning of the run trains step (upstream `assign`)
             actions += %w[assign] unless @game.krasnaya_trains(entity).empty?
-            actions += %w[choose] unless pullman_choices(entity).empty?
+            actions += %w[choose] unless choices_for(entity).empty?
             return actions if @game.double_head_candidates(entity).size < 2
             return actions if !@game.loading && !@game.orient_express_reachable?(entity)
 
@@ -26,11 +26,20 @@ module Engine
           # §11.3.9 (#55): the president says which train carries the Pullman; it adds £10 per level of that
           # train. Offered before the routes are run, one choice per train that does not carry it now.
           def choices
-            pullman_choices(current_entity)
+            choices_for(current_entity)
           end
 
           def choice_name
-            'Attach Pullman'
+            'Pullman, port authority'
+          end
+
+          # §11.3.5 (#56): the port authority marker may be bought before the Buy Trains step, so here too.
+          def choices_for(entity)
+            pullman_choices(entity).merge(@game.port_authority_choices(entity))
+          end
+
+          def port_authority_choices(entity)
+            @game.port_authority_choices(entity)
           end
 
           def pullman_choices(entity)
@@ -46,6 +55,8 @@ module Engine
           def process_choose(action)
             entity = action.entity
             choice = action.choice
+            return @game.buy_port_authority!(entity, choice) if @game.port_authority_choice?(choice)
+
             raise GameError, "#{choice} is not a Pullman choice on offer (§11.3.9)" unless pullman_choices(entity).key?(choice)
 
             train = entity.trains.find { |t| t.id == choice.delete_prefix('pullman_on:') }

@@ -1,12 +1,15 @@
 # frozen_string_literal: true
 
 require_relative '../../../step/track'
+require_relative 'port_authority_purchase'
 
 module Engine
   module Game
     module G18OE
       module Step
         class Track < Engine::Step::Track
+          include PortAuthorityPurchase
+
           def setup
             super
             @points_used = 0
