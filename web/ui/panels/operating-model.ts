@@ -10,7 +10,17 @@ import { playerName } from "../frame/model.ts";
 export type Action = Record<string, unknown>;
 export const ROUTE_STEP = "Route";
 export const DIVIDEND_STEP = "Dividend";
-export const OPERATING_TYPES = [[ROUTE_STEP, "run_routes"], [DIVIDEND_STEP, "dividend"]] as const;
+export const OPERATING_TYPES = [[ROUTE_STEP, "run_routes"], [ROUTE_STEP, "choose"], [DIVIDEND_STEP, "dividend"]] as const;
+
+export interface PullmanOption { choice: string; label: string; action: Action }
+/** The trains the viewer may attach the Pullman to (§11.3.9, #55): the `choose` actions `pullman_on:<train>` of the Route step. */
+export function pullmanOptions(g: Game): PullmanOption[] {
+  if (g.state.prompt.step !== ROUTE_STEP || !g.state.prompt.viewer_to_act) return [];
+  const choices = g.state.prompt.choices ?? [];
+  return g.state.prompt.actions
+    .filter((a) => a.type === "choose" && typeof a.choice === "string" && a.choice.startsWith("pullman_on:"))
+    .map((a) => ({ choice: String(a.choice), label: choices.find((c) => c.choice === a.choice)?.label ?? String(a.choice), action: a }));
+}
 
 /** Operating steps in rule order (rulebook 11); the ladder marks the current one. */
 export const LADDER = ["Track", "Token", "Route", "Dividend", "BuyTrain"] as const;

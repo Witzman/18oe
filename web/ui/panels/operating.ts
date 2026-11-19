@@ -10,15 +10,16 @@ import { Geld, formatGeld, toDom, v, type VNode } from "../kit/index.ts";
 import { fillText, txt } from "../text.ts";
 import {
   DIVIDEND_STEP, OPERATING_TYPES, ROUTE_STEP, chosenOption, dividendOptions, dividendOrder, isOperatingStep,
-  operator, optionLine, payoutRows, runHexes, runLines, runModel, runSentence, type DivOption,
+  operator, optionLine, payoutRows, pullmanOptions, runHexes, runLines, runModel, runSentence, type DivOption,
 } from "./operating-model.ts";
 import { mapPick } from "./map-pick.ts";
 
 const tip = (key: string): string => `${txt(key).en} (${txt(key).regel})`;
 const mineToAct = (g: Game): boolean => isOperatingStep(g) && g.state.prompt.viewer_to_act;
 
-export function RoutePanel(g: Game): VNode {
+export function RoutePanel(g: Game, onPullman?: (action: Record<string, unknown>) => void): VNode {
   const m = runModel(g);
+  const pullman = pullmanOptions(g);
   const cell = (cls: string, ...c: (string | VNode)[]) => v("td", { class: cls }, ...c);
   const extra = (key: string, n: number) => n > 0 ? v("tr", { class: "op-extra", title: tip(key) }, cell("", txt(key).de), cell("", ""), cell("op-num", Geld(n))) : null;
   return v("div", { class: "op-run" },
@@ -29,10 +30,13 @@ export function RoutePanel(g: Game): VNode {
           v("th", { class: "op-num", title: tip("route.col_revenue") }, txt("route.col_revenue").de))),
         v("tbody", {}, ...m.rows.map((r) => v("tr", { "data-train": r.train }, cell("", r.train), cell("op-stops", r.stops), cell("op-num", Geld(r.revenue)))),
           extra("route.extra", m.extra), extra("route.subsidy", m.subsidy)),
-        v("tfoot", {}, v("tr", { title: tip("route.total") }, cell("", txt("route.total").de), cell("", ""), cell("op-num op-total", Geld(m.total))))));
+        v("tfoot", {}, v("tr", { title: tip("route.total") }, cell("", txt("route.total").de), cell("", ""), cell("op-num op-total", Geld(m.total))))),
+    pullman.length > 0 ? v("div", { class: "op-pullman", role: "group", "aria-label": txt("route.pullman").de },
+      v("p", { class: "op-payouts-title muted" }, txt("route.pullman").de),
+      ...pullman.map((o) => v("button", { type: "button", class: "op-opt", "data-pullman": o.choice, onclick: () => onPullman?.(o.action) }, v("strong", { class: "op-opt-name" }, o.label)))) : null);
 }
 
-export interface DividendHandlers { onPick: (kind: string) => void }
+export interface DividendHandlers { onPick: (kind: string) => void; onPullman?: (action: Record<string, unknown>) => void }
 
 function optionRow(o: DivOption, now: number | null, selected: boolean, mine: boolean, h: DividendHandlers): VNode {
   return v("button", {
@@ -64,7 +68,7 @@ export function DividendPanel(g: Game, pick: string | null, h: DividendHandlers)
 export function OperatingPanel(g: Game, pick: string | null, h: DividendHandlers): VNode {
   const step = g.state.prompt.step;
   return v("section", { class: "op-panel", "aria-label": txt("op.title").de },
-    step === ROUTE_STEP ? RoutePanel(g) : DividendPanel(g, pick, h),
+    step === ROUTE_STEP ? RoutePanel(g, h.onPullman) : DividendPanel(g, pick, h),
     !g.state.prompt.viewer_to_act ? v("p", { class: "muted", role: "status" }, fillText("op.waiting", { who: operator(g)?.president ?? operator(g)?.id ?? "" })) : null);
 }
 
@@ -77,7 +81,7 @@ export function mountOperating(frame: GameFrame): OperatingHandle {
   let owns = false;
   let releaseOrder: (() => void) | null = null;
   const releases = OPERATING_TYPES.map(([step, type]) => frame.claims.claim(step, type));
-  const handlers: DividendHandlers = { onPick: (kind) => { pick = kind; draw(); } };
+  const handlers: DividendHandlers = { onPick: (kind) => { pick = kind; draw(); }, onPullman: (action) => frame.send(action) };
   const mapMarks = mapPick(frame);
 
   function draw() {

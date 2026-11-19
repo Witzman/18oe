@@ -8,7 +8,7 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { choiceLabel, choiceTip, genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, runModel, runSentence } from "../ui/panels/operating-model.ts";
+import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, pullmanOptions, runModel, runSentence } from "../ui/panels/operating-model.ts";
 import { DividendPanel, OperatingPanel, RoutePanel } from "../ui/panels/operating.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
@@ -138,4 +138,19 @@ test("private choices: German label and tooltip from text.ts (#290)", () => {
   g.state.prompt.choices = [{ choice: "flip_private", target: "PeC", entity: "p0", label: "Flip face down" }];
   assert.match(choiceLabel(g, flip)!, /^Schließen \(umdrehen\).*· für PeC$/);
   assert.match(choiceTip(flip)!, /zählt nicht mehr zum Zertifikatslimit/);
+});
+
+test("#55: the Route step offers the trains the Pullman may be attached to; a click sends the choose action", () => {
+  const g = load("operating-route");
+  const corp = operator(g)!.id;
+  const choose = { type: "choose", entity: corp, entity_type: "corporation", choice: "pullman_on:2+2-0" };
+  g.state.prompt.actions.push(choose);
+  g.state.prompt.choices = [{ choice: "pullman_on:2+2-0", target: null, entity: corp, label: "Attach Pullman to the 2+2 train" }];
+  assert.deepEqual(pullmanOptions(g).map((o) => o.choice), ["pullman_on:2+2-0"]);
+  const sent: unknown[] = [];
+  const panel = RoutePanel(g, (a) => sent.push(a));
+  assert.match(textOf(panel), /Attach Pullman to the 2\+2 train/);
+  find(panel, (n) => n.attrs["data-pullman"] === "pullman_on:2+2-0")[0]!.on.click!(new Event("click"));
+  assert.deepEqual(sent, [choose]);
+  assert.deepEqual(pullmanOptions(load("operating-route")), [], "nothing without the Pullman choices");
 });
