@@ -31,6 +31,13 @@
 .frame-signet { display: inline-flex; align-items: center; justify-content: center; min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); font-size: var(--type-display); font-weight: 700; letter-spacing: .08em; color: inherit; text-decoration: none; }
 .frame-rr, .frame-phase, .frame-round { padding: 2px 10px; border: 1px solid color-mix(in srgb, var(--ui-bar-ink) 40%, transparent); border-radius: var(--shape-radius); }
 .frame-round { font-weight: 700; }
+/* Round indicator as on the board (issue 478): discs on a ring; the running one filled, bold and framed. Not interactive. */
+.frame-round.round-marks { display: inline-flex; align-items: center; gap: 8px; padding: 2px 8px; background: var(--stock-field); border-color: var(--stock-cell); color: var(--stock-cell); }
+.round-set { font-size: var(--type-xs); font-weight: 400; text-transform: uppercase; letter-spacing: .06em; }
+.round-marks-list { display: flex; gap: 3px; list-style: none; margin: 0; padding: 0; }
+.round-mark { display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; height: 1.7rem; padding: 0 6px; border-radius: 999px; background: var(--stock-cell); color: var(--stock-cell-ink); font-size: var(--type-sm); font-weight: 400; border: 2px solid transparent; }
+.round-mark[data-active="true"] { background: var(--stock-round-on); color: var(--stock-round-on-ink); font-weight: 700; border-color: var(--stock-cell); box-shadow: 0 0 0 1px var(--stock-round-on); }
+@media (max-width: 1699px) { .round-set { display: none; } }
 /* Order band (issue 416, assumption: thin bar under the head bar in the bar colours, fold button 44 px wide, list scrolls sideways). */
 .frame-orderband[hidden] { display: none; }
 .order-band { display: flex; align-items: center; gap: var(--shape-gap); padding: 0 var(--shape-gap); background: color-mix(in srgb, var(--ui-bar) 88%, var(--ui-bg)); color: var(--ui-bar-ink); font-family: var(--font-head); border-top: 1px solid color-mix(in srgb, var(--ui-bar-ink) 20%, transparent); }
@@ -38,9 +45,17 @@
 .order-band-title { color: color-mix(in srgb, var(--ui-bar-ink) 70%, transparent); }
 .order-band[data-collapsed="true"] .order-band-title { color: inherit; }
 .order-strip { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; display: flex; gap: 4px; list-style: none; margin: 0; padding: 2px 0; white-space: nowrap; }
-.order-strip-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; border: 1px solid transparent; border-radius: var(--shape-radius); }
-.order-strip-item[data-state="done"] { opacity: .45; }
-.order-strip-item[data-state="current"] { border-color: var(--ui-accent); background: color-mix(in srgb, var(--ui-accent) 22%, transparent); font-weight: 700; }
+/* Board look (issue 478): the dark order track, one numbered cream cell per company; finished cells grey like the board's "Finished Operating" row, the running one framed in the major red. */
+.order-band { background: var(--stock-field); color: var(--stock-cell); }
+.order-band-title { color: var(--stock-cell); text-transform: uppercase; letter-spacing: .08em; }
+.order-strip { gap: 3px; padding: 4px 0; }
+.order-strip-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; min-height: 2.2rem; border: 2px solid transparent; border-radius: var(--shape-radius); background: var(--stock-cell); color: var(--stock-cell-ink); }
+.order-strip-no { min-width: 1.1em; font-size: var(--type-xs); font-weight: 700; color: var(--stock-cell-ink); }
+.order-strip-mark { min-width: 1em; font-size: var(--type-sm); }
+.order-strip-item[data-state="done"] { background: var(--stock-order-done); color: var(--stock-order-done-ink); }
+.order-strip-item[data-state="done"] :is(.order-strip-no) { color: var(--stock-order-done-ink); }
+.order-strip-item[data-state="current"] { border-color: var(--stock-major); box-shadow: 0 0 0 1px var(--stock-major); font-weight: 700; }
+.order-strip-item[data-state="current"] .order-strip-mark { color: var(--stock-major-ink); }
 .order-strip-item[data-mine="true"] .order-strip-owner { text-decoration: underline; }
 .order-strip-owner { font-size: var(--type-sm); }
 .frame-who { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 4px 14px; border-radius: var(--shape-radius); }
@@ -190,3 +205,4 @@ body:has(.frame) .dev-menu { top: 8px; bottom: auto; right: 12px; z-index: 20; }
 .frame-log-host .kit-dialog-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .frame-log-host .frame-log { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; height: auto; }
 .frame-log-host .kit-dialog-actions button { min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); }
+.order-strip-mark:empty { display: none; }

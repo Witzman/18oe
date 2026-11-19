@@ -14,7 +14,7 @@ import { playerName } from "../frame/model.ts";
 import { fillText, txt } from "../text.ts";
 import { LADDER, ladderIndex, operator } from "./operating-model.ts";
 
-export interface OpFact { key: string; label: string; value: string }
+export interface OpFact { key: string; label: string; value: string; area?: string }
 export interface OpStep { step: string; label: string; state: "done" | "current" | "next" }
 export interface OpSheet {
   id: string; name: string;
@@ -41,7 +41,7 @@ export function opSheet(g: Game, theme: Theme): OpSheet | null {
   if (c.share_price !== null) facts.push(fact("op.price", formatGeld(c.share_price)));
   facts.push(fact("op.trains", c.trains.length > 0 ? c.trains.map((t) => t.name).join(", ") : txt("frame.none").de));
   if (g.state.depot.pullmans?.available) facts.push(fact("op.pullman", c.pullman ? txt("op.pullman_yes").de : txt("frame.none").de));
-  if (c.port_authority) facts.push(fact("op.port_authority", txt(`op.port_authority_${c.port_authority}`).de));
+  if (c.port_authority) facts.push({ ...fact("op.port_authority", txt(`op.port_authority_${c.port_authority}`).de), area: c.port_authority });
   if (c.tokens.length > 0) facts.push(fact("op.tokens", fillText("op.token_short", { free: c.tokens.filter((t) => !t.used).length, all: c.tokens.length })));
   const at = ladderIndex(g);
   const steps: OpStep[] = at < 0 ? [] : LADDER.map((s, i) => ({
@@ -56,7 +56,7 @@ export function OpSheetView(s: OpSheet): VNode {
     v("p", { class: "op-sheet-who", title: s.name }, v("strong", {}, `${s.id} · ${s.who}`)),
     v("p", { class: "op-sheet-facts" }, ...s.facts.flatMap((f, i) => [
       i > 0 ? v("span", { class: "op-sheet-sep", "aria-hidden": "true" }, " · ") : null,
-      v("span", { class: "op-sheet-fact", "data-key": f.key, title: `${txt(f.key).en} (${txt(f.key).regel})` }, `${f.label} `, v("b", {}, f.value)),
+      v("span", { class: "op-sheet-fact", "data-key": f.key, "data-area": f.area, title: `${txt(f.key).en} (${txt(f.key).regel})` }, `${f.label} `, v("b", {}, f.value)),
     ])),
     s.steps.length > 0 ? v("ol", { class: "op-strip", "aria-label": txt("op.ladder").de },
       ...s.steps.map((st) => v("li", {

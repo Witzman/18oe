@@ -19,7 +19,8 @@ import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./or
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
 import { OrderBandView, orBand } from "./or-band.ts";
 import { opSheet, OpSheetView } from "../panels/op-sheet.ts";
-import { corpColor, playerRows, roundBar, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
+import { roundChip } from "./round-marks.ts";
+import { corpColor, playerRows, roundBar, roundMarkers, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
 import { panelIdle, readCollapsed, readOrderCollapsed, writeCollapsed, writeOrderCollapsed } from "./panel.ts";
 import { createViews } from "./views.ts";
 import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
@@ -197,7 +198,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       v("a", { class: "frame-signet", href: "#/", title: txt("frame.signet_title").de }, "18OE"),
       v("span", { class: "frame-rr", title: txt(`rrphase.${m.rrPhase}`).en }, txt(`rrphase.${m.rrPhase}`).de),
       phase,
-      v("span", { class: "frame-round", "aria-current": "step", title: m.round }, m.roundShort),
+      roundChip(m.round, m.roundShort, roundMarkers(game)),
       v("div", { class: "frame-who", "data-mine": m.who.mine ? "true" : "false", role: "status", title: m.who.text },
         m.who.corp ? Siegel({ sym: m.who.corp.sym, color: m.who.corp.color }, { theme: t, size: "s" }) : null,
         v("span", {}, m.who.text)),
