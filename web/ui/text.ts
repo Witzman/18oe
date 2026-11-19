@@ -56,6 +56,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.HomeHexConsent": e("Gleisbau im Heimathex erlauben", "Home hex permission", "§11.1.9"),
   "step.Route": e("Fahrt", "Run routes", "§11.3"),
   "step.OrientExpressBonus": e("Orient-Express-Bonus", "Orient Express bonus", "§12, §12.2"),
+  "step.TransferTokens": e("Stationen von eigenen Majors kaufen", "Buy tokens from your other majors", "§11.5"),
   "step.IssueShares": e("Aktien ausgeben", "Issue shares", "§4"),
   "step.MergeMinor": e("Minor einbringen", "Merge minor", "§10.5"),
   "step.MergeToken": e("Station beim Zusammenschluss", "Merge token", "§10.5, §10.6"),
