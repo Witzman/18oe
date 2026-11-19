@@ -2,6 +2,7 @@
 
 require "engine"
 require_relative "legal_actions"
+require_relative "coverage"
 
 module Oe
   # The JSON view model (#35): everything the client may render, as plain
@@ -76,6 +77,8 @@ module Oe
         standings: game.result.map { |id, value| { player: id, value: value } },
         winner: game.finished ? game.result.keys.first : nil,
         game_end: game_end(game),
+        # Whether the state lies within the verified rules slice (#130).
+        coverage: Oe::Coverage.for(game),
       }
     end
 
