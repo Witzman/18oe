@@ -1699,8 +1699,12 @@ module Engine
           allowance = numeric ? 0 : steamship_allowance(route.corporation, route.phase)
           pa_allowance = numeric ? 0 : port_authority_allowance(route.corporation)
           error = nil
-          # the fewest units of both reductions that let the route pass (§15.8, §11.3.5), Minor H's first
-          ((0..allowance).to_a.product((0..pa_allowance).to_a)).sort_by { |s, p| [s + p, s] }.each do |used, pa_used|
+          # the fewest units of both reductions that let the route pass (§15.8, §11.3.5), those the other trains of the
+          # RR have not taken yet first (#472: both reductions belong to the RR, so the trains share them), then the
+          # port authority's (it holds only in its area, Minor H's anywhere)
+          left = sibling_reduction_left(route, allowance, pa_allowance)
+          ((0..allowance).to_a.product((0..pa_allowance).to_a))
+            .sort_by { |s, p| [s > left[0] || p > left[1] ? 1 : 0, s + p, s] }.each do |used, pa_used|
             units = sea_units(route, used, pa_used)
             begin
               if units.zero? || train.distance.is_a?(Numeric)
@@ -1720,6 +1724,15 @@ module Engine
             end
           end
           raise error
+        end
+
+        # [Minor H units, port authority units] the other routes of the RR's turn have not used (#472). Only an order
+        # of preference: a route that needs more still passes its own check; Game#check_steamship_total refuses
+        # the set of routes then.
+        def sibling_reduction_left(route, allowance, pa_allowance)
+          others = (route.routes || []).reject { |other| other.equal?(route) }
+          [allowance - others.sum { |other| other.instance_variable_get(:@steamship_use).to_i },
+           pa_allowance - others.sum { |other| other.instance_variable_get(:@port_authority_use).to_i }]
         end
 
         # What the base distance check sees of a train that rides a ferry: its rows, less the ferry distance.
