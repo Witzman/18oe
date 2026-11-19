@@ -11,6 +11,7 @@ module Engine
         PORT_AUTHORITY_PRICE = 125
         PORT_AUTHORITY_AREAS = { north_sea: 'North Sea', mediterranean: 'Mediterranean' }.freeze
         PORT_AUTHORITY_PER_AREA = 8
+        PORT_AUTHORITY_TRANSFER_PREFIX = 'transfer_marker:'
 
         attr_reader :port_authority_supply
 
@@ -36,6 +37,39 @@ module Engine
 
         def port_authority_choice?(choice)
           choice.to_s.start_with?('port_authority:')
+        end
+
+        # Transfer (§11.5 with §11.3.5, workshop #469): in the Transfer Tokens step a major without a marker buys the
+        # marker of another major of the same player for exactly £125, paid to the seller. Choice id
+        # "transfer_marker:<seller>". Assumption (#56): only between majors of the same player, as with tokens.
+        def port_authority_transfer_choices(buyer)
+          return {} unless buyer&.corporation? && buyer.type == :major && buyer.floated? && !buyer.closed?
+          return {} if port_authority(buyer) || buyer.cash < PORT_AUTHORITY_PRICE
+
+          @corporations.each_with_object({}) do |seller, choices|
+            next unless seller != buyer && seller.type == :major && seller.floated? && !seller.closed?
+            next unless seller.owner == buyer.owner && (area = port_authority(seller))
+
+            choices["#{PORT_AUTHORITY_TRANSFER_PREFIX}#{seller.id}"] =
+              "Buy #{seller.name}'s #{PORT_AUTHORITY_AREAS[area]} port authority marker " \
+              "(#{format_currency(PORT_AUTHORITY_PRICE)} to #{seller.name})"
+          end
+        end
+
+        def port_authority_transfer_choice?(choice)
+          choice.to_s.start_with?(PORT_AUTHORITY_TRANSFER_PREFIX)
+        end
+
+        def transfer_port_authority!(buyer, choice)
+          raise GameError, "#{choice} is not a port authority marker #{buyer.name} may buy (§11.3.5)" unless
+            port_authority_transfer_choices(buyer).key?(choice)
+
+          seller = corporation_by_id(choice.delete_prefix(PORT_AUTHORITY_TRANSFER_PREFIX))
+          area = @port_authority_owners.delete(seller)
+          buyer.spend(PORT_AUTHORITY_PRICE, seller)
+          @port_authority_owners[buyer] = area
+          @log << "#{buyer.name} buys #{seller.name}'s #{PORT_AUTHORITY_AREAS[area]} port authority marker for " \
+                  "#{format_currency(PORT_AUTHORITY_PRICE)} to #{seller.name} (§11.5)"
         end
 
         def buy_port_authority!(entity, choice)

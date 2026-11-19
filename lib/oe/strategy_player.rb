@@ -54,10 +54,10 @@ module Oe
     PULLMAN_PAYBACK_ORS = 5
     PULLMAN_CASH_BUFFER = 150
 
-    # Token transfers between majors (§11.5, #57) are not used by the bot yet: it passes the step.
+    # Token and port authority marker transfers between majors (§11.5, #57, #469) are not used by the bot yet: it passes the step.
     def self.pullman_choice?(action)
       action.is_a?(Engine::Action::Choose) &&
-        action.choice.to_s.start_with?('pullman_', 'port_authority:', 'transfer_token:')
+        action.choice.to_s.start_with?('pullman_', 'port_authority:', 'transfer_token:', 'transfer_marker:')
     end
 
     def choose(actions)

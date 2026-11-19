@@ -27,14 +27,17 @@ module Engine
           end
 
           def choice_name
-            'Buy a token'
+            'Buy a token or port authority marker'
           end
 
           def choices
-            @game.token_transfer_choices(current_entity)
+            @game.token_transfer_choices(current_entity).merge(@game.port_authority_transfer_choices(current_entity))
           end
 
           def process_choose(action)
+            return @game.transfer_port_authority!(action.entity, action.choice) if
+              @game.port_authority_transfer_choice?(action.choice)
+
             @game.transfer_token!(action.entity, action.choice)
           end
         end
