@@ -200,6 +200,23 @@ jobs:
           bundler-cache: true
       - run: bundle exec ruby -I lib bin/script_game.rb --spawn
 
+  # Slice S2 (#481): conversions, merges, national formation. Its own job, not a second step: slice s1 alone takes
+  # 32 to 38 min of the 45 (measured), and the rush game of s2 needs about 15 min. The targets it does not reach
+  # are named `unreachable` in slices/s2.yml; a target missing from `combos` turns this job red.
+  script-game-s2:
+    name: scripted game S2 (bin/script-game --slice s2 --spawn)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - run: bundle exec ruby -I lib bin/script_game.rb --spawn --slice s2
+
   docker:
     name: docker build (optional)
     if: github.event_name == 'workflow_dispatch' && inputs.docker
