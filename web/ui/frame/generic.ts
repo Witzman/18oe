@@ -83,10 +83,12 @@ export function genericModel(g: Game, claims: Claims): GenericModel {
   return { groups, ranges, unsupported, count: groups.reduce((n, gr) => n + gr.entries.length, 0) + ranges.length };
 }
 
-/** The bid a range stands for: a normal action, as the legal-action list documents (#91). */
+/** The bid or trade offer a range stands for: a normal action, as the legal-action list documents (#91, #202). */
 export function rangeAction(g: Game, r: Range, price: number): Action {
   const entityType = g.state.players.some((p) => p.id === r.entity) ? "player" : "corporation";
-  return { type: r.type, entity: r.entity, entity_type: entityType, company: r.company, price };
+  // A trade offer for a minor (#202) names the minor corporation; every other range a company.
+  const target = r.type === "buy_corporation" ? { corporation: r.company } : { company: r.company };
+  return { type: r.type, entity: r.entity, entity_type: entityType, ...target, price };
 }
 
 /** Whole number on the range's grid (min, min+step .. max); null when not. */

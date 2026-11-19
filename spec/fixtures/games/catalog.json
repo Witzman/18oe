@@ -278,7 +278,7 @@
     {
       "surface": "§10.4 Spielerhandel (Kauf von Spielern, Zustimmung des Verkaeufers)",
       "slice": "S1",
-      "reason": "Engine: Game#player_trade_enabled? ist false, die Regel ist nicht gespielbar; Zustimmungs-Abfrage folgt mit #148 (Teil 2). Eintrag, sobald #148 den Handel freischaltet."
+      "reason": "Seit #202 spielbar als Angebot des Kaeufers und Annahme/Ablehnung des Verkaeufers (Schritt TradeOffer), in jeder Aktienrunde. Bots und Strategie machen keine Angebote und lehnen ab, daher in keiner Katalogpartie; gedeckt durch Engine-Specs (player_trade_offer_spec, player_trading_spec). Eintrag, sobald die Skript-Partie den Handel steuert (Workshop #223)."
     },
     {
       "surface": "§10.5/§11.6 Zugkauf mit Aktienverkauf des Praesidenten (BuyTrain/sell_shares)",
