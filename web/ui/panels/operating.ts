@@ -10,7 +10,7 @@ import { Geld, formatGeld, toDom, v, type VNode } from "../kit/index.ts";
 import { fillText, txt } from "../text.ts";
 import {
   DIVIDEND_STEP, OPERATING_TYPES, ROUTE_STEP, chosenOption, dividendOptions, dividendOrder, isOperatingStep,
-  operator, optionLine, payoutRows, portAuthorityOptions, pullmanOptions, runHexes, runLines, runModel, runSentence, type DivOption,
+  operator, optionLine, payoutRows, portAuthorityOptions, pullmanOptions, runBands, runHexes, runLines, runModel, runSentence, type DivOption,
 } from "./operating-model.ts";
 import { mapPick } from "./map-pick.ts";
 
@@ -100,7 +100,7 @@ export function mountOperating(frame: GameFrame): OperatingHandle {
     }
     owns = true;
     const hexes = runHexes(g);
-    mapMarks.show(hexes.length > 0 ? { hexes, kind: "route" } : null, null);
+    mapMarks.show(hexes.length > 0 ? { hexes, kind: "route" } : null, null, runBands(g));
     frame.slots.context.replaceChildren(toDom(OperatingPanel(g, pick, handlers)));
     if (!mineToAct(g)) return;
     if (g.state.prompt.step === ROUTE_STEP) {

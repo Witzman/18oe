@@ -51,6 +51,9 @@ export const NUMBER_RANGES = {
   track: {
     gauge: [0.02, 0.3], railWidth: [0.005, 0.08], sleeperSpacing: [0.03, 0.3],
     sleeperLength: [0.05, 0.5], sleeperWidth: [0.01, 0.1], bedWidth: [0.05, 0.6],
+    // Run band (#155) in side lengths: band width, light outline per side, sideways gap of several trains, width factor
+    // with several trains, radius of a stop ring; and the least width on screen in px.
+    runWidth: [0.05, 0.6], runOutline: [0, 0.1], runGap: [0.05, 0.5], runMultiScale: [0.3, 1], runRing: [0.05, 0.5], runMinPx: [0, 12],
   },
   motion: { runMsPerHex: [50, 1000], runMaxMs: [500, 20000], queueMaxMs: [500, 30000], flashMs: [100, 2000], flyMs: [0, 3000],
     // Touch (#259): decay time constant of the pan inertia, window of a double tap (ms).

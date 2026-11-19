@@ -6,6 +6,7 @@ import type { Corporation, DividendContext, Game, RunSea } from "../../types.ts"
 import { fillText, txt } from "../text.ts";
 import { formatGeld, type Change } from "../kit/index.ts";
 import { playerName } from "../frame/model.ts";
+import type { MapRun } from "../../render/layers/runs.ts";
 
 export type Action = Record<string, unknown>;
 export const ROUTE_STEP = "Route";
@@ -145,6 +146,25 @@ export function runHexes(g: Game): string[] {
     ? (Array.isArray(runModel(g).action?.routes) ? runModel(g).action!.routes as { hexes?: unknown }[] : []).flatMap((r) => (Array.isArray(r.hexes) ? r.hexes.map(String) : []))
     : (g.state.prompt.context?.dividend?.routes ?? []).flatMap((r) => r.hexes);
   return [...new Set(hexes)];
+}
+
+/**
+ * The run the server proposes in the Route step as bands on the map (#155, display only): the routes of the
+ * offered `run_routes` with their hex chains and stops. Null outside the Route step, without an offered run, or
+ * when the offer carries no hex chain (states recorded before `connections`).
+ */
+export function runBands(g: Game): MapRun | null {
+  if (!isOperatingStep(g) || g.state.prompt.step !== ROUTE_STEP) return null;
+  const corp = operator(g);
+  const raw = runModel(g).action?.routes;
+  if (!corp || !Array.isArray(raw)) return null;
+  const strings = (x: unknown): string[] => (Array.isArray(x) ? x.map(String) : []);
+  const routes = raw.flatMap((r: { train?: unknown; connections?: unknown; nodes?: unknown; revenue?: unknown }) => {
+    const connections = Array.isArray(r.connections) ? r.connections.map(strings).filter((c) => c.length > 0) : [];
+    const train = String(r.train ?? "");
+    return connections.length === 0 ? [] : [{ train, name: corp.trains.find((t) => t.id === train)?.name ?? train, connections, nodes: strings(r.nodes), revenue: Number(r.revenue ?? 0) }];
+  });
+  return routes.length > 0 ? { corporation: corp.id, routes } : null;
 }
 
 /** One line per option as on the board: what each share gets, what the treasury keeps, where the price goes. */
