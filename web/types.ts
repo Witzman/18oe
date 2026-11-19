@@ -89,11 +89,11 @@ export interface Corporation {
   tokens: { used: boolean; hex: string | null }[];
   last_run: {
     revenue: number; dividend: string | null;
-    routes: {
+    routes: ({
       train: string; name: string; revenue: number; hexes: string[];
       segments: { hex: string; exits: number[]; nodes: number[] }[];
       stops: { hex: string; index: number; revenue: number }[];
-    }[];
+    } & RunSea)[];
   } | null;
   track_rights: string[];
   orient_express_marker: boolean;
@@ -150,7 +150,15 @@ export interface DividendContext {
     direction: string[]; times: number[]; price: number | null;
   }[];
   // The run being paid out (#302): per train its hexes and revenue; missing in states recorded before.
-  routes?: { train: string; hexes: string[]; revenue: number }[];
+  routes?: ({ train: string; hexes: string[]; revenue: number } & RunSea)[];
+}
+/** The sea traffic of a run (§11.3.3, §11.3.4, §11.3.7, #362); missing in states recorded before. `counted` is what counts
+ *  against the city limit after the reductions (kind: port_token, steamship, extra). */
+export interface RunSea {
+  distance_str?: string;
+  sea?: { from: string; from_exit: number | "offshore"; to: string; to_exit: number | "offshore"; zones: number; counted: number;
+    reductions: { kind: string; units: number }[] }[];
+  ferries?: { ferry: string; distance: number; counted: number }[];
 }
 export interface TrainContext {
   limit: number; count: number; must_buy: boolean;

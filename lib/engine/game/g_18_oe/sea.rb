@@ -42,7 +42,8 @@ module Engine
 
         # A stretch of a route's sea traffic that counts against the city limit: a sea crossing's zones or a ferry's
         # distance. hex_ids: the land hexes of its ports or ferry ends, where a token can reach it (assumption A2 of #60).
-        SeaTarget = Struct.new(:units, :hex_ids)
+        # ref: the ferry component or the crossing it is, for the view (#362).
+        SeaTarget = Struct.new(:units, :hex_ids, :ref)
 
         # What takes units off the targets of one train: up to `amount` units of one target whose hex_ids hold one of
         # its hex_ids. A port token is one (§11.3.5); Port Authority, Minor H and the Star Harbor token (#56, #73, #79)
@@ -86,9 +87,9 @@ module Engine
         def sea_targets(route)
           ferries = route.paths.filter_map { |path| ferry_component(path) }.uniq(&:object_id)
           ferry_targets = ferries.select { |ferry| ferry.distance.to_i.positive? }
-                                 .map { |ferry| SeaTarget.new(ferry.distance, ferry.ends.map(&:first).uniq) }
+                                 .map { |ferry| SeaTarget.new(ferry.distance, ferry.ends.map(&:first).uniq, ferry) }
           crossing_targets = sea_crossings(route).map do |chain|
-            SeaTarget.new(chain[:sea][:zones], [chain[:sea][:from].hex_id, chain[:sea][:to].hex_id])
+            SeaTarget.new(chain[:sea][:zones], [chain[:sea][:from].hex_id, chain[:sea][:to].hex_id], chain[:sea])
           end
           ferry_targets + crossing_targets
         end
@@ -118,19 +119,54 @@ module Engine
         # The most units the reducers take off the targets, each reducer on one target, each target at most down to
         # zero. Few tokens and few stretches per route, so every assignment is tried: no greedy argument needed.
         def max_sea_reduction(left, targets, reducers)
-          reducer, *rest = reducers
-          return 0 unless reducer
+          sea_reduction_split(left, targets, reducers).first
+        end
 
-          best = max_sea_reduction(left, targets, rest)
+        # The same search with its result: [units taken off, [[reducer, target index, units], ...]] (#362).
+        def sea_reduction_split(left, targets, reducers)
+          reducer, *rest = reducers
+          return [0, []] unless reducer
+
+          best = sea_reduction_split(left, targets, rest)
           targets.each_index do |i|
             next if left[i].zero? || (targets[i].hex_ids & reducer.hex_ids).empty?
 
             used = [left[i], reducer.amount].min
             left[i] -= used
-            best = [best, used + max_sea_reduction(left, targets, rest)].max
+            total, picks = sea_reduction_split(left, targets, rest)
+            best = [total + used, picks + [[reducer, i, used]]] if total + used > best.first
             left[i] += used
           end
           best
+        end
+
+        # What the view shows of a run's sea traffic (#362): per sea crossing its ports (hex and hex side of the
+        # arrow, :offshore for an offshore port), zones, the units that count against the city limit and the
+        # reductions that took units off (kind: port_token, steamship, extra); per ferry its distance and
+        # counted units. The counted units add up to sea_units. `steamship`: the units of Minor H's reduction
+        # the route took (check_distance).
+        def route_sea_detail(route)
+          targets = sea_targets(route)
+          kinds = {}.compare_by_identity
+          reducers = port_token_reducers(route).each { |r| kinds[r] = 'port_token' } +
+                     extra_sea_reducers(route).each { |r| kinds[r] = 'extra' } +
+                     steamship_reducers(targets, route.instance_variable_get(:@steamship_use).to_i).each { |r| kinds[r] = 'steamship' }
+          _, picks = sea_reduction_split(targets.map(&:units), targets, reducers)
+          targets.each_with_index.with_object({ sea: [], ferries: [] }) do |(target, i), detail|
+            used = picks.select { |_, index, _| index == i }
+            counted = target.units - used.sum { |_, _, units| units }
+            if target.ref.is_a?(FerryComponent)
+              detail[:ferries] << { ferry: target.hex_ids.join('-'), distance: target.units, counted: counted }
+            else
+              detail[:sea] << sea_crossing_detail(target, counted, used.map { |r, _, units| { kind: kinds[r], units: units } })
+            end
+          end
+        end
+
+        def sea_crossing_detail(target, counted, reductions)
+          crossing = target.ref
+          { from: crossing[:from].hex_id, from_exit: crossing[:from].exit, to: crossing[:to].hex_id,
+            to_exit: crossing[:to].exit, zones: crossing[:zones], counted: counted, reductions: reductions }
         end
 
         # §11.3.4: a sea crossing is a route chain without track between the port nodes of two hexes. The port
