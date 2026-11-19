@@ -28,7 +28,21 @@ module Oe
       @or_count = Hash.new(0)
     end
 
+    # A trade offer to another player (§10.4, #202): buy_company of a player's private or minor charter,
+    # buy_corporation of a player's minor. Bots make no offers yet (rule 7: simple local rules); as
+    # sellers they decline (pick_other prefers Pass over the step's 'accept_trade' choice).
+    def self.trade_offer?(action)
+      case action
+      when Engine::Action::BuyCorporation then true
+      when Engine::Action::BuyCompany
+        owner = action.company.owner
+        owner.respond_to?(:player?) && owner.player? ? true : false
+      else false
+      end
+    end
+
     def choose(actions)
+      actions = actions.reject { |a| self.class.trade_offer?(a) } if actions.any? { |a| !self.class.trade_offer?(a) }
       # Like Oe::Bot (#128): actions a private issues itself (White Cliffs Ferry's
       # place_token, entity = the company) are not played by the strategy; its
       # rules read corporation state (trains, cash) from the entity.
