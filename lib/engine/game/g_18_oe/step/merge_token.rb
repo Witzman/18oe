@@ -100,7 +100,7 @@ module Engine
           end
 
           def forced_decline?(token)
-            pending_corporation.unplaced_tokens.empty? ||
+            pending_corporation.type == :national || pending_corporation.unplaced_tokens.empty? ||
               token.city.hex.tile.cities.any? { |city| city.tokened_by?(pending_corporation) }
           end
 
