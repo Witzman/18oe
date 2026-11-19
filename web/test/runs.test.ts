@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Z1_FROM, Z2_FROM, zoomStage } from "../render/camera.ts";
-import { MAX_STEP, axisChain, offsetPoints, parseNode, routeLine, runOffsets, runVisibility, type RunWorld } from "../render/runs.ts";
+import { MAX_STEP, axisChain, offsetPoints, parseNode, routeLine, runOffsets, runVisibility, type RunRouteInput, type RunWorld } from "../render/runs.ts";
 import { bandWidth, effectiveWidth } from "../render/layers/runs.ts";
 import { renderTheme } from "../render/theme.ts";
 import { themes, DEFAULT_THEME_ID } from "../themes/index.ts";
@@ -122,4 +122,27 @@ test("band width: a token, narrower for several trains, never thinner than runMi
   assert.ok(bandWidth(theme, 2) < theme.track.runWidth);
   assert.equal(effectiveWidth(0.3, 100, 3), 0.3);
   assert.ok(Math.abs(effectiveWidth(0.3, 5, 3) * 5 - 3) < 1e-9, "at zoom 5 the band keeps 3 px");
+});
+
+test("the recorded two-train scene on the real tile catalog and map: both axes are continuous and fully resolved", () => {
+  const geo = JSON.parse(readFileSync(new URL("./fixtures/map-geometry.json", import.meta.url), "utf8")) as { hexes: { id: string; x: number; y: number; neighbors: (string | null)[] }[] };
+  const game = JSON.parse(readFileSync(new URL("./fixtures/games/operating-route-two-trains.json", import.meta.url), "utf8")) as {
+    state: { map: { hex: string; tile: { name: string; rotation: number } }[]; prompt: { actions: { type: string; routes?: (RunRouteInput & { hexes: string[] })[] }[] } };
+  };
+  const hexes = new Map(geo.hexes.map((h) => [h.id, h]));
+  const laid = new Map(game.state.map.map((e) => [e.hex, e.tile]));
+  const world: RunWorld = {
+    neighbors: (h) => hexes.get(h)?.neighbors,
+    geometry: (h) => { const t = laid.get(h); return t && fx.tiles[t.name] ? tileGeometry(fx.tiles[t.name]!, t.rotation, frame) : null; },
+    origin: (h) => { const x = hexes.get(h); return x ? { x: x.x, y: x.y } : null; },
+  };
+  const routes = game.state.prompt.actions.find((a) => a.type === "run_routes")!.routes!;
+  assert.equal(routes.length, 2);
+  for (const r of routes) {
+    const line = routeLine(r, world);
+    assert.deepEqual(line.unresolved, [], r.train);
+    assert.deepEqual(line.breaks, [], r.train);
+    assert.equal(line.stops.length, r.nodes.length);
+    for (let i = 1; i < line.points.length; i++) assert.ok(dist(line.points[i - 1]!, line.points[i]!) <= MAX_STEP + 1e-9, `${r.train}: jump at ${i}`);
+  }
 });

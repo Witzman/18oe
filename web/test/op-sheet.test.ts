@@ -97,6 +97,7 @@ test("run bands (#155): the offered run of the active company, chains and stops 
   assert.deepEqual(run.routes[0]!.connections, [["H21", "G22", "G24"], ["G24", "G26"]]);
   assert.deepEqual(run.routes[0]!.nodes, ["H21-0", "G24-0", "G26-0"]);
   assert.equal(run.routes[0]!.revenue, 60);
+  assert.match(run.routes[0]!.label!, /^2\+2 £60$/, "shield: train name and the sum");
   assert.equal(runBands(load("operating-dividend")), null, "only the Route step shows the proposal");
   assert.equal(runBands(load("stock")), null);
   const none = load("operating-route");

@@ -17,7 +17,7 @@ import type { Vec } from "../track-axes.ts";
 /** The proposed run of one company: its colour and routes with the train names for the shields. */
 export interface MapRun {
   corporation: string;
-  routes: (RunRouteInput & { name?: string })[];
+  routes: (RunRouteInput & { name?: string; label?: string })[];
 }
 
 export interface RunScene {
@@ -105,7 +105,7 @@ export function buildRunScene(input: RunSceneInput): RunScene {
 
   // Rings at the stops (flat, in the level of their hex); the figures are screen text.
   const figures: { text: Text; at: Vec; z: number; r: number }[] = [];
-  const shields: { box: Container; at: Vec; z: number; row: number }[] = [];
+  const shields: { box: Container; at: Vec; z: number; rise: number }[] = [];
   const seen = new Set<string>();
   lines.forEach((l, i) => {
     for (const s of l.stops) {
@@ -119,7 +119,7 @@ export function buildRunScene(input: RunSceneInput): RunScene {
       const rev = input.stopRevenue(s.hex, s.node);
       if (rev !== null) {
         const text = new Text({
-          text: String(rev), resolution: input.dpr,
+          text: `+${rev}`, resolution: input.dpr,
           style: { fontFamily: theme.font.body, fontSize: 11, fontWeight: "700", fill: theme.map.label, stroke: { color: theme.map.labelHalo, width: 3, join: "round" } },
         });
         text.anchor.set(0, 0);
@@ -129,11 +129,11 @@ export function buildRunScene(input: RunSceneInput): RunScene {
       }
     }
     // Shield at the start of the band: train name and the sum of this train.
-    const start = shifted[i]![0];
+    const start = l.points[0]; // the unshifted start: the shields of several trains stack above one point
     if (!start) return;
     const box = new Container({ label: "run-shield" });
     const label = new Text({
-      text: `${run.routes[i]!.name ?? l.train} ${l.revenue}`, resolution: input.dpr,
+      text: run.routes[i]!.label ?? `${run.routes[i]!.name ?? l.train} ${l.revenue}`, resolution: input.dpr,
       style: { fontFamily: theme.font.body, fontSize: 11, fontWeight: "700", fill: ink },
     });
     label.anchor.set(0.5);
@@ -142,7 +142,7 @@ export function buildRunScene(input: RunSceneInput): RunScene {
     box.addChild(bg, label);
     box.visible = false;
     labels.addChild(box);
-    shields.push({ box, at: start, z: input.zOf(l.hexes[0]!), row: i });
+    shields.push({ box, at: start, z: input.zOf(l.hexes[0]!), rise: 8 + h / 2 + i * (h + 3) });
   });
 
   return {
@@ -164,7 +164,7 @@ export function buildRunScene(input: RunSceneInput): RunScene {
         s.box.visible = vis.shields;
         if (vis.shields) {
           const p = project(view, s.at, s.z);
-          s.box.position.set(Math.round(p.x), Math.round(p.y - 16 - s.row * 20));
+          s.box.position.set(Math.round(p.x), Math.round(p.y - s.rise));
         }
       }
     },

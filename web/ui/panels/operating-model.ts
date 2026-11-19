@@ -148,6 +148,8 @@ export function runHexes(g: Game): string[] {
   return [...new Set(hexes)];
 }
 
+const shieldText = (train: string, revenue: number): string => fillText("run.shield", { train, revenue: formatGeld(revenue) });
+
 /**
  * The run the server proposes in the Route step as bands on the map (#155, display only): the routes of the
  * offered `run_routes` with their hex chains and stops. Null outside the Route step, without an offered run, or
@@ -162,7 +164,8 @@ export function runBands(g: Game): MapRun | null {
   const routes = raw.flatMap((r: { train?: unknown; connections?: unknown; nodes?: unknown; revenue?: unknown }) => {
     const connections = Array.isArray(r.connections) ? r.connections.map(strings).filter((c) => c.length > 0) : [];
     const train = String(r.train ?? "");
-    return connections.length === 0 ? [] : [{ train, name: corp.trains.find((t) => t.id === train)?.name ?? train, connections, nodes: strings(r.nodes), revenue: Number(r.revenue ?? 0) }];
+    const name = corp.trains.find((t) => t.id === train)?.name ?? train, revenue = Number(r.revenue ?? 0);
+    return connections.length === 0 ? [] : [{ train, name, label: shieldText(name, revenue), connections, nodes: strings(r.nodes), revenue }];
   });
   return routes.length > 0 ? { corporation: corp.id, routes } : null;
 }
