@@ -85,4 +85,16 @@ describe 'G18OE port authority and the city limit (§11.3.5)' do
     expect { second.revenue }.not_to raise_error
     expect { third.revenue }.to raise_error(Engine::RouteTooLong)
   end
+
+  # #472: Minor H and the marker are both the RR's; the split of their units over the trains must not be decided
+  # train by train (Minor H first for each), or the third train is refused though 1 + 2 units cover three trains.
+  it 'with Minor H too: three trains that need one unit each pass with Minor H (1) and the marker (2) (#472)' do
+    dsj.add_ability(game.corporation_by_id('H').abilities.first)
+    own!(:north_sea)
+    routes = []
+    3.times { route_over(dsj, '2+2', 'I50', 'I52', routes: routes) }
+    routes.each { |route| expect { route.revenue(suppress_check_route_combination: true) }.not_to raise_error }
+    expect { game.check_overlap(routes) }.not_to raise_error
+    expect(routes.sum { |r| r.instance_variable_get(:@steamship_use).to_i + r.instance_variable_get(:@port_authority_use).to_i }).to eq(3)
+  end
 end
