@@ -391,6 +391,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -433,6 +434,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -471,6 +473,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -509,6 +512,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -547,6 +551,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -585,6 +590,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -623,6 +629,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -661,6 +668,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -699,6 +707,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -737,6 +746,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -775,6 +785,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -813,6 +824,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": null
    },
@@ -851,6 +863,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -893,6 +906,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "floated"
    },
@@ -931,6 +945,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -969,6 +984,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1007,6 +1023,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1045,6 +1062,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1083,6 +1101,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1121,6 +1140,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1159,6 +1179,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1197,6 +1218,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1235,6 +1257,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1273,6 +1296,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "parred"
    },
@@ -1311,6 +1335,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "parred"
    },
@@ -1349,6 +1374,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1387,6 +1413,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "parred"
    },
@@ -1425,6 +1452,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1463,6 +1491,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "parred"
    },
@@ -1501,6 +1530,7 @@
     ],
     "orient_express_marker": false,
     "pullman": false,
+    "port_authority": null,
     "status": [],
     "regional_state": "parred"
    }

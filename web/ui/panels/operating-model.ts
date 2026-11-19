@@ -13,14 +13,18 @@ export const DIVIDEND_STEP = "Dividend";
 export const OPERATING_TYPES = [[ROUTE_STEP, "run_routes"], [ROUTE_STEP, "choose"], [DIVIDEND_STEP, "dividend"]] as const;
 
 export interface PullmanOption { choice: string; label: string; action: Action }
-/** The trains the viewer may attach the Pullman to (§11.3.9, #55): the `choose` actions `pullman_on:<train>` of the Route step. */
-export function pullmanOptions(g: Game): PullmanOption[] {
+/** The `choose` actions of the Route step whose choice starts with `prefix`, with the label the view gives them. */
+function routeChoices(g: Game, prefix: string): PullmanOption[] {
   if (g.state.prompt.step !== ROUTE_STEP || !g.state.prompt.viewer_to_act) return [];
   const choices = g.state.prompt.choices ?? [];
   return g.state.prompt.actions
-    .filter((a) => a.type === "choose" && typeof a.choice === "string" && a.choice.startsWith("pullman_on:"))
+    .filter((a) => a.type === "choose" && typeof a.choice === "string" && a.choice.startsWith(prefix))
     .map((a) => ({ choice: String(a.choice), label: choices.find((c) => c.choice === a.choice)?.label ?? String(a.choice), action: a }));
 }
+/** The trains the viewer may attach the Pullman to (§11.3.9, #55): the `choose` actions `pullman_on:<train>` of the Route step. */
+export const pullmanOptions = (g: Game): PullmanOption[] => routeChoices(g, "pullman_on:");
+/** The port authority markers the viewer's major may still buy (§11.3.5, #56): `port_authority:<area>`; the Route step is the last that offers them. */
+export const portAuthorityOptions = (g: Game): PullmanOption[] => routeChoices(g, "port_authority:");
 
 /** Operating steps in rule order (rulebook 11); the ladder marks the current one. */
 export const LADDER = ["Track", "Token", "Route", "Dividend", "BuyTrain"] as const;

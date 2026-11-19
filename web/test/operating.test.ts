@@ -8,7 +8,7 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { choiceLabel, choiceTip, genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, pullmanOptions, runLines, runModel, runSentence } from "../ui/panels/operating-model.ts";
+import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, portAuthorityOptions, pullmanOptions, runLines, runModel, runSentence } from "../ui/panels/operating-model.ts";
 import { DividendPanel, OperatingPanel, RoutePanel } from "../ui/panels/operating.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
@@ -165,4 +165,20 @@ test("run: sea crossings and ferries of the stored run get a line with what coun
   const lines = runLines(g);
   assert.deepEqual(lines[0]!.sea, ["Seefahrt I52 – I50: 2 Seezonen, 1 zählen, Hafenmarke −1", "Fähre AA20-AB27: Distanz 1, 1 zählt"]);
   assert.match(textOf(DividendPanel(g, "half", noop)), /3-0: Seefahrt I52 – I50/);
+});
+
+test("#56: the Route step offers the port authority markers a major may buy; a click sends the choose action", () => {
+  const g = load("operating-route");
+  const corp = operator(g)!.id;
+  const choose = { type: "choose", entity: corp, entity_type: "corporation", choice: "port_authority:north_sea" };
+  g.state.prompt.actions.push(choose);
+  g.state.prompt.choices = [{ choice: "port_authority:north_sea", target: null, entity: corp, label: "Buy the North Sea port authority marker (£125)" }];
+  assert.deepEqual(portAuthorityOptions(g).map((o) => o.choice), ["port_authority:north_sea"]);
+  assert.deepEqual(pullmanOptions(g), [], "a marker choice is not a Pullman");
+  const sent: unknown[] = [];
+  const panel = RoutePanel(g, (a) => sent.push(a));
+  assert.match(textOf(panel), /Buy the North Sea port authority marker/);
+  find(panel, (n) => n.attrs["data-port-authority"] === "port_authority:north_sea")[0]!.on.click!(new Event("click"));
+  assert.deepEqual(sent, [choose]);
+  assert.deepEqual(portAuthorityOptions(load("operating-route")), []);
 });

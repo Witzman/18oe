@@ -80,3 +80,11 @@ test("#55: the head shows the company's Pullman once Pullman cars are on sale (ย
   b.pullman = true;
   assert.equal(facts(g).find((f) => f.key === "op.pullman")!.value, "ja");
 });
+
+test("#56: the head names the water area of the company's port authority marker (ยง11.3.5)", () => {
+  const g = load("operating-route");
+  const facts = (gg: Game) => opSheet(gg, theme)!.facts;
+  assert.ok(!facts(g).some((f) => f.key === "op.port_authority"), "no marker, no fact");
+  g.state.corporations.find((c) => c.id === "B")!.port_authority = "north_sea";
+  assert.equal(facts(g).find((f) => f.key === "op.port_authority")!.value, "Nordsee");
+});
