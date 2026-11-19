@@ -83,6 +83,21 @@ module Engine
                   'and other RRs\' tokens in the city do not block them. '\
                   'The token city need not be reachable but may not serve as the sole token on a route, '\
                   'nor be used to place further tokens.',
+            # §14.5 (#79): a pass-through token in a port city, see Game#pass_token_city? and Step::SpecialToken.
+            abilities: [
+              {
+                type: 'token',
+                owner_type: 'player',
+                when: 'owning_player_token',
+                hexes: [],
+                extra_slot: true,
+                connected: false,
+                count: 1,
+                closed_when_used_up: true,
+                special_only: true,
+                price: 0,
+              },
+            ],
             auction_row: 3,
           },
           {
