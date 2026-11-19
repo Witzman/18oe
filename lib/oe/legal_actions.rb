@@ -156,8 +156,12 @@ module Oe
       @connected ||= @game.graph_for_entity(entity).connected_paths(entity).dup
     end
 
-    # The cities a token may be placed in now (#123).
+    # The cities a token may be placed in now (#123). A merge token (§10.5, #224) takes the place of the
+    # minor's token (City#exchange_token), so the city is full by definition and `tokenable?` would refuse
+    # it; the step's own `available_cities` (the minor's city) is the whole question.
     def token_targets(step, entity)
+      return token_cities(step, entity) if step.is_a?(Engine::Game::G18OE::Step::MergeToken)
+
       tokens = step.available_tokens(entity)
       tokener = step.is_a?(Engine::Step::HomeToken) || entity.company? ? tokens.first.corporation : entity
       extra_slot = company_extra_slot?(step, entity)

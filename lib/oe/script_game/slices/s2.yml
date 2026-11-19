@@ -1,0 +1,46 @@
+# Target list of slice S2 (workshop #224): conversions, minor merges, the consolidation round and
+# train discards, every combination round / step / action type through the API at least once.
+# Format as in s1.yml; run with `bin/script-game --slice s2`.
+#
+# Each target is an action the enumerator offers in a state a small scenario reaches, under the key
+# the script game counts (ScriptGame#key); spec/oe/s2_targets_spec.rb proves that one by one and fails
+# for a target without a scenario. What the spec does NOT show: that a whole script game reaches the
+# states. That is a CI run (`bin/script-game --slice s2`, not yet a step of full.yml, so a run that
+# misses a target cannot turn the nightly red before it is known to reach them). A target the run never
+# reaches makes the run red, so strike it from here then and say why.
+#
+# Train purchase between railroads and train variants (#127, #54, #354) have no key of their own: the
+# script game counts operating/BuyTrain/buy_train whatever the source or variant (a S1 target), so they
+# are covered by spec/oe/legal_actions_train_variants_spec.rb and spec/engine/g_18_oe/s2_train_scenarios_spec.rb.
+# Forced purchase with conversion (`bankrupt`) is an S1 target. Green tiles are lay_tile (S1).
+#
+# Not yet reachable, left out on purpose:
+# - the director has no steering for these states (it plays what is on offer). Whether the seeded rush
+#   game owns a minor and a major of one player in Train Phase 3+, or a regional with a 25% pair, is not
+#   known without a run; #118 (target-driven director up to phase 8) is the place to steer there.
+# - stock/BuySellParShares/choose:<minor id> (starting a merge) is keyed by the minor's id, so it cannot
+#   be a stable target; the merge is counted as stock/MergeMinor/merge.
+slice: S2
+games:
+  - name: rush game, conversions, merges and discards
+    seed: 1
+    finish: false
+    rush: true
+    combos:
+      - stock/BuySellParShares/convert
+      - stock/BuySellParShares/choose:offer_or_merge
+      - stock/MergeMinor/merge
+      - stock/MergeOffer/choose:merge_offer
+      - stock/MergeOffer/pass
+      - stock/MergeToken/place_token
+      - stock/MergeToken/pass
+      - stock/MergeDiscardTrain/discard_train
+      - stock/MergeDiscardTrain/pass
+      - consolidation/Consolidate/convert
+      - consolidation/Consolidate/choose:offer_or_abandon
+      - consolidation/Consolidate/choose:offer_or_merge
+      - consolidation/MergeOffer/choose:merge_offer
+      - consolidation/MergeOffer/pass
+      - operating/ConvertToNational/convert
+      - operating/ConvertToNational/pass
+      - operating/DiscardTrain/discard_train
