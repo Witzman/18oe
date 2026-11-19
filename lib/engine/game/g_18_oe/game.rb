@@ -963,15 +963,21 @@ module Engine
           self.class::TRACK_RIGHTS_COST[region] || 0
         end
 
-        # What a minor pays for its home token (§9.1 step 4): the chit's cost. A
-        # minor that cannot afford any open zone in full (bought at a price below
-        # every chit cost, e.g. a row reduced to 0 and taken by force) pays what
-        # its treasury holds, so the float can finish (#367, assumption).
+        # What a minor's home token costs (§9.1 step 4): the chit's cost. The rulebook is silent when the treasury
+        # holds less (a row reduced to 0 is taken by force, §7); owner decision (#369): the owning player tops up
+        # the rest (Step::HomeToken). Only a minor that even with its player's cash cannot afford any open zone in
+        # full pays what the two together hold, so the float can finish (#367).
         def home_token_cost(minor, region)
           cost = track_rights_cost(region)
-          return cost if @minor_available_regions.keys.any? { |r| track_rights_cost(r) <= minor.cash }
+          funds = home_token_funds(minor)
+          return cost if @minor_available_regions.keys.any? { |r| track_rights_cost(r) <= funds }
 
-          [cost, minor.cash].min
+          [cost, funds].min
+        end
+
+        # Treasury of the minor plus the personal cash of its owner, who tops up the home token.
+        def home_token_funds(minor)
+          minor.cash + (minor.owner&.player? ? minor.owner.cash : 0)
         end
 
         def claim_region!(entity, region)
