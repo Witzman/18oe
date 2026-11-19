@@ -10,7 +10,7 @@ import { Geld, formatGeld, toDom, v, type VNode } from "../kit/index.ts";
 import { fillText, txt } from "../text.ts";
 import {
   DIVIDEND_STEP, OPERATING_TYPES, ROUTE_STEP, chosenOption, dividendOptions, dividendOrder, isOperatingStep,
-  operator, optionLine, payoutRows, portAuthorityOptions, pullmanOptions, runBands, runHexes, runLines, runModel, runSentence, type DivOption,
+  operator, optionLine, payoutRows, portAuthorityOptions, portSign, pullmanOptions, runBands, runHexes, runLines, runModel, runSentence, type DivOption,
 } from "./operating-model.ts";
 import { mapPick } from "./map-pick.ts";
 
@@ -37,7 +37,14 @@ export function RoutePanel(g: Game, onPullman?: (action: Record<string, unknown>
       ...pullman.map((o) => v("button", { type: "button", class: "op-opt", "data-pullman": o.choice, onclick: () => onPullman?.(o.action) }, v("strong", { class: "op-opt-name" }, o.label)))) : null,
     marker.length > 0 ? v("div", { class: "op-pullman", role: "group", "aria-label": txt("route.port_authority").de },
       v("p", { class: "op-payouts-title muted", title: tip("route.port_authority") }, txt("route.port_authority").de),
-      ...marker.map((o) => v("button", { type: "button", class: "op-opt", "data-port-authority": o.choice, onclick: () => onPullman?.(o.action) }, v("strong", { class: "op-opt-name" }, o.label)))) : null);
+      v("div", { class: "op-signs" }, ...marker.map((o) => {
+        const sign = portSign(o);
+        const name = txt(`op.port_authority_${sign.area}`);
+        // The sign of the board (#478): area name and the engine's price; the full engine label stays as tooltip.
+        return v("button", { type: "button", class: "op-opt op-sign", "data-port-authority": o.choice, "data-area": sign.area, title: o.label, onclick: () => onPullman?.(o.action) },
+          v("strong", { class: "op-opt-name" }, name.de === `op.port_authority_${sign.area}` ? o.label : name.de),
+          sign.price ? v("span", { class: "op-sign-price" }, sign.price) : null);
+      }))) : null);
 }
 
 export interface DividendHandlers { onPick: (kind: string) => void; onPullman?: (action: Record<string, unknown>) => void }

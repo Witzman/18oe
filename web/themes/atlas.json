@@ -71,7 +71,15 @@
     "major": "#b8352a",
     "majorInk": "#8b2418",
     "arrow": "#3a2f1f",
-    "par": "#376590"
+    "par": "#376590",
+    "roundOn": "#a63326",
+    "roundOnInk": "#efe5cc",
+    "orderDone": "#a89f86",
+    "orderDoneInk": "#2e2517",
+    "signNorth": "#35587a",
+    "signNorthInk": "#efe5cc",
+    "signMed": "#3f6a58",
+    "signMedInk": "#efe5cc"
   },
   "company": {
     "c1": "#3f6f9a",
