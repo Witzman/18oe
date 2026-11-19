@@ -264,7 +264,7 @@ module Engine
 
             choices = { 'remove_private' => 'Remove from game' }
             choices['flip_private'] = 'Flip face down' unless @game.face_down_private?(company)
-            choices
+            choices.merge(@game.bbbt_choices(company)) # §14.4 (#78)
           end
 
           def process_choose(action)
@@ -287,7 +287,9 @@ module Engine
             company = action.target
             raise GameError, "Cannot #{action.choice} #{company.name}" unless private_choices(company).key?(action.choice)
 
-            if action.choice == 'flip_private'
+            if @game.bbbt_choice?(action.choice)
+              @game.bbbt_exercise!(company, action.choice)
+            elsif action.choice == 'flip_private'
               @log << "#{player.name} turns #{company.name} face down"
               @game.flip_private!(company)
             else
@@ -614,6 +616,7 @@ module Engine
 
           def reserved_for_another?(entity, bundle)
             return false unless bundle
+            return true if @game.bbbt_custody_blocks?(entity, bundle) # §14.4 (2)
 
             corporation = bundle.corporation
             bundle.shares.include?(@game.reserved_share(corporation)) && entity != corporation.owner
