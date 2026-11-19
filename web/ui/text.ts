@@ -542,7 +542,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "end.ranking": e("Rangliste", "Ranking", "§13"),
   "end.corps": e("Gesellschaften am Spielende", "Corporations at game end", "—"),
   "end.face_down": e("verdeckt, zählt nicht", "face down, not counted", "§14"),
-  "end.shares_note": e("Aktienwert: Endwert abzüglich Bargeld und Privates (Annahme: der Server liefert noch keinen Anteilswert je Firma).", "Share value: final value minus cash and privates (assumption: the server does not deliver a value per corporation yet)", "—"),
+  "end.shares_note": e("Aktienwert je Firma, wie das Spiel ihn für den Endstand zählt (Endwert = Bargeld + Aktienwert + offene Privates).", "Share value per corporation as the game counts it for the final standings (final value = cash + share value + open privates)", "—"),
   "end.reason_bank": e("Spielende: Die Bank ist gesprengt.", "Game over: the bank is broken.", "§13"),
   "end.reason_note": e("Annahme: abgeleitet aus dem Bankstand, solange der Server den Grund nicht meldet (#126).", "Assumption: derived from the bank cash until the server reports the reason (#126)", "—"),
   "end.show": e("Endstand anzeigen", "Show final standings", "—"),

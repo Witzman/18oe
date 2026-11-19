@@ -153,7 +153,8 @@ module Oe
         shares: player.shares_by_corporation(sorted: true).filter_map do |corp, shares|
           next if shares.empty?
 
-          { corporation: corp.id, percent: shares.sum(&:percent), president: shares.any?(&:president) }
+          { corporation: corp.id, percent: shares.sum(&:percent), president: shares.any?(&:president),
+            value: corp.ipoed ? shares.sum(&:price) : 0 } # #226: as Engine::Player#value counts it
         end.sort_by { |h| h[:corporation].to_s },
         companies: player.companies.sort_by(&:id).map { |c| company(game, c, viewer == player.id) },
       }
