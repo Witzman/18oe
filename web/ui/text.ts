@@ -757,6 +757,9 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "div.payout_title": e("Auszahlung bei {kind}", "Paid out on {kind}", "§11.4"),
   "train.group_depot": e("Aus dem Depot", "From the depot", "§11.6"),
   "train.group_corp": e("Von anderen Gesellschaften", "From other corporations", "§11.6.3"),
+  "train.group_pullman": e("Pullman", "Pullman", "§11.6.2"),
+  "train.pullman_sentence": e("{corp}: {what}.", "{corp}: {what}.", "§11.6.2"),
+  "train.pullman_help": e("Ein Pullman bringt £10 je Level des höchsten Zuges je OR, zählt nicht zum Zuglimit; höchstens einer je Gesellschaft. Kauf von Minor M oder vom Open Market £150, von einer anderen Gesellschaft £75; Abwerfen vor dem Zugkauf, ohne Erstattung.", "A Pullman adds £10 per level of the highest train each OR and does not count against the train limit; at most one per corporation. Bought from Minor M or the Open Market for £150, from another corporation for £75; discarding before buying a train gives no refund.", "§11.6.2"),
   "frame.choice_for": e("für {target}", "for {target}", "—"),
   // Engine choices (#290): the engine labels are English; the player sees these and a tooltip.
   "choice.flip_private": e("Schließen (umdrehen): kein Einkommen, zählt nicht fürs Zertifikatslimit", "Flip face down", "§3.3, §6.1, §10.4"),

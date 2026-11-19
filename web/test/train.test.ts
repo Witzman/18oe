@@ -7,7 +7,7 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { TrainPanel, dutyLine, effectiveSelection, emptySelection, insolvencyLines, orderFor, sentenceFor, trainRows } from "../ui/panels/train.ts";
+import { TrainPanel, dutyLine, effectiveSelection, emptySelection, insolvencyLines, orderFor, pullmanRows, sentenceFor, trainRows } from "../ui/panels/train.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
 const noop = { onTrain: () => {}, onPrice: () => {} };
@@ -148,4 +148,18 @@ test("panel: every row is a button of at least touch size class, the mark and th
   assert.match(text, /Aus dem Depot/);
   assert.match(text, /Von anderen Gesellschaften/);
   assert.match(text, /von A/);
+});
+
+test("#55: the Pullman purchases and the discard are rows of their own; the sentence carries the view's label", () => {
+  const g = load("buy-train");
+  const corp = g.state.prompt.actions.find((a) => typeof a.entity === "string")!.entity as string;
+  const choose = { type: "choose", entity: corp, entity_type: "corporation", choice: "pullman_market" };
+  g.state.prompt.actions.push(choose);
+  g.state.prompt.choices = [{ choice: "pullman_market", target: null, entity: corp, label: "Pullman from the Open Market (£150)" }];
+  const rows = pullmanRows(g);
+  assert.deepEqual(rows.map((r) => r.choice), ["pullman_market"]);
+  assert.match(textOf(TrainPanel(g, emptySelection(), noop)), /Pullman from the Open Market/);
+  const s = sentenceFor(g, { train: null, price: null, pullman: "pullman_market" });
+  assert.equal(s.action, choose);
+  assert.match(s.text, /Open Market/);
 });

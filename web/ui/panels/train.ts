@@ -27,8 +27,19 @@ export interface TrainRow {
   hint: string | null;
   left: number | null;
 }
-export interface TrainSelection { train: string | null; price: number | null }
-export const emptySelection = (): TrainSelection => ({ train: null, price: null });
+/** `pullman`: the `choose` of a Pullman (§11.6.2, #55) picked instead of a train; the view's label names source and price. */
+export interface TrainSelection { train: string | null; price: number | null; pullman?: string | null }
+export const emptySelection = (): TrainSelection => ({ train: null, price: null, pullman: null });
+
+export interface PullmanRow { choice: string; label: string; action: Action }
+/** The Pullman purchases and the discard the step offers the viewer (`choose` actions `pullman_*`, #55). */
+export function pullmanRows(g: Game): PullmanRow[] {
+  if (!mineToAct(g)) return [];
+  const choices = g.state.prompt.choices ?? [];
+  return g.state.prompt.actions
+    .filter((a) => a.type === "choose" && typeof a.choice === "string" && a.choice.startsWith("pullman_"))
+    .map((a) => ({ choice: String(a.choice), label: choices.find((c) => c.choice === a.choice)?.label ?? String(a.choice), action: a }));
+}
 
 export const isTrainStep = (g: Game): boolean => g.state.prompt.step === "BuyTrain" && !g.state.meta.finished;
 const mineToAct = (g: Game): boolean => isTrainStep(g) && g.state.prompt.viewer_to_act;
@@ -134,6 +145,8 @@ export function effectiveSelection(g: Game, sel: TrainSelection): TrainSelection
 export interface Sentence { text: string; action: Action | null; changes: Change[]; warn: string | null }
 
 export function sentenceFor(g: Game, sel: TrainSelection): Sentence {
+  const pull = pullmanRows(g).find((r) => r.choice === sel.pullman);
+  if (pull) return { text: fillText("train.pullman_sentence", { corp: buyer(g)?.id ?? "", what: pull.label }), action: pull.action, changes: [], warn: null };
   const eff = effectiveSelection(g, sel);
   const row = trainRows(g).find((r) => r.id === eff.train);
   const corp = buyer(g);
@@ -165,7 +178,19 @@ export function orderFor(g: Game, sel: TrainSelection, send: (a: Action) => void
 }
 
 // ---- view ---------------------------------------------------------------------------------------
-export interface TrainHandlers { onTrain: (id: string) => void; onPrice: (id: string, price: number) => void }
+export interface TrainHandlers { onTrain: (id: string) => void; onPrice: (id: string, price: number) => void; onPullman?: (choice: string) => void }
+
+function pullmanGroup(g: Game, sel: TrainSelection, h: TrainHandlers): VNode | null {
+  const rows = pullmanRows(g);
+  if (rows.length === 0) return null;
+  return v("div", { class: "train-group train-pullman", role: "group", "aria-label": txt("train.group_pullman").de },
+    v("p", { class: "train-group-title muted" }, txt("train.group_pullman").de),
+    v("div", { class: "train-list", role: "list" }, ...rows.map((r) => v("button", {
+      type: "button", class: "train-row", "data-pullman": r.choice, "aria-pressed": String(r.choice === sel.pullman),
+      "data-state": r.choice === sel.pullman ? "selected" : "normal", onclick: () => h.onPullman?.(r.choice),
+    }, v("strong", { class: "train-name" }, r.label)))),
+    v("small", { class: "train-hint muted" }, txt("train.pullman_help").de));
+}
 
 function rowButton(r: TrainRow, selected: boolean, mine: boolean, h: TrainHandlers): VNode {
   const source = r.owner === null ? txt("train.source_works").de : fillText("train.source_corp", { corp: r.owner });
@@ -211,6 +236,7 @@ export function TrainPanel(g: Game, sel: TrainSelection, h: TrainHandlers): VNod
     group("train.group_depot", rows.filter((r) => r.owner === null)),
     group("train.group_corp", rows.filter((r) => r.owner !== null)),
     chosen && chosen.options.length > 1 ? priceRow(chosen, eff.price, h) : null,
+    pullmanGroup(g, sel, h),
     warn ? v("p", { class: "train-warn", role: "status" }, warn) : null,
     ins.length > 0 ? v("div", { class: "train-insolvency" }, v("h4", {}, txt("train.insolvency").de), v("ul", {}, ...ins.map((t) => v("li", {}, t)))) : null);
 }
@@ -228,11 +254,12 @@ export function mountTrain(frame: GameFrame): TrainHandle {
   const handlers: TrainHandlers = {
     onTrain: (id) => { sel = { train: id, price: null }; draw(); },
     onPrice: (id, price) => { sel = { train: id, price }; draw(); },
+    onPullman: (choice) => { sel = { train: null, price: null, pullman: choice }; draw(); },
   };
 
   function claim(active: boolean) {
     while (releases.length > 0) releases.pop()!();
-    if (active) releases.push(frame.claims.claim("BuyTrain", "buy_train"), frame.claims.claim("BuyTrain", "pass"));
+    if (active) releases.push(frame.claims.claim("BuyTrain", "buy_train"), frame.claims.claim("BuyTrain", "pass"), frame.claims.claim("BuyTrain", "choose"));
   }
 
   function draw() {
