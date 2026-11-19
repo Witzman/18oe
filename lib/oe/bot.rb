@@ -99,7 +99,7 @@ module Oe
       # stays unplayed until the bot learns that private (S8, #77 ff.).
       mine = actions.select { |a| !a.entity.company? && acting_player(a.entity)&.id == player_id }
       # Bots make no trade offers to other players yet (§10.4, #202); as sellers they decline.
-      others = mine.reject { |a| StrategyPlayer.trade_offer?(a) || StrategyPlayer.merge_offer?(@game, a) || StrategyPlayer.pullman_choice?(a) }
+      others = mine.reject { |a| StrategyPlayer.trade_offer?(a) || StrategyPlayer.merge_offer?(@game, a) }
       others.empty? ? mine : others
     end
 
