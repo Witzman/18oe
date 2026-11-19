@@ -6,7 +6,7 @@ import type { Game } from "../../types.ts";
 import { Geld, Siegel, Tabelle, v, Wimpel, type Column, type VNode } from "../kit/index.ts";
 import { fillText, txt } from "../text.ts";
 
-export interface Holding { corp: string; percent: number; president: boolean }
+export interface Holding { corp: string; percent: number; president: boolean; value: number }
 export interface OwnedPrivate { id: string; name: string; value: number; faceDown: boolean }
 export interface EndRow {
   rank: number; id: string; seat: number; name: string; me: boolean; winner: boolean;
@@ -42,10 +42,9 @@ export function endgameModel(g: Game): EndModel {
     return {
       rank, id: p.id, seat, name: p.name, me: p.id === g.viewer, winner: meta.winner === p.id,
       cash: p.cash, privates, total: s.value,
-      // The view has no value per share certificate, so the share value is the remainder of the final value
-      // (final value = cash + shares + open privates, engine player_value); see issue "Anteilswert je Firma".
-      shares: s.value - p.cash - privates,
-      holdings: p.shares.map((x) => ({ corp: x.corporation, percent: x.percent, president: x.president })), companies,
+      // Share value = the sum of the per-holding values the view takes from the engine (#226).
+      shares: p.shares.reduce((n, x) => n + x.value, 0),
+      holdings: p.shares.map((x) => ({ corp: x.corporation, percent: x.percent, president: x.president, value: x.value })), companies,
     };
   });
   return {
@@ -92,7 +91,7 @@ export function Endstand(m: EndModel, h: EndHandlers): VNode {
       v("dt", {}, txt("frame.shares").de),
       v("dd", { class: "frame-end-holdings" },
         ...(r.holdings.length === 0 ? [txt("frame.none").de] : r.holdings.map((x) => v("span", { class: "frame-end-holding" },
-          Siegel({ sym: x.corp, color: h.corpColor(x.corp) }, { theme: h.theme, size: "s" }), `${x.percent}%${x.president ? " ★" : ""}`))),
+          Siegel({ sym: x.corp, color: h.corpColor(x.corp) }, { theme: h.theme, size: "s" }), `${x.percent}%${x.president ? " ★" : ""} `, Geld(x.value)))),
         v("span", { class: "frame-end-sub" }, Geld(r.shares))),
       v("dt", {}, txt("frame.companies").de),
       v("dd", {}, r.companies.length === 0 ? txt("frame.none").de : v("ul", { class: "frame-end-privates" },

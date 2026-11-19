@@ -68,7 +68,7 @@ export interface Zone {
   id: string; price: number; chits_left: number; free: boolean; taken_by: string[]; discount: number;
 }
 
-export interface PlayerShare { corporation: string; percent: number; president: boolean }
+export interface PlayerShare { corporation: string; percent: number; president: boolean; value: number }
 export interface PlayerCompany { id: string; name: string | null; value: number | null; face_down: boolean }
 export interface Player {
   id: string; name: string; order: number; cash: number; value: number;
