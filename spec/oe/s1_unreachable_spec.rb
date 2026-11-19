@@ -77,4 +77,20 @@ RSpec.describe "S1 target list, types outside the strategy (#235)" do
     expect(keys.grep(/shares:(minor|regional)/)).to be_empty
     expect(game.corporations.reject { |c| c.type == :major }.flat_map { |c| game.issuable_shares(c) }).to be_empty
   end
+
+  it "offers no redeem in the turn of an issue: selling passes the Issue step (#468)" do
+    major = start_major!(game, "LNWR", alice)
+    at_phase!(game, "4")
+    round = operating_round_for!(game, 1)
+    with_trains!(game, major)
+    fund!(game, major, 2000)
+    operate_until!(round, major, Engine::Game::G18OE::Step::IssueShares)
+    step = round.active_step
+    expect(step.actions(major)).to include("sell_shares")
+    bundle = game.issuable_shares(major).first
+    round.process_action(Engine::Action::SellShares.new(major, shares: bundle.shares, share_price: bundle.price, percent: bundle.percent))
+    # selling passes the step at once: sell and redeem are never offered in one prompt of the same turn
+    expect(round.active_step).not_to be_a(Engine::Game::G18OE::Step::IssueShares)
+    expect(offered_keys("IssueShares")).not_to include("operating/IssueShares/buy_shares:major")
+  end
 end
