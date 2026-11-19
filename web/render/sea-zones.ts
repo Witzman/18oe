@@ -70,3 +70,15 @@ export function dashes(a: Vec, b: Vec, dash: number, gap: number): [Vec, Vec][] 
   }
   return out;
 }
+
+/**
+ * The glyph of a zone circle as on the board (#477): a bold "1" over a short wave line, in strokes of `width`
+ * (the circle scales with the map like a printed mark, so no font is involved). Pure geometry around (cx, cy).
+ */
+export function markGlyph(cx: number, cy: number, r: number): { one: Vec[][]; wave: Vec[]; width: number } {
+  const at = (u: number, v: number): Vec => ({ x: cx + u * r, y: cy + v * r });
+  const one = [[at(0.05, -0.5), at(0.05, 0.14)], [at(0.05, -0.5), at(-0.2, -0.3)]];
+  const wave: Vec[] = [];
+  for (let i = 0; i <= 8; i++) wave.push(at(-0.45 + (0.9 * i) / 8, 0.36 + (i % 2 ? 0.06 : -0.06)));
+  return { one, wave, width: r * 0.2 };
+}

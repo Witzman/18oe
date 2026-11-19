@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { dashes, seaOfHex, zoneBorders, zoneMarks } from "../render/sea-zones.ts";
+import { dashes, markGlyph, seaOfHex, zoneBorders, zoneMarks } from "../render/sea-zones.ts";
 import type { MapHex } from "../render/mapdata.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -67,4 +67,15 @@ test("the fixture map carries the sea zones the scenes and tests draw (/map has 
   const seas = seaOfHex(geometry.sea_zones);
   assert.equal(new Set(geometry.sea_zones.map((z: { sea: string }) => z.sea)).size, 2);
   for (const h of hexes) if (h.sea_zone) assert.ok(seas.has(h.id), `${h.id} has a zone but no sea`);
+});
+
+test("the mark glyph is a bold one over a wave, inside the circle (#477)", () => {
+  const g = markGlyph(10, 20, 0.6);
+  assert.equal(g.one.length >= 2, true);
+  assert.ok(g.wave.length >= 4);
+  for (const p of [...g.one.flat(), ...g.wave]) assert.ok(Math.hypot(p.x - 10, p.y - 20) < 0.6 * 0.85, `${p.x},${p.y}`);
+  // the wave sits under the one
+  const lowestOne = Math.max(...g.one.flat().map((p) => p.y)), waveY = g.wave.reduce((s, p) => s + p.y, 0) / g.wave.length;
+  assert.ok(waveY > lowestOne - 1e-9);
+  assert.ok(g.width > 0 && g.width < 0.6);
 });

@@ -12,7 +12,7 @@ export const COLOR_KEYS = {
     "rail", "sleeper", "bed",
     "zoneBorder", "seaZoneLine", "ferry", "port", "impassable", "portPublic", "portPrivate", "oeRoute",
     // The two seas of the board (#449): north seas, Mediterranean and Black Sea; the circles of the sea zones.
-    "seaNorth", "seaMed", "seaMarkNorth", "seaMarkMed",
+    "seaNorth", "seaMed", "seaMarkNorth", "seaMarkMed", "seaMarkRing", "seaMarkInk",
     // Base surfaces (#477): the tint that lightens the sea towards the coast, and the foam along it.
     "seaCoast", "coastFoam",
     "label", "labelHalo", "valid", "selected", "invalid", "preview", "shadow",
@@ -93,6 +93,9 @@ export const NUMBER_RANGES = {
     // alpha of the hex lines between sea hexes (0 = none); sea zone boundary dashes, gap and width and the radius of the
     // zone circles, in side lengths.
     seaTint: [0, 1], seaHexLineAlpha: [0, 1], seaZoneDash: [0.05, 1], seaZoneGap: [0.05, 1], seaZoneWidth: [0.005, 0.2], seaMarkRadius: [0.15, 1],
+    // Zone lines of the board (#477), in side lengths: ring of the zone circles as a fraction of their radius; the black
+    // dashed track-rights boundary: dash, gap and width.
+    seaMarkRing: [0.02, 0.4], rightsDash: [0.05, 1.5], rightsGap: [0.05, 1.5], rightsWidth: [0.02, 0.4],
     // Base surfaces (#477), in side lengths: how far the sea gradient reaches from the coast, the alpha it has at the coast;
     // width and alpha of the foam fringe (0 = none).
     seaReach: [0, 20], seaCoastAlpha: [0, 1], coastFoamWidth: [0, 1], coastFoamAlpha: [0, 1],
