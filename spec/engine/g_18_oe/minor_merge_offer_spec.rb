@@ -6,8 +6,7 @@ require_relative 'helpers'
 # #65: in an ordinary Stock Round a minor may merge into another player's major when that player
 # agrees (§10.5: "agreed on by both owning players"; §10.7). The owner asks the other presidents
 # (Step::MergeOffer, as in the Consolidation Round, §10.6): each offers or declines; a single offer
-# must be taken, from several the owner chooses. No cash changes hands in this step (the optional
-# personal payment of §10.5 is not built).
+# must be taken, from several the owner chooses. Cash is settled in minor_merge_cash_spec (#467).
 describe 'G18OE merging a minor into another player\'s major in a Stock Round (§10.5)' do
   include G18OESpecHelpers
 

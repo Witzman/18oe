@@ -151,39 +151,54 @@ describe 'G18OE floating minors (§9.1)' do
     expect(minor.tokens.reject(&:used).map(&:price)).to eq([20])
   end
 
-  # A minor bought at a price below every chit cost (a row reduced to 0 is taken
-  # by force, §6.3) cannot pay its home token (§9.1 step 4). Assumption (#367):
-  # it pays what it has, but only when no open zone is affordable in full.
-  describe 'home token of a minor with too little cash (#367)' do
+  # A minor bought at a price below the chit cost (a row reduced to 0 is taken by force, §6.3, §7) cannot pay its
+  # home token from its treasury alone (§9.1 step 4). The rulebook is silent; owner decision (#369, 2026-11-19):
+  # the owning player tops up the rest from personal cash. Only if the player cannot cover it either, the minor
+  # pays what the two together hold (#367 fallback).
+  describe 'home token of a minor with too little cash (#369)' do
     def float_poor!(zone, treasury)
       minor = par_minor!(treasury: treasury)
       city = game.home_token_locations(minor).find { |h| game.region_for_hex(h) == zone }.tile.cities.first
       [minor, city]
     end
 
-    it 'places it for free in a UK zone when the treasury is empty' do
+    let!(:player) { round.current_entity }
+
+    it 'lets the player pay the whole £40 of a UK zone when the treasury is empty' do
       minor, city = float_poor!('UK', 0)
+      cash = player.cash
       home!(minor, city)
 
       expect(minor.cash).to eq(0)
+      expect(player.cash).to eq(cash - 40)
       expect(game.minor_floated_regions[minor.id]).to eq('UK')
-      expect(round.active_step).not_to be_a(Engine::Game::G18OE::Step::HomeToken)
     end
 
-    it 'pays only its whole treasury when that is below every zone cost' do
-      minor, city = float_poor!('IT', 5)
+    it 'lets the player pay only the missing part when the treasury covers some of it' do
+      minor, city = float_poor!('UK', 25)
+      cash = player.cash
       home!(minor, city)
 
       expect(minor.cash).to eq(0)
+      expect(player.cash).to eq(cash - 15)
     end
 
-    it 'still charges the full cost where some zone is affordable' do
-      minor, uk = float_poor!('UK', 25)
-
-      expect { home!(minor, uk) }.to raise_error(Engine::GameError)
-      home!(minor, game.home_token_locations(minor).find { |h| game.region_for_hex(h) == 'IT' }.tile.cities.first)
+    it 'charges nothing to the player when the treasury covers the cost' do
+      minor, city = float_poor!('IT', 25)
+      cash = player.cash
+      home!(minor, city)
 
       expect(minor.cash).to eq(15)
+      expect(player.cash).to eq(cash)
+    end
+
+    it 'falls back to what minor and player together hold when that is below the cost' do
+      minor, city = float_poor!('IT', 5)
+      player.set_cash(3, game.bank)
+      home!(minor, city)
+
+      expect(minor.cash).to eq(0)
+      expect(player.cash).to eq(0)
     end
   end
 end
