@@ -58,6 +58,8 @@ export function DividendPanel(g: Game, pick: string | null, h: DividendHandlers)
   return v("div", { class: "op-dividend" },
     revenue !== undefined ? v("p", { class: "op-revenue", title: tip("div.revenue") }, v("span", {}, txt("div.run").de), v("b", {}, formatGeld(revenue))) : null,
     lines.length > 0 ? v("p", { class: "op-runlines muted" }, lines.map((l) => `${l.train}: ${l.stops} ${formatGeld(l.revenue)}`).join(" · ")) : null,
+    lines.some((l) => l.sea.length > 0) ? v("ul", { class: "op-sealines muted", title: txt("route.sea_help").de },
+      ...lines.flatMap((l) => l.sea.map((s) => v("li", {}, `${l.train}: ${s}`)))) : null,
     v("div", { class: "op-opts", role: "group", "aria-label": txt("div.title").de },
       ...dividendOptions(g).map((o) => optionRow(o, now, o.kind === chosen?.kind, mine, h))),
     pay ? v("div", { class: "op-payouts", "data-kind": pay.kind },

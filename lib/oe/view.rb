@@ -370,11 +370,14 @@ module Oe
         train: train.id,
         name: train.name,
         revenue: info.revenues[train],
-        # a sea crossing's id holds "sea a.b" between its port hexes (#357); the
-        # crossing itself is shown with #362, here only the hexes count (#359)
+        # a sea crossing's id holds "sea a.b" between its port hexes (#357): `hexes` are the land hexes only;
+        # the crossings and ferries are `sea` and `ferries` (#362)
         hexes: info.routes[train].flatten.map(&:to_s).reject { |id| id.start_with?("sea ") },
         segments: info.segments[train],
         stops: info.stops[train],
+        distance_str: info.distance_strs[train],
+        sea: info.seas[train][:sea],
+        ferries: info.seas[train][:ferries],
       }
     end
 
@@ -891,7 +894,8 @@ module Oe
     # map can show it. `round.routes` is what the Route step stored (Engine::Round::Operating).
     def dividend_routes(game)
       Array(safe { game.round.routes }).map do |route|
-        { train: route.train.name, hexes: route.hexes.map(&:id), revenue: route.revenue }
+        { train: route.train.name, hexes: route.hexes.map(&:id), revenue: route.revenue,
+          distance_str: route.distance_str }.merge(route.sea_detail)
       end
     end
 
