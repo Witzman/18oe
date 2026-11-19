@@ -143,7 +143,7 @@ module OeViewChecks
   # and the segments follow the hexes (#436: also over a sea crossing). Returns the number of routes checked.
   def check_last_run(run, game)
     run["routes"].each do |r|
-      expect(r.keys.sort).to eq(%w[hexes name revenue segments stops train])
+      expect(r.keys.sort).to eq(%w[distance_str ferries hexes name revenue sea segments stops train])
       expect(r["hexes"]).to all(satisfy { |id| game.hex_by_id(id) })
       expect(r["segments"].map { |s| s["hex"] }.chunk(&:itself).map(&:first)).to eq(r["hexes"].uniq) if r["segments"].any?
       expect(r["stops"].sum { |s| s["revenue"] }).to eq(r["revenue"])

@@ -316,6 +316,11 @@ module Engine
       raise GameError, 'Route cannot pass through terminal' if ordered_paths[1..-2].any?(&:terminal?)
     end
 
+    # The sea stretches of the run for the view (#362); a game hook, nothing for games without sea.
+    def sea_detail
+      @game.route_sea_detail(self)
+    end
+
     def distance_str
       @distance_str ||= @game.route_distance_str(self)
     end

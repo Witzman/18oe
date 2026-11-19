@@ -1456,6 +1456,10 @@ module Engine
         route_distance(route).to_s
       end
 
+      def route_sea_detail(_route)
+        { sea: [], ferries: [] }
+      end
+
       def route_distance(route)
         route.visited_stops.sum(&:visit_cost)
       end

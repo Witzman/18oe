@@ -2,7 +2,7 @@
 // (the one route the server proposes, no route band yet, #155) and the dividend choice with amounts.
 // Pure functions over the view model; tests run them under node on recorded states. No rule checks here:
 // everything shown and every action sent comes from `prompt.actions` and `prompt.context.dividend`.
-import type { Corporation, DividendContext, Game } from "../../types.ts";
+import type { Corporation, DividendContext, Game, RunSea } from "../../types.ts";
 import { fillText, txt } from "../text.ts";
 import { formatGeld, type Change } from "../kit/index.ts";
 import { playerName } from "../frame/model.ts";
@@ -114,13 +114,24 @@ export function dividendOrder(g: Game, pick: string | null): { sentence: string;
 }
 
 // ---- the run on the map and in the dividend step (#302) ------------------------------------------
-export interface RunLine { train: string; stops: string; revenue: number }
+export interface RunLine { train: string; stops: string; revenue: number; sea: string[] }
+
+/** The sea stretches of one run as text lines (#362): each crossing and ferry with what counts against the city limit. */
+export function seaLines(r: RunSea): string[] {
+  const reduction = (x: { kind: string; units: number }) =>
+    fillText("route.reduction", { kind: txt(`route.reduction_${x.kind}`).de, units: x.units });
+  return [
+    ...(r.sea ?? []).map((s) => [fillText("route.sea", { from: s.from, to: s.to, zones: s.zones, counted: s.counted }),
+      ...s.reductions.map(reduction)].join(", ")),
+    ...(r.ferries ?? []).map((f) => fillText("route.ferry", { ferry: f.ferry, distance: f.distance, counted: f.counted })),
+  ];
+}
 
 /** The run being decided: in the Route step the offered run_routes, in the Dividend step the stored run. */
 export function runLines(g: Game): RunLine[] {
-  if (g.state.prompt.step === ROUTE_STEP) return runModel(g).rows;
+  if (g.state.prompt.step === ROUTE_STEP) return runModel(g).rows.map((r) => ({ ...r, sea: [] }));
   if (g.state.prompt.step !== DIVIDEND_STEP) return [];
-  return (g.state.prompt.context?.dividend?.routes ?? []).map((r) => ({ train: r.train, stops: r.hexes.join(" – "), revenue: r.revenue }));
+  return (g.state.prompt.context?.dividend?.routes ?? []).map((r) => ({ train: r.train, stops: r.hexes.join(" – "), revenue: r.revenue, sea: seaLines(r) }));
 }
 
 /** Hexes of that run, each once, for the highlight on the map; empty when the view does not carry them. */
