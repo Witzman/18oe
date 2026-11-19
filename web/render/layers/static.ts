@@ -11,7 +11,7 @@ import {
 import type { RenderTheme } from "../theme.ts";
 import type { Box } from "../projection.ts";
 import { coastRuns, foamLayers, seaBands, simplify, type Band, type Run } from "../sea-bands.ts";
-import { dashes, seaOfHex, zoneBorders, zoneMarks } from "../sea-zones.ts";
+import { dashes, markGlyph, seaOfHex, zoneBorders, zoneMarks } from "../sea-zones.ts";
 import { worldText } from "../world-text.ts";
 
 export interface Block {
@@ -108,7 +108,7 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
       }
       // Track-rights boundaries as dashes, in the style of the sea zone lines (#454); impassable sides solid red.
       for (const s of zones.get(id) ?? []) {
-        for (const [a, c] of dashes(s.a, s.b, theme.seaZoneDash, theme.seaZoneGap)) zone.moveTo(a.x, a.y).lineTo(c.x, c.y);
+        for (const [a, c] of dashes(s.a, s.b, theme.rightsDash, theme.rightsGap)) zone.moveTo(a.x, a.y).lineTo(c.x, c.y);
         zoneLines++;
       }
       for (const s of impassable.get(id) ?? []) {
@@ -135,7 +135,7 @@ export function drawGrid(scene: Scene, theme: RenderTheme): Block[] {
       }
     }
     detail.stroke({ width: theme.zoneLine, color: theme.map.label, cap: "round", join: "round" });
-    if (zoneLines) zone.stroke({ width: theme.zoneLine, color: theme.map.zoneBorder, cap: "butt" });
+    if (zoneLines) zone.stroke({ width: theme.rightsWidth, color: theme.map.zoneBorder, cap: "butt" });
     if (walls) wall.stroke({ width: theme.zoneLine, color: theme.map.impassable, cap: "round" });
     const group = new Container();
     group.addChild(detail, signs);
@@ -259,7 +259,7 @@ function drawTintedSea(sea: Graphics, scene: Scene, theme: RenderTheme): void {
   }
 }
 
-/** Sea zone boundaries as white dashes, and a circle with the city limit "-1" in every zone (#449). */
+/** Sea zone boundaries as white dashes, and a circle with a one over a wave in every zone (#449, #477). */
 function drawSeaZones(sea: Graphics, scene: Scene, theme: RenderTheme): void {
   const { map } = theme;
   const hexes = scene.geometry.hexes;
@@ -274,12 +274,13 @@ function drawSeaZones(sea: Graphics, scene: Scene, theme: RenderTheme): void {
   const r = theme.seaMarkRadius;
   for (const m of zoneMarks(hexes)) {
     const color = seas.get(m.hex) === "mediterranean" ? map.seaMarkMed : map.seaMarkNorth;
-    sea.circle(m.x, m.y, r).fill({ color }).stroke({ width: r * 0.1, color: map.seaZoneLine });
-    // "-1": a minus and a one, in strokes (the circle scales with the map like a printed mark)
-    const w = r * 0.14;
-    sea.moveTo(m.x - r * 0.62, m.y + r * 0.02).lineTo(m.x - r * 0.18, m.y + r * 0.02);
-    sea.moveTo(m.x + r * 0.3, m.y - r * 0.42).lineTo(m.x + r * 0.3, m.y + r * 0.42).moveTo(m.x + r * 0.3, m.y - r * 0.42).lineTo(m.x + r * 0.1, m.y - r * 0.26);
-    sea.stroke({ width: w, color: map.seaZoneLine, cap: "round", join: "round" });
+    sea.poly(flat(Array.from({ length: 64 }, (_, i) => ({ x: m.x + r * Math.cos((i * Math.PI) / 32), y: m.y + r * Math.sin((i * Math.PI) / 32) }))), true).fill({ color }).stroke({ width: r * theme.seaMarkRing, color: map.seaMarkRing });
+    // The one over a wave, in strokes (the circle scales with the map like a printed mark)
+    const glyph = markGlyph(m.x, m.y, r);
+    for (const line of glyph.one) sea.moveTo(line[0]!.x, line[0]!.y).lineTo(line[1]!.x, line[1]!.y);
+    sea.stroke({ width: glyph.width, color: map.seaMarkInk, cap: "round", join: "round" });
+    glyph.wave.forEach((p, i) => (i === 0 ? sea.moveTo(p.x, p.y) : sea.lineTo(p.x, p.y)));
+    sea.stroke({ width: glyph.width * 0.45, color: map.seaMarkInk, cap: "round", join: "round" });
   }
 }
 
