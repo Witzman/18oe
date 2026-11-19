@@ -21,11 +21,12 @@ export function mountStock(frame: GameFrame): () => void {
   let focus: string | null = null;
   let mode: Mode = "buy";
   let tab: Tab = "stock";
+  let cellList: string | null = null;
   let wasStock = false;
   let host: HTMLElement | null = null;
   const releaseClaims = STOCK_TYPES.map((t) => frame.claims.claim(STOCK_STEP, t));
 
-  const open = (corp: string, m: Mode) => { frame.discardSelection(); focus = corp; mode = m; sel = null; draw(); };
+  const open = (corp: string, m: Mode) => { frame.discardSelection(); cellList = null; focus = corp; mode = m; sel = null; draw(); };
   const handlers: SheetHandlers = {
     onFocus: (corp) => open(corp, "buy"),
     onSell: (corp) => open(corp, "sell"),
@@ -36,8 +37,9 @@ export function mountStock(frame: GameFrame): () => void {
       sel = sel?.corp === corp && sel.key === key ? null : { corp, key };
       draw();
     },
-    onTab(t) { tab = t; focus = null; sel = null; draw(); },
-    onClose() { focus = null; sel = null; draw(); },
+    onTab(t) { tab = t; focus = null; sel = null; cellList = null; draw(); },
+    onCell(row, col) { frame.discardSelection(); focus = null; sel = null; cellList = `${row},${col}`; draw(); },
+    onClose() { focus = null; sel = null; cellList = null; draw(); },
     onConfirm() {
       const a = game ? orderModel(game, corpRows(game), sel).action : null;
       if (a) frame.send(a);
@@ -48,7 +50,7 @@ export function mountStock(frame: GameFrame): () => void {
     },
   };
 
-  const inputOf = (g: Game, rows: ReturnType<typeof corpRows>) => ({ g, theme: theme(), rows, market: marketModel(g, rows, focus, sel), focus, sel, tab, mode, must: mustSell(g) });
+  const inputOf = (g: Game, rows: ReturnType<typeof corpRows>) => ({ g, theme: theme(), rows, market: marketModel(g, rows, focus, sel), focus, sel, tab, mode, must: mustSell(g), cellList });
 
   function draw() {
     const el = host;
@@ -81,7 +83,7 @@ export function mountStock(frame: GameFrame): () => void {
   const stop = frame.subscribe((g) => {
     game = g;
     // A new state closes the dialog: the action was sent (or the turn moved on).
-    if (g.seq !== seq) { seq = g.seq; sel = null; focus = null; }
+    if (g.seq !== seq) { seq = g.seq; sel = null; focus = null; cellList = null; }
     const inStock = g.state.prompt.step === STOCK_STEP && !g.state.meta.finished;
     // The sheet replaces the map while a stock round is on (G7); the player may go back with the tab "Karte".
     if (inStock && !wasStock) frame.views.activate(MARKET_VIEW);

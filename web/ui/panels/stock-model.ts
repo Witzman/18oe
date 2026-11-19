@@ -194,6 +194,12 @@ export interface MarketCellModel {
   /** Where the price of the corporation in focus would go after the sale in the selection. */
   preview: boolean;
 }
+/** The seals a cell shows: up to three, beyond that three and a counter of the rest; the full list is the cell's dialog (#484). */
+export const SEALS_PER_CELL = 3;
+export function sealStack(corps: string[]): { shown: string[]; more: number } {
+  return { shown: corps.slice(0, SEALS_PER_CELL), more: Math.max(0, corps.length - SEALS_PER_CELL) };
+}
+
 export interface MarketModel { rows: (MarketCellModel | null)[][] }
 
 /** The cell of the market where `price` is nearest to the corporation's current one (same price can repeat). */

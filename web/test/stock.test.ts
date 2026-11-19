@@ -8,7 +8,7 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { corpRows, holdings, inTab, marketModel, mustSell, offersFor, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
+import { corpRows, holdings, inTab, marketModel, sealStack, mustSell, offersFor, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
 import { offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
@@ -290,7 +290,104 @@ test("kurstafel: the cell says what its arrows and its par mark mean in words (c
   assert.ok(labels.some((l) => /Major-Par A/.test(l)), "major par named");
   assert.ok(labels.some((l) => /Regional-Par A/.test(l)), "regional par named");
   assert.ok(labels.some((l) => /nach rechts/.test(l)) && labels.some((l) => /nach unten/.test(l)) && labels.some((l) => /nach oben/.test(l)), "arrows named");
-  const arrows = find(tree, (n) => n.attrs.class === "stock-arrow");
-  assert.ok(arrows.length > 0 && arrows.every((n) => n.attrs["aria-hidden"] === "true"));
+  // The arrows sit in a strip that is hidden from screen readers (the aria-label above says it in words).
+  const strips = find(tree, (n) => n.attrs.class === "stock-cell-arrows");
+  assert.ok(strips.length > 0 && strips.every((n) => n.attrs["aria-hidden"] === "true"));
   assert.ok(find(tree, (n) => n.attrs.class === "stock-cell-major").length === 6);
+});
+
+// ---- Kurstafel against the printed board (#484): staircase, seal stack, label fallback ----------------------------
+
+/** The board image, row by row: [first column, [price, arrows] of the cells that carry an arrow]. Columns are the engine's (the red MAJOR column is 4). */
+const BOARD: { row: number; first: number; len: number; down: number; right: number[]; up: number | null }[] = [
+  { row: 0, first: 3, len: 16, down: 3, right: Array.from({ length: 15 }, (_, i) => 3 + i), up: null },
+  { row: 1, first: 2, len: 17, down: 2, right: [2], up: 18 },
+  { row: 2, first: 1, len: 15, down: 1, right: [1], up: 15 },
+  { row: 3, first: 0, len: 13, down: 0, right: [0], up: 12 },
+  { row: 4, first: 0, len: 11, down: 0, right: [], up: 10 },
+  { row: 5, first: 0, len: 9, down: 0, right: [], up: 8 },
+  { row: 6, first: 0, len: 7, down: 0, right: [], up: 6 },
+  { row: 7, first: 0, len: 6, down: 0, right: [], up: 5 },
+  { row: 8, first: 0, len: 5, down: 0, right: [], up: 4 },
+];
+
+test("kurstafel: the nine-row grid has the board's staircase, MAJOR column and arrows cell by cell (#484)", () => {
+  const m = marketModel(pool, corpRows(pool), null, null);
+  assert.equal(m.rows.length, 9);
+  for (const b of BOARD) {
+    const line = m.rows[b.row]!;
+    const filled = line.map((c, i) => (c ? i : -1)).filter((i) => i >= 0);
+    assert.equal(filled[0], b.first, `row ${b.row} starts at column ${b.first}`);
+    assert.equal(filled.length, b.len, `row ${b.row} length`);
+    line.forEach((c, i) => {
+      if (!c) return;
+      const want = [b.right.includes(i) ? "right" : null, i === b.down ? "down" : null, i === b.up ? "up" : null].filter(Boolean);
+      assert.deepEqual([...c.arrows].sort(), want.sort(), `row ${b.row} col ${i} (${c.price})`);
+    });
+  }
+  // The red MAJOR column: column 4 in rows 0 to 5 (A at 75 .. F at 120), nowhere else.
+  m.rows.forEach((line, r) => line.forEach((c, i) => { if (c) assert.equal(c.major !== null, i === 4 && r <= 5, `major at ${r},${i}`); }));
+  assert.deepEqual(m.rows[8]!.filter(Boolean).map((c) => c!.price), [30, 40, 50, 55, 60]);
+});
+
+test("kurstafel: a cell's seals: up to three show, more become a counter; every corporation stays in the list (#484)", () => {
+  assert.deepEqual(sealStack(["A", "B"]), { shown: ["A", "B"], more: 0 });
+  assert.deepEqual(sealStack(["A", "B", "C"]), { shown: ["A", "B", "C"], more: 0 });
+  assert.deepEqual(sealStack(["A", "B", "C", "D", "E"]), { shown: ["A", "B", "C"], more: 2 });
+  assert.deepEqual(sealStack([]), { shown: [], more: 0 });
+});
+
+test("kurstafel: a cell with several corporations is a button that opens a list with name and price; Escape keys come from the dialog (#484)", () => {
+  const m = marketModel(pool, corpRows(pool), null, null);
+  const cell = m.rows.flat().find((c) => c && c.corps.length > 3)!;
+  const opened: string[] = [];
+  const h: SheetHandlers = { ...noop, onCell: (r, c) => opened.push(`${r},${c}`) };
+  const tree = sheetNode(input(pool), h);
+  const btn = find(tree, (n) => n.tag === "button" && n.attrs.class === "stock-cell" && n.attrs["data-price"] === String(cell.price) && String(n.attrs["aria-label"]).includes(cell.corps[0]!))[0]!;
+  assert.ok(btn, "the stacked cell is a button");
+  assert.match(String(btn.attrs["aria-label"]), new RegExp(cell.corps.join(", ")));
+  assert.ok(find(btn, (n) => n.attrs.class === "stock-cell-more").length === 1, "counter");
+  assert.equal(find(btn, (n) => n.attrs.class === "stock-cell-corps")[0]!.children.length, 3);
+  btn.on.click!(new Event("click"));
+  assert.deepEqual(opened, [`${cell.row},${cell.col}`]);
+  const open = sheetNode(input(pool, { cellList: `${cell.row},${cell.col}` }), h);
+  const items = find(open, (n) => n.attrs.class === "stock-cell-list-item");
+  assert.equal(items.length, cell.corps.length);
+  const text = textOf(find(open, (n) => n.attrs.role === "dialog")[0]!);
+  for (const id of cell.corps) assert.match(text, new RegExp(id));
+  assert.match(text, /£\d+/);
+});
+
+test("kurstafel: the MAJOR label has a long and a short form; the legend says the letter stands for MAJOR A to F (#484)", () => {
+  const tree = sheetNode(input(pool), noop);
+  const majors = find(tree, (n) => n.attrs.class === "stock-cell-major");
+  assert.equal(majors.length, 6);
+  for (const n of majors) {
+    assert.equal(find(n, (x) => x.attrs.class === "stock-major-long").length, 1);
+    assert.equal(find(n, (x) => x.attrs.class === "stock-major-short").length, 1);
+  }
+  assert.match(textOf(find(tree, (n) => n.attrs["data-type"] === "convert_range" && n.tag === "li")[0]!), /MAJOR A bis F/);
+});
+
+test("kurstafel: arrows sit in their own strip above the price, never over it (#484)", () => {
+  const tree = sheetNode(input(pool), noop);
+  const strips = find(tree, (n) => n.attrs.class === "stock-cell-arrows");
+  assert.ok(strips.length > 0);
+  for (const s of strips) assert.ok(find(s, (n) => n.attrs.class === "stock-arrow").length >= 1);
+  assert.equal(find(tree, (n) => n.attrs.class === "stock-cell-price" ).length, pool.state.market.rows.flat().filter(Boolean).length);
+});
+
+test("par step: valid par cells, the chosen one and its dialog on the nine-row grid (#484)", () => {
+  const rows = corpRows(par);
+  const row = rows.find((r) => r.pars.length > 0)!;
+  const offer = row.pars[0]!;
+  const m = marketModel(par, rows, row.id, { corp: row.id, key: offer.key });
+  const flat = m.rows.flat().filter(Boolean);
+  assert.equal(flat.filter((c) => c!.valid).length, row.pars.length);
+  assert.deepEqual(flat.filter((c) => c!.chosen).map((c) => [c!.row, c!.col]), [[offer.cell!.row, offer.cell!.col]]);
+  // The chosen par cell is where the action says, on the new grid.
+  assert.equal(m.rows[offer.cell!.row]![offer.cell!.col]!.price, offer.price);
+  const tree = sheetNode(input(par, { focus: row.id, sel: { corp: row.id, key: offer.key } }), noop);
+  assert.equal(find(tree, (n) => n.attrs.class === "stock-cell" && n.attrs["data-valid"] === "true").length, row.pars.length);
+  assert.equal(find(tree, (n) => n.attrs.class === "stock-cell" && n.attrs["data-chosen"] === "true").length, 1);
 });
