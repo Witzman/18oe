@@ -3,7 +3,10 @@
 require_relative '../engine_helper'
 require_relative 'helpers'
 
-describe 'G18OE trading with another player (§10.4, errata 8 and 10)' do
+# Rule change (#202): the limit to the opening stock round ("errata 8 and 10") had no source (workshop #67,
+# input/errata-recherche.md); owner decision F1 (2026-11-18): trading is a stock action of every stock round.
+# A purchase from another player is an offer the seller accepts (Step::TradeOffer), see player_trade_offer_spec.rb.
+describe 'G18OE trading with another player (§10.4, every stock round)' do
   include G18OESpecHelpers
 
   let(:game) { new_game }
@@ -15,16 +18,21 @@ describe 'G18OE trading with another player (§10.4, errata 8 and 10)' do
   let(:unfloated) { give_company!(seller, game.company_by_id('A')) }
   let(:minor) { start_minor!(game, 'B', seller, 'SP') }
 
-  # The mechanics below are exercised with the consent switch on; the default (off) is
-  # covered in player_trade_protection_spec.rb (#148 part 1).
-  before { allow(game).to receive(:player_trade_enabled?).and_return(true) }
-
-  def buy_company!(target, price, buyer = player)
-    act!(round, Engine::Action::BuyCompany.new(buyer, company: target, price: price))
+  # The seller agrees (§10.4 "mutually agreed upon price", #202): the offer, then the seller's acceptance.
+  def accept!(on_round, seller_of)
+    act!(on_round, Engine::Action::Choose.new(seller_of, choice: 'accept_trade'))
   end
 
-  def buy_minor!(target, price, buyer = player)
-    act!(round, Engine::Action::BuyCorporation.new(buyer, corporation: target, price: price))
+  def buy_company!(target, price, buyer = player, on_round: round)
+    seller_of = target.owner
+    act!(on_round, Engine::Action::BuyCompany.new(buyer, company: target, price: price))
+    accept!(on_round, seller_of)
+  end
+
+  def buy_minor!(target, price, buyer = player, on_round: round)
+    seller_of = target.owner
+    act!(on_round, Engine::Action::BuyCorporation.new(buyer, corporation: target, price: price))
+    accept!(on_round, seller_of)
   end
 
   def snapshot(*entities)
@@ -46,7 +54,7 @@ describe 'G18OE trading with another player (§10.4, errata 8 and 10)' do
     expect(step.actions(player)).to include('buy_corporation')
   end
 
-  it 'still offers trades once the Major Railroad Phase has begun in the opening stock round (§10.4, errata 10)' do
+  it 'still offers trades once the Major Railroad Phase has begun in the opening stock round (§10.4)' do
     company
     minor
     allow(game).to receive(:major_phase?).and_return(true)
@@ -55,7 +63,8 @@ describe 'G18OE trading with another player (§10.4, errata 8 and 10)' do
     expect(step.can_buy_corporation?(player, minor)).to be(true)
   end
 
-  it 'offers no trade in the second stock round while the engine phase is still 2 (errata 10)' do
+  # Was "offers no trade in the second stock round (errata 10)"; changed with the rule (F1, #202).
+  it 'offers trades in the second stock round while the engine phase is still 2 (F1, #67)' do
     later_round = stock_round!(game, turn: 2)
     later_step = later_round.active_step
     company
@@ -63,23 +72,22 @@ describe 'G18OE trading with another player (§10.4, errata 8 and 10)' do
     later_player = later_round.current_entity
 
     expect(game.phase.name).to eq('2')
-    expect(later_step.purchasable_companies(later_player)).to be_empty
-    expect(later_step.can_buy_corporation?(later_player, minor)).to be(false)
-    expect(later_step.actions(later_player)).not_to include('buy_company', 'buy_corporation')
+    expect(later_step.purchasable_companies(later_player)).to eq([company])
+    expect(later_step.can_buy_corporation?(later_player, minor)).to be(true)
+    expect(later_step.actions(later_player)).to include('buy_company', 'buy_corporation')
   end
 
-  it 'rejects a trade processed outside the opening stock round (errata 10)' do
+  # Was "rejects a trade processed outside the opening stock round (errata 10)"; changed with the rule (F1, #202).
+  it 'processes a trade in a later stock round (F1, #67)' do
     later_round = stock_round!(game, turn: 2)
-    later_step = later_round.active_step
     company
     later_player = later_round.current_entity
     cash = later_player.cash
 
-    expect do
-      later_step.process_buy_company(Engine::Action::BuyCompany.new(later_player, company: company, price: 10))
-    end.to raise_error(Engine::GameError)
-    expect(company.owner).to eq(seller)
-    expect(later_player.cash).to eq(cash)
+    buy_company!(company, 10, later_player, on_round: later_round)
+
+    expect(company.owner).to eq(later_player)
+    expect(later_player.cash).to eq(cash - 10)
   end
 
   it 'offers and processes no trade in a concession turn (§8.1)' do
@@ -229,9 +237,13 @@ describe 'G18OE trading with another player (§10.4, errata 8 and 10)' do
 
   it 'adds the purchase to the round actions only once (§10)' do
     company
-    step.process_buy_company(Engine::Action::BuyCompany.new(player, company: company, price: 5))
+    buyer = player
+    step.process_buy_company(Engine::Action::BuyCompany.new(buyer, company: company, price: 5))
+    tracked = []
+    allow(step).to receive(:track_action).and_wrap_original { |m, *args| tracked << args.first; m.call(*args) }
+    accept!(round, seller)
 
-    expect(round.current_actions.count { |a| a.is_a?(Engine::Action::BuyCompany) }).to eq(1)
+    expect(tracked.count { |a| a.is_a?(Engine::Action::BuyCompany) }).to eq(1)
   end
 
   it 'accepts a price of zero (§10.4)' do
@@ -491,9 +503,11 @@ describe 'G18OE trading with another player (§10.4, errata 8 and 10)' do
     action = Engine::Action::BuyCompany.new(player, company: company, price: 12)
 
     replayed = Engine::Action::Base.action_from_h(JSON.parse(action.to_h.to_json), game)
+    buyer = player
     act!(round, replayed)
+    accept!(round, seller)
 
-    expect(company.owner).to eq(player)
+    expect(company.owner).to eq(buyer)
   end
 
   it 'resolves the traded minor from a serialized BuyCorporation action (replay)' do
@@ -501,9 +515,11 @@ describe 'G18OE trading with another player (§10.4, errata 8 and 10)' do
     action = Engine::Action::BuyCorporation.new(player, corporation: minor, price: 12)
 
     replayed = Engine::Action::Base.action_from_h(JSON.parse(action.to_h.to_json), game)
+    buyer = player
     act!(round, replayed)
+    accept!(round, seller)
 
-    expect(minor.owner).to eq(player)
+    expect(minor.owner).to eq(buyer)
   end
 
   context 'in the UK-France scenario' do

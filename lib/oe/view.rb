@@ -622,14 +622,16 @@ module Oe
     #   dividend: per option the amount per share, to the treasury, the new price
     #   train:    train limit, obligation, reserved 2+2, president's contribution
     #   stock:    price and new share price of the offered share actions (#47)
+    #   trade:    the trade offer a seller answers (§10.4, #202)
     # `legal` (an Oe::LegalActions) is given only for the viewer to act: choice
     # spaces that need the enumeration (tile lays, token targets) are nil otherwise.
     # complete: `offered` is the unsampled legal set (no limit), so the track
     # panel can be built from its lay_tile actions instead of a second
     # enumeration (#340).
     def context(game, step, legal, offered = [], complete: false)
-      empty = { track: nil, token: nil, dividend: nil, train: nil, stock: nil }
+      empty = { track: nil, token: nil, dividend: nil, train: nil, stock: nil, trade: nil }
       return empty.merge(stock: safe { stock_context(game, step, offered) }) if stock_step?(step)
+      return empty.merge(trade: safe { trade_context(step) }) if step.is_a?(Engine::Game::G18OE::Step::TradeOffer)
       return empty unless step
 
       entity = safe { step.current_entity }
@@ -641,7 +643,20 @@ module Oe
         dividend: step.is_a?(Engine::Step::Dividend) ? safe { dividend_context(game, step, entity) } : nil,
         train: step.is_a?(Engine::Step::BuyTrain) ? safe { train_context(game, step, entity) } : nil,
         stock: nil,
+        trade: nil,
       }
+    end
+
+    # The open trade offer (§10.4, #202) the seller answers: `choose` accept_trade or `pass` (decline).
+    #   trade: { buyer:, seller:, kind: "company" | "corporation", target: id, price: }
+    def trade_context(step)
+      offer = step.pending_offer
+      return nil unless offer
+
+      minor = offer.is_a?(Engine::Action::BuyCorporation)
+      target = minor ? offer.corporation : offer.company
+      { buyer: offer.entity.id, seller: target.owner.id, kind: minor ? "corporation" : "company",
+        target: target.id, price: offer.price }
     end
 
     # Every private, minor charter and concession and where it is now (#124,

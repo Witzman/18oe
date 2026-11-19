@@ -35,7 +35,7 @@ module OeViewChecks
   # --- operating context (#123) ------------------------------------------------------------------------
 
   def check_shape(ctx)
-    expect(ctx.keys).to eq(%i[track token dividend train stock])
+    expect(ctx.keys).to eq(%i[track token dividend train stock trade])
     JSON.generate(ctx)
   end
 
