@@ -88,6 +88,10 @@ module Engine
         def pullman_train(corporation)
           return nil unless pullman?(corporation)
 
+          # §12.1: while a combination exists it is the only train that runs, so the car sits on it
+          combined = corporation.trains.find { |train| combined_train?(train) }
+          return combined if combined
+
           chosen = @pullman_attached[corporation]
           return chosen if chosen && corporation.trains.include?(chosen) && !chosen.rusted
 
