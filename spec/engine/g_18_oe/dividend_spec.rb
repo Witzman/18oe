@@ -240,3 +240,126 @@ describe 'G18OE share value marker after a dividend (§4.4, #419)' do
     end
   end
 end
+
+# #486 (owner decision of 2026-11-19, #485 option A): half pay on an odd revenue. The treasury gets
+# floor(revenue / 2), the shareholders the rest, and every recipient is rounded UP to the next £1 after its
+# own share is computed (Rulebook §11.4, "rounding up to the nearest £1 after calculating the percentage
+# for each recipient"). A £1 rounding surplus therefore comes from the bank, never from the treasury's half.
+describe 'G18OE half dividend on an odd revenue (§11.4, #486)' do
+  include G18OESpecHelpers
+
+  let(:game) { new_game }
+  let(:president) { game.players[0] }
+  let(:other) { game.players[1] }
+  let(:third) { game.players[2] }
+  let(:round) { operating_round_for!(game) }
+  let(:step) { round_step(round, Engine::Game::G18OE::Step::Dividend) }
+
+  def major_at(price)
+    major = start_major!(game, 'LNWR', president)
+    game.stock_market.move(major, cell(game, price).coordinates)
+    major
+  end
+
+  def pay!(entity, revenue, kind)
+    allow(step).to receive(:current_entity).and_return(entity)
+    allow(step).to receive(:total_revenue).and_return(revenue)
+    step.process_dividend(Engine::Action::Dividend.new(entity, kind: kind))
+  end
+
+  # Cash change of the given holders (and the bank) caused by one dividend.
+  def deltas(entity, holders, revenue, kind)
+    all = holders + [entity]
+    before = all.to_h { |h| [h, h.cash] }
+    bank_before = game.bank.cash
+    pay!(entity, revenue, kind)
+    all.to_h { |h| [h, h.cash - before[h]] }.merge(bank: bank_before - game.bank.cash)
+  end
+
+  describe 'a major' do
+    it 'withholds floor(301 / 2) = £150, pays the other £151 and moves RIGHT at £150' do
+      major = major_at(150)
+      expect(step.half(major, 301)[:corporation]).to eq(150)
+
+      delta = deltas(major, [president], 301, 'half')
+
+      # president 20% of £15.10 per share-percent block = £30.20 -> £31; treasury 80% -> £120.80 -> £121
+      expect(delta[president]).to eq(31)
+      expect(delta[major]).to eq(150 + 121)
+      expect(major.share_price.price).to eq(165)
+    end
+
+    it 'counts only the paid £151, not the £301 revenue: a £165 major stays' do
+      major = major_at(165)
+
+      pay!(major, 301, 'half')
+
+      expect(major.share_price.price).to eq(165)
+    end
+
+    it 'rounds every recipient up on its own (20% and 10% player, 70% treasury)' do
+      major = major_at(150)
+      take_treasury_shares!(game, other, major, 1)
+
+      delta = deltas(major, [president, other], 301, 'half')
+
+      expect(delta[president]).to eq(31) # 20% of 151 = 30.2
+      expect(delta[other]).to eq(16)     # 10% of 151 = 15.1
+      expect(delta[major]).to eq(150 + 106) # 70% of 151 = 105.7; the withheld £150 is untouched
+    end
+
+    it 'pays the rounding surplus out of the bank, not out of the treasury half' do
+      major = major_at(150)
+      take_treasury_shares!(game, other, major, 1)
+
+      delta = deltas(major, [president, other], 301, 'half')
+      paid_to_holders = delta[president] + delta[other] + (delta[major] - 150)
+
+      expect(paid_to_holders).to eq(31 + 16 + 106)
+      expect(paid_to_holders).to be > 151
+      expect(delta[:bank]).to eq(150 + paid_to_holders) # the bank covers the £2 over £301
+      expect(delta[major]).to be >= 150                  # the treasury keeps its full floor half
+    end
+
+    it 'leaves an even revenue exact: £300 gives £150 to the treasury and £150 split without surplus' do
+      major = major_at(150)
+      take_treasury_shares!(game, other, major, 1)
+
+      delta = deltas(major, [president, other], 300, 'half')
+
+      expect(delta[president]).to eq(30)
+      expect(delta[other]).to eq(15)
+      expect(delta[major]).to eq(150 + 105)
+      expect(delta[:bank]).to eq(300)
+      expect(major.share_price.price).to eq(165)
+    end
+  end
+
+  describe 'a minor (§11.4 Example 1: Minor K)' do
+    let(:minor) { start_minor!(game, 'K', president, 'RU') }
+
+    it 'pays £25 / £25 on an even £50' do
+      delta = deltas(minor, [president], 50, 'half')
+
+      expect(delta[minor]).to eq(25)
+      expect(delta[president]).to eq(25)
+    end
+
+    it 'withholds floor(51 / 2) = £25 and pays the player the other £26 on an odd £51' do
+      expect(step.half(minor, 51)[:corporation]).to eq(25)
+
+      delta = deltas(minor, [president], 51, 'half')
+
+      expect(delta[minor]).to eq(25)
+      expect(delta[president]).to eq(26)
+      expect(delta[:bank]).to eq(51)
+    end
+
+    it 'keeps the whole odd revenue on withhold' do
+      delta = deltas(minor, [president], 51, 'withhold')
+
+      expect(delta[minor]).to eq(51)
+      expect(delta[president]).to eq(0)
+    end
+  end
+end
