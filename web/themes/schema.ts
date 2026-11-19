@@ -13,6 +13,8 @@ export const COLOR_KEYS = {
     "zoneBorder", "seaZoneLine", "ferry", "port", "impassable", "portPublic", "portPrivate", "oeRoute",
     // The two seas of the board (#449): north seas, Mediterranean and Black Sea; the circles of the sea zones.
     "seaNorth", "seaMed", "seaMarkNorth", "seaMarkMed",
+    // Base surfaces (#477): the tint that lightens the sea towards the coast, and the foam along it.
+    "seaCoast", "coastFoam",
     "label", "labelHalo", "valid", "selected", "invalid", "preview", "shadow",
   ],
   ui: ["bg", "panel", "panelAlt", "ink", "faint", "rule", "accent", "accentInk", "bar", "barInk", "error", "ok", "warn", "info", "overlay"],
@@ -87,6 +89,9 @@ export const NUMBER_RANGES = {
     // alpha of the hex lines between sea hexes (0 = none); sea zone boundary dashes, gap and width and the radius of the
     // zone circles, in side lengths.
     seaTint: [0, 1], seaHexLineAlpha: [0, 1], seaZoneDash: [0.05, 1], seaZoneGap: [0.05, 1], seaZoneWidth: [0.005, 0.2], seaMarkRadius: [0.15, 1],
+    // Base surfaces (#477), in side lengths: how far the sea gradient reaches from the coast, the alpha it has at the coast;
+    // width and alpha of the foam fringe (0 = none).
+    seaReach: [0, 20], seaCoastAlpha: [0, 1], coastFoamWidth: [0, 1], coastFoamAlpha: [0, 1],
     // Cities, towns and tokens (#147), in side lengths: slot circle, token cylinder, town bar.
     slotRadius: [0.05, 0.35], tokenRadius: [0.04, 0.3], townLength: [0.1, 0.6], townWidth: [0.02, 0.2],
     // Arrow at the middle end of a port stub in a sea hex (#444), in side lengths: length along the stub, width across.

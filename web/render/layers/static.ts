@@ -10,6 +10,7 @@ import {
 } from "../scene.ts";
 import type { RenderTheme } from "../theme.ts";
 import type { Box } from "../projection.ts";
+import { coastRuns, foamLayers, seaBands, simplify, type Band, type Run } from "../sea-bands.ts";
 import { dashes, seaOfHex, zoneBorders, zoneMarks } from "../sea-zones.ts";
 import { worldText } from "../world-text.ts";
 
@@ -151,11 +152,22 @@ export const BLOB_LAYERS = [{ scale: 0.95, alpha: 0.35 }, { scale: 0.62, alpha: 
 /** Chaikin cut ratio of terrain blobs. */
 const BLOB_ROUND = 0.3;
 
+/** The sea gradient strokes are simplified by this fraction of their width (see simplify). */
+const SEA_SIMPLIFY = 0.05;
+
 export interface Coast {
-  /** The sea: one rectangle over the map box with the seaDeep to seaShallow gradient (NW to SE). */
-  sea: Graphics;
-  /** Shore halo and land mass in map.land, with the soft terrain on top. */
-  land: Graphics;
+  /** The sea: one rectangle over the map box (base colours), the coast gradient on it, the zone marks on top. */
+  sea: Container;
+  /** Foam fringe, land mass in map.land and the soft terrain on top. */
+  land: Container;
+}
+
+/** Clip a graphic to the map box (#477): the coast strokes must not reach past the border of the board. */
+function clipToMap(g: Graphics, scene: Scene): void {
+  const b = scene.bounds;
+  const m = new Graphics().rect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY).fill({ color: 0xffffff });
+  g.addChild(m);
+  g.mask = m;
 }
 
 /**
@@ -176,13 +188,33 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
     });
     sea.rect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY).fill(grad);
   }
-  drawSeaZones(sea, scene, theme);
-
-  const land = new Graphics();
   const rings = landRings(scene, { round: theme.coastRound, noise: theme.coastNoise });
-  // Shallow water along the shore (under the land), then the land, then a thin shore line.
-  const halo = mix(map.seaShallow, 0xffffff, 0.35);
-  for (const r of rings) land.poly(flat(r.points), true).stroke({ width: 0.4, color: halo, alpha: 0.3, join: "round" });
+  const runs = rings.flatMap(coastRuns);
+  // #477: the sea lightens towards the coast (strokes along the coast, under the land), then the zone marks on top.
+  // Opaque stacks per sea: the north seas everywhere, the Mediterranean and the Black Sea on top inside their hexes.
+  const bands = seaBands(theme.seaReach, theme.seaCoastAlpha);
+  const gradient = new Graphics();
+  strokeRuns(gradient, runs, bands.map((b) => ({ width: b.width, alpha: 1, color: mix(tinted ? map.seaNorth : mix(map.seaDeep, map.seaShallow, 0.5), map.seaCoast, b.alpha) })), SEA_SIMPLIFY);
+  clipToMap(gradient, scene);
+  const gradientMed = new Graphics();
+  if (tinted) {
+    strokeRuns(gradientMed, runs, bands.map((b) => ({ width: b.width, alpha: 1, color: mix(map.seaMed, map.seaCoast, b.alpha) })), SEA_SIMPLIFY);
+    const medMask = new Graphics();
+    for (const [id, group] of seaOfHex(scene.geometry.sea_zones)) {
+      const h = scene.grid.byId.get(id);
+      if (h && group === "mediterranean") medMask.poly(flat(worldCorners(scene.grid, h))).fill({ color: 0xffffff }).stroke({ width: 0.03, color: 0xffffff, join: "round" });
+    }
+    gradientMed.addChild(medMask);
+    gradientMed.mask = medMask;
+  }
+  const marks = new Graphics();
+  drawSeaZones(marks, scene, theme);
+
+  // Foam fringe along the coast (under the land, so only the sea side shows), then the land, then a thin shore line.
+  const foam = new Graphics();
+  strokeRuns(foam, runs, foamLayers(theme.coastFoamWidth, theme.coastFoamAlpha).map((b) => ({ ...b, color: map.coastFoam })));
+  clipToMap(foam, scene);
+  const land = new Graphics();
   const shapes = landShapes(rings);
   for (const { outer, holes } of shapes) {
     land.poly(flat(outer.points), true).fill({ color: map.land });
@@ -197,9 +229,21 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
       for (const l of BLOB_LAYERS) land.poly(flat(blob(scene, hex.id, l.scale, BLOB_ROUND, 1)), true).fill({ color: colorOf[kind], alpha: l.alpha * theme.terrainBlobAlpha });
     }
   }
-  return { sea, land };
+  const seaNode = new Container();
+  seaNode.addChild(sea, gradient, gradientMed, marks);
+  const landNode = new Container();
+  landNode.addChild(foam, land);
+  return { sea: seaNode, land: landNode };
 }
 
+/** One stroke per band along every coast run (own colour and alpha); butt ends so nothing reaches past the map border. */
+function strokeRuns(g: Graphics, runs: Run[], bands: (Band & { color: number })[], detail = 0): void {
+  for (const b of bands) {
+    // `detail`: fraction of the stroke width by which the run may be simplified (a wide soft band needs no fine coast)
+    for (const r of runs) g.poly(flat(simplify(r.points, b.width * detail)), r.closed);
+    g.stroke({ width: b.width, color: b.color, alpha: b.alpha, cap: "butt", join: "round" });
+  }
+}
 /** The sea as one surface (#449): the north seas in map.seaNorth over the whole map, the Mediterranean and the Black Sea in map.seaMed on top. */
 function drawTintedSea(sea: Graphics, scene: Scene, theme: RenderTheme): void {
   const { map } = theme;
