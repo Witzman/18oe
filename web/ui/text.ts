@@ -739,6 +739,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "route.reduction_steamship": e("Dampfschiff", "Steamship", "§15.8"),
   "route.reduction_extra": e("Sonderrecht", "Special right", "§11.3.5"),
   "route.sea_help": e("Seefahrt und Fähre zählen aufs City-Limit.", "Sea crossings and ferries count against the city limit", "§11.3.3"),
+  "run.shield": e("{train} {revenue}", "Train and revenue of the proposed run (shield on the map)", "§11.3"),
   "route.confirm": e("Fahrt bestätigen", "Confirm run", "§11.3"),
   "div.title": e("Dividende", "Dividend", "§11.4"),
   "div.revenue": e("Einnahme der Fahrt: {revenue}", "Revenue of the run: {revenue}", "§11.3"),

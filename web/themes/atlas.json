@@ -285,6 +285,12 @@
     "sleeperLength": 0.19,
     "sleeperWidth": 0.028,
     "bedWidth": 0.25,
+    "runWidth": 0.3,
+    "runOutline": 0.045,
+    "runGap": 0.22,
+    "runMultiScale": 0.65,
+    "runRing": 0.2,
+    "runMinPx": 3,
     "colorMode": "neutral",
     "colorPart": "bed"
   },

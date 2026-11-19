@@ -7,7 +7,7 @@ import type { Game } from "../types.ts";
 import { themes, DEFAULT_THEME_ID } from "../themes/index.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
 import { opSheet, OpSheetView } from "../ui/panels/op-sheet.ts";
-import { dividendOptions, optionLine, payoutRows, runHexes, runLines } from "../ui/panels/operating-model.ts";
+import { dividendOptions, optionLine, payoutRows, runBands, runHexes, runLines } from "../ui/panels/operating-model.ts";
 import { DividendPanel } from "../ui/panels/operating.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
@@ -87,4 +87,20 @@ test("#56: the head names the water area of the company's port authority marker 
   assert.ok(!facts(g).some((f) => f.key === "op.port_authority"), "no marker, no fact");
   g.state.corporations.find((c) => c.id === "B")!.port_authority = "north_sea";
   assert.equal(facts(g).find((f) => f.key === "op.port_authority")!.value, "Nordsee");
+});
+
+test("run bands (#155): the offered run of the active company, chains and stops as the prompt carries them", () => {
+  const r = load("operating-route");
+  const run = runBands(r)!;
+  assert.equal(run.corporation, "B");
+  assert.equal(run.routes.length, 1);
+  assert.deepEqual(run.routes[0]!.connections, [["H21", "G22", "G24"], ["G24", "G26"]]);
+  assert.deepEqual(run.routes[0]!.nodes, ["H21-0", "G24-0", "G26-0"]);
+  assert.equal(run.routes[0]!.revenue, 60);
+  assert.match(run.routes[0]!.label!, /^2\+2 £60$/, "shield: train name and the sum");
+  assert.equal(runBands(load("operating-dividend")), null, "only the Route step shows the proposal");
+  assert.equal(runBands(load("stock")), null);
+  const none = load("operating-route");
+  delete none.state.prompt.actions.find((a) => a.type === "run_routes")!.routes;
+  assert.equal(runBands(none), null);
 });

@@ -28,6 +28,7 @@ import { between, centerOn, clampPan, fit, frame, maxZoom, panBy, zoomAt, zoomSt
 import { drawCoast, drawGrid, drawPlate, drawWalls, type Block } from "./layers/static.ts";
 import { drawTileSurface } from "./layers/tiles.ts";
 import { drawTrack, setTrackStage, type TrackNode } from "./track.ts";
+import { buildRunScene, type MapRun, type RunScene } from "./layers/runs.ts";
 import { findFerries, type Ferry } from "./ferries.ts";
 import { drawFerryLine } from "./layers/ferry.ts";
 import { drawPortMark } from "./layers/port.ts";
@@ -100,7 +101,8 @@ export interface MapView {
   setTargets(targets: MapTargets | null): void;
   setPreview(preview: MapPreview): void;
   setLayers(layers: MapLayers): void;
-  showRoutes(routes: unknown[], opts?: { animate?: boolean }): void;
+  /** The proposed run of a company as bands on the track (#155); null removes it. Display only. */
+  showRoutes(run: MapRun | null): void;
   /** Fly to a hex id or a corporation id (its tokens, else its home). False if unknown. */
   flyTo(target: string): boolean;
   /** Centre on a corporation's home station, zoomed in to at least the theme's homeZoom (#415). */
@@ -195,16 +197,18 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let targets: MapTargets | null = null;
   let preview: MapPreview = null;
   let shownLayers: MapLayers = { terrainCost: true };
-  let routes: unknown[] = [];
+  let run: MapRun | null = null;
+  let runScene: RunScene | null = null;
   let hover: string | null = null;
   let cacheRes = 0;
   const handlers = new Map<MapEvent, Set<(d: MapEventData) => void>>();
   const stats: MapStats = { buildMs: 0, themeMs: null, stateMs: null, stateHexes: 0, frameMs: null, blocks: 0, visibleBlocks: 0 };
-  void preview; void routes;
+  void preview;
 
   const emit = (e: MapEvent, d: MapEventData) => handlers.get(e)?.forEach((h) => h(d));
 
   function clearLayers() {
+    runScene = null; // its objects are destroyed with the layers below; drawRun() builds it again
     for (const rl of levelRL) { rl.detachAll(); rl.destroy(); }
     levelRL = [];
     for (const n of LAYERS) for (const c of layers[n].removeChildren()) c.destroy({ children: true });
@@ -300,6 +304,30 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       names.push({ id: l.id, text, at: { x: g.x, y: g.y }, z: g.z });
     }
     app.renderer.background.color = theme.ui.bg;
+    drawRun();
+  }
+
+  /** The proposed run (#155): bands on the track, rings and shields; rebuilt whenever the tiles or the theme are. */
+  function drawRun() {
+    runScene?.destroy();
+    runScene = null;
+    if (!run || run.routes.length === 0) return;
+    const nodeRevenue = (hex: string, node: number): number | null => {
+      const p = partsOf(hex);
+      const n = [...(p?.cities ?? []), ...(p?.towns ?? []), ...(p?.double_towns ?? []), ...(p?.offboards ?? [])].find((x) => x.node === node);
+      return n ? revenueNow(n.revenue, phaseColors()) : null;
+    };
+    runScene = buildRunScene({
+      run, theme, color: corpColor(run.corporation), dpr,
+      world: {
+        neighbors: (id) => scene.hexById.get(id)?.neighbors,
+        geometry: (id) => geomOf(id),
+        origin: (id) => { const g = scene.grid.byId.get(id); return g ? { x: g.x, y: g.y } : null; },
+      },
+      levels: levelNodes.overlay, labels: layers.labels,
+      levelOf: (id) => scene.levelOf.get(id) ?? 0, zOf: (id) => scene.grid.byId.get(id)?.z ?? 0,
+      stopRevenue: nodeRevenue,
+    });
   }
 
   /** Hexes raised by a laid tile, with the tile colour. ASSUMPTION: an entry whose colour differs from the printed one (so a hex that only reports its printed tile because of tokens stays low). */
@@ -577,6 +605,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     for (const w of wallNodes) { w.position.set(view.panX, view.panY); w.scale.set(view.zoom); }
     const stage = zoomStage(view.zoom);
     for (const t of trackNodes.values()) setTrackStage(t, stage);
+    runScene?.update(view, stage);
     let visible = 0;
     for (const b of blocks) {
       b.node.visible = boxOnScreen(b.box, view, scene.levels[b.level]!, width, height, 8);
@@ -933,6 +962,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       } else {
         changed.forEach(drawTile);
         stats.stateHexes = changed.length;
+        if (run) drawRun();
       }
       render();
       void rendered().then(() => { stats.stateMs = performance.now() - t; });
@@ -940,7 +970,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     setTargets(t) { targets = t; drawTargets(); drawHover(); render(); },
     setPreview(p) { preview = p; drawPreview(); render(); },
     setLayers(l) { shownLayers = { ...shownLayers, ...l }; render(); },
-    showRoutes(r) { routes = r; },
+    showRoutes(r) { run = r; drawRun(); render(); },
     flyTo,
     flyHome,
     on(event, handler) {
