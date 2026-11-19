@@ -547,6 +547,7 @@ module Oe
       when Engine::Game::G18OE::Step::BuySellParShares then stock_choices(step, entity)
       when Engine::Game::G18OE::Step::IssueShares then issue_choices(step, entity)
       when Engine::Game::G18OE::Step::HochbergToken then hochberg_choices(step, entity)
+      when Engine::Game::G18OE::Step::SmlTrain then sml_choices(step, entity)
       else plain_choices(step, entity)
       end
     end
@@ -560,6 +561,11 @@ module Oe
     # §14.8: the private places its token on one of the rough hexes (the action's target).
     def hochberg_choices(step, entity)
       step.hexes.map { |hex| A::Choose.new(entity, choice: step.class::CHOICE, target: hex) }
+    end
+
+    # §14.10: the private gives the rusted 2+2 to the RR operating (the action's target).
+    def sml_choices(step, entity)
+      step.corporations(entity).map { |corporation| A::Choose.new(entity, choice: step.class::CHOICE, target: corporation) }
     end
 
     def issue_choices(step, entity)

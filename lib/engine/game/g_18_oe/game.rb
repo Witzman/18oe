@@ -13,6 +13,7 @@ require_relative 'sea'
 require_relative 'national'
 require_relative 'step/consolidate'
 require_relative 'step/hochberg_token'
+require_relative 'step/sml_train'
 require_relative 'green_junction'
 require_relative 'krasnaya_strela'
 require_relative 'right_of_way'
@@ -49,7 +50,7 @@ module Engine
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
         attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation,
-                    :hochberg_hex,
+                    :hochberg_hex, :sml_train,
                     :bbe_token_hexes
 
         FERRY_COLOR = '#0047AB'
@@ -652,6 +653,40 @@ module Engine
           city.exchange_token(token, extra_slot: true)
           clear_graph
           token
+        end
+
+        # ---- §14.10 Swift Metropolitan Line (workshop #83) ------------------------------------------
+
+        def sml_company
+          company_by_id('SML')
+        end
+
+        # §14.10: "one unclaimed rusted 2+2": the pool of §11.6.6 (rusted, owned by nobody).
+        def sml_pool
+          unclaimed_rusted_trains.select { |train| train.name == '2+2' }
+        end
+
+        def sml_train?(train)
+          !@sml_train.nil? && train.equal?(@sml_train)
+        end
+
+        def sml_assign!(company, corporation)
+          train = sml_pool.first
+          buy_train(corporation, train, :free)
+          @sml_train = train
+          clear_graph
+          @log << "#{company.name}: #{corporation.name} receives a preserved rusted #{train.name} (marker on the train)"
+          flip_private!(company)
+        end
+
+        # §14.10: the train "does not count against the train limit".
+        def num_corp_trains(entity)
+          super - (@sml_train && entity.respond_to?(:trains) && entity.trains.include?(@sml_train) ? 1 : 0)
+        end
+
+        # The trains of a RR that count: not the preserved 2+2 (it does not fulfil "must own a train", §14.10).
+        def counted_trains(entity)
+          entity.trains.reject { |train| sml_train?(train) }
         end
 
         # ---- §14.8 Hochberg Mining & Lumber Co. --------------------------------------------
@@ -1500,6 +1535,7 @@ module Engine
             G18OE::Step::DiscardTrain,
             Engine::Step::HomeToken,
             G18OE::Step::HochbergToken,
+            G18OE::Step::SmlTrain,
             G18OE::Step::SpecialTrack,
             G18OE::Step::HomeHexConsent,
             G18OE::Step::Track,
@@ -1547,7 +1583,7 @@ module Engine
           return [] if !corporation.corporation? || corporation.type != :major
           return [] if corporation.trains.any? { |train| combined_train?(train) }
 
-          corporation.trains.reject { |train| train.operated || !train.rusts_on }
+          corporation.trains.reject { |train| train.operated || !train.rusts_on || sml_train?(train) }
         end
 
         def non_permanent_trains?
