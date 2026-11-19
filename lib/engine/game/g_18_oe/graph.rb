@@ -12,6 +12,7 @@ module Engine
           @sea_port_nodes = nil
           @water = nil
           @ferry_costs = nil
+          @ferry_pending = nil
         end
 
         # §11.1.6, §11.2 (#360, #61): the hypothetical train that connects a tile or a token to a station token of the
@@ -19,12 +20,13 @@ module Engine
         # free there; #price_ferries then counts the paid ones, and Sea crossings extend the result: see #cross_water.
         # The merge graph is an Engine::Graph and stays off the sea (§10.5).
         def compute(corporation, routes_only: false, one_token: nil, &block)
+          price_pending_ferries(corporation) # before this walk replaces the one they belong to
           before = @connected_nodes[corporation]
           super
           nodes = @connected_nodes[corporation]
           return if one_token || nodes.nil? || nodes.equal?(before)
 
-          price_ferries(corporation)
+          (@ferry_pending ||= {})[corporation] = true # #446: priced when somebody asks, see #ferry_cost
           cross_water(corporation, &block)
         end
 
@@ -125,6 +127,7 @@ module Engine
           end
           return water if sources.empty?
 
+          price_pending_ferries(corporation)
           queue = Hash.new { |h, k| h[k] = [] }
           landings = @game.sea_landings(corporation)
           arrows = @game.sea_arrows(corporation)
@@ -185,6 +188,11 @@ module Engine
           end
         end
 
+        # #446: the extra walks are the heaviest part of the graph; only what asks for a water cost pays for them.
+        def price_pending_ferries(corporation)
+          price_ferries(corporation) if @ferry_pending&.delete(corporation)
+        end
+
         def paid_ferry_line?(path)
           (ferry = @game.ferry_component(path)) && ferry.distance.to_i.positive?
         end
@@ -215,6 +223,7 @@ module Engine
         # The ferries on the way to a node (kind :nodes, key node) or a side of a hex (kind :edges, key hex and side):
         # none unless #price_ferries found some.
         def ferry_cost(corporation, kind, *key)
+          price_pending_ferries(corporation)
           Sea::WaterCost.new(@ferry_costs&.[](corporation)&.dig(kind, *key).to_i, 0)
         end
 
