@@ -55,7 +55,7 @@ module Oe
     PULLMAN_CASH_BUFFER = 150
 
     def self.pullman_choice?(action)
-      action.is_a?(Engine::Action::Choose) && action.choice.to_s.start_with?('pullman_')
+      action.is_a?(Engine::Action::Choose) && action.choice.to_s.start_with?('pullman_', 'port_authority:')
     end
 
     def choose(actions)
