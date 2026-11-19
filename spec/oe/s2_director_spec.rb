@@ -37,4 +37,9 @@ RSpec.describe "S2 director steering (#481)" do
       expect(script.send(:director, "stock", "BuySellParShares", prompt(pass, offer, take_minor))).to be_nil
     end
   end
+
+  it "reads the seats of a game from the slice file, 4 without a `players:`" do
+    expect([0, 1].map { |game| Oe::ScriptGame.players("s2", game) }).to eq([4, 3])
+    expect(Oe::ScriptGame.players("s1", 0)).to eq(4)
+  end
 end

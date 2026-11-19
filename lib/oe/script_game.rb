@@ -116,6 +116,11 @@ module Oe
       slice(slice).fetch("games").size
     end
 
+    # Seats of a game of the slice (`players:` in the slice file, 4 without it, #481).
+    def self.players(slice, game)
+      slice(slice).fetch("games").fetch(game)["players"] || 4
+    end
+
     def run
       started = clock
       accounts = @clients.keys
