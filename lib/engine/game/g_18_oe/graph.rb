@@ -26,8 +26,20 @@ module Engine
           nodes = @connected_nodes[corporation]
           return if one_token || nodes.nil? || nodes.equal?(before)
 
-          (@ferry_pending ||= {})[corporation] = true # #446: priced when somebody asks, see #ferry_cost
+          (@ferry_pending ||= {})[corporation] = true unless @ferry_pricing_off # #446: priced when somebody asks, see #ferry_cost
           cross_water(corporation, &block)
+        end
+
+        # #373: a trial map (LegalActions#with_tile_laid) is asked only what it connects (paths, nodes, and whether a
+        # node is reached without a sea crossing), never what the ferries on the way cost. Inside the block the walks
+        # that price the paid ferries are skipped (the connected paths and nodes do not depend on them, see
+        # #price_ferries, which puts the plain walk back); the caller clears the graph afterwards.
+        def without_ferry_prices
+          before = @ferry_pricing_off
+          @ferry_pricing_off = true
+          yield
+        ensure
+          @ferry_pricing_off = before
         end
 
         # What the hypothetical train crosses to reach the node: nothing over land, nil if it is not reached.

@@ -305,6 +305,36 @@ RSpec.describe Oe::LegalActions, "#lay_tile_options log" do
   end
 end
 
+# #373: a trial lay is asked only what it connects, so the walks that price the paid ferries are skipped there.
+RSpec.describe Engine::Game::G18OE::Graph, "#without_ferry_prices" do
+  include G18OESpecHelpers
+
+  let(:game) do
+    g = new_game(%w[a b c])
+    start_major!(g, "LNWR", g.players[0])
+    g
+  end
+  let(:corp) { game.corporation_by_id("LNWR") }
+  let(:graph) { game.graph_for_entity(corp) }
+
+  it "leaves the ferries unpriced inside the block and prices them lazily outside" do
+    graph.without_ferry_prices do
+      game.clear_graph_for_entity(corp)
+      graph.connected_paths(corp)
+      expect(graph.instance_variable_get(:@ferry_pending)).to be_nil
+    end
+
+    game.clear_graph_for_entity(corp)
+    graph.connected_paths(corp)
+    expect(graph.instance_variable_get(:@ferry_pending)).to have_key(corp)
+  end
+
+  it "restores the flag when the block raises" do
+    expect { graph.without_ferry_prices { raise "boom" } }.to raise_error("boom")
+    expect(graph.instance_variable_get(:@ferry_pricing_off)).to be_nil
+  end
+end
+
 # #315/#319: the path search runs on every prompt and bot move; unbounded, one
 # search in a phase-8 network took 47 s. It is bounded by a visit count.
 RSpec.describe Oe::LegalActions::RoutePicker do
