@@ -1085,7 +1085,7 @@ module Engine
           return [] if minor.type != :minor || !minor.floated? || minor.owner != player
 
           @corporations.select do |corporation|
-            corporation.type == :major &&
+            %i[major national].include?(corporation.type) &&
               corporation.floated? &&
               corporation.president?(player) &&
               !@round.merged_majors.include?(corporation)
