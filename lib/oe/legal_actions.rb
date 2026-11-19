@@ -163,7 +163,8 @@ module Oe
       extra_slot = company_extra_slot?(step, entity)
       token_cities(step, entity).select do |city|
         city.tokenable?(tokener, free: false, tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
-          token_spend_ok?(step, tokener, tokens, city) && connected_for_token?(step, entity, city)
+          token_spend_ok?(step, tokener, tokens, city) && connected_for_token?(step, entity, city) &&
+          (!step.respond_to?(:pass_city_ok?) || step.pass_city_ok?(entity, city))
       end
     end
 

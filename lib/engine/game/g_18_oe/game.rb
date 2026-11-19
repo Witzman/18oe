@@ -594,6 +594,66 @@ module Engine
           company.close!
         end
 
+        # ---- §14.5/§14.6 pass-through tokens (Star Harbor, Central Circle; workshop #79, #80) ----------
+
+        # The private whose token this is: Central Circle in a non-port city, Star Harbor in a port city.
+        PASS_TOKEN_COMPANIES = %w[CCTC SHTC].freeze
+        # ASSUMPTION: no artwork yet, placeholder logo path.
+        PASS_TOKEN_LOGO = '/logos/18_oe/pass_token.svg'
+
+        def pass_token_company?(company)
+          company.respond_to?(:sym) && PASS_TOKEN_COMPANIES.include?(company.sym)
+        end
+
+        def pass_token?(token)
+          token&.type == :pass
+        end
+
+        # Whether the city holds a pass-through token of the RR.
+        def pass_token_city?(city, corporation)
+          return false unless city.respond_to?(:extra_tokens)
+
+          city.extra_tokens.any? { |token| pass_token?(token) && token.corporation == corporation }
+        end
+
+        # §14.5/§14.6: the token stands in an extra position of the city; it is no station of the RR: no route
+        # needs it or starts from it, and no token is placed from it (everything asking city_tokened_by? skips it).
+        # The city itself is not blocked for the RR (City#blocks? asks tokened_by?, which sees the token).
+        def city_tokened_by?(city, entity)
+          return super unless city.respond_to?(:extra_tokens) && city.extra_tokens.any? { |token| pass_token?(token) }
+
+          (city.tokens + city.extra_tokens).any? { |token| token&.corporation == entity && !pass_token?(token) }
+        end
+
+        # §14.5/§14.6: the city does not count towards the city limit and pays nothing for the trains of the RR.
+        def visited_stops(route)
+          stops = super
+          corporation = route.corporation
+          return stops unless stops.any? { |stop| pass_token_city?(stop, corporation) }
+
+          stops.reject { |stop| pass_token_city?(stop, corporation) }
+        end
+
+        # Why the private's token may not go on the city (nil if it may): Central Circle takes a non-port city,
+        # Star Harbor a port city; the RR holds no token in the hex yet. Reachability is not asked (§14.5, §14.6).
+        def pass_token_site_error(company, city, corporation)
+          port = port_accesses(city).any?
+          if company.sym == 'CCTC' && port
+            return "#{company.name} token needs a non-port city; #{city.hex.name} is a port (Star Harbor)"
+          end
+          return "#{company.name} token needs a port city; #{city.hex.name} is not one" if company.sym == 'SHTC' && !port
+          return nil unless city.tile.cities.any? { |other| other.tokened_by?(corporation) }
+
+          "#{corporation.name} already has a token in #{city.hex.name}"
+        end
+
+        def place_pass_token!(company, city, corporation)
+          token = Engine::Token.new(corporation, logo: PASS_TOKEN_LOGO, simple_logo: PASS_TOKEN_LOGO, type: :pass)
+          city.exchange_token(token, extra_slot: true)
+          clear_graph
+          token
+        end
+
         # ---- §14.8 Hochberg Mining & Lumber Co. --------------------------------------------
 
         # Revenue of the token per train phase, for every RR of the owner (counted as a town).
