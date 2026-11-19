@@ -44,6 +44,11 @@ export interface RenderTheme {
   seaZoneGap: number;
   seaZoneWidth: number;
   seaMarkRadius: number;
+  /** Base surfaces (#477): sea gradient reach and alpha at the coast, foam width and alpha. */
+  seaReach: number;
+  seaCoastAlpha: number;
+  coastFoamWidth: number;
+  coastFoamAlpha: number;
   /** Cities, towns and tokens in side lengths (#147). */
   slotRadius: number;
   tokenRadius: number;
@@ -105,6 +110,10 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     seaZoneGap: t.shape.seaZoneGap,
     seaZoneWidth: t.shape.seaZoneWidth,
     seaMarkRadius: t.shape.seaMarkRadius,
+    seaReach: t.shape.seaReach,
+    seaCoastAlpha: t.shape.seaCoastAlpha,
+    coastFoamWidth: t.shape.coastFoamWidth,
+    coastFoamAlpha: t.shape.coastFoamAlpha,
     slotRadius: t.shape.slotRadius,
     tokenRadius: t.shape.tokenRadius,
     townLength: t.shape.townLength,
