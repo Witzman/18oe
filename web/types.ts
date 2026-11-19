@@ -39,6 +39,14 @@ export interface Meta {
   railroads: Railroads;
   operating_order: { id: string; done: boolean }[];
   priority: string[];
+  coverage: Coverage;
+}
+
+// #130: is the state inside the verified rules slice? reason: "major_phase", "train_phase:<n>", "round:<Class>", "step:<Class>".
+export interface Coverage {
+  slice: string;
+  verified: boolean;
+  reason: string | null;
 }
 
 export interface GameEnd {

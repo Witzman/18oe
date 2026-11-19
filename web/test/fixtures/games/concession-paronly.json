@@ -26,7 +26,7 @@
  "viewer": "p3",
  "seq": 2371,
  "state": {
-  "meta": {
+  "meta": {"coverage":{"slice":"S1","verified":true,"reason":null},
    "seq": 2371,
    "game_id": 1,
    "finished": false,
