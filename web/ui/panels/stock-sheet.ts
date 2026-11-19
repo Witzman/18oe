@@ -8,7 +8,7 @@ import { corpColor, playerName } from "../frame/model.ts";
 import { Auftrag, Dialog, Geld, inkFor, playerSlot, Siegel, v, type VNode } from "../kit/index.ts";
 import { formatGeld } from "../kit/money.ts";
 import { fillText, txt } from "../text.ts";
-import { blockedReason, holdings, inTab, offerOf, offersFor, orderModel, passAction, type BuyOffer, type CorpRow, type MarketCellModel, type MarketModel, type Mode, type MustSell, type Offer, type ParOffer, type SellOffer, type Selection, type Tab } from "./stock-model.ts";
+import { blockedReason, holdings, inTab, offerOf, offersFor, orderModel, passAction, sealStack, type BuyOffer, type CorpRow, type MarketCellModel, type MarketModel, type Mode, type MustSell, type Offer, type ParOffer, type SellOffer, type Selection, type Tab } from "./stock-model.ts";
 
 export interface SheetHandlers {
   /** A corporation card: opens the dialog to buy or found (#408). */
@@ -17,6 +17,8 @@ export interface SheetHandlers {
   onSell: (corp: string) => void;
   onPick: (corp: string, key: string) => void;
   onTab: (tab: Tab) => void;
+  /** A Kurstafel cell with corporations on it: opens the list of them (#484). */
+  onCell?: (row: number, col: number) => void;
   /** Dialog: cancel, Escape and the backdrop only drop the choice; the main button sends. */
   onClose?: () => void;
   onConfirm?: () => void;
@@ -33,6 +35,8 @@ export interface SheetInput {
   tab: Tab;
   mode: Mode;
   must: MustSell | null;
+  /** "row,col" of the Kurstafel cell whose corporation list is open. */
+  cellList?: string | null;
 }
 
 const money = (n: number | null): string => (n === null ? txt("stock.unknown_value").de : formatGeld(n));
@@ -133,7 +137,8 @@ function holdingsNode(i: SheetInput, h: SheetHandlers): VNode {
 const ARROW_GLYPH = { right: "→", down: "↓", up: "↑" } as const;
 
 function cellNode(c: MarketCellModel, i: SheetInput, h: SheetHandlers): VNode {
-  const corps = c.corps.map((id) => sealOf(i.g, i.theme, id, i.g.state.corporations.find((x) => x.id === id)?.name));
+  const stack = sealStack(c.corps);
+  const seal = (id: string) => sealOf(i.g, i.theme, id, i.g.state.corporations.find((x) => x.id === id)?.name);
   const base = c.corps.length > 0 ? fillText("stock.cell_corps", { price: formatGeld(c.price), corps: c.corps.join(", ") }) : fillText("stock.cell", { price: formatGeld(c.price) });
   const marks = [
     c.major ? fillText("stock.cell_major", { letter: c.major }) : null,
@@ -144,19 +149,41 @@ function cellNode(c: MarketCellModel, i: SheetInput, h: SheetHandlers): VNode {
   const attrs = {
     class: "stock-cell", "data-type": c.type ?? "", "data-valid": c.valid ? "true" : "false", "data-chosen": c.chosen ? "true" : "false",
     "data-preview": c.preview ? "true" : "false", "data-price": String(c.price), "aria-label": label,
-    "data-major": c.major ?? "", "data-regional": c.regional ?? "",
+    "data-major": c.major ?? "", "data-regional": c.regional ?? "", "data-arrows": c.arrows.length > 0 ? "true" : "false",
   };
   const body = [
+    c.arrows.length > 0 ? v("span", { class: "stock-cell-arrows", "aria-hidden": "true" }, ...c.arrows.map((a) => v("span", { class: "stock-arrow", "data-dir": a }, ARROW_GLYPH[a]))) : null,
     v("span", { class: "stock-cell-price" }, formatGeld(c.price)),
-    c.major ? v("span", { class: "stock-cell-major", "aria-hidden": "true" }, fillText("stock.major_label", { letter: c.major })) : null,
+    c.major ? v("span", { class: "stock-cell-major", "aria-hidden": "true" },
+      v("span", { class: "stock-major-long" }, fillText("stock.major_label", { letter: c.major })), v("span", { class: "stock-major-short" }, c.major)) : null,
     c.regional ? v("span", { class: "stock-cell-regional", "aria-hidden": "true" }, fillText("stock.regional_label", { letter: c.regional })) : null,
-    corps.length > 0 ? v("span", { class: "stock-cell-corps" }, ...corps) : null,
-    ...c.arrows.map((a) => v("span", { class: "stock-arrow", "data-dir": a, "aria-hidden": "true" }, ARROW_GLYPH[a])),
+    stack.shown.length > 0 ? v("span", { class: "stock-cell-corps" }, ...stack.shown.map(seal)) : null,
+    stack.more > 0 ? v("span", { class: "stock-cell-more", "aria-hidden": "true" }, fillText("stock.more_seals", { n: stack.more })) : null,
   ];
-  if (!c.valid) return v("div", attrs, ...body);
-  const row = i.rows.find((r) => r.id === i.focus);
-  const offer = row?.pars.find((p) => p.cell?.row === c.row && p.cell.col === c.col);
-  return v("button", { ...attrs, type: "button", "aria-pressed": String(c.chosen), onclick: () => { if (row && offer) h.onPick(row.id, offer.key); } }, ...body);
+  if (c.valid) {
+    const row = i.rows.find((r) => r.id === i.focus);
+    const offer = row?.pars.find((p) => p.cell?.row === c.row && p.cell.col === c.col);
+    return v("button", { ...attrs, type: "button", "aria-pressed": String(c.chosen), onclick: () => { if (row && offer) h.onPick(row.id, offer.key); } }, ...body);
+  }
+  // Seals on the cell: a tap opens the list of all of them with name and price.
+  if (c.corps.length > 0) return v("button", { ...attrs, type: "button", "aria-haspopup": "dialog", onclick: () => h.onCell?.(c.row, c.col) }, ...body);
+  return v("div", attrs, ...body);
+}
+
+/** The list of the corporations on one Kurstafel cell: name and price each (#484). */
+function cellListDialog(i: SheetInput, h: SheetHandlers): VNode | null {
+  if (!i.cellList) return null;
+  const [r, col] = i.cellList.split(",").map(Number);
+  const c = i.market.rows[r!]?.[col!];
+  if (!c || c.corps.length === 0) return null;
+  return Dialog({
+    id: "stock-cells", title: fillText("stock.cell_list_title", { price: formatGeld(c.price) }), onClose: h.onClose,
+    body: [v("ul", { class: "stock-cell-list" }, ...c.corps.map((id) => v("li", { class: "stock-cell-list-item" },
+      sealOf(i.g, i.theme, id, i.g.state.corporations.find((x) => x.id === id)?.name),
+      v("strong", {}, id), v("span", { class: "muted" }, i.g.state.corporations.find((x) => x.id === id)?.name ?? ""),
+      v("span", { class: "stock-price" }, formatGeld(c.price)))))],
+    actions: [v("button", { type: "button", class: "kit-side-btn", onclick: () => h.onClose?.() }, txt("stock.close").de)],
+  });
 }
 
 const emptyCell = () => v("div", { class: "stock-cell stock-cell-empty", "aria-hidden": "true" });
@@ -234,5 +261,5 @@ export function sheetNode(i: SheetInput, h: SheetHandlers): VNode {
       me ? v("span", { class: "stock-cash" }, `${txt("stock.cash").de} `, Geld(me.cash), ` · ${txt("stock.certs").de} ${fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit })}`) : null),
     i.must ? v("p", { class: "stock-warn", role: "alert" }, fillText("stock.must_sell", { limit: i.must.limit, certs: i.must.certs })) : null,
     v("div", { class: "stock-body" }, listNode(i, h), holdingsNode(i, h), gridNode(i, h)));
-  return v("div", { class: "stock-stage" }, sheet, stockDialog(i, h));
+  return v("div", { class: "stock-stage" }, sheet, stockDialog(i, h) ?? cellListDialog(i, h));
 }
