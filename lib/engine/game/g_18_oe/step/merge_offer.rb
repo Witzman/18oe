@@ -137,6 +137,10 @@ module Engine
             offer = @round.merge_offer
             @round.merge_offer = nil
             @log << "No offers for #{offer[:minor].name}"
+            # A Stock Round offer (§10.5) has no abandon: without an own major to merge into, the owner's
+            # turn goes on as before (the offer used no stock action).
+            return if offer[:action].choice == 'offer_or_merge' && @game.merge_targets(offer[:minor].owner, offer[:minor]).empty?
+
             if offer[:action].choice == 'offer_or_abandon'
               @game.abandon_minor!(offer[:minor])
             else

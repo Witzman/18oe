@@ -41,8 +41,16 @@ module Oe
       end
     end
 
+    # A merge offer to the other presidents in an ordinary Stock Round (§10.5, #65): bots make none there
+    # (they do in the Consolidation Round, where it is how an unmergeable minor is placed, §10.6).
+    def self.merge_offer?(game, action)
+      action.is_a?(Engine::Action::Choose) && action.choice == 'offer_or_merge' &&
+        !game.round.is_a?(Engine::Round::G18OE::Consolidation)
+    end
+
     def choose(actions)
       actions = actions.reject { |a| self.class.trade_offer?(a) } if actions.any? { |a| !self.class.trade_offer?(a) }
+      actions = actions.reject { |a| self.class.merge_offer?(@game, a) } if actions.any? { |a| !self.class.merge_offer?(@game, a) }
       # Like Oe::Bot (#128): actions a private issues itself (White Cliffs Ferry's
       # place_token, entity = the company) are not played by the strategy; its
       # rules read corporation state (trains, cash) from the entity.
