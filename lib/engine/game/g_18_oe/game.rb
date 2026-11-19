@@ -9,6 +9,7 @@ require_relative '../base'
 require_relative 'round/consolidation'
 require_relative 'round/concession'
 require_relative 'golden_bell'
+require_relative 'bbbt'
 require_relative 'sea'
 require_relative 'national'
 require_relative 'step/consolidate'
@@ -40,6 +41,7 @@ module Engine
       class Game < Game::Base
         include_meta(G18OE::Meta)
         include G18OE::Entities
+        include G18OE::Bbbt
         include G18OE::Map
         include G18OE::GoldenBell
         include G18OE::GreenJunction
@@ -1263,6 +1265,7 @@ module Engine
               super
             when Engine::Round::Stock
               @reserved_shares = []
+              bbbt_end_of_stock_round!
               remove_major_par_markers!
               round = super
               @operating_rounds = final_operating_rounds if @turn == @final_turn
