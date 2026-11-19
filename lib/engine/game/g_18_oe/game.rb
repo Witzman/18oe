@@ -18,6 +18,8 @@ require_relative 'step/sml_train'
 require_relative 'green_junction'
 require_relative 'krasnaya_strela'
 require_relative 'port_authority'
+require_relative 'token_transfer'
+require_relative 'step/transfer_tokens'
 require_relative 'pullman'
 require_relative 'right_of_way'
 require_relative 'step/home_hex_consent'
@@ -52,6 +54,7 @@ module Engine
         include G18OE::Sea
         include G18OE::National
         include G18OE::PortAuthority
+        include G18OE::TokenTransfer
         include G18OE::Pullman
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
@@ -1564,6 +1567,7 @@ module Engine
             G18OE::Step::Route,
             G18OE::Step::Dividend,
             G18OE::Step::OrientExpressBonus,
+            G18OE::Step::TransferTokens,
             G18OE::Step::BuyTrain,
             G18OE::Step::IssueShares,
           ], round_num: round_num)
