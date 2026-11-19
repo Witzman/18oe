@@ -1659,7 +1659,7 @@ module Engine
           return super if rows.is_a?(Numeric)
 
           # the stops are chosen with the whole reduction of Minor H; check_distance then takes what the route needs
-          units = sea_units(route, steamship_allowance(route.corporation, route.phase))
+          units = sea_units(route, steamship_allowance(route.corporation, route.phase), port_authority_allowance(route.corporation))
           rows = distance_rows_after_sea(rows, units) if units.positive?
 
           rows = rows.sort_by { |h| h['nodes'].size }
@@ -1685,10 +1685,13 @@ module Engine
         # the units are remembered on the route for the RR's total (#check_overlap) and for what the route shows.
         def check_distance(route, visits, train = nil)
           train ||= route.train
-          allowance = train.distance.is_a?(Numeric) ? 0 : steamship_allowance(route.corporation, route.phase)
+          numeric = train.distance.is_a?(Numeric)
+          allowance = numeric ? 0 : steamship_allowance(route.corporation, route.phase)
+          pa_allowance = numeric ? 0 : port_authority_allowance(route.corporation)
           error = nil
-          (0..allowance).each do |used|
-            units = sea_units(route, used)
+          # the fewest units of both reductions that let the route pass (§15.8, §11.3.5), Minor H's first
+          ((0..allowance).to_a.product((0..pa_allowance).to_a)).sort_by { |s, p| [s + p, s] }.each do |used, pa_used|
+            units = sea_units(route, used, pa_used)
             begin
               if units.zero? || train.distance.is_a?(Numeric)
                 super(route, visits, train)
@@ -1700,6 +1703,7 @@ module Engine
                 super(route, visits, SeaTrain.new(distance_rows_after_sea(rows, units)))
               end
               route.instance_variable_set(:@steamship_use, used)
+              route.instance_variable_set(:@port_authority_use, pa_used)
               return
             rescue RouteTooLong => e
               error = e
@@ -1758,6 +1762,11 @@ module Engine
 
           used = routes.sum { |route| route.instance_variable_get(:@steamship_use).to_i }
           allowance = steamship_allowance(corporation, routes.first.phase)
+          pa_used = routes.sum { |route| route.instance_variable_get(:@port_authority_use).to_i }
+          pa_allowance = port_authority_allowance(corporation)
+          if pa_used > pa_allowance
+            raise RouteTooLong, "The port authority reduction of #{pa_allowance} is used #{pa_used} times by the routes"
+          end
           return if used <= allowance
 
           raise RouteTooLong, "The Great Western Steamship reduction of #{allowance} is used #{used} times by the routes"

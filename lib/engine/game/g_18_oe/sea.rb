@@ -48,18 +48,20 @@ module Engine
         # What takes units off the targets of one train: up to `amount` units of one target whose hex_ids hold one of
         # its hex_ids. A port token is one (§11.3.5); Port Authority, Minor H and the Star Harbor token (#56, #73, #79)
         # join through extra_sea_reducers.
-        SeaReducer = Struct.new(:amount, :hex_ids)
+        # `zones_only`: the reducer takes sea zones only, not a ferry's distance (port authority, §11.3.5)
+        SeaReducer = Struct.new(:amount, :hex_ids, :zones_only)
 
         # §11.3.3, §11.3.7: the places a route's sea traffic takes from the city limit. Each ferry the route rides
         # counts its full distance (0 or 1), even when the train rides only part of it; each sea crossing counts
         # its sea zones (§11.3.4); the port tokens of the route take units off again (§11.3.5, §11.3.7).
         # `steamship`: how many units of Minor H's reduction the route takes (§15.8, #73); see #steamship_allowance.
-        def sea_units(route, steamship = 0)
+        def sea_units(route, steamship = 0, port_authority = 0)
           targets = sea_targets(route)
           return 0 if targets.empty?
 
           units = targets.map(&:units)
-          reducers = sea_reducers(route) + steamship_reducers(targets, steamship)
+          reducers = sea_reducers(route) + steamship_reducers(targets, steamship) +
+                     port_authority_reducers(route.corporation, targets, port_authority)
           units.sum - max_sea_reduction(units.dup, targets, reducers)
         end
 
@@ -79,9 +81,29 @@ module Engine
           Array.new(count) { SeaReducer.new(1, hex_ids) }
         end
 
+        # §11.3.5 (#56): the port authority marker takes two sea zones in its water area off the city limits of the
+        # RR's trains; like Minor H's reduction it belongs to the RR, the trains share it (split between two trains is
+        # allowed). It takes sea zones of its area only: a crossing that starts or ends in a zone of the area.
+        def port_authority_allowance(corporation)
+          port_authority(corporation) ? 2 : 0
+        end
+
+        def port_authority_reducers(corporation, targets, count)
+          area = port_authority(corporation)
+          return [] if !area || count.zero?
+
+          hex_ids = targets.select { |target| crossing_in_area?(target, area) }.flat_map(&:hex_ids).uniq
+          Array.new(count) { SeaReducer.new(1, hex_ids, true) }
+        end
+
+        def crossing_in_area?(target, area)
+          crossing = target.ref
+          crossing.is_a?(Hash) && [crossing[:from], crossing[:to]].any? { |access| access.zone && sea(access.zone) == area }
+        end
+
         # The units a route takes from the city limit, with the reduction it was found to use (check_distance).
         def route_sea_units(route)
-          sea_units(route, route.instance_variable_get(:@steamship_use).to_i)
+          sea_units(route, route.instance_variable_get(:@steamship_use).to_i, route.instance_variable_get(:@port_authority_use).to_i)
         end
 
         def sea_targets(route)
@@ -130,6 +152,7 @@ module Engine
           best = sea_reduction_split(left, targets, rest)
           targets.each_index do |i|
             next if left[i].zero? || (targets[i].hex_ids & reducer.hex_ids).empty?
+            next if reducer.zones_only && targets[i].ref.is_a?(FerryComponent)
 
             used = [left[i], reducer.amount].min
             left[i] -= used
@@ -150,7 +173,9 @@ module Engine
           kinds = {}.compare_by_identity
           reducers = port_token_reducers(route).each { |r| kinds[r] = 'port_token' } +
                      extra_sea_reducers(route).each { |r| kinds[r] = 'extra' } +
-                     steamship_reducers(targets, route.instance_variable_get(:@steamship_use).to_i).each { |r| kinds[r] = 'steamship' }
+                     steamship_reducers(targets, route.instance_variable_get(:@steamship_use).to_i).each { |r| kinds[r] = 'steamship' } +
+                     port_authority_reducers(route.corporation, targets, route.instance_variable_get(:@port_authority_use).to_i)
+                       .each { |r| kinds[r] = 'port_authority' }
           _, picks = sea_reduction_split(targets.map(&:units), targets, reducers)
           targets.each_with_index.with_object({ sea: [], ferries: [] }) do |(target, i), detail|
             used = picks.select { |_, index, _| index == i }
