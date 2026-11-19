@@ -16,10 +16,40 @@ module Engine
 
             # §15.11: Minor L's marker, assigned at the beginning of the run trains step (upstream `assign`)
             actions += %w[assign] unless @game.krasnaya_trains(entity).empty?
+            actions += %w[choose] unless pullman_choices(entity).empty?
             return actions if @game.double_head_candidates(entity).size < 2
             return actions if !@game.loading && !@game.orient_express_reachable?(entity)
 
             actions + %w[double_head_trains]
+          end
+
+          # §11.3.9 (#55): the president says which train carries the Pullman; it adds £10 per level of that
+          # train. Offered before the routes are run, one choice per train that does not carry it now.
+          def choices
+            pullman_choices(current_entity)
+          end
+
+          def choice_name
+            'Attach Pullman'
+          end
+
+          def pullman_choices(entity)
+            return {} unless entity&.corporation? && entity == current_entity && @game.pullman?(entity)
+            return {} if entity.type == :national || @round.routes.any?
+
+            carrying = @game.pullman_train(entity)
+            entity.trains.reject { |train| train == carrying }.to_h do |train|
+              ["pullman_on:#{train.id}", "Attach Pullman to the #{train.name} train"]
+            end
+          end
+
+          def process_choose(action)
+            entity = action.entity
+            choice = action.choice
+            raise GameError, "#{choice} is not a Pullman choice on offer (§11.3.9)" unless pullman_choices(entity).key?(choice)
+
+            train = entity.trains.find { |t| t.id == choice.delete_prefix('pullman_on:') }
+            @game.pullman_attach!(entity, train)
           end
 
           def krasnaya_trains(entity)
