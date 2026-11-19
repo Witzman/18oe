@@ -200,13 +200,19 @@ jobs:
           bundler-cache: true
       - run: bundle exec ruby -I lib bin/script_game.rb --spawn
 
-  # Slice S2 (#481): conversions, merges, national formation. Its own job, not a second step: slice s1 alone takes
-  # 32 to 38 min of the 45 (measured), and the rush game of s2 needs about 15 min. The targets it does not reach
-  # are named `unreachable` in slices/s2.yml; a target missing from `combos` turns this job red.
+  # Slice S2 (#481): conversions, merges, national formation (game 1, 4 players), the consolidation round (game 2,
+  # 3 players: with 4 or more the rush game ends in Train Phase 4, before the round). Its own job, one runner per
+  # game, not a step of the job above: slice s1 alone takes 32 to 38 min of the 45 (measured), a game of s2 about
+  # 15 min. The targets it does not reach are named `unreachable` in slices/s2.yml; a target missing from `combos`
+  # turns the job red.
   script-game-s2:
-    name: scripted game S2 (bin/script-game --slice s2 --spawn)
+    name: scripted game S2 game ${{ matrix.game }} (bin/script-game --slice s2 --spawn)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        game: [1, 2]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -215,7 +221,7 @@ jobs:
         with:
           ruby-version: "3.3"
           bundler-cache: true
-      - run: bundle exec ruby -I lib bin/script_game.rb --spawn --slice s2
+      - run: bundle exec ruby -I lib bin/script_game.rb --spawn --slice s2 --game ${{ matrix.game }}
 
   docker:
     name: docker build (optional)
