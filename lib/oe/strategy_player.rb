@@ -48,13 +48,20 @@ module Oe
         !game.round.is_a?(Engine::Round::G18OE::Consolidation)
     end
 
-    # Buying or discarding a Pullman (§11.6.2, #55): no bot move until the bot rule (#55 part 3); a random
-    # one would discard cars and buy at any price.
+    # Buying or discarding a Pullman (§11.6.2, #55). The bot rule is pick_pullman; every other Pullman
+    # choice stays out of play (a random one would discard cars, or take a car from another bot who
+    # buys it back: #428).
+    PULLMAN_PAYBACK_ORS = 5
+    PULLMAN_CASH_BUFFER = 150
+
     def self.pullman_choice?(action)
       action.is_a?(Engine::Action::Choose) && action.choice.to_s.start_with?('pullman_')
     end
 
     def choose(actions)
+      pullman = pick_pullman(actions)
+      return pullman if pullman
+
       actions = actions.reject { |a| self.class.pullman_choice?(a) } if actions.any? { |a| !self.class.pullman_choice?(a) }
       actions = actions.reject { |a| self.class.trade_offer?(a) } if actions.any? { |a| !self.class.trade_offer?(a) }
       actions = actions.reject { |a| self.class.merge_offer?(@game, a) } if actions.any? { |a| !self.class.merge_offer?(@game, a) }
@@ -80,6 +87,24 @@ module Oe
     end
 
     private
+
+    # §11.6.2, §11.3.9: a Pullman adds £10 per level of the highest train every OR. Buy one from the Open
+    # Market (no royalty) or Minor M when it pays back within a few ORs, the RR already runs a train and
+    # keeps a cash buffer for its trains. Never from another RR, and never a second one.
+    def pick_pullman(actions)
+      options = actions.select { |a| self.class.pullman_choice?(a) && %w[pullman_market pullman_m].include?(a.choice) }
+      return nil if options.empty?
+
+      entity = options.first.entity
+      trains = @game.counted_trains(entity)
+      return nil if trains.empty?
+
+      bonus = trains.map { |train| train.sym.to_i }.max * Engine::Game::G18OE::National::PULLMAN_PER_LEVEL
+      price = Engine::Game::G18OE::Pullman::PULLMAN_PRICE # Minor J's discount is ignored: a safe bound
+      return nil if price > PULLMAN_PAYBACK_ORS * bonus || entity.cash < price + PULLMAN_CASH_BUFFER
+
+      options.find { |a| a.choice == 'pullman_market' } || options.first
+    end
 
     def underscore(name)
       name.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
