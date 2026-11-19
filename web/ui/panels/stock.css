@@ -64,18 +64,33 @@
 
 /* Kurstafel */
 .stock-grid { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.stock-grid-scroll { display: grid; grid-template-columns: repeat(var(--cols, 17), minmax(2.4rem, 1fr)); gap: 2px; overflow-x: auto; padding-bottom: 4px; }
+/* The board of the real game (#478): light cells on a dark field, the price in each cell, arrows at the edges, the six major par
+   cells outlined in red with their letter. Colours from stock.*; the staircase comes from the market rows themselves. */
+.stock-grid-scroll { display: grid; grid-template-columns: repeat(var(--cols, 17), minmax(var(--shape-hit), 1fr)); grid-auto-rows: 3.6rem; gap: 2px; overflow-x: auto; padding: var(--space-sm); background: var(--stock-field); border-radius: var(--shape-radius); touch-action: pan-x pan-y pinch-zoom; }
 .stock-grid-row { display: contents; }
-.stock-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 2.1rem; padding: 1px; border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); background: var(--ui-panel); font-size: var(--type-sm); font-variant-numeric: tabular-nums; }
+.stock-cell { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: var(--shape-hit); padding: 1px; border: 2px solid transparent; border-radius: 1px; background: var(--stock-cell); color: var(--stock-cell-ink); font-size: var(--type-sm); font-variant-numeric: tabular-nums; }
+.stock-cell-price { font-size: var(--type-md); font-weight: 700; line-height: 1.1; }
 .stock-cell-empty { border-color: transparent; background: transparent; }
-.stock-cell[data-type="par"], .stock-legend [data-type="par"]::before { background: color-mix(in srgb, var(--ui-accent) 30%, var(--ui-panel)); }
-.stock-cell[data-type="convert_range"], .stock-legend [data-type="convert_range"]::before { background: color-mix(in srgb, var(--ui-info) 25%, var(--ui-panel)); }
-.stock-cell[data-valid="true"] { outline: 2px solid var(--map-valid); outline-offset: 1px; cursor: pointer; }
-.stock-cell[data-chosen="true"] { outline: 3px double var(--map-selected); outline-offset: 1px; background: var(--ui-ink); color: var(--ui-panel); }
-.stock-cell[data-preview="true"] { outline: 2px dashed var(--map-preview); outline-offset: 1px; font-style: italic; }
-.stock-cell-corps { display: flex; flex-wrap: wrap; justify-content: center; gap: 1px; }
+.stock-cell[data-type="par"] { box-shadow: inset 0 -4px 0 var(--stock-par); }
+.stock-cell[data-major]:not([data-major=""]) { border-color: var(--stock-major); }
+.stock-cell-major, .stock-cell-regional { font-size: calc(var(--type-xs) - 1px); font-weight: 700; line-height: 1; white-space: nowrap; }
+.stock-cell-major { color: var(--stock-major-ink); }
+.stock-cell-regional { color: var(--stock-par); }
+.stock-arrow { position: absolute; font-family: system-ui, "Segoe UI Symbol", sans-serif; font-size: var(--type-lg); font-weight: 900; line-height: 1; color: var(--stock-arrow); pointer-events: none; }
+.stock-arrow[data-dir="right"] { right: 1px; top: 1px; }
+.stock-arrow[data-dir="down"] { left: 1px; top: 1px; }
+.stock-arrow[data-dir="up"] { right: 1px; bottom: 1px; }
+.stock-cell[data-valid="true"] { outline: 3px solid var(--map-valid); outline-offset: 1px; cursor: pointer; z-index: 1; }
+.stock-cell[data-chosen="true"] { outline: 3px double var(--map-selected); outline-offset: 1px; background: var(--stock-cell-ink); color: var(--stock-cell); z-index: 1; }
+.stock-cell[data-chosen="true"] :is(.stock-cell-major, .stock-cell-regional, .stock-arrow) { color: var(--stock-cell); }
+.stock-cell[data-preview="true"] { outline: 3px dashed var(--map-preview); outline-offset: 1px; font-style: italic; z-index: 1; }
+.stock-cell-corps { display: flex; flex-wrap: nowrap; justify-content: center; max-width: 100%; overflow: hidden; }
+.stock-cell-corps > * + * { margin-left: -9px; }
 .stock-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: .85rem; }
 .stock-legend li::before { content: ""; display: inline-block; width: .9rem; height: .9rem; margin-right: 6px; vertical-align: -2px; border: 1px solid var(--ui-rule); border-radius: 2px; }
+.stock-legend [data-type="par"]::before { background: var(--stock-cell); box-shadow: inset 0 -4px 0 var(--stock-par); }
+.stock-legend [data-type="convert_range"]::before { background: var(--stock-cell); border: 2px solid var(--stock-major); }
+.stock-legend [data-mark="arrow"]::before { content: "\2192"; width: auto; height: auto; border: 0; background: none; font-weight: 700; }
 .stock-legend [data-mark="valid"]::before { outline: 2px solid var(--map-valid); }
 .stock-legend [data-mark="preview"]::before { outline: 2px dashed var(--map-preview); }
 
@@ -91,7 +106,6 @@
   .stock-list { grid-column: 2; grid-row: 1; }
   .stock-grid { grid-column: 2; grid-row: 2; }
 }
-@media (pointer: coarse) { .stock-cell { min-height: var(--shape-hit); } }
 
 /* Portrait / narrow: keep the cards clear of the bottom sheet (collapsed height). */
 @media (orientation: portrait) and (max-width: 1100px), (max-width: 700px) {

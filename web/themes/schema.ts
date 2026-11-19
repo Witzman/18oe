@@ -16,6 +16,8 @@ export const COLOR_KEYS = {
     "label", "labelHalo", "valid", "selected", "invalid", "preview", "shadow",
   ],
   ui: ["bg", "panel", "panelAlt", "ink", "faint", "rule", "accent", "accentInk", "bar", "barInk", "error", "ok", "warn", "info", "overlay"],
+  // Kurstafel as on the board (#478): dark board, light cells, price ink, red major par outline and its label, arrows, regional par mark.
+  stock: ["field", "cell", "cellInk", "major", "majorInk", "arrow", "par"],
   // Fallback palette for company ids without an entry in `companies` (unknown or future ids).
   company: ["c1", "c2", "c3", "c4", "c5", "c6"],
   player: ["p1", "p2", "p3", "p4", "p5", "p6", "p7"],
@@ -106,7 +108,7 @@ export const MOTION_KEYS = [...Object.keys(NUMBER_RANGES.motion), "enabled"] as 
 export const TYPE_SCALE_KEYS = Object.keys(NUMBER_RANGES.type) as (keyof typeof NUMBER_RANGES.type)[];
 export const SPACE_SCALE_KEYS = Object.keys(NUMBER_RANGES.space) as (keyof typeof NUMBER_RANGES.space)[];
 export const SHAPE_KEYS = ["tileStyle", "shadow", ...Object.keys(NUMBER_RANGES.shape)] as const;
-export const TOP_KEYS = ["id", "name", "colorScheme", "map", "ui", "company", "companies", "player", "font", "camera", "track", "motion", "shape", "type", "space"] as const;
+export const TOP_KEYS = ["id", "name", "colorScheme", "map", "ui", "stock", "company", "companies", "player", "font", "camera", "track", "motion", "shape", "type", "space"] as const;
 
 /** Colours of one company (#99): seal/token background, text on it, edge. Ink is checked for 4.5:1 by the specs. */
 export const COMPANY_COLOR_KEYS = ["bg", "ink", "edge"] as const;
@@ -118,6 +120,7 @@ export interface Theme {
   colorScheme: "light" | "dark";
   map: Colors<"map">;
   ui: Colors<"ui">;
+  stock: Colors<"stock">;
   company: Colors<"company">;
   /** Real company colours by company id (engine sym), derived from the engine by themes/derive-companies.ts. */
   companies: Record<string, CompanyColors>;

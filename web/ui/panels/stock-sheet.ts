@@ -130,14 +130,29 @@ function holdingsNode(i: SheetInput, h: SheetHandlers): VNode {
         v("span", { class: "stock-price" }, r.price !== null ? Geld(r.price) : txt("stock.none").de))))));
 }
 
+const ARROW_GLYPH = { right: "→", down: "↓", up: "↑" } as const;
+
 function cellNode(c: MarketCellModel, i: SheetInput, h: SheetHandlers): VNode {
   const corps = c.corps.map((id) => sealOf(i.g, i.theme, id, i.g.state.corporations.find((x) => x.id === id)?.name));
-  const label = c.corps.length > 0 ? fillText("stock.cell_corps", { price: formatGeld(c.price), corps: c.corps.join(", ") }) : fillText("stock.cell", { price: formatGeld(c.price) });
+  const base = c.corps.length > 0 ? fillText("stock.cell_corps", { price: formatGeld(c.price), corps: c.corps.join(", ") }) : fillText("stock.cell", { price: formatGeld(c.price) });
+  const marks = [
+    c.major ? fillText("stock.cell_major", { letter: c.major }) : null,
+    c.regional ? fillText("stock.cell_regional", { letter: c.regional }) : null,
+    ...c.arrows.map((a) => txt(`stock.arrow_${a}`).de),
+  ].filter(Boolean);
+  const label = marks.length > 0 ? `${base}; ${marks.join(", ")}` : base;
   const attrs = {
     class: "stock-cell", "data-type": c.type ?? "", "data-valid": c.valid ? "true" : "false", "data-chosen": c.chosen ? "true" : "false",
     "data-preview": c.preview ? "true" : "false", "data-price": String(c.price), "aria-label": label,
+    "data-major": c.major ?? "", "data-regional": c.regional ?? "",
   };
-  const body = [v("span", { class: "stock-cell-price" }, formatGeld(c.price)), corps.length > 0 ? v("span", { class: "stock-cell-corps" }, ...corps) : null];
+  const body = [
+    v("span", { class: "stock-cell-price" }, formatGeld(c.price)),
+    c.major ? v("span", { class: "stock-cell-major", "aria-hidden": "true" }, fillText("stock.major_label", { letter: c.major })) : null,
+    c.regional ? v("span", { class: "stock-cell-regional", "aria-hidden": "true" }, fillText("stock.regional_label", { letter: c.regional })) : null,
+    corps.length > 0 ? v("span", { class: "stock-cell-corps" }, ...corps) : null,
+    ...c.arrows.map((a) => v("span", { class: "stock-arrow", "data-dir": a, "aria-hidden": "true" }, ARROW_GLYPH[a])),
+  ];
   if (!c.valid) return v("div", attrs, ...body);
   const row = i.rows.find((r) => r.id === i.focus);
   const offer = row?.pars.find((p) => p.cell?.row === c.row && p.cell.col === c.col);
@@ -157,6 +172,7 @@ function gridNode(i: SheetInput, h: SheetHandlers): VNode {
     v("ul", { class: "stock-legend muted" },
       v("li", { "data-type": "par" }, txt("stock.legend_par").de),
       v("li", { "data-type": "convert_range" }, txt("stock.legend_convert").de),
+      v("li", { "data-mark": "arrow" }, txt("stock.legend_arrow").de),
       v("li", { "data-mark": "valid" }, txt("stock.legend_target").de),
       v("li", { "data-mark": "preview" }, txt("stock.legend_after").de)));
 }
