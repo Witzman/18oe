@@ -40,6 +40,14 @@ test("model: ranking follows meta.standings, sums equal the standings, one winne
   assert.equal(m.rows[0]!.rank, 1);
 });
 
+test("model: share value is the sum of the per-corporation values from the view (#226)", () => {
+  for (const r of endgameModel(g).rows) {
+    const p = g.state.players.find((x) => x.id === r.id)!;
+    assert.deepEqual(r.holdings.map((h) => h.value), p.shares.map((x) => x.value));
+    assert.equal(r.shares, r.holdings.reduce((n, h) => n + h.value, 0));
+  }
+});
+
 test("model: equal values share a rank; face-down privates do not count", () => {
   const t = structuredClone(g);
   t.state.meta.standings = t.state.meta.standings.map((s) => ({ ...s, value: 100 }));
