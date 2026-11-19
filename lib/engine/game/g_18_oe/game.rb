@@ -17,6 +17,7 @@ require_relative 'step/hochberg_token'
 require_relative 'step/sml_train'
 require_relative 'green_junction'
 require_relative 'krasnaya_strela'
+require_relative 'pullman'
 require_relative 'right_of_way'
 require_relative 'step/home_hex_consent'
 require_relative 'step/special_track'
@@ -49,6 +50,7 @@ module Engine
         include G18OE::RightOfWay
         include G18OE::Sea
         include G18OE::National
+        include G18OE::Pullman
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
         attr_reader :concessions, :concession_owners, :merged_minors, :wcf_placeholder, :national_formation,
@@ -95,6 +97,7 @@ module Engine
 
         EVENTS_TEXT = Base::EVENTS_TEXT.merge(
           'level_8_available' => ['Level 8 Trains Available', 'Level 8 trains may be bought'],
+          'pullmans_available' => ['Pullman Cars Available', 'Minor M gets its free Pullman; Pullman cars may be bought (§11.6.2)'],
           'consolidation_triggered' => [
             'Consolidation Round',
             'Consolidation round follows at end of current OR set; minors and regionals must merge or be abandoned',
@@ -201,6 +204,7 @@ module Engine
                        { 'nodes' => %w[city offboard town], 'pay' => 4, 'visit' => 4 }],
             price: 300,
             rusts_on: '8+8',
+            events: [{ 'type' => 'pullmans_available' }],
             variants: [{
               name: '4+4',
               distance: [{ 'nodes' => ['town'], 'pay' => 4, 'visit' => 99 },
@@ -489,6 +493,7 @@ module Engine
           setup_green_junction!
           # §15.11: Minor L's +1+1 marker
           setup_krasnaya_strela!
+          setup_pullmans!
         end
 
         def setup_wcf_placeholder!
@@ -1182,6 +1187,7 @@ module Engine
 
         def add_minor_charter!(minor, major)
           @merged_minors[major] << minor
+          pullman_on_merge!(minor, major)
           return unless major.type == :major
 
           pay_minor_a_bonus!(minor, major) if minor.id == 'A'
@@ -1721,12 +1727,13 @@ module Engine
           revenue = super + hochberg_revenue_change(route, stops) + green_junction_revenue(route) +
                     krasnaya_revenue_change(route, stops)
           revenue += self.class::ORIENT_EXPRESS_BONUS[route.phase.name] if orient_express_bonus_route?(route)
-          revenue
+          revenue + pullman_revenue(route)
         end
 
         def revenue_str(route)
           str = super
           str = "#{str} + Green Junction" if green_junction_revenue(route).positive?
+          str = "#{str} + Pullman" if pullman_revenue(route).positive?
           orient_express_bonus_route?(route) ? "#{str} + Orient Express" : str
         end
 
@@ -1944,6 +1951,7 @@ module Engine
           @log << "#{corporation.name} forms a national (§9.4)"
           national_cash_to_bank!(corporation)
           national_treasury_to_market!(corporation)
+          pullman_to_market!(corporation)
           national_tokens_off!(corporation)
           national_merged_minors_off!(corporation)
           national_charter_assets_off!(corporation)
