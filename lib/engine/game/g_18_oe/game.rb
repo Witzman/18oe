@@ -779,6 +779,7 @@ module Engine
           rate = ability.discount.rationalize
           ability.discount = self.class::TRAINS.flat_map { |t| [t, *Array(t[:variants])] }
                                                 .to_h { |t| [t[:name], (t[:price] * rate).ceil] }
+          ability.discount['Pullman'] = (G18OE::Pullman::PULLMAN_PRICE * rate).ceil # §15.9 (#55)
         end
 
         # ---- §14.9 Brandt & Brandau, Engineers ---------------------------------------------

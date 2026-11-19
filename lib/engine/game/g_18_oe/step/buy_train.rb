@@ -19,7 +19,111 @@ module Engine
 
             # §11.6.4: the president may not sell shares to pay for the train.
             actions = super
-            @game.class::EBUY_CAN_SELL_SHARES ? actions : actions - ['sell_shares']
+            actions -= ['sell_shares'] unless @game.class::EBUY_CAN_SELL_SHARES
+            actions << 'choose' if !actions.empty? && !pullman_choices(entity).empty?
+            actions
+          end
+
+          # ---- Pullman cars (§11.6.2, workshop #55) ------------------------------------------------------
+          # Buying and discarding are `choose` actions of this step: from Minor M (£150, the bank pays the
+          # £15 royalty), from the Open Market (£150), from another RR (exactly £75), and the discard of
+          # the own car before a train is bought. Minor J's 10% applies to the £150 (§15.9). Only treasury
+          # cash pays. One Pullman per RR; a national has its own.
+          def setup
+            super
+            @train_bought = false
+          end
+
+          def choices
+            pullman_choices(current_entity)
+          end
+
+          def choice_name
+            'Pullman'
+          end
+
+          def pullman_choices(entity)
+            return {} unless entity&.corporation? && entity == current_entity && @game.pullmans_available?
+            return {} if entity.type == :national
+
+            return pullman_discard_choice(entity) if @game.pullman?(entity)
+
+            pullman_purchase_choices(entity)
+          end
+
+          def pullman_discard_choice(entity)
+            return {} if @train_bought
+
+            { 'pullman_discard' => "Discard Pullman (to the Open Market, no refund)" }
+          end
+
+          def pullman_purchase_choices(entity)
+            choices = {}
+            price = pullman_price(entity)
+            if @game.pullman_from_m_available? && entity.cash >= price
+              choices['pullman_m'] = "Pullman from Minor M (#{@game.format_currency(price)}, royalty to M)"
+            end
+            if @game.pullman_market.positive? && entity.cash >= price
+              choices['pullman_market'] = "Pullman from the Open Market (#{@game.format_currency(price)})"
+            end
+            sellers = @game.corporations.select { |c| c != entity && c.floated? && c.type != :national && @game.pullman?(c) }
+            sellers.each do |seller|
+              next if entity.cash < @game.class::PULLMAN_RR_PRICE
+
+              choices["pullman_from:#{seller.id}"] =
+                "Pullman from #{seller.name} (#{@game.format_currency(@game.class::PULLMAN_RR_PRICE)})"
+            end
+            choices
+          end
+
+          # §15.9: Minor J's discount (upstream's :train_discount) applies to a Pullman bought from M or the
+          # Open Market; the royalty stays whole.
+          def pullman_price(entity)
+            card = Struct.new(:name).new('Pullman')
+            Array(@game.abilities(entity, :train_discount, time: ability_timing))
+              .map { |ability| ability.discounted_price(card, @game.class::PULLMAN_PRICE) }.min || @game.class::PULLMAN_PRICE
+          end
+
+          def process_choose(action)
+            entity = action.entity
+            choice = action.choice
+            raise GameError, "#{choice} is not a Pullman choice on offer (§11.6.2)" unless pullman_choices(entity).key?(choice)
+
+            case choice
+            when 'pullman_discard' then @game.pullman_to_market!(entity)
+            when 'pullman_m' then buy_pullman_from_m!(entity)
+            when 'pullman_market' then buy_pullman_from_market!(entity)
+            else buy_pullman_from_rr!(entity, @game.corporation_by_id(choice.delete_prefix('pullman_from:')))
+            end
+          end
+
+          def buy_pullman_from_m!(entity)
+            price = pullman_price(entity)
+            entity.spend(price, @game.bank)
+            @game.pullman_bought_from_m!
+            @log << "#{entity.name} buys a Pullman from Minor M for #{@game.format_currency(price)}"
+            royalty = @game.pullman_royalty_receiver
+            if royalty
+              @game.bank.spend(@game.class::PULLMAN_ROYALTY, royalty)
+              @log << "#{royalty.name} receives #{@game.format_currency(@game.class::PULLMAN_ROYALTY)} royalty"
+            end
+            @game.receive_pullman!(entity)
+          end
+
+          def buy_pullman_from_market!(entity)
+            price = pullman_price(entity)
+            entity.spend(price, @game.bank)
+            @game.pullman_bought_from_market!
+            @log << "#{entity.name} buys a Pullman from the Open Market for #{@game.format_currency(price)}"
+            @game.receive_pullman!(entity)
+          end
+
+          def buy_pullman_from_rr!(entity, seller)
+            price = @game.class::PULLMAN_RR_PRICE
+            entity.spend(price, seller)
+            @game.pullman_owners.delete(seller)
+            @log << "#{entity.name} buys a Pullman from #{seller.name} for #{@game.format_currency(price)}"
+            @game.receive_pullman!(entity)
           end
 
           def help
@@ -89,6 +193,7 @@ module Engine
             check_depot_price!(action)
             reserved = action.train.name == '2+2' && action.train.from_depot?
             super
+            @train_bought = true
             @game.fulfill_train_obligation!(action.entity) if reserved
           end
 

@@ -48,7 +48,14 @@ module Oe
         !game.round.is_a?(Engine::Round::G18OE::Consolidation)
     end
 
+    # Buying or discarding a Pullman (§11.6.2, #55): no bot move until the bot rule (#55 part 3); a random
+    # one would discard cars and buy at any price.
+    def self.pullman_choice?(action)
+      action.is_a?(Engine::Action::Choose) && action.choice.to_s.start_with?('pullman_')
+    end
+
     def choose(actions)
+      actions = actions.reject { |a| self.class.pullman_choice?(a) } if actions.any? { |a| !self.class.pullman_choice?(a) }
       actions = actions.reject { |a| self.class.trade_offer?(a) } if actions.any? { |a| !self.class.trade_offer?(a) }
       actions = actions.reject { |a| self.class.merge_offer?(@game, a) } if actions.any? { |a| !self.class.merge_offer?(@game, a) }
       # Like Oe::Bot (#128): actions a private issues itself (White Cliffs Ferry's
