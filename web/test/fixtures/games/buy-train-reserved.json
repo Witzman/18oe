@@ -390,6 +390,7 @@
      "RU"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -431,6 +432,7 @@
      "UK"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -468,6 +470,7 @@
      "FR"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -505,6 +508,7 @@
      "AH"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -542,6 +546,7 @@
      "IT"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -579,6 +584,7 @@
      "RU"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -616,6 +622,7 @@
      "SP"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -653,6 +660,7 @@
      "UK"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -690,6 +698,7 @@
      "SP"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -727,6 +736,7 @@
      "FR"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -764,6 +774,7 @@
      "IT"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -801,6 +812,7 @@
      "SC"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": null
    },
@@ -838,6 +850,7 @@
      "UK"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -879,6 +892,7 @@
      "UK"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "floated"
    },
@@ -916,6 +930,7 @@
      "FR"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -953,6 +968,7 @@
      "FR"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -990,6 +1006,7 @@
      "FR"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1027,6 +1044,7 @@
      "PHS"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1064,6 +1082,7 @@
      "PHS"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1101,6 +1120,7 @@
      "PHS"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1138,6 +1158,7 @@
      "AH"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1175,6 +1196,7 @@
      "AH"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1212,6 +1234,7 @@
      "IT"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1249,6 +1272,7 @@
      "SP"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "parred"
    },
@@ -1286,6 +1310,7 @@
      "SP"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "parred"
    },
@@ -1323,6 +1348,7 @@
      "RU"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1360,6 +1386,7 @@
      "RU"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "parred"
    },
@@ -1397,6 +1424,7 @@
      "RU"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "unparred"
    },
@@ -1434,6 +1462,7 @@
      "SC"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "parred"
    },
@@ -1471,6 +1500,7 @@
      "SC"
     ],
     "orient_express_marker": false,
+    "pullman": false,
     "status": [],
     "regional_state": "parred"
    }
@@ -1564,7 +1594,12 @@
      "obsolete_on": null,
      "available_on": null
     }
-   ]
+   ],
+   "pullmans": {
+    "available": false,
+    "supply": 10,
+    "market": 0
+   }
   },
   "bank": {
    "cash": 53085
