@@ -12,7 +12,34 @@
 # Not listed yet (follow-up issues): player trade (§10.4, an offer the seller
 # accepts since #202; the director does not steer it yet, workshop #223),
 # Spielende by Level-8 etc. (S4).
+#
+# Not targets, and why (#235; the code facts are checked in spec/oe/s1_unreachable_spec.rb). The
+# `unreachable` block below is read by nobody at run time; it is the record, and the spec fails if
+# one of its keys becomes a target. A target the run never reaches turns the CI run red, so a type
+# only goes into `combos` once a state that offers it is known to be reached.
 slice: S1
+unreachable:
+  stock/BuySellParShares/buy_company: >-
+    Purchase of a bank-owned private. No step of the game hands a private to the bank (G18OE::Step::BuySellParShares
+    does not include the base game's company sale, companies start with no owner and leave the auction to players),
+    so Game#buyable_bank_owned_companies is always empty; the player trade (buy_company:trade) is the only buy_company.
+  operating/BuyTrain/sell_shares:regional: >-
+    A president selling shares to pay for a train is off for every corporation type (EBUY_CAN_SELL_SHARES = false,
+    §11.6.4, #354), so the step never offers sell_shares; the insolvent corporation converts instead (bankrupt, a target).
+  operating/IssueShares/sell_shares:minor: >-
+    Only a major issues shares (Game#issuable_shares returns nothing for minors, regionals and nationals), so the
+    Issue step offers sell_shares only as sell_shares:major, which is a target.
+  operating/IssueShares/buy_shares:major: >-
+    Redeeming issued shares is offered when a major has shares in the market and the cash for them (checked on a set-up
+    state). Whether the rush game reaches such a major in the target window is not known without a run, and the
+    director steers majors away from issuing while bankrupt is missing; so not listed. Candidate for a later slice.
+  skip: >-
+    Offered only to a player whose sole possible stock action is a merge-free skip (president of a fully held major
+    and owner of a minor, nothing to buy, sell or float): a state no steering of the director produces on purpose.
+    The engine treats it as an auto action; no seeded game is known to reach it.
+  operating/OrientExpressBonus/choose: >-
+    Needs a train running the Orient Express route to Constantinople for the first time (§ Orient Express bonus):
+    a late-game state (slice S5), not reachable inside the rush game and not steerable in the whole game.
 games:
   - name: whole game
     seed: 1
