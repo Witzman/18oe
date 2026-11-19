@@ -17,6 +17,7 @@
   ],
   "meta": [
     "active_players",
+    "coverage",
     "current",
     "finished",
     "game_end",
