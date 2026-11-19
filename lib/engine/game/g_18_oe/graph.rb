@@ -153,8 +153,8 @@ module Engine
               if target.is_a?(Array)
                 mark_water_edge(corporation, *target, cost)
               elsif !@connected_nodes[corporation][target]
-                land_over_water(corporation, target, cost, &block).each do |node|
-                  sea_crossings_from(node, cost, landings, arrows, corporation, queue)
+                land_over_water(corporation, target, cost, &block).each do |node, node_cost|
+                  sea_crossings_from(node, node_cost, landings, arrows, corporation, queue)
                 end
               end
             end
@@ -258,8 +258,10 @@ module Engine
         end
 
         # The train arrives at the node over the sea: as at a token, every side of its hex may take new track; unless
-        # the city is full of other RRs' tokens, the walk goes on over land (as in super). Returns the nodes reached
-        # that may start another crossing.
+        # the city is full of other RRs' tokens, the walk goes on over land (as in super). #445: the paid ferries
+        # behind the landing are priced as in #price_ferries (the walk with them shut, then the cheapest sets of
+        # ferries that touch what was walked first), their distance added to the cost of what lies behind them.
+        # Returns the nodes reached that may start another crossing, with their cost: [[node, cost], ...].
         def land_over_water(corporation, landing, cost)
           nodes = @connected_nodes[corporation]
           water = @water[corporation]
@@ -274,10 +276,38 @@ module Engine
 
           landing.hex.neighbors.each_key { |edge| mark_water_edge(corporation, landing.hex, edge, cost) }
           reached = []
+          walked = {}
+          queue = { 0 => [[]] }
+          seen = { [] => true }
+          until queue.empty?
+            price = queue.keys.min
+            queue.delete(price).each do |allowed|
+              @ferry_skip = @game.paid_ferry_skip(allowed)
+              walk_landing(corporation, landing, cost.plus_ferries(price), walked, reached) do |node|
+                yield node if block_given?
+              end
+              adjacent_paid_ferries(walked, allowed).each do |ferry|
+                set = allowed + [ferry]
+                next if seen[(key = set.map(&:object_id).sort)]
+
+                seen[key] = true
+                (queue[price + ferry.distance] ||= []) << set
+              end
+            end
+          end
+          reached
+        ensure
+          @ferry_skip = nil
+        end
+
+        def walk_landing(corporation, landing, cost, walked, reached)
+          nodes = @connected_nodes[corporation]
+          water = @water[corporation]
           paths = @connected_paths[corporation]
           walk_token(landing, visited: nodes.reject { |node, _| node == landing }, corporation: corporation,
                               skip_track: @skip_track, skip_paths: nil, converging_path: false,
                               walk_calls: @walk_calls[corporation]) do |path, _, _|
+            walked[path] = true
             next if paths[path]
 
             paths[path] = true
@@ -287,8 +317,8 @@ module Engine
 
               nodes[node] = true
               water[:nodes][node] = cost
-              yield node if block_given?
-              reached << node if node.hex != landing.hex && !node.blocks?(corporation)
+              yield node
+              reached << [node, cost] if node.hex != landing.hex && !node.blocks?(corporation)
             end
             path.exits.each do |edge|
               mark_water_edge(corporation, path.hex, edge, cost)
@@ -296,7 +326,6 @@ module Engine
               mark_water_edge(corporation, neighbor, path.hex.invert(edge), cost) if neighbor
             end
           end
-          reached
         end
 
         def mark_water_edge(corporation, hex, edge, cost)

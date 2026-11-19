@@ -124,4 +124,46 @@ describe 'G18OE ferry fees for track and tokens (§11.1.6, §11.2.1)' do
       expect(game.cross_water_token_fee(lnwr, hex('Z41').tile.cities.first)).to eq(0)
     end
   end
+
+  # #445: a ferry behind a sea landing. From Antwerp's port (X33) the train crosses 3 sea zones to the landing Palma
+  # (AD79); the ferry AD79 - AE72 (distance 1) lies behind it, so a token in AE72 costs the zones and the ferry.
+  describe 'a ferry behind a sea landing (#445)' do
+    before do
+      lnwr
+      token!('X33', lnwr)
+    end
+
+    it 'counts the ferry after the landing together with the sea zones (§11.2.1)' do
+      cost = game.cross_water_token_cost(lnwr, hex('AE72').tile.city_towns.first)
+
+      expect([cost.ferries, cost.zones]).to eq([1, 3])
+    end
+
+    it 'does not count it for the landing itself' do
+      cost = game.cross_water_token_cost(lnwr, hex('AD79').tile.city_towns.first)
+
+      expect([cost.ferries, cost.zones]).to eq([0, 3])
+    end
+  end
+
+  # #445: two paid ferries one behind the other: AA20 - AB27 and AB27 - AF25 (each distance 1) meet in AB27.
+  describe 'two ferries in a row (#445)' do
+    let(:bend) do
+      game.tiles.find { |t| !t.hex && t.exits.size == 2 && (0..5).any? { |r| t.rotate!(r) && t.exits.sort == [0, 1] } }
+    end
+
+    it 'charges both ferries for a tile behind the second' do
+      lnwr
+      lay!('AA20', '57', 5)
+      token!('AA20', lnwr)
+      skip 'no tile with the exits 0 and 1' unless bend
+      bend.rotate!((0..5).find { |r| bend.rotate!(r) && bend.exits.sort == [0, 1] })
+      hex('AB27').lay(bend)
+      game.graph.clear
+
+      cost = game.cross_water_track_cost(lnwr, hex('AF25'), rotated('57', 3))
+
+      expect([cost.ferries, cost.zones]).to eq([2, 0])
+    end
+  end
 end
