@@ -17,8 +17,11 @@ module Engine
       module Pullman
         PULLMAN_ID = 'M'
         PULLMAN_TOTAL = 10
+        PULLMAN_PRICE = 150
+        PULLMAN_ROYALTY = 15
+        PULLMAN_RR_PRICE = 75
 
-        attr_reader :pullman_supply, :pullman_market
+        attr_reader :pullman_supply, :pullman_market, :pullman_owners
 
         def setup_pullmans!
           @pullman_owners = Set.new
@@ -96,6 +99,26 @@ module Engine
           return 0 unless corporation.respond_to?(:type) && route.train == pullman_train(corporation)
 
           pullman_train_level(route.train) * National::PULLMAN_PER_LEVEL
+        end
+
+        # §11.6.2: who gets the £15 royalty for a car bought from Minor M: the major M merged into, else M
+        # itself while it is a floated minor (nobody else is paid).
+        def pullman_royalty_receiver
+          holder = pullman_m_holder
+          holder.type == :minor && !holder.floated? ? nil : holder
+        end
+
+        def pullman_from_m_available?
+          @pullmans_available && @pullman_supply.positive?
+        end
+
+        # Buying takes the car from its source (§11.6.2); the caller pays.
+        def pullman_bought_from_m!
+          @pullman_supply -= 1
+        end
+
+        def pullman_bought_from_market!
+          @pullman_market -= 1
         end
       end
     end
