@@ -64,6 +64,9 @@ module Oe
       pullman = pick_pullman(actions)
       return pullman if pullman
 
+      marker = pick_port_authority(actions)
+      return marker if marker
+
       actions = actions.reject { |a| self.class.pullman_choice?(a) } if actions.any? { |a| !self.class.pullman_choice?(a) }
       actions = actions.reject { |a| self.class.trade_offer?(a) } if actions.any? { |a| !self.class.trade_offer?(a) }
       actions = actions.reject { |a| self.class.merge_offer?(@game, a) } if actions.any? { |a| !self.class.merge_offer?(@game, a) }
@@ -106,6 +109,22 @@ module Oe
       return nil if price > PULLMAN_PAYBACK_ORS * bonus || entity.cash < price + PULLMAN_CASH_BUFFER
 
       options.find { |a| a.choice == 'pullman_market' } || options.first
+    end
+
+    # §11.3.5 (#56): a marker takes two sea units off a crossing in its water area. Buy it for the area where the
+    # RR's network has the most usable crossing ends (at least two, so a crossing exists), when it runs a train
+    # and keeps the cash buffer for its trains. Never for an area without a crossing.
+    def pick_port_authority(actions)
+      options = actions.select { |a| a.is_a?(Engine::Action::Choose) && @game.port_authority_choice?(a.choice) }
+      return nil if options.empty?
+
+      entity = options.first.entity
+      price = Engine::Game::G18OE::PortAuthority::PORT_AUTHORITY_PRICE
+      return nil if @game.counted_trains(entity).empty? || entity.cash < price + PULLMAN_CASH_BUFFER
+
+      ends = @game.sea_landings(entity).flat_map { |_node, zones| zones.map { |zone| @game.sea(zone) } }
+      best = ends.tally.select { |_area, n| n >= 2 }.max_by { |_area, n| n }&.first
+      options.find { |a| a.choice == "port_authority:#{best}" } if best
     end
 
     def underscore(name)
