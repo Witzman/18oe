@@ -59,8 +59,12 @@ describe 'G18OE sea zones (§11.3.4, §11.3.5)' do
     expect(game.port_sea_zone('AA82', 3)).to eq('Black Sea')
   end
 
-  it 'opens Constantinople exit 0 port into the Aegean Sea' do
-    expect(game.port_sea_zone('AA82', 0)).to eq('Aegean Sea')
+  # #474: the board prints a black dead-end arrow with a 0 circle at the lower left of Constantinople, no anchor;
+  # the Aegean side is reached by the offshore port AB73 (public, anchor with the label "Constantinople").
+  it 'has a dead end, not a port, at Constantinople exit 0 and opens the Aegean Sea by the offshore port' do
+    expect(game.class::PORTS['AA82'][0]).to eq(dead_end: true)
+    expect(game.class::PORTS['AA82'][:offshore]).to eq(hex: 'AB73', port: :public)
+    expect(game.port_sea_zone('AA82', :offshore)).to eq('Aegean Sea')
   end
 
   it 'resolves every port and ferry exit that is not a dead end to a sea zone' do

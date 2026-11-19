@@ -1765,7 +1765,7 @@ module Engine
           'AD79' => { 1 => { port: :public, ferries: [{ hex: 'AE72', exit: 5, distance: 1 }] } },
           'AA82' => {
             :offshore => { hex: 'AB73', port: :public },
-            0 => { port: :public },
+            0 => { dead_end: true },
             2 => { ferries: [{ hex: 'X79', exit: 5, distance: 1 }] },
             3 => { port: :public },
           },
