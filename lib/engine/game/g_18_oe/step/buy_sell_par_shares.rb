@@ -187,8 +187,23 @@ module Engine
           def choose_available?(entity)
             return can_act_on_any_private?(entity) unless non_private_choices_allowed?(entity)
 
-            can_merge_any?(entity) || can_remove_any_corporation?(entity) || can_reserve_any?(entity) ||
-              can_act_on_any_private?(entity)
+            can_merge_any?(entity) || can_offer_any?(entity) || can_remove_any_corporation?(entity) ||
+              can_reserve_any?(entity) || can_act_on_any_private?(entity)
+          end
+
+          # §10.5 / §10.7 (#65): a minor may merge into another player's major when that player agrees; the
+          # owner asks the other presidents (Step::MergeOffer, as in the Consolidation Round, §10.6).
+          def can_offer_any?(player)
+            @game.corporations.any? { |corporation| can_offer?(player, corporation) }
+          end
+
+          def can_offer?(player, minor)
+            @round.current_actions.empty? && minor.type == :minor && minor.floated? && minor.owner == player &&
+              @game.phase.available?('3') && !offer_step.nil? && !@game.merge_offer_majors(minor).empty?
+          end
+
+          def offer_step
+            @round.steps.find { |step| step.is_a?(G18OE::Step::MergeOffer) }
           end
 
           def can_act_on_any_private?(player)
@@ -283,6 +298,7 @@ module Engine
 
             corporation = target
             choices = {}
+            choices['offer_or_merge'] = 'Offer' if can_offer?(current_entity, corporation)
             choices['remove'] = 'Remove from game' if can_remove_corporation?(current_entity, corporation)
             choices['reserve'] = 'Reserve share' if can_reserve?(current_entity, corporation)
             choices
@@ -301,6 +317,7 @@ module Engine
             raise GameError, "Cannot choose #{action.choice} while above the certificate limit" unless
               non_private_choices_allowed?(action.entity)
 
+            return offer_merge(action) if action.target && action.choice == 'offer_or_merge'
             return remove_regional(action) if action.target && action.choice == 'remove'
             return reserve_regional(action) if action.target && action.choice == 'reserve'
 
@@ -309,6 +326,13 @@ module Engine
 
             @round.merge_minor = minor
             track_action(action, minor)
+          end
+
+          def offer_merge(action)
+            minor = action.target
+            raise GameError, "Cannot offer #{minor.name}" unless @game.loading || can_offer?(action.entity, minor)
+
+            offer_step.start!(minor, action)
           end
 
           def process_private_choice(action)
