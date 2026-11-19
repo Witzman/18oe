@@ -1,0 +1,26 @@
+# TEMPORARY (#481): measures which S2 targets a rush game reaches. Removed before the PR is merged.
+name: s2-probe
+on:
+  push:
+    branches: ["feature/481-s2"]
+jobs:
+  probe:
+    name: s2 probe ${{ matrix.max }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        max: [1500, 3000, 6000]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: run
+        run: |
+          rc=0
+          bundle exec ruby -I lib bin/script_game.rb --spawn --slice s2 --max-actions ${{ matrix.max }} > "$RUNNER_TEMP/out.txt" 2> "$RUNNER_TEMP/err.txt" || rc=$?
+          { echo "exit $rc"; grep -n -i -E "^(status|slice|missing)|missing|Problems" -A12 "$RUNNER_TEMP/out.txt" | head -80; tail -3 "$RUNNER_TEMP/err.txt"; } | tee -a "$GITHUB_STEP_SUMMARY"
+          head -c 3000 "$RUNNER_TEMP/out.txt" | while IFS= read -r l; do echo "::notice::${l}"; done | head -40
