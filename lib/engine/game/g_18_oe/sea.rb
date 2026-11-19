@@ -247,17 +247,23 @@ module Engine
 
         # The ferries (distance) and sea zones the hypothetical train crosses to a tile or a token; see
         # Graph#water_cost_to_hex. A ferry of distance 1 is half a sea zone in price (£5 against £10, £20 against £40).
-        WaterCost = Struct.new(:ferries, :zones) do
+        # `areas`: the water areas (:north_sea, :mediterranean) the sea crossings touch, for the jurisdiction of a
+        # port authority marker (§11.3.5, #56): the areas of the zones a crossing starts and ends in.
+        WaterCost = Struct.new(:ferries, :zones, :areas) do
+          def initialize(ferries, zones, areas = [])
+            super
+          end
+
           def units
             ferries + (2 * zones)
           end
 
-          def plus_zones(count)
-            WaterCost.new(ferries, zones + count)
+          def plus_zones(count, more_areas = [])
+            WaterCost.new(ferries, zones + count, (areas + more_areas).uniq)
           end
 
           def plus_ferries(count)
-            WaterCost.new(ferries + count, zones)
+            WaterCost.new(ferries + count, zones, areas)
           end
         end
 
@@ -269,11 +275,24 @@ module Engine
           corporation = owning_corporation(entity)
           return WaterCost.new(0, 0) if corporation&.type == :national
 
-          graph_for_entity(corporation).water_cost_to_hex(corporation, hex, tile)
+          port_authority_cost(corporation, graph_for_entity(corporation).water_cost_to_hex(corporation, hex, tile))
         end
 
         def cross_water_token_cost(entity, city)
-          token_graph_for_entity(entity).water_cost_to_node(entity, city)
+          port_authority_cost(entity, token_graph_for_entity(entity).water_cost_to_node(entity, city))
+        end
+
+        # §11.1.6, §11.2.1, §11.3.5: a port authority marker takes two sea zones and ferry distance off the cost of
+        # a crossing in its water area. ASSUMPTION (#56): sea zones count only for a crossing that starts or ends in
+        # a zone of the marker's area (the rulebook names no more); a ferry's distance counts in any area. Two units
+        # in all, the zones first (they cost more), never below 0. Port tokens and Minor H do not change the cost.
+        def port_authority_cost(corporation, cost)
+          area = port_authority(corporation)
+          return cost if !area || !cost
+
+          zones = cost.areas.include?(area) ? [2, cost.zones].min : 0
+          ferries = [2 - zones, cost.ferries].min
+          WaterCost.new(cost.ferries - ferries, cost.zones - zones, cost.areas)
         end
 
         # The fee for the crossing: nil without a cost (not connected).
@@ -335,6 +354,13 @@ module Engine
 
         def fewest_sea_zones(from_zones, to_zones)
           from_zones.product(to_zones).filter_map { |a, b| sea_zone_distance(a, b) }.min
+        end
+
+        # The fewest sea zones with the water areas of the zones the best crossing starts and ends in (§11.3.5, #56);
+        # nil without a way.
+        def fewest_sea_zones_in(from_zones, to_zones)
+          best = from_zones.product(to_zones).filter_map { |a, b| (d = sea_zone_distance(a, b)) && [d, a, b] }.min_by(&:first)
+          best && [best[0], [sea(best[1]), sea(best[2])].uniq]
         end
 
         # The nodes a crossing of the RR's hypothetical train may end at: [node, its usable port zones].
