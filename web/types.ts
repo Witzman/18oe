@@ -99,6 +99,8 @@ export interface Corporation {
   orient_express_marker: boolean;
   /** Owns a Pullman (§11.6.2); a national always does (§11.3.10). */
   pullman: boolean;
+  /** Water area of the port authority marker (§11.3.5), null without one. */
+  port_authority: "north_sea" | "mediterranean" | null;
   status: string[];
   regional_state: RegionalState | null;
 }

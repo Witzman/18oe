@@ -10,7 +10,7 @@ import { Geld, formatGeld, toDom, v, type VNode } from "../kit/index.ts";
 import { fillText, txt } from "../text.ts";
 import {
   DIVIDEND_STEP, OPERATING_TYPES, ROUTE_STEP, chosenOption, dividendOptions, dividendOrder, isOperatingStep,
-  operator, optionLine, payoutRows, pullmanOptions, runHexes, runLines, runModel, runSentence, type DivOption,
+  operator, optionLine, payoutRows, portAuthorityOptions, pullmanOptions, runHexes, runLines, runModel, runSentence, type DivOption,
 } from "./operating-model.ts";
 import { mapPick } from "./map-pick.ts";
 
@@ -20,6 +20,7 @@ const mineToAct = (g: Game): boolean => isOperatingStep(g) && g.state.prompt.vie
 export function RoutePanel(g: Game, onPullman?: (action: Record<string, unknown>) => void): VNode {
   const m = runModel(g);
   const pullman = pullmanOptions(g);
+  const marker = portAuthorityOptions(g);
   const cell = (cls: string, ...c: (string | VNode)[]) => v("td", { class: cls }, ...c);
   const extra = (key: string, n: number) => n > 0 ? v("tr", { class: "op-extra", title: tip(key) }, cell("", txt(key).de), cell("", ""), cell("op-num", Geld(n))) : null;
   return v("div", { class: "op-run" },
@@ -33,7 +34,10 @@ export function RoutePanel(g: Game, onPullman?: (action: Record<string, unknown>
         v("tfoot", {}, v("tr", { title: tip("route.total") }, cell("", txt("route.total").de), cell("", ""), cell("op-num op-total", Geld(m.total))))),
     pullman.length > 0 ? v("div", { class: "op-pullman", role: "group", "aria-label": txt("route.pullman").de },
       v("p", { class: "op-payouts-title muted" }, txt("route.pullman").de),
-      ...pullman.map((o) => v("button", { type: "button", class: "op-opt", "data-pullman": o.choice, onclick: () => onPullman?.(o.action) }, v("strong", { class: "op-opt-name" }, o.label)))) : null);
+      ...pullman.map((o) => v("button", { type: "button", class: "op-opt", "data-pullman": o.choice, onclick: () => onPullman?.(o.action) }, v("strong", { class: "op-opt-name" }, o.label)))) : null,
+    marker.length > 0 ? v("div", { class: "op-pullman", role: "group", "aria-label": txt("route.port_authority").de },
+      v("p", { class: "op-payouts-title muted", title: tip("route.port_authority") }, txt("route.port_authority").de),
+      ...marker.map((o) => v("button", { type: "button", class: "op-opt", "data-port-authority": o.choice, onclick: () => onPullman?.(o.action) }, v("strong", { class: "op-opt-name" }, o.label)))) : null);
 }
 
 export interface DividendHandlers { onPick: (kind: string) => void; onPullman?: (action: Record<string, unknown>) => void }

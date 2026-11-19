@@ -192,6 +192,8 @@ module Oe
         orient_express_marker: game.orient_express_marker?(corp) ? true : false,
         # §11.6.2 (#55): owns a Pullman (a national always has its printed one, §11.3.10)
         pullman: corp.type == :national || safe { game.pullman?(corp) } ? true : false,
+        # §11.3.5 (#56): the water area of its port authority marker (north_sea, mediterranean) or nil
+        port_authority: safe { game.port_authority(corp) }&.to_s,
         status: Array(safe { game.status_array(corp) }).flatten.map(&:to_s),
         regional_state: regional_state(game, corp),
       }
