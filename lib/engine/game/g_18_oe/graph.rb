@@ -246,14 +246,14 @@ module Engine
           landings.each do |to, to_zones|
             next if to.hex == node.hex || @connected_nodes[corporation][to]
 
-            crossed = @game.fewest_sea_zones(from, to_zones)
-            queue[cost.units + (2 * crossed)] << [to, cost.plus_zones(crossed)] if crossed
+            crossed, areas = @game.fewest_sea_zones_in(from, to_zones)
+            queue[cost.units + (2 * crossed)] << [to, cost.plus_zones(crossed, areas)] if crossed
           end
           arrows.each do |hex, exit, zone|
             next if hex == node.hex
 
-            crossed = @game.fewest_sea_zones(from, [zone])
-            queue[cost.units + (2 * crossed)] << [[hex, exit], cost.plus_zones(crossed)] if crossed
+            crossed, areas = @game.fewest_sea_zones_in(from, [zone])
+            queue[cost.units + (2 * crossed)] << [[hex, exit], cost.plus_zones(crossed, areas)] if crossed
           end
         end
 
