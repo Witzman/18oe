@@ -90,7 +90,8 @@ module Oe
       # port the RR may use.
       passes = [{}]
       # (Minor H's reduction, §15.8, lets a crossing that is one or two units over the places still pass.)
-      sea_limit = trains.map { |t| @game.sea_places(t) }.max.to_i + @game.steamship_allowance(corporation, @game.phase)
+      sea_limit = trains.map { |t| @game.sea_places(t) }.max.to_i + @game.steamship_allowance(corporation, @game.phase) +
+                  @game.port_authority_allowance(corporation)
       passes << { sea: sea_limit } if sea_pass?(graph, nodes, corporation, trains)
 
       train_routes = Hash.new { |h, k| h[k] = [] }    # map of train to route list
