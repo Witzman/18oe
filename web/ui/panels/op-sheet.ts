@@ -40,6 +40,7 @@ export function opSheet(g: Game, theme: Theme): OpSheet | null {
   const facts: OpFact[] = [fact("op.cash", formatGeld(c.cash))];
   if (c.share_price !== null) facts.push(fact("op.price", formatGeld(c.share_price)));
   facts.push(fact("op.trains", c.trains.length > 0 ? c.trains.map((t) => t.name).join(", ") : txt("frame.none").de));
+  if (g.state.depot.pullmans?.available) facts.push(fact("op.pullman", c.pullman ? txt("op.pullman_yes").de : txt("frame.none").de));
   if (c.tokens.length > 0) facts.push(fact("op.tokens", fillText("op.token_short", { free: c.tokens.filter((t) => !t.used).length, all: c.tokens.length })));
   const at = ladderIndex(g);
   const steps: OpStep[] = at < 0 ? [] : LADDER.map((s, i) => ({

@@ -711,6 +711,8 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "op.cash": e("Kasse", "Treasury", "§11"),
   "op.trains": e("Züge", "Trains", "§11.6"),
   "route.pullman": e("Pullman anhängen an", "Attach Pullman to", "§11.3.9"),
+  "op.pullman": e("Pullman", "Pullman", "§11.6.2"),
+  "op.pullman_yes": e("ja", "yes", "§11.6.2"),
   "op.tokens": e("Stationen", "Tokens", "§11.2"),
   "op.price": e("Kurs", "Share price", "§10"),
   "op.token_count": e("{free} von {all} frei", "{free} of {all} free", "§11.2"),
