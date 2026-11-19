@@ -30,9 +30,12 @@ unreachable:
     Only a major issues shares (Game#issuable_shares returns nothing for minors, regionals and nationals), so the
     Issue step offers sell_shares only as sell_shares:major, which is a target.
   operating/IssueShares/buy_shares:major: >-
-    Redeeming issued shares is offered when a major has shares in the market and the cash for them (checked on a set-up
-    state). Whether the rush game reaches such a major in the target window is not known without a run, and the
-    director steers majors away from issuing while bankrupt is missing; so not listed. Candidate for a later slice.
+    Redeeming is offered only on a later turn than the issue (selling passes the Issue step, G18OE::Step::IssueShares
+    #process_sell_shares) and only while the major has shares in the market and the cash for them. In the rush game the
+    director makes majors withhold and pass the Issue step while bankrupt is missing (ScriptGame#starve_presidents, #434),
+    so the one issuing major spends the proceeds on trains and the market share may be bought by a player first; whether
+    a redeem state then occurs before the combos are done is not known without a run (CI only). A target never reached
+    turns the run red, so not listed (#468); candidate once a CI run of the script game shows such an offer.
   skip: >-
     Offered only to a player whose sole possible stock action is a merge-free skip (president of a fully held major
     and owner of a minor, nothing to buy, sell or float): a state no steering of the director produces on purpose.
