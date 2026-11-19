@@ -6,10 +6,13 @@ module Engine
       # §14.4 Barclay, Bevan, Barclay and Tritton (workshop #78). The owner exercises one of three abilities;
       # this part has (2) custodianship and (3) protection of a share value marker against DOWN, both used on the
       # owner's own turn of a stock round (the private choices of Step::BuySellParShares). (1) re-setting a par
-      # value and the use at the moment another player acts are not built yet (see the issue).
+      # value is, by the owner's decision (#78/#466), used only when a regional of the owner converts to a major:
+      # a free choice from the major par list instead of the letter mapping (deviates from the wording of §14.4,
+      # which also allows the OR). The use at the moment another player acts is not built yet (see the issue).
       module Bbbt
         BBBT_CUSTODY = 'bbbt_custody'
         BBBT_PROTECT = 'bbbt_protect'
+        BBBT_REPAR = 'bbbt_repar'
 
         def bbbt_company
           company_by_id('BBBT')
@@ -28,8 +31,36 @@ module Engine
           choices
         end
 
+        # §14.4 (1), owner's reading: while the owner's regional converts, any major par value; {choice => text}.
+        def bbbt_repar_choices(company, corporation)
+          return {} unless company == bbbt_company && !@bbbt_used && !company.closed? && company.owner == corporation.owner
+
+          bbbt_major_par_cells.to_h { |cell| ["#{BBBT_REPAR}:#{cell.price}", "Re-Par: #{format_currency(cell.price)}"] }
+        end
+
+        # The major par values (the red convert-range cells of the share price table), highest value last.
+        def bbbt_major_par_cells
+          @stock_market.market.flatten.compact.select { |cell| cell.type == :convert_range }.sort_by(&:price)
+        end
+
+        def bbbt_repar_cell(price)
+          bbbt_major_par_cells.find { |cell| cell.price == price }
+        end
+
+        # Returns the chosen par cell; the private is used up (closed) at once, the step applies the cell.
+        def bbbt_repar!(company, corporation, choice)
+          cell = bbbt_repar_cell(choice.split(':', 2).last.to_i)
+          raise GameError, "#{choice} is not a major par value" unless cell
+
+          @bbbt_used = true
+          @log << "#{company.owner.name} re-sets the par value of #{corporation.name} to #{format_currency(cell.price)} " \
+                  "as it converts to a major (#{company.name}); #{company.name} leaves the game"
+          company.close!
+          cell
+        end
+
         def bbbt_choice?(choice)
-          choice.start_with?(BBBT_CUSTODY, BBBT_PROTECT)
+          choice.start_with?(BBBT_CUSTODY, BBBT_PROTECT, BBBT_REPAR)
         end
 
         def bbbt_exercise!(company, choice)
