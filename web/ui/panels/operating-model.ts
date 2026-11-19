@@ -24,7 +24,7 @@ export function pullmanOptions(g: Game): PullmanOption[] {
 
 /** Operating steps in rule order (rulebook 11); the ladder marks the current one. */
 export const LADDER = ["Track", "Token", "Route", "Dividend", "BuyTrain"] as const;
-const LADDER_INDEX: Record<string, number> = { Track: 0, Token: 1, HomeToken: 1, SpecialToken: 1, Route: 2, Dividend: 3, BuyTrain: 4 };
+const LADDER_INDEX: Record<string, number> = { Track: 0, Token: 1, HomeToken: 1, SpecialToken: 1, Route: 2, Dividend: 3, TransferTokens: 3, BuyTrain: 4 };
 
 export const isOperatingStep = (g: Game): boolean =>
   (g.state.prompt.step === ROUTE_STEP || g.state.prompt.step === DIVIDEND_STEP) && !g.state.meta.finished;
