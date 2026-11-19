@@ -66,15 +66,20 @@ module Engine
         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
                            { group: :white, count: 3 }, { group: :green, count: 8 }].freeze
 
+        # The Info Board's grid (stockboard.png, #482). Nine rows, every row starts at the column of its leftmost
+        # field ('' = no field), so the red major par column (C) is column 4 in each row and the regional par
+        # column (p) column 2. Rows 3 to 9 reach down to £30 on the left; the arrows of the board are movement
+        # rules (G18OE::StockMarket).
         MARKET = [
-          ['', '110', '120C', '135', '150', '165', '180', '200', '225', '250', '280', '310', '350', '390', '440', '490', '550'],
-          %w[90p 100 110C 120 135 150 165 180 200 225 250 280 310 350 390 440 490],
-          %w[80p 90 100C 110 120 135 150 165 180 200 225 250 280 310],
-          %w[75p 80 90C 100 110 120 135 150 165 180 200],
-          %w[70p 75 80C 90 100 110 120 135 150],
-          %w[65p 70 75C 80 90 100 110],
-          %w[60p 65 70 75 80],
-          %w[50 60 65 70],
+          ['', '', '', '110', '120C', '135', '150', '165', '180', '200', '225', '250', '280', '310', '350', '390', '440', '490', '550'],
+          ['', '', '90p', '100', '110C', '120', '135', '150', '165', '180', '200', '225', '250', '280', '310', '350', '390', '440', '490'],
+          ['', '75', '80p', '90', '100C', '110', '120', '135', '150', '165', '180', '200', '225', '250', '280', '310'],
+          %w[65 70 75p 80 90C 100 110 120 135 150 165 180 200],
+          %w[60 65 70p 75 80C 90 100 110 120 135 150],
+          %w[55 60 65p 70 75C 80 90 100 110],
+          %w[50 55 60p 65 70 75 80],
+          %w[40 50 55 60 65 70],
+          %w[30 40 50 55 60],
         ].freeze
         CERT_LIMIT = { 2 => 99, 3 => 48, 4 => 36, 5 => 29, 6 => 24, 7 => 20 }.freeze
         # Standard game: £5,400 total / num_players, rounded up to nearest £5.

@@ -165,10 +165,10 @@ describe 'G18OE share value marker after a dividend (§4.4, #419)' do
 
     it 'moves UP when it cannot move RIGHT (£490 at the end of the second row)' do
       major = major_at(150)
-      game.stock_market.move(major, [1, 16])
+      game.stock_market.move(major, [1, 18])
       expect(major.share_price.price).to eq(490)
       pay!(major, 500, 'payout')
-      expect(major.share_price.coordinates).to eq([0, 16])
+      expect(major.share_price.coordinates).to eq([0, 18])
       expect(major.share_price.price).to eq(550)
     end
 
@@ -178,17 +178,17 @@ describe 'G18OE share value marker after a dividend (§4.4, #419)' do
 
     it 'moves DOWN when it cannot move LEFT (£110 in the top row)' do
       major = major_at(150)
-      game.stock_market.move(major, [0, 1])
+      game.stock_market.move(major, [0, 3])
       expect(major.share_price.price).to eq(110)
       pay!(major, 0, 'withhold')
-      expect(major.share_price.coordinates).to eq([1, 1])
+      expect(major.share_price.coordinates).to eq([1, 3])
       expect(major.share_price.price).to eq(100)
     end
 
-    it 'does not move from £50' do
-      major = major_at(50)
-      expect(major.share_price.coordinates).to eq([7, 0])
-      expect(price_after(major, 0, 'withhold')).to eq(50)
+    it 'does not move from £30, the bottom left field of the board' do
+      major = major_at(30)
+      expect(major.share_price.coordinates).to eq([8, 0])
+      expect(price_after(major, 0, 'withhold')).to eq(30)
     end
   end
 
