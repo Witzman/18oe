@@ -90,9 +90,20 @@ module Oe
       detail = case type
                when "choose" then action["choice"]
                when "par" then corporation_type(action["corporation"])
+               when "buy_company" then "trade" if trade_offer?(action)
                when "buy_shares", "sell_shares" then corporation_type(action["shares"].first.sub(/_\d+\z/, ""))
                end
       "#{round}/#{step}/#{[type, detail].compact.join(':')}"
+    end
+
+    # A buy_company of another player's company is a trade offer (§10.4, #202), told apart from the
+    # purchase of a bank-owned private: in the prompt it is a range (price from min to max); as a
+    # plain action it is one when the mirror shows a player as the owner.
+    def trade_offer?(action)
+      return true if action.key?("min")
+
+      owner = @mirror&.company_by_id(action["company"])&.owner
+      owner.respond_to?(:player?) && owner.player? ? true : false
     end
 
     def corporation_type(id)
@@ -236,8 +247,19 @@ module Oe
       return starve if starve
 
       range = prompt["ranges"].find { |r| missing.include?(key(round, step, r)) }
-      range && { "type" => "bid", "entity" => range["entity"], "entity_type" => "player",
-                 "company" => range["company"], "price" => range["min"] }
+      return nil unless range
+
+      return trade_offer_from(range) if %w[buy_company buy_corporation].include?(range["type"])
+
+      { "type" => "bid", "entity" => range["entity"], "entity_type" => "player",
+        "company" => range["company"], "price" => range["min"] }
+    end
+
+    # The offer of a trade range (§10.4, #223): a small price inside the range, so the buyer can pay.
+    def trade_offer_from(range)
+      price = [[5, range["min"]].max, range["max"]].min
+      action = { "type" => range["type"], "entity" => range["entity"], "price" => price }
+      action.merge(range["type"] == "buy_company" ? { "company" => range["company"] } : { "corporation" => range["company"] })
     end
 
     # Buying a regional's treasury shares (and so the reserved-share question,
@@ -303,10 +325,12 @@ module Oe
 
     def offered_in?(action, prompt)
       return true if prompt["actions"].include?(action)
-      return false unless action["type"] == "bid"
+      return false unless %w[bid buy_company buy_corporation].include?(action["type"])
 
       prompt["ranges"].any? do |r|
-        r["entity"] == action["entity"] && r["company"] == action["company"] &&
+        target = action["company"] || action["corporation"]
+        (action["type"] == "bid" || r["type"] == action["type"]) &&
+          r["entity"] == action["entity"] && r["company"] == target &&
           action["price"].between?(r["min"], r["max"]) && ((action["price"] - r["min"]) % r["step"]).zero?
       end
     end
