@@ -30,6 +30,7 @@ require_relative 'step/merge_offer'
 require_relative 'step/merge_token'
 require_relative 'step/concession'
 require_relative 'step/reserve_share'
+require_relative 'step/trade_offer'
 require_relative 'step/orient_express_bonus'
 require_relative 'step/route'
 require_relative 'step/special_token'
@@ -567,10 +568,11 @@ module Engine
           !company_becomes_minor?(company) && !concession?(company)
         end
 
-        # §10.4 needs a mutually agreed price. Until the seller can consent (#148 part 2),
-        # buying a private/minor from another player is switched off; the bank stays open.
+        # §10.4 needs a mutually agreed price: a purchase from another player is an offer the seller
+        # accepts or declines (Step::TradeOffer, #202). The switch (#148) stays as the one place to turn
+        # player trading off again; the bank stays open either way.
         def player_trade_enabled?
-          false
+          true
         end
 
         def face_down_private?(company)
@@ -1515,6 +1517,7 @@ module Engine
             G18OE::Step::MergeDiscardTrain,
             G18OE::Step::MergeMinor,
             G18OE::Step::ReserveShare,
+            G18OE::Step::TradeOffer,
             G18OE::Step::BuySellParShares,
           ])
         end

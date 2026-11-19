@@ -53,9 +53,12 @@ module Engine
             @game.purchasable_companies(player).reject { |company| @game.face_down_private?(company) }
           end
 
+          # §10.4 is a stock action of every stock round (owner decision F1, 2026-11-18, workshop #67: the
+          # earlier limit to the opening stock round, "errata 10", has no source). Only a round that can ask
+          # the seller (Step::TradeOffer) trades: the stock round, not the consolidation (§10.6) or concession round.
           def can_trade?(player)
-            @game.turn == 1 && @round.current_actions.empty? &&
-              @game.num_certs(player) < @game.cert_limit(player)
+            @round.current_actions.empty? && @game.num_certs(player) < @game.cert_limit(player) &&
+              @round.steps.any? { |step| step.is_a?(G18OE::Step::TradeOffer) }
           end
 
           def can_buy_any_corporation?(player)
@@ -98,8 +101,29 @@ module Engine
             raise GameError, "#{seller.name} has not agreed to sell #{company.name} (§10.4)" unless @game.player_trade_enabled?
             raise GameError, "Cannot buy #{company.name}" unless purchasable_companies(player).include?(company)
 
+            validate_trade_price!(action.price, price_range(player, company))
+            offer_trade!(action, company, seller)
+          end
+
+          # §10.4 (#202): a purchase from another player is an offer; Step::TradeOffer asks the seller.
+          def offer_trade!(action, target, seller)
+            @log << "#{action.entity.name} offers #{@game.format_currency(action.price)} to #{seller.name} " \
+                    "for #{target.name}"
+            @round.trade_offer = action
+          end
+
+          # The seller accepted (Step::TradeOffer): the offer becomes the buyer's stock action.
+          def execute_trade(action)
+            return trade_corporation(action) if action.is_a?(Engine::Action::BuyCorporation)
+
+            trade_company(action)
+          end
+
+          def trade_company(action)
+            company = action.company
+            seller = company.owner
+            player = action.entity
             price = action.price
-            validate_trade_price!(price, price_range(player, company))
 
             company.owner = player
             seller.companies.delete(company)
@@ -118,9 +142,14 @@ module Engine
             raise GameError, "Cannot buy #{corporation&.name || 'that corporation'}" unless
               can_buy_corporation?(player, corporation)
 
-            price = action.price
-            validate_trade_price!(price, price_range(player, corporation))
+            validate_trade_price!(action.price, price_range(player, corporation))
+            offer_trade!(action, corporation, corporation.owner)
+          end
 
+          def trade_corporation(action)
+            player = action.entity
+            corporation = action.corporation
+            price = action.price
             seller = corporation.owner
             @log << "#{player.name} buys #{corporation.name} from #{seller.name} for #{@game.format_currency(price)}"
             @game.share_pool.transfer_shares(

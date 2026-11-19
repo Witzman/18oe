@@ -74,6 +74,9 @@ test("a range is a form; its value must lie on min, min+step .. max and becomes 
   assert.deepEqual(rangeAction(g, r, r.min), { type: "bid", entity: r.entity, entity_type: "player", company: r.company, price: r.min });
   const bar = GenericBar(m, handlers());
   assert.equal(find(bar, (n) => n.tag === "form").length, m.ranges.length);
+  // A trade offer for a minor (§10.4, #202) is a buy_corporation naming the minor as `corporation`.
+  const offer = { type: "buy_corporation", entity: r.entity, company: "B", min: 0, max: 300, step: 1 };
+  assert.deepEqual(rangeAction(g, offer, 40), { type: "buy_corporation", entity: r.entity, entity_type: "player", corporation: "B", price: 40 });
 });
 
 test("unsupported types are named in the bar, not silently dropped", () => {

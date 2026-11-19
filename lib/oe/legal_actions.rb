@@ -508,13 +508,16 @@ module Oe
       end
     end
 
+    # A buy_company / buy_corporation from another player is a trade offer (§10.4, #202): the seller
+    # answers it in Step::TradeOffer. With `compact: true` the offer prices (every whole amount from
+    # 0 to the buyer's cash) are one range per target, like bids (#91); `company` is the target's id
+    # (the private, or the minor corporation for buy_corporation).
     def generate_buy_company(step, entity)
       actions = step.buyable_bank_owned_companies(entity).map do |company|
         A::BuyCompany.new(entity, company: company, price: company.value)
       end
       step.purchasable_companies(entity).each do |company|
-        min, max = step.price_range(entity, company)
-        sample(amounts(min, max, 5)).each { |price| actions << A::BuyCompany.new(entity, company: company, price: price) }
+        actions.concat(trade_offers(step, entity, company) { |price| A::BuyCompany.new(entity, company: company, price: price) })
       end
       actions
     end
@@ -523,9 +526,18 @@ module Oe
       @game.corporations.flat_map do |corporation|
         next [] unless step.can_buy_corporation?(entity, corporation)
 
-        min, max = step.price_range(entity, corporation)
-        sample(amounts(min, max, 5)).map { |price| A::BuyCorporation.new(entity, corporation: corporation, price: price) }
+        trade_offers(step, entity, corporation) { |price| A::BuyCorporation.new(entity, corporation: corporation, price: price) }
       end
+    end
+
+    def trade_offers(step, entity, target)
+      min, max = step.price_range(entity, target)
+      if @compact
+        type = target.corporation? ? 'buy_corporation' : 'buy_company'
+        @ranges << { type: type, entity: entity.id, company: target.id, min: min, max: max, step: 1 } if max >= min
+        return []
+      end
+      sample(amounts(min, max, 5)).map { |price| yield price }
     end
 
     # ---- choose -----------------------------------------------------------

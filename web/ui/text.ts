@@ -60,6 +60,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.MergeMinor": e("Minor einbringen", "Merge minor", "§10.5"),
   "step.MergeToken": e("Station beim Zusammenschluss", "Merge token", "§10.5, §10.6"),
   "step.MergeOffer": e("Angebot beim Zusammenschluss", "Merge offer", "§10.6"),
+  "step.TradeOffer": e("Handelsangebot", "Trade offer", "§10.4"),
   "step.MergeDiscardTrain": e("Zug beim Zusammenschluss abwerfen", "Discard train on merger", "§10.5, §10.6"),
   "step.Consolidate": e("Konsolidierung", "Consolidation", "§10.6"),
   "step.DiscardTrain": e("Zug abwerfen", "Discard train", "§11.6"),
@@ -760,6 +761,8 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   // Engine choices (#290): the engine labels are English; the player sees these and a tooltip.
   "choice.flip_private": e("Schließen (umdrehen): kein Einkommen, zählt nicht fürs Zertifikatslimit", "Flip face down", "§3.3, §6.1, §10.4"),
   "choice.flip_private_tip": e("Das Privat wird umgedreht und geschlossen: es zahlt keine Einnahme mehr, zählt nicht mehr zum Zertifikatslimit, ist nicht mehr handelbar und zählt nicht in der Endwertung.", "Close the private: flip its certificate face down", "§3.3, §6.1, §10.4"),
+  "choice.accept_trade": e("Annehmen", "Accept", "§10.4"),
+  "choice.accept_trade_tip": e("Du verkaufst zum angebotenen Preis; das Geld geht in dein Barvermögen. Passen heißt ablehnen: Der Käufer behält seinen Zug.", "Sell at the offered price; passing declines the offer", "§10.4"),
   "choice.allow_home_lay": e("Erlauben", "Allow", "§11.1.9"),
   "choice.allow_home_lay_tip": e("Eine andere Bahn darf gelbes Gleis in den Heimathex deiner gegründeten Bahn legen. Passen heißt ablehnen: Das Feld ist ihr dann für diesen Gleisbau gesperrt.", "Allow yellow track in your RR's home hex; passing refuses it", "§11.1.9"),
   "choice.remove_private": e("Aus dem Spiel nehmen", "Remove from game", "§3.3, §6.1"),

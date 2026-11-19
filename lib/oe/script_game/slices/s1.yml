@@ -9,9 +9,9 @@
 # such a game stops as soon as its combos are executed, because with 18
 # regionals operating a whole game takes hours.
 #
-# Not reachable, so not listed (follow-up issues): player trade (§10.4, off
-# until #148: buy_company/buy_corporation of another player's company are
-# refused by the engine), Spielende by Level-8 etc. (S4).
+# Not listed yet (follow-up issues): player trade (§10.4, an offer the seller
+# accepts since #202; the director does not steer it yet, workshop #223),
+# Spielende by Level-8 etc. (S4).
 slice: S1
 games:
   - name: whole game
