@@ -10,6 +10,7 @@ export interface RenderTheme {
   id: string;
   map: Numeric<"map">;
   ui: Numeric<"ui">;
+  stock: Numeric<"stock">;
   company: Numeric<"company">;
   /** Company colours by company id (#99), numeric. */
   companies: Record<string, { bg: number; ink: number; edge: number }>;
@@ -83,6 +84,7 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     id: t.id,
     map: numeric(t, "map"),
     ui: numeric(t, "ui"),
+    stock: numeric(t, "stock"),
     company: numeric(t, "company"),
     companies: Object.fromEntries(Object.entries(t.companies).map(([id, c]) => [id, { bg: hexToNumber(c.bg), ink: hexToNumber(c.ink), edge: hexToNumber(c.edge) }])),
     player: numeric(t, "player"),
