@@ -12,7 +12,8 @@ const KEYS = JSON.parse(readFileSync(new URL("../view-keys.json", import.meta.ur
 const DIR = new URL("./fixtures/games/", import.meta.url);
 
 // "<group>.<key>": contract keys that no recorded fixture shows yet. Re-record a fixture, then delete the entry.
-const NOT_YET_RECORDED = ["meta.game_end", "prompt.double_head", "prompt.double_head_note"];
+// context.trade: the open trade offer (§10.4, #202), only while a seller answers one; no recording has one yet.
+const NOT_YET_RECORDED = ["meta.game_end", "prompt.double_head", "prompt.double_head_note", "context.trade"];
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);

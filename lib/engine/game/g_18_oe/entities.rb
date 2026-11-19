@@ -33,8 +33,24 @@ module Engine
             value: 40,
             revenue: 10,
             desc: 'During any RR\'s Place Token step, the owner may place one station token from any '\
-                  'controlled RR on the map for free (sea-zone crossing costs still apply). '\
+                  'controlled RR on the map for free. The token must be reachable by that RR as if it were '\
+                  'paid for; the cost of crossing ferries and sea zones (§11.2.1) still applies. '\
                   'If also owning the White Cliffs Ferry, this private may pay for that token\'s placement cost.',
+            # §14.3 (#77): see Step::SpecialToken#process_free_token; used once (ASSUMPTION: the rules give no count).
+            abilities: [
+              {
+                type: 'token',
+                owner_type: 'player',
+                when: 'owning_player_token',
+                hexes: [],
+                from_owner: true,
+                connected: true,
+                count: 1,
+                closed_when_used_up: true,
+                special_only: true,
+                price: 0,
+              },
+            ],
             auction_row: 2,
           },
           {

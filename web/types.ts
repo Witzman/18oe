@@ -165,9 +165,14 @@ export interface StockBundle {
 // What the president's share costs at an offered par price; `share_price` is the id the `par` action carries.
 export interface StockPar { corporation: string; share_price: string; price: number; percent: number }
 export interface StockContext { bundles: StockBundle[]; pars: StockPar[] }
+// The open trade offer (§10.4, #202) the seller answers with `choose` accept_trade or `pass` (decline);
+// `target` is a private's company id (kind "company") or a minor's corporation id (kind "corporation").
+export interface TradeContext { buyer: string; seller: string; kind: "company" | "corporation"; target: string; price: number }
 export interface PromptContext {
   track: TrackContext | null; token: TokenContext | null;
   dividend: DividendContext | null; train: TrainContext | null; stock: StockContext | null;
+  // Missing in states recorded before #202.
+  trade?: TradeContext | null;
 }
 
 export interface AuctionCard {
