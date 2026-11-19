@@ -50,7 +50,7 @@ module Engine
 
           def first_round_insolvency?(corporation)
             return false unless corporation&.corporation? && %i[minor regional].include?(corporation.type)
-            return false unless corporation.floated? && corporation.trains.empty? && corporation.owner&.player?
+            return false unless corporation.floated? && @game.counted_trains(corporation).empty? && corporation.owner&.player?
             return false if @game.fulfilled_train_obligation?(corporation)
 
             train = reserved_train
@@ -60,13 +60,14 @@ module Engine
           def must_buy_train?(entity)
             return false if entity.type == :national
 
-            entity.floated? && entity.trains.empty? && (!@game.fulfilled_train_obligation?(entity) || entity.type == :major)
+            entity.floated? && @game.counted_trains(entity).empty? && (!@game.fulfilled_train_obligation?(entity) || entity.type == :major)
           end
 
           def buyable_trains(entity)
             return national_train_offers(entity).map(&:first).uniq if national?(entity)
 
-            trains = super
+            # §14.10: the preserved 2+2 can never be sold
+            trains = super.reject { |t| @game.sml_train?(t) }
 
             # Level 8 trains visible via available_on:'7+7' but gated until 4th L7 purchase (§11.6)
             trains = trains.reject { |t| t.name == '8+8' } unless @game.level8_train_available?
