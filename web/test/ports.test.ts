@@ -11,14 +11,14 @@ import { portMarks } from "../render/ports.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 const geometry = JSON.parse(readFileSync(join(here, "fixtures", "map-geometry.json"), "utf8"));
 
-test("one mark per port with a kind: 30+11 public and 23+5 private on a side, 10 public and 2 private offshore", () => {
+test("one mark per port with a kind: 30+10 public and 23+5 private on a side, 10 public and 2 private offshore", () => {
   const marks = portMarks(geometry.ports);
   const count = (kind: string, offshore: boolean) => marks.filter((m) => m.kind === kind && (m.side === "offshore") === offshore).length;
-  assert.equal(count("public", false), 41);
+  assert.equal(count("public", false), 40);
   assert.equal(count("private", false), 28);
   assert.equal(count("public", true), 10);
   assert.equal(count("private", true), 2);
-  assert.equal(marks.length, 81);
+  assert.equal(marks.length, 80);
 });
 
 test("a ferry end or dead end without a kind makes no mark; a port that is also a ferry end does", () => {
