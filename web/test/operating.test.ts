@@ -8,7 +8,7 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { choiceLabel, choiceTip, genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, pullmanOptions, runModel, runSentence } from "../ui/panels/operating-model.ts";
+import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, pullmanOptions, runLines, runModel, runSentence } from "../ui/panels/operating-model.ts";
 import { DividendPanel, OperatingPanel, RoutePanel } from "../ui/panels/operating.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
@@ -153,4 +153,16 @@ test("#55: the Route step offers the trains the Pullman may be attached to; a cl
   find(panel, (n) => n.attrs["data-pullman"] === "pullman_on:2+2-0")[0]!.on.click!(new Event("click"));
   assert.deepEqual(sent, [choose]);
   assert.deepEqual(pullmanOptions(load("operating-route")), [], "nothing without the Pullman choices");
+});
+
+test("run: sea crossings and ferries of the stored run get a line with what counts against the city limit (#362)", () => {
+  const g = load("operating-dividend");
+  g.state.prompt.context!.dividend!.routes = [{
+    train: "3-0", hexes: ["I52", "I50"], revenue: 40, distance_str: "2+1~",
+    sea: [{ from: "I52", from_exit: 3, to: "I50", to_exit: 0, zones: 2, counted: 1, reductions: [{ kind: "port_token", units: 1 }] }],
+    ferries: [{ ferry: "AA20-AB27", distance: 1, counted: 1 }],
+  }];
+  const lines = runLines(g);
+  assert.deepEqual(lines[0]!.sea, ["Seefahrt I52 – I50: 2 Seezonen, 1 zählen, Hafenmarke −1", "Fähre AA20-AB27: Distanz 1, 1 zählt"]);
+  assert.match(textOf(DividendPanel(g, "half", noop)), /3-0: Seefahrt I52 – I50/);
 });

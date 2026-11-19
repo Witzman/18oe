@@ -3,7 +3,7 @@
 module Engine
   # Information about an entities operating round
   class OperatingInfo
-    attr_reader :routes, :halts, :nodes, :dividend, :revenue, :dividend_kind, :revenues, :segments, :stops
+    attr_reader :routes, :halts, :nodes, :dividend, :revenue, :dividend_kind, :revenues, :segments, :stops, :seas, :distance_strs
     attr_accessor :laid_hexes
 
     def initialize(runs, dividend, revenue, laid_hexes, dividend_kind: nil)
@@ -17,6 +17,8 @@ module Engine
       @revenues = runs.to_h { |run| [run.train, run.revenue] }
       @segments = runs.to_h { |run| [run.train, run_segments(run)] }
       @stops = runs.to_h { |run| [run.train, run_stops(run)] }
+      @seas = runs.to_h { |run| [run.train, run_sea(run)] }
+      @distance_strs = runs.to_h { |run| [run.train, run.distance_str] }
       @revenue = revenue
       @dividend = dividend
       @laid_hexes = laid_hexes
@@ -42,6 +44,12 @@ module Engine
       end
     rescue StandardError
       []
+    end
+
+    def run_sea(run)
+      run.sea_detail
+    rescue StandardError
+      { sea: [], ferries: [] }
     end
 
     def run_stops(run)

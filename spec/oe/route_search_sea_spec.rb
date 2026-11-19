@@ -96,8 +96,8 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
     it "lists only real hexes for a run with a crossing (the crossing itself is #362)" do
       train = train!(bjv, "3")
       route = search(bjv, train)[train].find { |r| stop_hexes(r) == %w[C48 I50] }
-      info = Struct.new(:routes, :revenues, :segments, :stops)
-        .new({ train => route.connection_hexes }, { train => 0 }, { train => [] }, { train => [] })
+      info = Struct.new(:routes, :revenues, :segments, :stops, :seas, :distance_strs)
+        .new({ train => route.connection_hexes }, { train => 0 }, { train => [] }, { train => [] }, { train => {} }, { train => "" })
 
       expect(route.connection_hexes.flatten).to include(a_string_starting_with("sea "))
       expect(Oe::View.run_detail(info, train)[:hexes]).to eq(%w[C48 I50])
@@ -122,6 +122,56 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
         expect(detail[:segments]).not_to be_empty
         expect(detail[:segments].map { |s| s[:hex] }.chunk(&:itself).map(&:first)).to eq(detail[:hexes].uniq)
       end
+    end
+  end
+
+  # #362 (SC8): the view names the sea stretches of a run: per crossing its ports, zones and what counts against
+  # the city limit after the reductions, per ferry its distance, and the route's distance_str (#356).
+  describe "the sea stretches in the view (#362)" do
+    def detail_of(route)
+      route.routes = [route]
+      Oe::View.run_detail(Engine::OperatingInfo.new([route], nil, route.revenue, []), route.train)
+    end
+
+    it "lists the DSJ crossing Malmo to Kobenhavn with its zones and the port token's reduction" do
+      lay_tile!("I52", "57", 0)
+      token!("I52", dsj)
+      train = train!(dsj, "3")
+      route = search(dsj, train)[train].find { |r| stop_hexes(r) == %w[I50 I52] }
+      detail = detail_of(route)
+
+      expect(detail[:sea].size).to eq(1)
+      crossing = detail[:sea].first
+      expect([crossing[:from], crossing[:to]].sort).to eq(%w[I50 I52])
+      expect(crossing[:zones]).to eq(2)
+      expect(crossing[:counted]).to eq(1)
+      expect(crossing[:reductions]).to eq([{ kind: "port_token", units: 1 }])
+      expect(crossing.keys).to include(:from_exit, :to_exit)
+      expect(detail[:ferries]).to eq([])
+      expect(detail[:distance_str]).to eq(route.distance_str)
+    end
+
+    it "lists a ferry with its distance and counts crossing and ferry as sea_units does" do
+      lay_tile!("AA20", "5", 4)
+      lay_tile!("AB27", "5", 1)
+      token!("AA20", corp)
+      train = train!(corp, "5")
+      route = search(corp, train)[train].find { |r| stop_hexes(r) == %w[AA20 AB27 AF25] }
+      detail = detail_of(route)
+
+      expect(detail[:ferries].size).to eq(1)
+      expect(detail[:ferries].first).to include(distance: 1)
+      counted = detail[:sea].sum { |s| s[:counted] } + detail[:ferries].sum { |f| f[:counted] }
+      expect(counted).to eq(game.sea_units(route))
+    end
+
+    it "has no sea stretches for a run over land" do
+      lnwr = start_major!(game, "LNWR", game.players[0])
+      train = train!(lnwr, "3")
+      route = search(lnwr, train)[train].find { |r| !sea?(r) }
+      detail = detail_of(route)
+
+      expect(detail).to include(sea: [], ferries: [])
     end
   end
 
