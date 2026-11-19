@@ -152,6 +152,107 @@ describe 'G18OE Barclay, Bevan, Barclay and Tritton (§14.4)' do
     end
   end
 
+  # Owner's reading (#78): Re-Par only at the conversion of the owner's regional, free choice from the major par list.
+  describe '(1) re-par at conversion' do
+    let(:own) { start_regional!(game, 'LNWR', player) }
+
+    before { allow(game).to receive(:major_phase?).and_return(true) }
+
+    def start_conversion!
+      act!(round, Engine::Action::Convert.new(own))
+    end
+
+    def finish_conversion!
+      act!(round, Engine::Action::Pass.new(player))
+      act!(round, Engine::Action::BuyShares.new(player, shares: own.ipo_shares.first, percent: 10))
+    end
+
+    it 'is not offered as an ordinary private choice' do
+      own
+      bbbt
+
+      expect(step.entity_choices(bbbt).keys.grep(/repar/)).to be_empty
+    end
+
+    it 'offers the six major par values while the regional converts' do
+      own
+      bbbt
+      start_conversion!
+
+      expect(step.actions(player)).to include('choose')
+      expect(step.entity_choices(bbbt).keys.grep(/repar/)).to eq(%w[75 80 90 100 110 120].map { |v| "bbbt_repar:#{v}" })
+    end
+
+    it 'sets the chosen value instead of the letter mapping and closes the private' do
+      own
+      bbbt
+      start_conversion!
+      choose!('bbbt_repar:120')
+      finish_conversion!
+
+      expect(own.type).to eq(:major)
+      expect(own.share_price.price).to eq(120)
+      expect(own.par_price.price).to eq(120)
+      expect(bbbt).to be_closed
+    end
+
+    it 'keeps the letter mapping when the owner does not use it' do
+      own
+      bbbt
+      start_conversion!
+      finish_conversion!
+
+      expect(own.share_price.price).to eq(75)
+      expect(bbbt).not_to be_closed
+    end
+
+    it 'leaves the treasury unchanged (only the president\'s share bought at the new par comes in)' do
+      own
+      bbbt
+      cash = own.cash
+      start_conversion!
+      choose!('bbbt_repar:90')
+      finish_conversion!
+
+      expect(own.cash).to eq(cash + 90)
+    end
+
+    it 'is not offered to a player who does not own the private' do
+      own
+      give_company!(rival, game.company_by_id('BBBT'))
+      start_conversion!
+
+      expect(step.entity_choices(game.company_by_id('BBBT'))).to be_empty
+    end
+
+    it 'is not offered once the private was used for (2) or (3)' do
+      own
+      bbbt
+      choose!('bbbt_protect:LNWR')
+      step.instance_variable_set(:@private_action_used, false)
+      start_conversion!
+
+      expect(step.entity_choices(bbbt).keys.grep(/repar/)).to be_empty
+    end
+
+    it 'is enumerated for the bots while the regional converts' do
+      own
+      bbbt
+      start_conversion!
+      choices = Oe::LegalActions.new(game).call.select { |a| a.is_a?(Engine::Action::Choose) && a.target == bbbt }
+
+      expect(choices.map(&:choice)).to eq(%w[75 80 90 100 110 120].map { |v| "bbbt_repar:#{v}" })
+    end
+
+    it 'cannot be chosen with a value outside the major par list' do
+      own
+      bbbt
+      start_conversion!
+
+      expect { choose!('bbbt_repar:60') }.to raise_error(Engine::GameError)
+    end
+  end
+
   it 'is enumerated for the owner, and every offered action is accepted' do
     regional
     bbbt

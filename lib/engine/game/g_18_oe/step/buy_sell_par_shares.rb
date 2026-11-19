@@ -305,6 +305,7 @@ module Engine
           end
 
           def private_choices(company)
+            return repar_choices_for(current_entity).select { company.owner == current_entity } if @converting
             return {} unless can_act_on_private?(current_entity, company)
 
             choices = { 'remove_private' => 'Remove from game' }
@@ -340,7 +341,9 @@ module Engine
             company = action.target
             raise GameError, "Cannot #{action.choice} #{company.name}" unless private_choices(company).key?(action.choice)
 
-            if @game.bbbt_choice?(action.choice)
+            if action.choice.start_with?(Engine::Game::G18OE::Bbbt::BBBT_REPAR)
+              @repar_cell = @game.bbbt_repar!(company, @converting, action.choice)
+            elsif @game.bbbt_choice?(action.choice)
               @game.bbbt_exercise!(company, action.choice)
             elsif action.choice == 'flip_private'
               @log << "#{player.name} turns #{company.name} face down"
@@ -499,9 +502,11 @@ module Engine
             # Step 3: Locate the major par cell (right×2, up×1 from original par)
             # Using original_par_price ensures correct placement even if the regional
             # somehow moved before conversion.
-            target_price = @game.stock_market.find_relative_share_price(
+            # §14.4 (1) Re-Par (owner's reading, #78): the owner of the private picked the target instead.
+            target_price = @repar_cell || @game.stock_market.find_relative_share_price(
               corporation.original_par_price, corporation, %i[right right up]
             )
+            @repar_cell = nil
 
             # Step 4: Move stock market token to major par cell and update par_price.
             # Directly calling move() avoids relying on three incremental moves from
@@ -644,8 +649,21 @@ module Engine
             actions = []
             ipo_bundle = @converting.ipo_shares.first&.to_bundle
             actions << 'buy_shares' if ipo_bundle && can_buy?(entity, ipo_bundle)
+            actions << 'choose' if repar_available?(entity)
             actions << 'pass'
             actions
+          end
+
+          # §14.4 (1), owner's reading (#78): only while the owner's own regional converts.
+          def repar_available?(player)
+            !repar_choices_for(player).empty?
+          end
+
+          def repar_choices_for(player)
+            return {} unless @converting && !@repar_cell
+
+            company = player.companies.find { |c| c == @game.bbbt_company && !@game.face_down_private?(c) }
+            company ? @game.bbbt_repar_choices(company, @converting) : {}
           end
 
           def converted_actions(entity)
