@@ -71,6 +71,15 @@ describe 'G18OE a broken bank ends the game after one OR (§13)' do
     expect(game.log.map(&:message).last).to match(/Game over/)
   end
 
+  it 'names every player in the game-over line, also with non-numeric player ids' do
+    enter_round!(game, game.operating_round(1))
+    break_bank!
+    play_operating_round!(1)
+
+    line = game.log.map(&:message).last
+    expect(game.players.map(&:name).all? { |name| line.include?("#{name} (") }).to be(true), line
+  end
+
   it 'plays one more OR when the bank breaks during a stock round (§13)' do
     stock_round!(game)
     break_bank!

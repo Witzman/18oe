@@ -167,7 +167,14 @@ module Oe
       trains = base unless base.empty?
       entity = trains.first.entity
       affordable = trains.select { |a| a.price <= entity.cash }
-      return affordable.max_by(&:price) unless affordable.empty?
+      from_depot = affordable.select { |a| !a.train.owned_by_corporation? }
+      return from_depot.max_by(&:price) unless from_depot.empty?
+
+      # #428: a train of another corporation only for a corporation without one, at the lowest price
+      # offered; otherwise two bots sell each other the same trains back and forth.
+      from_others = affordable.select { |a| a.train.owned_by_corporation? }
+      return from_others.min_by(&:price) if entity.trains.empty? && !from_others.empty?
+      return nil if !affordable.empty? && !entity.trains.empty?
 
       # Cannot pay: raise money first (issue shares, president sells shares).
       raise_money(by_class) || trains.min_by(&:price)
