@@ -249,3 +249,48 @@ test("grid: every market row fills the whole line, so a short row never takes in
   assert.ok(pool.state.market.rows.some((l) => l.length < cols), "the fixture needs a short row");
   for (const l of lines) assert.equal(l.children.length, cols, `row ${l.attrs["data-row"]}`);
 });
+
+// ---- Kurstafel as the board (#478): arrows at the edges, MAJOR A to F, regional par letters -------------------
+
+const cellAt = (m: ReturnType<typeof marketModel>, r: number, c: number) => m.rows[r]![c]!;
+
+test("kurstafel: arrows follow the edge of the staircase (up blocked -> right, left blocked -> down, right blocked -> up)", () => {
+  const m = marketModel(pool, corpRows(pool), null, null);
+  const rows = m.rows;
+  // Top row: every cell with a right neighbour points right; the last one (550) has none.
+  const top = rows[0]!.map((c, i) => (c ? { c, i } : null)).filter(Boolean) as { c: NonNullable<(typeof rows)[0][0]>; i: number }[];
+  assert.ok(top.slice(0, -1).every((x) => x.c.arrows.includes("right")), "top row points right");
+  assert.deepEqual(top[top.length - 1]!.c.arrows, []);
+  // The first cell of the top row (110) also has nothing to its left: down.
+  assert.deepEqual(top[0]!.c.arrows, ["right", "down"]);
+  // The last cell of every lower row points up; the last cell of a row that is not the top one never points right.
+  rows.slice(1).forEach((line, i) => {
+    const last = [...line].reverse().find(Boolean)!;
+    assert.ok(last.arrows.includes("up"), `row ${i + 1} ends in an up arrow`);
+    assert.ok(!last.arrows.includes("right"));
+  });
+  // A cell with neighbours on both sides and a cell above carries no arrow.
+  assert.deepEqual(cellAt(m, 2, 3).arrows, []);
+});
+
+test("kurstafel: the six major par cells are labelled MAJOR A to F from the cheapest, the regional pars A to F likewise", () => {
+  const m = marketModel(pool, corpRows(pool), null, null);
+  const flat = m.rows.flat().filter(Boolean) as NonNullable<(typeof m.rows)[0][0]>[];
+  const majors = flat.filter((c) => c.type === "convert_range").sort((a, b) => a.price - b.price);
+  assert.deepEqual(majors.map((c) => [c.price, c.major]), [[75, "A"], [80, "B"], [90, "C"], [100, "D"], [110, "E"], [120, "F"]]);
+  assert.ok(flat.filter((c) => c.type !== "convert_range").every((c) => c.major === null));
+  const regs = flat.filter((c) => c.type === "par").sort((a, b) => a.price - b.price);
+  assert.deepEqual(regs.map((c) => [c.price, c.regional]), [[60, "A"], [65, "B"], [70, "C"], [75, "D"], [80, "E"], [90, "F"]]);
+});
+
+test("kurstafel: the cell says what its arrows and its par mark mean in words (colour is not the only carrier)", () => {
+  const tree = sheetNode(input(pool), noop);
+  const cells = find(tree, (n) => n.attrs.class === "stock-cell");
+  const labels = cells.map((n) => String(n.attrs["aria-label"]));
+  assert.ok(labels.some((l) => /Major-Par A/.test(l)), "major par named");
+  assert.ok(labels.some((l) => /Regional-Par A/.test(l)), "regional par named");
+  assert.ok(labels.some((l) => /nach rechts/.test(l)) && labels.some((l) => /nach unten/.test(l)) && labels.some((l) => /nach oben/.test(l)), "arrows named");
+  const arrows = find(tree, (n) => n.attrs.class === "stock-arrow");
+  assert.ok(arrows.length > 0 && arrows.every((n) => n.attrs["aria-hidden"] === "true"));
+  assert.ok(find(tree, (n) => n.attrs.class === "stock-cell-major").length === 6);
+});

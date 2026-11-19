@@ -104,6 +104,13 @@ for (const t of themes) {
       ["city outline on land", t.map.cityEdge, t.map.land, 3],
       ...TILE_COLOR_KEYS.map((k) => [`rail on ${k}`, t.map.rail, t.map[k], 3] as [string, string, string, number]),
       ["panel edge against page", t.ui.panel, t.ui.bg, 1.1],
+      // Kurstafel (#478): price on a cell, a cell on the board, the red major par outline and the arrows on the board.
+      ["price on stock cell", t.stock.cellInk, t.stock.cell, 7],
+      ["cell on stock board", t.stock.cell, t.stock.field, 3],
+      ["major par outline on stock cell", t.stock.major, t.stock.cell, 3],
+      ["regional par mark on stock cell", t.stock.par, t.stock.cell, 3],
+      ["major par label on stock cell", t.stock.majorInk, t.stock.cell, 4.5],
+      ["arrow on stock cell", t.stock.arrow, t.stock.cell, 4.5],
     ];
     for (const [what, fg, bg, min] of pairs) {
       const c = contrast(fg, bg);

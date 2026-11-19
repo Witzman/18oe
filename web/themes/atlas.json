@@ -62,6 +62,15 @@
     "info": "#376590",
     "overlay": "#2a2418"
   },
+  "stock": {
+    "field": "#262d52",
+    "cell": "#efe5cc",
+    "cellInk": "#3a2f1f",
+    "major": "#b8352a",
+    "majorInk": "#8b2418",
+    "arrow": "#3a2f1f",
+    "par": "#376590"
+  },
   "company": {
     "c1": "#3f6f9a",
     "c2": "#a8443a",

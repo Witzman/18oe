@@ -178,9 +178,16 @@ export function offerOf(rows: CorpRow[], sel: Selection | null): Offer | null {
 
 // ---- Kurstafel -------------------------------------------------------------------------------------------
 
+/** Where the price moves on at the edge of the board (the arrows of the printed board, #478). */
+export type CellArrow = "right" | "down" | "up";
 export interface MarketCellModel {
   row: number; col: number; price: number; type: string | null;
   corps: string[];
+  /** Arrows at the edge: up is blocked (no cell above) -> right, left is blocked -> down, right is blocked -> up. */
+  arrows: CellArrow[];
+  /** "A".."F" for the six major par cells (type convert_range) and for the six regional par cells (type par), cheapest first. */
+  major: string | null;
+  regional: string | null;
   /** A par target of the corporation in `focus`: the cell is a valid choice. */
   valid: boolean;
   chosen: boolean;
@@ -201,6 +208,23 @@ function nearestCell(cells: (MarketCell | null)[][], from: { row: number; col: n
   return b ? { row: b.row, col: b.col } : null;
 }
 
+const LETTERS = "ABCDEF";
+
+/** Letters A.. by ascending price for the cells of one type; null for the others. */
+function letterOf(grid: (MarketCell | null)[][], type: string): Map<number, string> {
+  const prices = [...new Set(grid.flat().filter((c) => c?.type === type).map((c) => c!.price))].sort((a, b) => a - b);
+  return new Map(prices.map((p, i) => [p, LETTERS[i] ?? ""]));
+}
+
+function arrowsOf(grid: (MarketCell | null)[][], r: number, c: number): CellArrow[] {
+  const at = (rr: number, cc: number) => (rr >= 0 && cc >= 0 ? grid[rr]?.[cc] ?? null : null);
+  const out: CellArrow[] = [];
+  if (at(r, c + 1) && !at(r - 1, c)) out.push("right");
+  if (!at(r, c - 1)) out.push("down");
+  if (r > 0 && !at(r, c + 1)) out.push("up");
+  return out;
+}
+
 export function marketModel(g: Game, rows: CorpRow[], focus: string | null, sel: Selection | null): MarketModel {
   const grid = g.state.market.rows;
   const row = focus ? rows.find((r) => r.id === focus) : undefined;
@@ -213,9 +237,12 @@ export function marketModel(g: Game, rows: CorpRow[], focus: string | null, sel:
     const to = nearestCell(grid, at ? { row: at.r, col: at.c } : null, picked.newPrice);
     if (to) previewAt = `${to.row},${to.col}`;
   }
+  const majors = letterOf(grid, "convert_range"), regionals = letterOf(grid, "par");
   return {
     rows: grid.map((line, r) => line.map((cell, c) => cell && {
-      row: r, col: c, price: cell.price, type: cell.type, corps: cell.corporations,
+      row: r, col: c, price: cell.price, type: cell.type, corps: cell.corporations, arrows: arrowsOf(grid, r, c),
+      major: cell.type === "convert_range" ? majors.get(cell.price) ?? null : null,
+      regional: cell.type === "par" ? regionals.get(cell.price) ?? null : null,
       valid: parCells.has(`${r},${c}`), chosen: chosen === `${r},${c}`, preview: previewAt === `${r},${c}`,
     })),
   };
