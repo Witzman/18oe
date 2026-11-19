@@ -59,7 +59,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.IssueShares": e("Aktien ausgeben", "Issue shares", "§4"),
   "step.MergeMinor": e("Minor einbringen", "Merge minor", "§10.5"),
   "step.MergeToken": e("Station beim Zusammenschluss", "Merge token", "§10.5, §10.6"),
-  "step.MergeOffer": e("Angebot beim Zusammenschluss", "Merge offer", "§10.6"),
+  "step.MergeOffer": e("Angebot beim Zusammenschluss", "Merge offer", "§10.5, §10.6"),
   "step.TradeOffer": e("Handelsangebot", "Trade offer", "§10.4"),
   "step.MergeDiscardTrain": e("Zug beim Zusammenschluss abwerfen", "Discard train on merger", "§10.5, §10.6"),
   "step.Consolidate": e("Konsolidierung", "Consolidation", "§10.6"),
