@@ -68,3 +68,15 @@ test("head: a state without the operating order still names the current company 
   assert.equal(s.id, "B");
   assert.equal(s.steps.find((x) => x.state === "current")!.step, "BuyTrain");
 });
+
+test("#55: the head shows the company's Pullman once Pullman cars are on sale (§11.6.2)", () => {
+  const g = load("operating-route");
+  const facts = (gg: Game) => opSheet(gg, theme)!.facts;
+  assert.ok(!facts(g).some((f) => f.key === "op.pullman"), "not before the first 4 train, nor on a state without the field");
+  g.state.depot.pullmans = { available: true, supply: 9, market: 0 };
+  const b = g.state.corporations.find((c) => c.id === "B")!;
+  b.pullman = false;
+  assert.equal(facts(g).find((f) => f.key === "op.pullman")!.value, "keine");
+  b.pullman = true;
+  assert.equal(facts(g).find((f) => f.key === "op.pullman")!.value, "ja");
+});

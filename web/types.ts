@@ -97,6 +97,8 @@ export interface Corporation {
   } | null;
   track_rights: string[];
   orient_express_marker: boolean;
+  /** Owns a Pullman (§11.6.2); a national always does (§11.3.10). */
+  pullman: boolean;
   status: string[];
   regional_state: RegionalState | null;
 }
@@ -217,6 +219,8 @@ export interface GameState {
   market: { rows: (MarketCell | null)[][] };
   depot: {
     available: (Train & { owner: string | null })[]; upcoming: number; next: string | null; discarded: string[];
+    /** Minor M's Pullman cars (§11.6.2): on sale, left at M, in the Open Market. */
+    pullmans: { available: boolean; supply: number; market: number };
     schedule: {
       name: string; count: number; price: number; phase_on: string | null;
       rusts_on: string | null; obsolete_on: string | null; available_on: string | null;

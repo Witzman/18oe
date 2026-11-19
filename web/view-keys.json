@@ -67,6 +67,7 @@
     "orient_express_marker",
     "par_price",
     "president",
+    "pullman",
     "regional_state",
     "reserved",
     "share_price",
@@ -98,6 +99,7 @@
     "available",
     "discarded",
     "next",
+    "pullmans",
     "schedule",
     "upcoming"
   ],

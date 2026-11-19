@@ -190,6 +190,8 @@ module Oe
         last_run: last_run(corp),
         track_rights: Array(safe { game.track_rights_zones(corp) }).map(&:to_s),
         orient_express_marker: game.orient_express_marker?(corp) ? true : false,
+        # §11.6.2 (#55): owns a Pullman (a national always has its printed one, §11.3.10)
+        pullman: corp.type == :national || safe { game.pullman?(corp) } ? true : false,
         status: Array(safe { game.status_array(corp) }).flatten.map(&:to_s),
         regional_state: regional_state(game, corp),
       }
@@ -392,6 +394,8 @@ module Oe
         next: depot.upcoming.first&.name,
         discarded: depot.discarded.map(&:name),
         schedule: schedule(game),
+        # Minor M's Pullman cars (§11.6.2, #55): on sale since the first 4 train; cars left at M and in the Open Market
+        pullmans: { available: game.pullmans_available?, supply: game.pullman_supply, market: game.pullman_market },
       }
     end
 
