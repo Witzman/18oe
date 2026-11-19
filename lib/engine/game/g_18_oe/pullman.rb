@@ -25,6 +25,7 @@ module Engine
 
         def setup_pullmans!
           @pullman_owners = Set.new
+          @pullman_attached = {}
           @pullman_supply = PULLMAN_TOTAL
           @pullman_market = 0
           @pullmans_available = false
@@ -69,6 +70,7 @@ module Engine
         def pullman_to_market!(corporation)
           return unless @pullman_owners.delete?(corporation)
 
+          @pullman_attached.delete(corporation)
           @pullman_market += 1
           @log << "#{corporation.name}'s Pullman goes to the Open Market"
         end
@@ -86,7 +88,20 @@ module Engine
         def pullman_train(corporation)
           return nil unless pullman?(corporation)
 
+          chosen = @pullman_attached[corporation]
+          return chosen if chosen && corporation.trains.include?(chosen) && !chosen.rusted
+
           corporation.trains.max_by { |train| pullman_train_level(train) }
+        end
+
+        # §11.3.9: "the president may specify the train to which the Pullman is attached".
+        def pullman_attach!(corporation, train)
+          unless pullman?(corporation) && corporation.trains.include?(train)
+            raise GameError, "#{corporation.name} cannot attach a Pullman to that train"
+          end
+
+          @pullman_attached[corporation] = train
+          @log << "#{corporation.name} attaches its Pullman to its #{train.name} train"
         end
 
         def pullman_train_level(train)
