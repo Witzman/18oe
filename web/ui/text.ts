@@ -643,6 +643,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "stock.pick_offer": e("Choose an option.", "Choose an option", "—"),
   "stock.close": e("Close", "Close", "—"),
   "stock.tab_grid": e("Stock market grid", "Stock market grid", "§10"),
+  "stock.switch_label": e("Market view", "Market view", "§10"),
   "stock.tab_stock": e("Stock market", "Stock market", "§10"),
   "stock.tab_market": e("Open Market", "Open Market", "§10.1"),
   "stock.empty_stock": e("No corporation offers shares right now.", "No corporation offers shares now", "—"),

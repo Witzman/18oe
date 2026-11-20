@@ -11,7 +11,7 @@ import type { GameFrame } from "../frame/frame.ts";
 import { toDom } from "../kit/index.ts";
 import type { Kind } from "../frame/kinds.ts";
 import { corpRows, isMarketKind, MARKET_KINDS, marketModel, mustSell, offerOf, orderModel, STOCK_STEP, STOCK_TYPES, type Mode, type Selection, type Tab } from "./stock-model.ts";
-import { sheetNode, type SheetHandlers } from "./stock-sheet.ts";
+import { marketSwitchNode, sheetNode, type SheetHandlers } from "./stock-sheet.ts";
 
 const theme = () => choiceFromRoot(document.documentElement).theme;
 export const MARKET_VIEW = "market";
@@ -107,7 +107,7 @@ export function mountStock(frame: GameFrame): () => void {
     if (game?.state.prompt.step === STOCK_STEP && isMarketKind(frame.kinds.current()) && frame.views.activeId !== MARKET_VIEW) frame.views.activate(MARKET_VIEW);
     draw();
   });
-  const releaseView = frame.views.register({ id: MARKET_VIEW, labelKey: "stock.view", render: ({ container }) => { host = container; draw(); } });
+  const releaseView = frame.views.register({ id: MARKET_VIEW, labelKey: "stock.view", tabExtra: () => marketSwitchNode(tab, handlers.onTab), render: ({ container }) => { host = container; draw(); } });
 
   return () => { stop(); stopKinds(); releaseKinds.forEach((f) => f()); releaseRow(); releaseView(); releaseClaims.forEach((f) => f()); };
 }

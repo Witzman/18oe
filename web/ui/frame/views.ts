@@ -1,5 +1,6 @@
 // Mount point for the views of the main area (#114 fills it: map, market, holdings, ...).
 // The frame only knows the registry; a view renders into the container it is given.
+import type { VNode } from "../kit/index.ts";
 export interface ViewContext { container: HTMLElement }
 export interface ViewDef {
   id: string;
@@ -7,6 +8,8 @@ export interface ViewDef {
   labelKey: string;
   /** Draws the view into `ctx.container`; called again on every new game state. */
   render: (ctx: ViewContext) => void;
+  /** Optional control the frame puts right behind this view's tab while the view is active (#529). Built fresh on every draw. */
+  tabExtra?: () => VNode | null;
 }
 
 export function createViews(initial: ViewDef[] = []) {

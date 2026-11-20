@@ -10,7 +10,7 @@ import { genericModel } from "../ui/frame/generic.ts";
 import { kindOfAction, type Kind } from "../ui/frame/kinds.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
 import { corpRows, holdings, inTab, marketModel, offerKind, offersOfKind, rowsForKind, sealStack, mustSell, offersFor, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
-import { offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
+import { marketSwitchNode, offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
 const pool = load("stock-pool"), par = load("stock-par");
@@ -185,9 +185,19 @@ test("tabs: Stock market lists what treasuries offer, Open Market what the marke
   assert.equal(heads("market"), rows.filter((r) => r.market > 0).length);
   assert.ok(rows.some((r) => r.market > 0) && rows.some((r) => r.market === 0 || r.treasury === 0), "the fixture needs both kinds");
   const tree = sheetNode(input(pool), noop);
-  const tabs = find(tree, (n) => n.tag === "button" && n.attrs.role === "tab");
-  assert.deepEqual(tabs.map((t) => textOf(t)), ["Stock market", "Open Market"]);
+  assert.equal(find(tree, (n) => n.attrs.role === "tab").length, 0, "the switch moved behind the Market tab of the frame (#529)");
   assert.equal(find(tree, (n) => n.attrs.class === "stock-map").length, 0);
+});
+
+test("switch: a selector with Stock market and Open Market, the current one chosen; choosing calls onTab (#529)", () => {
+  const picked: string[] = [];
+  const sw = marketSwitchNode("market", (t) => picked.push(t));
+  assert.equal(sw.tag, "select");
+  const opts = find(sw, (n) => n.tag === "option");
+  assert.deepEqual(opts.map((o) => [o.attrs.value, textOf(o)]), [["stock", "Stock market"], ["market", "Open Market"]]);
+  assert.deepEqual(opts.filter((o) => "selected" in o.attrs).map((o) => o.attrs.value), ["market"]);
+  sw.on.change!({ target: { value: "stock" } } as unknown as Event);
+  assert.deepEqual(picked, ["stock"]);
 });
 
 test("dialog: a focused corporation opens a modal with its offers, the order and Cancel once one is chosen; nothing is open without focus (#407, #408)", () => {
