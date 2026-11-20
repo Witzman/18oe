@@ -60,10 +60,10 @@ function stub(dir: string, start: { seq: number }, next: { seq: number }[] = [],
   return { server, posted };
 }
 
-async function run(dir: string, port: number, waitFor: string, checks: string): Promise<number> {
+async function run(dir: string, port: number, waitFor: string, checks: string, view: string[] = ["--width", "1440", "--height", "900"]): Promise<number> {
   const { spawn } = await import("node:child_process");
   return new Promise<number>((resolve) => {
-    const child = spawn(process.execPath, [shot, `http://127.0.0.1:${port}/#/game/1`, join(dir, "out.png"), "--width", "1440", "--height", "900", "--wait-for", waitFor, ...(process.env.OE_THEME ? ["--theme", process.env.OE_THEME] : []), "--eval", checks], { stdio: "pipe" });
+    const child = spawn(process.execPath, [shot, `http://127.0.0.1:${port}/#/game/1`, join(dir, "out.png"), ...view, "--wait-for", waitFor, ...(process.env.OE_THEME ? ["--theme", process.env.OE_THEME] : []), "--eval", checks], { stdio: "pipe" });
     let err = "";
     child.stderr.on("data", (d) => { err += d; });
     child.on("close", (c) => { if (c) console.error(err); resolve(c ?? 1); });
@@ -153,14 +153,14 @@ const CHECKS_HOME = String.raw`(async () => {
   if (errs.length) fail("page errors: " + errs.join(" | "));
 })()`;
 
-async function scenario(name: string, waitFor: string, checks: string, nextNames: string[] = [], delays = { postMs: 0, getMs: 0 }) {
+async function scenario(name: string, waitFor: string, checks: string, nextNames: string[] = [], delays = { postMs: 0, getMs: 0 }, view?: string[]) {
   const dir = mkdtempSync(join(tmpdir(), "oe-concession-test-"));
   try {
     await bundle(dir);
     const game = fixture(name);
     const { server, posted } = stub(dir, game, nextNames.map(fixture), delays);
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
-    const code = await run(dir, (server.address() as { port: number }).port, waitFor, checks);
+    const code = await run(dir, (server.address() as { port: number }).port, waitFor, checks, view);
     if (process.env.OE_SHOT_DIR) copyFileSync(join(dir, "out.png"), join(process.env.OE_SHOT_DIR, `${name}-${process.env.OE_THEME ?? "default"}.png`));
     server.closeAllConnections();
     server.close();
@@ -265,3 +265,28 @@ test("concession in the browser (#409): the steps follow one another, Zurück go
   const { posted } = await scenario("concession", ".concession-card", CHECKS_STEPS);
   assert.equal(posted.length, 0);
 });
+
+// #497 S5: the two-step box on the iPad (rule 18), both orientations: every target of step 1 and step 2 is at least 44 px
+// in both directions, the box stays inside the screen, the page does not scroll sideways, back leads to step 1.
+const CHECKS_IPAD = String.raw`(async () => {
+  ${HEAD}
+  const inside = (sel) => { const r = q(sel).getBoundingClientRect(); if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) fail(sel + " leaves the screen: " + [r.left, r.top, r.right, r.bottom].map(Math.round)); };
+  const wide = (sel) => { for (const e of document.querySelectorAll(sel)) { const r = e.getBoundingClientRect(); if (r.width < 43.5 || r.height < 43.5) fail(sel + " below 44 px: " + r.width + "x" + r.height); } };
+  const noSideScroll = () => { if (document.documentElement.scrollWidth > innerWidth + 1) fail("page scrolls sideways: " + document.documentElement.scrollWidth + " > " + innerWidth); };
+  if (document.querySelectorAll(".frame-kind").length !== 2) fail("kinds " + document.querySelectorAll(".frame-kind").length);
+  wide(".frame-kind"); inside(".frame-panel"); noSideScroll();
+  await pickKind("float_minor");
+  if (document.querySelectorAll(".frame-kind").length) fail("other kinds visible inside a kind");
+  wide(".frame-kind-back"); wide(".concession-card"); inside(".frame-panel"); noSideScroll();
+  q(".frame-kind-back").click();
+  await sleep(60);
+  if (document.querySelectorAll(".frame-kind").length !== 2) fail("back did not return to step 1");
+  if ((await (await fetch("/__posted")).json()).length !== 0) fail("walking the box sent something");
+})()`;
+
+for (const [device, orientation] of [["ipad", "landscape"], ["ipad", "portrait"], ["ipad-10.2", "portrait"]] as const) {
+  test(`concession in the browser (#497 S5): the box on the ${device} ${orientation}, 44 px targets, inside the screen`, { skip: browser ? false : "no headless browser installed" }, async () => {
+    const { posted } = await scenario("concession-minor", ".frame-kind", CHECKS_IPAD, [], { postMs: 0, getMs: 0 }, ["--device", device, "--orientation", orientation]);
+    assert.equal(posted.length, 0);
+  });
+}
