@@ -35,11 +35,11 @@ export function validateReset(email: string): string | null {
 
 // Server-Fehler -> verständlicher Text. Rein: kein DOM.
 export function errorText(err: unknown): string {
-  if (!(err instanceof ApiError)) return txt("access.err_other").de.replace("{message}", String(err));
-  if (err.status === 0) return txt("access.err_network").de;
+  if (!(err instanceof ApiError)) return txt("access.err_other").text.replace("{message}", String(err));
+  if (err.status === 0) return txt("access.err_network").text;
   const known = txt(`access.err_${err.code}`);
-  if (known.de !== `access.err_${err.code}`) return known.de;
-  return txt("access.err_other").de.replace("{message}", err.message);
+  if (known.text !== `access.err_${err.code}`) return known.text;
+  return txt("access.err_other").text.replace("{message}", err.message);
 }
 
 function field(label: string, input: HTMLInputElement, hint?: string): HTMLElement {
@@ -57,9 +57,9 @@ export function titleStage(): HTMLElement {
   const still = root.getPropertyValue("--motion-enabled").trim() === "0" || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
   const every = num("--motion-title-slide-ms", 8000);
   const images = SLIDES.map((s, i) => h("img", { class: "title-slide", src: `title/${s.scene}.png`, alt: "", width: "1747", height: "923", loading: i === 0 ? "eager" : "lazy", draggable: "false" }));
-  const dots = SLIDES.map((s, i) => h("button", { type: "button", class: "title-dot", "aria-label": txt(s.alt).de }, h("i", {})));
+  const dots = SLIDES.map((s, i) => h("button", { type: "button", class: "title-dot", "aria-label": txt(s.alt).text }, h("i", {})));
   const slides = h("div", { class: "title-slides", "aria-hidden": "true" }, ...images);
-  const stage = h("div", { class: "title-stage" }, slides, h("nav", { class: "title-dots", "aria-label": txt("access.slides_nav").de }, ...dots));
+  const stage = h("div", { class: "title-stage" }, slides, h("nav", { class: "title-dots", "aria-label": txt("access.slides_nav").text }, ...dots));
   let at = 0, hover = false, pressed = false, timer = 0;
   const show = (i: number) => {
     at = i;
@@ -90,22 +90,22 @@ export function titleStage(): HTMLElement {
 export function resetPage(api: Api): HTMLElement {
   const error = h("p", { class: "error", role: "alert" });
   const email = h("input", { name: "email", type: "email", autocomplete: "email" });
-  const submit = h("button", { type: "submit" }, txt("access.submit_reset").de);
+  const submit = h("button", { type: "submit" }, txt("access.submit_reset").text);
   const result = h("div", { class: "reset-result", hidden: true });
   const onsubmit = async (ev: Event) => {
     ev.preventDefault();
     error.textContent = "";
     const bad = validateReset(email.value);
-    if (bad) { error.textContent = txt(bad).de; return; }
+    if (bad) { error.textContent = txt(bad).text; return; }
     submit.disabled = true;
     try {
       const { password } = await api.resetPassword(email.value.trim());
-      const copy = h("button", { type: "button" }, txt("access.reset_copy").de);
-      copy.onclick = () => { void navigator.clipboard?.writeText(password).then(() => { copy.textContent = txt("access.reset_copied").de; }); };
+      const copy = h("button", { type: "button" }, txt("access.reset_copy").text);
+      copy.onclick = () => { void navigator.clipboard?.writeText(password).then(() => { copy.textContent = txt("access.reset_copied").text; }); };
       result.replaceChildren(
-        h("p", {}, txt("access.reset_done").de),
+        h("p", {}, txt("access.reset_done").text),
         h("div", { class: "row" }, h("code", { class: "new-password", "data-testid": "new-password" }, password), copy),
-        h("p", { class: "muted" }, txt("access.reset_then").de));
+        h("p", { class: "muted" }, txt("access.reset_then").text));
       result.hidden = false;
     } catch (e) {
       error.textContent = errorText(e);
@@ -114,13 +114,13 @@ export function resetPage(api: Api): HTMLElement {
   };
   return h("div", { class: "access" },
     titleStage(),
-    h("header", { class: "title" }, h("h1", {}, "18OE"), h("p", { class: "game-title" }, txt("access.game_title").de)),
+    h("header", { class: "title" }, h("h1", {}, "18OE"), h("p", { class: "game-title" }, txt("access.game_title").text)),
     h("div", { class: "panel" },
-      h("h2", {}, txt("access.title_reset").de),
-      h("p", { class: "muted" }, txt("access.hint_reset").de),
-      h("form", { onsubmit, novalidate: true }, field(txt("access.email_label").de, email), h("div", { class: "row" }, submit), error),
+      h("h2", {}, txt("access.title_reset").text),
+      h("p", { class: "muted" }, txt("access.hint_reset").text),
+      h("form", { onsubmit, novalidate: true }, field(txt("access.email_label").text, email), h("div", { class: "row" }, submit), error),
       result,
-      h("p", {}, h("a", { href: "#/login" }, txt("access.to_login").de))),
+      h("p", {}, h("a", { href: "#/login" }, txt("access.to_login").text))),
     versionFooter());
 }
 
@@ -138,7 +138,7 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
   const email = input("email", "email", "email");
   const password = input("password", "password", reg ? "new-password" : "current-password");
   const code = input("code", "password", "off");
-  const submit = h("button", { type: "submit" }, txt(reg ? "access.submit_register" : "access.submit_login").de);
+  const submit = h("button", { type: "submit" }, txt(reg ? "access.submit_register" : "access.submit_login").text);
 
   const onsubmit = async (ev: Event) => {
     ev.preventDefault();
@@ -147,9 +147,9 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
     const bad = validate(mode, {
       login: login.value, name: name.value, email: email.value, password: password.value, code: code.value,
     });
-    if (bad) { error.textContent = txt(bad).de; return; }
+    if (bad) { error.textContent = txt(bad).text; return; }
     submit.disabled = true;
-    status.textContent = txt(reg ? "access.busy_register" : "access.busy_login").de;
+    status.textContent = txt(reg ? "access.busy_register" : "access.busy_login").text;
     let me: Account;
     try {
       me = reg
@@ -160,11 +160,11 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
       status.textContent = "";
       // A 200 without JSON (#294: api.ts reports it as bad_response) is the same "unexpected answer".
       const unexpected = (e instanceof ApiError && e.code === "bad_response") || (e instanceof Error && e.message.startsWith("unexpected response"));
-      error.textContent = unexpected ? txt("access.err_unexpected").de : errorText(e);
+      error.textContent = unexpected ? txt("access.err_unexpected").text : errorText(e);
       submit.disabled = false;
       return;
     }
-    status.textContent = txt(reg ? "access.ok_register" : "access.ok_login").de.replace("{name}", me.name);
+    status.textContent = txt(reg ? "access.ok_register" : "access.ok_login").text.replace("{name}", me.name);
     setTimeout(() => {
       try { done(me); } catch (e) {
         status.textContent = "";
@@ -175,27 +175,27 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
   };
 
   const fields = reg
-    ? [field(txt("access.name_label").de, name, txt("access.hint_name").de),
-       field(txt("access.email_label").de, email),
-       field(txt("access.password_label").de, password, txt("access.hint_password").de),
-       field(txt("access.code_label").de, code, txt("access.hint_code").de)]
-    : [field(txt("access.login_label").de, login), field(txt("access.password_label").de, password)];
+    ? [field(txt("access.name_label").text, name, txt("access.hint_name").text),
+       field(txt("access.email_label").text, email),
+       field(txt("access.password_label").text, password, txt("access.hint_password").text),
+       field(txt("access.code_label").text, code, txt("access.hint_code").text)]
+    : [field(txt("access.login_label").text, login), field(txt("access.password_label").text, password)];
 
   const panel = h("div", { class: "panel" },
-    h("h2", {}, txt(reg ? "access.title_register" : "access.title_login").de),
+    h("h2", {}, txt(reg ? "access.title_register" : "access.title_login").text),
     h("form", { onsubmit, novalidate: true }, ...fields, h("div", { class: "row" }, submit), status, error),
-    h("p", {}, h("a", { href: reg ? "#/login" : "#/register" }, txt(reg ? "access.to_login" : "access.to_register").de)),
-    reg ? null : h("p", {}, h("a", { href: "#/reset" }, txt("access.to_reset").de)));
+    h("p", {}, h("a", { href: reg ? "#/login" : "#/register" }, txt(reg ? "access.to_login" : "access.to_register").text)),
+    reg ? null : h("p", {}, h("a", { href: "#/reset" }, txt("access.to_reset").text)));
   let bar: HTMLElement | null = null;
   let body: HTMLElement = panel;
   if (!reg) {
-    const dialog = h("dialog", { class: "login-dialog", "aria-label": txt("access.title_login").de }) as HTMLDialogElement;
-    const close = h("button", { type: "button", class: "login-close" }, txt("access.dialog_close").de);
+    const dialog = h("dialog", { class: "login-dialog", "aria-label": txt("access.title_login").text }) as HTMLDialogElement;
+    const close = h("button", { type: "button", class: "login-close" }, txt("access.dialog_close").text);
     const show = () => { if (typeof dialog.showModal === "function" && !dialog.open) dialog.showModal(); else dialog.setAttribute("open", ""); };
     close.onclick = () => dialog.close();
     dialog.addEventListener("click", (ev) => { if (ev.target === dialog) dialog.close(); }); // Tipp neben das Formular
     dialog.append(panel, h("div", { class: "row" }, close));
-    const opener = h("button", { type: "button", class: "login-open" }, txt("access.open_login").de);
+    const opener = h("button", { type: "button", class: "login-open" }, txt("access.open_login").text);
     opener.onclick = show;
     bar = h("div", { class: "title-bar" }, opener);
     body = dialog;
@@ -204,7 +204,7 @@ export function accessPage(api: Api, mode: AccessMode, done: (me: Account) => vo
   return h("div", { class: "access" },
     titleStage(),
     bar,
-    h("header", { class: "title" }, h("h1", {}, "18OE"), h("p", { class: "game-title" }, txt("access.game_title").de)),
+    h("header", { class: "title" }, h("h1", {}, "18OE"), h("p", { class: "game-title" }, txt("access.game_title").text)),
     body,
     versionFooter());
 }

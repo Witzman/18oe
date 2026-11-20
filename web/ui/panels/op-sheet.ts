@@ -35,30 +35,30 @@ export function opSheet(g: Game, theme: Theme): OpSheet | null {
   const mine = a ? a.mine : c.president !== null && c.president === g.viewer;
   const bot = a ? a.bot : g.seats.some((s) => s.kind === "bot" && s.name === (c.president ? playerName(g, c.president) : null));
   const owner = a ? a.owner : c.president ? playerName(g, c.president) : null;
-  const who = mine ? txt("op.you").de : `${owner ?? "?"}${bot ? ` (${txt("frame.bot").de})` : ""}`;
-  const fact = (key: string, value: string): OpFact => ({ key, label: txt(key).de, value });
+  const who = mine ? txt("op.you").text : `${owner ?? "?"}${bot ? ` (${txt("frame.bot").text})` : ""}`;
+  const fact = (key: string, value: string): OpFact => ({ key, label: txt(key).text, value });
   const facts: OpFact[] = [fact("op.cash", formatGeld(c.cash))];
   if (c.share_price !== null) facts.push(fact("op.price", formatGeld(c.share_price)));
-  facts.push(fact("op.trains", c.trains.length > 0 ? c.trains.map((t) => t.name).join(", ") : txt("frame.none").de));
-  if (g.state.depot.pullmans?.available) facts.push(fact("op.pullman", c.pullman ? txt("op.pullman_yes").de : txt("frame.none").de));
-  if (c.port_authority) facts.push({ ...fact("op.port_authority", txt(`op.port_authority_${c.port_authority}`).de), area: c.port_authority });
+  facts.push(fact("op.trains", c.trains.length > 0 ? c.trains.map((t) => t.name).join(", ") : txt("frame.none").text));
+  if (g.state.depot.pullmans?.available) facts.push(fact("op.pullman", c.pullman ? txt("op.pullman_yes").text : txt("frame.none").text));
+  if (c.port_authority) facts.push({ ...fact("op.port_authority", txt(`op.port_authority_${c.port_authority}`).text), area: c.port_authority });
   if (c.tokens.length > 0) facts.push(fact("op.tokens", fillText("op.token_short", { free: c.tokens.filter((t) => !t.used).length, all: c.tokens.length })));
   const at = ladderIndex(g);
   const steps: OpStep[] = at < 0 ? [] : LADDER.map((s, i) => ({
-    step: s, label: fillText("op.strip_item", { n: i + 1, step: txt(`op.strip_${s}`).de }),
+    step: s, label: fillText("op.strip_item", { n: i + 1, step: txt(`op.strip_${s}`).text }),
     state: i < at ? "done" : i === at ? "current" : "next",
   }));
   return { id: c.id, name: c.name, who, mine, facts, steps };
 }
 
 export function OpSheetView(s: OpSheet): VNode {
-  return v("section", { class: "op-sheet", "data-mine": s.mine ? "true" : "false", "aria-label": txt("op.title").de },
+  return v("section", { class: "op-sheet", "data-mine": s.mine ? "true" : "false", "aria-label": txt("op.title").text },
     v("p", { class: "op-sheet-who", title: s.name }, v("strong", {}, `${s.id} · ${s.who}`)),
     v("p", { class: "op-sheet-facts" }, ...s.facts.flatMap((f, i) => [
       i > 0 ? v("span", { class: "op-sheet-sep", "aria-hidden": "true" }, " · ") : null,
       v("span", { class: "op-sheet-fact", "data-key": f.key, "data-area": f.area, title: `${txt(f.key).en} (${txt(f.key).regel})` }, `${f.label} `, v("b", {}, f.value)),
     ])),
-    s.steps.length > 0 ? v("ol", { class: "op-strip", "aria-label": txt("op.ladder").de },
+    s.steps.length > 0 ? v("ol", { class: "op-strip", "aria-label": txt("op.ladder").text },
       ...s.steps.map((st) => v("li", {
         class: "op-strip-item", "data-step": st.step, "data-state": st.state, "aria-current": st.state === "current" ? "step" : undefined,
       }, st.label))) : null);

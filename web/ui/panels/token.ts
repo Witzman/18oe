@@ -75,12 +75,12 @@ export interface Sentence { text: string; action: Action | null; changes: Change
 export function sentenceFor(g: Game, sel: string | null): Sentence {
   const t = tokenTargets(g).find((x) => x.id === effectiveCity(g, sel));
   const corp = placer(g);
-  if (!t || !corp) return { text: txt("token.sentence_pick").de, action: null, changes: [] };
+  if (!t || !corp) return { text: txt("token.sentence_pick").text, action: null, changes: [] };
   const price = t.price ?? 0;
   const text = fillText("token.sentence", { corp: corp.id, hex: t.hex ?? t.id, city: (t.city ?? 0) + 1, price: formatGeld(price) });
   const changes: Change[] = [{ label: fillText("token.change_cash", { who: corp.id }), before: formatGeld(corp.cash), after: formatGeld(corp.cash - price) }];
   const left = g.state.prompt.context?.token?.tokens_left;
-  if (typeof left === "number") changes.push({ label: txt("token.change_left").de, before: String(left), after: String(Math.max(left - 1, 0)) });
+  if (typeof left === "number") changes.push({ label: txt("token.change_left").text, before: String(left), after: String(Math.max(left - 1, 0)) });
   return { text, action: t.action, changes };
 }
 
@@ -91,8 +91,8 @@ export function orderFor(g: Game, sel: string | null, send: (a: Action) => void)
   const action = s.action;
   return {
     sentence: s.text, changes: s.changes, state: action ? "preview" : "invalid", reason: action ? undefined : s.text,
-    confirmLabel: txt("token.confirm").de, onConfirm: () => { if (action) send(action); },
-    side: pass ? [{ label: txt("token.pass").de, onClick: () => send(pass) }] : [],
+    confirmLabel: txt("token.confirm").text, onConfirm: () => { if (action) send(action); },
+    side: pass ? [{ label: txt("token.pass").text, onClick: () => send(pass) }] : [],
   };
 }
 
@@ -114,14 +114,14 @@ export function TokenPanel(g: Game, sel: string | null, h: TokenHandlers, map: M
   const corp = placer(g);
   // The step title stands in the panel head (#302); no hint text, the glowing cities say where to tap.
   const left = ctx && ctx.price !== null ? v("p", { class: "token-left" }, fillText("token.left", { n: ctx.tokens_left, price: formatGeld(ctx.price) })) : null;
-  if (!mine) return v("section", { class: "token-panel", "aria-label": txt("token.title").de }, left, v("p", { class: "muted" }, fillText("token.waiting", { corp: corp?.id ?? "" })));
+  if (!mine) return v("section", { class: "token-panel", "aria-label": txt("token.title").text }, left, v("p", { class: "muted" }, fillText("token.waiting", { corp: corp?.id ?? "" })));
   const ts = tokenTargets(g);
   const eff = effectiveCity(g, sel);
-  return v("section", { class: "token-panel", "aria-label": txt("token.title").de },
+  return v("section", { class: "token-panel", "aria-label": txt("token.title").text },
     left,
-    v("button", { type: "button", class: "track-map", title: txt("token.hint").de, onclick: () => h.onMap() }, txt("track.to_map").de),
-    ts.length === 0 ? v("p", { class: "muted" }, txt("token.none").de)
-      : v("div", { class: "token-cities", role: "list", "aria-label": txt("token.targets").de }, ...ts.map((t) => v("button", {
+    v("button", { type: "button", class: "track-map", title: txt("token.hint").text, onclick: () => h.onMap() }, txt("track.to_map").text),
+    ts.length === 0 ? v("p", { class: "muted" }, txt("token.none").text)
+      : v("div", { class: "token-cities", role: "list", "aria-label": txt("token.targets").text }, ...ts.map((t) => v("button", {
         type: "button", class: "token-city", "data-city": t.id, "aria-pressed": String(t.id === eff), "data-state": t.id === eff ? "selected" : "normal",
         onclick: () => h.onCity(t.id),
       }, cityRowText(t, map, ts.filter((x) => x.hex === t.hex).length)))));

@@ -437,19 +437,23 @@ describe 'G18OE trading with another player (§10.4, every stock round)' do
     expect { buy_minor!(minor, 5) }.to change { game.num_certs(player) }.by(1)
   end
 
-  it 'does not let a buyer at the certificate limit trade (§4.1)' do
+  # Owner decision 2026-11-20 (#524, option B): a player at the limit may trade; the check after the trade
+  # (§4.1) applies to every offer, a plain cash purchase included.
+  it 'does not let a buyer at the certificate limit buy for cash: the limit after the trade holds (§4.1)' do
     company
     minor
     allow(game).to receive(:cert_limit).and_return(game.num_certs(player))
     cash = player.cash
 
-    expect(step.purchasable_companies(player)).to be_empty
-    expect(step.can_buy_corporation?(player, minor)).to be(false)
-    expect(step.actions(player)).not_to include('buy_company', 'buy_corporation')
+    expect(step.actions(player)).to include('buy_company', 'buy_corporation')
     expect do
       step.process_buy_company(Engine::Action::BuyCompany.new(player, company: company, price: 5))
-    end.to raise_error(Engine::GameError)
+    end.to raise_error(Engine::GameError, /certificate limit/)
     expect(player.cash).to eq(cash)
+    expect(round.trade_offer).to be_nil
+    cash_offers = Oe::LegalActions.new(game, limit: 200, rng: Random.new(1)).call
+                                  .grep(Engine::Action::BuyCompany).select { |a| a.give.empty? }
+    expect(cash_offers).to be_empty
   end
 
   it 'allows a private pre-action before the purchase (§10)' do

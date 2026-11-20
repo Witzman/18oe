@@ -68,52 +68,52 @@ const nameOf = (m: EndModel, id: string) => m.rows.find((r) => r.id === id)?.nam
 
 export function Endstand(m: EndModel, h: EndHandlers): VNode {
   const winner = m.rows.find((r) => r.winner);
-  const title = v("h2", {}, txt("end.title").de);
+  const title = v("h2", {}, txt("end.title").text);
   if (!h.open) {
-    return v("section", { class: "frame-end", "data-open": "false", "aria-label": txt("end.title").de },
+    return v("section", { class: "frame-end", "data-open": "false", "aria-label": txt("end.title").text },
       title,
       winner ? v("span", { class: "frame-end-winner" }, fillText("end.winner", { name: winner.name })) : null,
-      v("button", { type: "button", class: "frame-end-show", onclick: h.onToggle }, txt("end.show").de));
+      v("button", { type: "button", class: "frame-end-show", onclick: h.onToggle }, txt("end.show").text));
   }
   const cols: Column<EndRow>[] = [
-    { key: "rank", label: txt("end.rank").de, align: "right", cell: (r) => v("span", { class: "frame-end-rank" }, `${r.rank}.`) },
-    { key: "player", label: txt("end.player").de, cell: (r) => v("span", { class: "frame-end-name" }, Wimpel({ seat: r.seat, name: r.name }, { theme: h.theme }), r.winner ? v("span", { class: "frame-end-crown", title: txt("end.winner_mark").de }, `★ ${txt("end.winner_mark").de}`) : null, r.me ? v("span", { class: "frame-tag" }, txt("frame.you").de) : null) },
-    { key: "cash", label: txt("frame.cash").de, align: "right", cell: (r) => Geld(r.cash) },
-    { key: "shares", label: txt("frame.shares").de, align: "right", cell: (r) => Geld(r.shares) },
-    { key: "privates", label: txt("frame.companies").de, align: "right", cell: (r) => Geld(r.privates) },
-    { key: "total", label: txt("end.total").de, align: "right", cell: (r) => v("strong", {}, Geld(r.total)) },
+    { key: "rank", label: txt("end.rank").text, align: "right", cell: (r) => v("span", { class: "frame-end-rank" }, `${r.rank}.`) },
+    { key: "player", label: txt("end.player").text, cell: (r) => v("span", { class: "frame-end-name" }, Wimpel({ seat: r.seat, name: r.name }, { theme: h.theme }), r.winner ? v("span", { class: "frame-end-crown", title: txt("end.winner_mark").text }, `★ ${txt("end.winner_mark").text}`) : null, r.me ? v("span", { class: "frame-tag" }, txt("frame.you").text) : null) },
+    { key: "cash", label: txt("frame.cash").text, align: "right", cell: (r) => Geld(r.cash) },
+    { key: "shares", label: txt("frame.shares").text, align: "right", cell: (r) => Geld(r.shares) },
+    { key: "privates", label: txt("frame.companies").text, align: "right", cell: (r) => Geld(r.privates) },
+    { key: "total", label: txt("end.total").text, align: "right", cell: (r) => v("strong", {}, Geld(r.total)) },
   ];
-  const table = Tabelle(cols, m.rows, { caption: txt("end.ranking").de, rowState: (r) => (r.winner ? "selected" : "normal") });
+  const table = Tabelle(cols, m.rows, { caption: txt("end.ranking").text, rowState: (r) => (r.winner ? "selected" : "normal") });
   const cards = m.rows.map((r) => v("article", { class: "frame-end-card", "data-winner": r.winner ? "true" : "false" },
     v("h3", {}, `${r.rank}. ${r.name}`),
     v("dl", { class: "frame-detail" },
-      v("dt", {}, txt("frame.cash").de), v("dd", {}, Geld(r.cash)),
-      v("dt", {}, txt("frame.shares").de),
+      v("dt", {}, txt("frame.cash").text), v("dd", {}, Geld(r.cash)),
+      v("dt", {}, txt("frame.shares").text),
       v("dd", { class: "frame-end-holdings" },
-        ...(r.holdings.length === 0 ? [txt("frame.none").de] : r.holdings.map((x) => v("span", { class: "frame-end-holding" },
+        ...(r.holdings.length === 0 ? [txt("frame.none").text] : r.holdings.map((x) => v("span", { class: "frame-end-holding" },
           Siegel({ sym: x.corp, color: h.corpColor(x.corp) }, { theme: h.theme, size: "s" }), `${x.percent}%${x.president ? " ★" : ""} `, Geld(x.value)))),
         v("span", { class: "frame-end-sub" }, Geld(r.shares))),
-      v("dt", {}, txt("frame.companies").de),
-      v("dd", {}, r.companies.length === 0 ? txt("frame.none").de : v("ul", { class: "frame-end-privates" },
-        ...r.companies.map((c) => v("li", { class: c.faceDown ? "muted" : "" }, c.name, " ", c.faceDown ? txt("end.face_down").de : Geld(c.value)))),
+      v("dt", {}, txt("frame.companies").text),
+      v("dd", {}, r.companies.length === 0 ? txt("frame.none").text : v("ul", { class: "frame-end-privates" },
+        ...r.companies.map((c) => v("li", { class: c.faceDown ? "muted" : "" }, c.name, " ", c.faceDown ? txt("end.face_down").text : Geld(c.value)))),
         v("span", { class: "frame-end-sub" }, Geld(r.privates))))));
   const corpCols: Column<EndCorp>[] = [
-    { key: "corp", label: txt("frame.corps").de, cell: (c) => v("span", {}, Siegel({ sym: c.id, name: c.name, color: h.corpColor(c.id) }, { theme: h.theme, size: "s" }), ` ${c.name}`) },
-    { key: "president", label: txt("frame.president").de, cell: (c) => (c.president ? nameOf(m, c.president) : txt("frame.none").de) },
-    { key: "price", label: txt("frame.share_price").de, align: "right", cell: (c) => (c.price === null ? "—" : Geld(c.price)) },
-    { key: "cash", label: txt("frame.cash").de, align: "right", cell: (c) => Geld(c.cash) },
-    { key: "trains", label: txt("frame.trains").de, align: "right", cell: (c) => String(c.trains) },
+    { key: "corp", label: txt("frame.corps").text, cell: (c) => v("span", {}, Siegel({ sym: c.id, name: c.name, color: h.corpColor(c.id) }, { theme: h.theme, size: "s" }), ` ${c.name}`) },
+    { key: "president", label: txt("frame.president").text, cell: (c) => (c.president ? nameOf(m, c.president) : txt("frame.none").text) },
+    { key: "price", label: txt("frame.share_price").text, align: "right", cell: (c) => (c.price === null ? "—" : Geld(c.price)) },
+    { key: "cash", label: txt("frame.cash").text, align: "right", cell: (c) => Geld(c.cash) },
+    { key: "trains", label: txt("frame.trains").text, align: "right", cell: (c) => String(c.trains) },
   ];
-  return v("section", { class: "frame-end", "data-open": "true", "aria-label": txt("end.title").de },
+  return v("section", { class: "frame-end", "data-open": "true", "aria-label": txt("end.title").text },
     v("div", { class: "frame-end-head" }, title,
       winner ? v("p", { class: "frame-end-winner" }, fillText("end.winner", { name: winner.name }), " ", Geld(winner.total)) : null,
-      m.bankBroken ? v("p", { class: "muted", title: txt("end.reason_note").de }, txt("end.reason_bank").de) : null),
+      m.bankBroken ? v("p", { class: "muted", title: txt("end.reason_note").text }, txt("end.reason_bank").text) : null),
     v("div", { class: "frame-end-buttons" },
-      v("button", { type: "button", onclick: h.onMap }, txt("end.map").de),
-      v("button", { type: "button", onclick: h.onLog }, txt("frame.log").de),
-      v("a", { class: "frame-end-lobby", href: "#/" }, txt("end.lobby").de)),
+      v("button", { type: "button", onclick: h.onMap }, txt("end.map").text),
+      v("button", { type: "button", onclick: h.onLog }, txt("frame.log").text),
+      v("a", { class: "frame-end-lobby", href: "#/" }, txt("end.lobby").text)),
     table,
-    v("p", { class: "muted frame-end-note" }, txt("end.shares_note").de),
+    v("p", { class: "muted frame-end-note" }, txt("end.shares_note").text),
     v("div", { class: "frame-end-cards" }, ...cards),
-    m.corps.length > 0 ? Tabelle(corpCols, m.corps, { caption: txt("end.corps").de }) : null);
+    m.corps.length > 0 ? Tabelle(corpCols, m.corps, { caption: txt("end.corps").text }) : null);
 }

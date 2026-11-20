@@ -18,22 +18,22 @@ export interface Outcome {
 }
 
 const fill = (key: string, vars: Record<string, string | number>): string =>
-  txt(key).de.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ""));
+  txt(key).text.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ""));
 
 export function classify(err: ApiError): Outcome {
   const message = err.message;
   const base = { discardSelection: false, reload: false, log: false, tone: "error" as const };
   switch (err.status) {
     case 0:
-      return { ...base, kind: "network", text: txt("msg.network_action").de };
+      return { ...base, kind: "network", text: txt("msg.network_action").text };
     case 401:
-      return { ...base, kind: "unauthorized", text: txt("error.login_required").de };
+      return { ...base, kind: "unauthorized", text: txt("error.login_required").text };
     case 403:
-      return { ...base, kind: "forbidden", text: txt("msg.not_your_turn").de, discardSelection: true, reload: true };
+      return { ...base, kind: "forbidden", text: txt("msg.not_your_turn").text, discardSelection: true, reload: true };
     case 404:
-      return { ...base, kind: "not_found", text: txt("msg.not_found_title").de };
+      return { ...base, kind: "not_found", text: txt("msg.not_found_title").text };
     case 409:
-      return { ...base, kind: "conflict", text: txt("msg.conflict").de, tone: "warn", discardSelection: true, reload: true };
+      return { ...base, kind: "conflict", text: txt("msg.conflict").text, tone: "warn", discardSelection: true, reload: true };
     case 400:
       return { ...base, kind: "bad_request", text: fill("msg.bad_request", { message }), reload: true, log: true };
     case 422:

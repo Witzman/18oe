@@ -43,7 +43,7 @@ export function mapDevPage(api: Api, hash: string): { root: HTMLElement; ready: 
       root.dataset.ready = "1";
       return map;
     } catch (e) {
-      status.textContent = e instanceof ApiError && e.status === 401 ? "Bitte zuerst anmelden." : `Fehler: ${e instanceof Error ? e.message : String(e)}`;
+      status.textContent = e instanceof ApiError && e.status === 401 ? "Please log in first." : `Error: ${e instanceof Error ? e.message : String(e)}`;
       return null;
     }
   })();

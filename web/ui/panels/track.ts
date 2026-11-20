@@ -116,7 +116,7 @@ export function targetsFor(g: Game, tiles?: MapGeometry["tiles"]): MapTargets | 
 }
 
 const COST_PARTS = ["terrain", "discount", "sea"];
-const costLabel = (label: string) => (COST_PARTS.includes(label) ? txt(`track.cost_part_${label}`).de : label);
+const costLabel = (label: string) => (COST_PARTS.includes(label) ? txt(`track.cost_part_${label}`).text : label);
 export const costLine = (h: TrackHex): string | null => {
   if (h.cost === null) return null;
   const parts = h.costParts.map((p) => `${costLabel(p.label)} ${formatGeld(p.amount)}`).join(", ");
@@ -128,14 +128,14 @@ export interface Sentence { text: string; action: Action | null; changes: Change
 export function sentenceFor(g: Game, sel: TrackSelection, tiles?: MapGeometry["tiles"]): Sentence {
   const p = picked(g, sel, tiles);
   const corp = builder(g);
-  if (!p || !corp) return { text: txt("track.sentence_pick").de, action: null, changes: [] };
+  if (!p || !corp) return { text: txt("track.sentence_pick").text, action: null, changes: [] };
   const cost = p.hex.cost ?? 0;
   const text = fillText("track.sentence", {
     corp: corp.id, tile: p.tile.name, hex: p.hex.hex, n: p.index + 1, m: p.tile.rotations.length, cost: formatGeld(cost),
   });
   const changes: Change[] = [{ label: fillText("track.change_cash", { who: corp.id }), before: formatGeld(corp.cash), after: formatGeld(corp.cash - cost) }];
   const pts = g.state.prompt.context?.track?.points;
-  if (pts && p.hex.points !== null) changes.push({ label: txt("track.change_points").de, before: String(pts.left), after: String(Math.max(pts.left - p.hex.points, 0)) });
+  if (pts && p.hex.points !== null) changes.push({ label: txt("track.change_points").text, before: String(pts.left), after: String(Math.max(pts.left - p.hex.points, 0)) });
   return { text, action: p.action, changes };
 }
 
@@ -147,11 +147,11 @@ export function orderFor(g: Game, sel: TrackSelection, send: (a: Action) => void
   const p = picked(g, sel, tiles);
   const action = s.action;
   const side = [];
-  if (p && p.tile.rotations.length > 1) side.push({ label: txt("track.rotate").de, onClick: rotate });
-  if (pass) side.push({ label: txt("track.pass").de, onClick: () => send(pass) });
+  if (p && p.tile.rotations.length > 1) side.push({ label: txt("track.rotate").text, onClick: rotate });
+  if (pass) side.push({ label: txt("track.pass").text, onClick: () => send(pass) });
   return {
     sentence: s.text, changes: s.changes, state: action ? "preview" : "invalid", reason: action ? undefined : s.text,
-    confirmLabel: txt("track.confirm").de, onConfirm: () => { if (action) send(action); }, side,
+    confirmLabel: txt("track.confirm").text, onConfirm: () => { if (action) send(action); }, side,
   };
 }
 
@@ -179,18 +179,18 @@ export function TrackPanel(g: Game, sel: TrackSelection, h: TrackHandlers, geome
   const corp = builder(g);
   // The step title stands in the panel head (#302); no hint text, the glowing hexes say where to tap.
   const points = ctx ? v("p", { class: "track-points" }, fillText("track.points", { left: ctx.points.left, budget: ctx.points.budget })) : null;
-  if (!mine) return v("section", { class: "track-panel", "aria-label": txt("track.title").de }, points, v("p", { class: "muted" }, fillText("track.waiting", { corp: corp?.id ?? "" })));
+  if (!mine) return v("section", { class: "track-panel", "aria-label": txt("track.title").text }, points, v("p", { class: "muted" }, fillText("track.waiting", { corp: corp?.id ?? "" })));
   const hexes = trackHexes(g, tiles);
   const eff = effectiveSelection(g, sel, tiles);
   const chosen = hexes.find((x) => x.hex === eff.hex);
   const tile = chosen?.tiles.find((x) => x.id === eff.tile);
   const index = tile ? tile.rotations.findIndex((x) => x.rotation === eff.rotation) : -1;
   const geo = geometry?.tiles ? { tiles: geometry.tiles, frame: hexFrame(geometry.layout.edge_vectors) } : null;
-  return v("section", { class: "track-panel", "aria-label": txt("track.title").de },
+  return v("section", { class: "track-panel", "aria-label": txt("track.title").text },
     points,
-    v("button", { type: "button", class: "track-map", title: txt("track.hint").de, onclick: () => h.onMap() }, txt("track.to_map").de),
-    hexes.length === 0 ? v("p", { class: "muted" }, txt("track.none").de)
-      : v("div", { class: "track-hexes", role: "list", "aria-label": txt("track.hexes").de }, ...hexes.map((x) => v("button", {
+    v("button", { type: "button", class: "track-map", title: txt("track.hint").text, onclick: () => h.onMap() }, txt("track.to_map").text),
+    hexes.length === 0 ? v("p", { class: "muted" }, txt("track.none").text)
+      : v("div", { class: "track-hexes", role: "list", "aria-label": txt("track.hexes").text }, ...hexes.map((x) => v("button", {
         type: "button", class: "track-hex", "data-hex": x.hex, "aria-pressed": String(x.hex === eff.hex), "data-state": x.hex === eff.hex ? "selected" : "normal",
         onclick: () => h.onHex(x.hex),
       }, fillText("track.hex_row", { hex: x.hex, cost: x.cost === null ? "–" : formatGeld(x.cost), points: x.points ?? "–" })))),
@@ -199,9 +199,9 @@ export function TrackPanel(g: Game, sel: TrackSelection, h: TrackHandlers, geome
       v("div", { class: "track-tiles", role: "group", "aria-label": fillText("track.tiles", { hex: chosen.hex }) },
         ...chosen.tiles.map((t) => tileButton(t, t.id === eff.tile, t.id === eff.tile ? eff.rotation! : t.rotations[0]!.rotation, geo, h))),
       tile ? v("div", { class: "track-rotation", role: "group", "aria-label": fillText("track.rotation", { n: index + 1, m: tile.rotations.length }) },
-        v("button", { type: "button", class: "track-turn", "data-dir": "-1", title: txt("track.rotate_left").de, "aria-label": txt("track.rotate_left").de, disabled: tile.rotations.length < 2, onclick: () => h.onTurn(-1) }, "↺"),
+        v("button", { type: "button", class: "track-turn", "data-dir": "-1", title: txt("track.rotate_left").text, "aria-label": txt("track.rotate_left").text, disabled: tile.rotations.length < 2, onclick: () => h.onTurn(-1) }, "↺"),
         v("span", { class: "track-rotation-label" }, fillText("track.rotation", { n: index + 1, m: tile.rotations.length })),
-        v("button", { type: "button", class: "track-turn", "data-dir": "1", title: txt("track.rotate_right").de, "aria-label": txt("track.rotate_right").de, disabled: tile.rotations.length < 2, onclick: () => h.onTurn(1) }, "↻")) : null,
+        v("button", { type: "button", class: "track-turn", "data-dir": "1", title: txt("track.rotate_right").text, "aria-label": txt("track.rotate_right").text, disabled: tile.rotations.length < 2, onclick: () => h.onTurn(1) }, "↻")) : null,
       costLine(chosen) ? v("p", { class: "track-cost" }, costLine(chosen)) : null) : null);
 }
 

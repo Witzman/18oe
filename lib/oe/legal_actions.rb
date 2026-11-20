@@ -540,10 +540,13 @@ module Oe
       min, max = step.price_range(entity, target)
       if @compact
         type = target.corporation? ? 'buy_corporation' : 'buy_company'
-        @ranges << { type: type, entity: entity.id, company: target.id, min: min, max: max, step: 1 } if max >= min
+        # #524: at the certificate limit a cash-only purchase is refused (§4.1); the price does not change that.
+        if max >= min && step.valid_trade_objects?(yield(min, []), target)
+          @ranges << { type: type, entity: entity.id, company: target.id, min: min, max: max, step: 1 }
+        end
         return []
       end
-      offers = sample(amounts(min, max, 5)).map { |price| yield price, [] }
+      offers = sample(amounts(min, max, 5)).map { |price| yield price, [] }.select { |action| step.valid_trade_objects?(action, target) }
       offers + trade_swaps(step, entity, target, min, max) { |price, give| yield price, give }
     end
 

@@ -5,8 +5,8 @@ import { THEME_CHANGED } from "./theme-switch.ts";
 
 // Seitentitel: "(●) 18OE · Partie 12" wenn ich dran bin, sonst "18OE · Partie 12"; ohne Partie nur "18OE".
 export function pageTitle(mine: boolean, gameId: number | null): string {
-  const base = gameId === null ? txt("attention.title_lobby").de : fillText("attention.title_game", { id: gameId });
-  return mine ? `${txt("attention.dot").de} ${base}` : base;
+  const base = gameId === null ? txt("attention.title_lobby").text : fillText("attention.title_game", { id: gameId });
+  return mine ? `${txt("attention.dot").text} ${base}` : base;
 }
 
 // Favicon als SVG-Data-URI. Farben kommen aus den Theme-Tokens (--ui-accent, --ui-panel, --ui-ink),

@@ -142,11 +142,11 @@ const DANGER_CHECKS = String.raw`(async () => {
   q(".kit-main-btn").click();
   await sleep(300);
   if ((await posted()) !== 0) fail("a dangerous action was sent on the first click");
-  if (!/Wirklich/.test(q(".kit-main-btn").textContent)) fail("no second-click label: " + q(".kit-main-btn").textContent);
+  if (!/Really/.test(q(".kit-main-btn").textContent)) fail("no second-click label: " + q(".kit-main-btn").textContent);
   q(".kit-main-btn").click();
   await sleep(600);
   if ((await posted()) !== 1) fail("second click did not send");
-  if (!/Nicht erlaubt: nope/.test(q(".msg").textContent)) fail("engine message not shown: " + q(".msg").textContent);
+  if (!/Not allowed: nope/.test(q(".msg").textContent)) fail("engine message not shown: " + q(".msg").textContent);
   if (!q(".kit-order")) fail("selection lost after 422");
   q(".kit-order .kit-side-btn").click();
   await sleep(50);

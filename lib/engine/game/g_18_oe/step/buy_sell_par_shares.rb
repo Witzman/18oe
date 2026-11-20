@@ -56,8 +56,10 @@ module Engine
           # §10.4 is a stock action of every stock round (owner decision F1, 2026-11-18, workshop #67: the
           # earlier limit to the opening stock round, "errata 10", has no source). Only a round that can ask
           # the seller (Step::TradeOffer) trades: the stock round, not the consolidation (§10.6) or concession round.
-          def can_trade?(player)
-            @round.current_actions.empty? && @game.num_certs(player) < @game.cert_limit(player) &&
+          # A player at the certificate limit may trade too (owner decision 2026-11-20, #524): what counts is the
+          # limit after the trade, checked for every offer in validate_trade_certs! (§4.1).
+          def can_trade?(_player)
+            @round.current_actions.empty? &&
               @round.steps.any? { |step| step.is_a?(G18OE::Step::TradeOffer) }
           end
 

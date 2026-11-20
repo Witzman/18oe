@@ -53,12 +53,12 @@ test("order: a purchase names source, price, cash and certificates before and af
   const o = orderModel(pool, rows, { corp: row.id, key: buy.key });
   assert.deepEqual(o.action, buy.action);
   assert.equal(o.state, "preview");
-  assert.match(o.sentence, new RegExp(`${row.id}: ${buy.percent} %`));
+  assert.match(o.sentence, new RegExp(`${row.id}: buy ${buy.percent} %`));
   const me = pool.state.players.find((p) => p.id === pool.viewer)!;
   const cash = o.changes.find((c) => c.money)!;
   assert.deepEqual([cash.before, cash.after], [me.cash, me.cash - buy.price!]);
-  const certs = o.changes.find((c) => c.label === "Zertifikate")!;
-  assert.equal(certs.after, `${me.certs + 1} von ${me.cert_limit}`);
+  const certs = o.changes.find((c) => c.label === "Certificates")!;
+  assert.equal(certs.after, `${me.certs + 1} of ${me.cert_limit}`);
 });
 
 test("order: a sale shows the proceeds, the holding and the price movement", () => {
@@ -68,12 +68,12 @@ test("order: a sale shows the proceeds, the holding and the price movement", () 
   const o = orderModel(pool, rows, { corp: SELL, key: sell.key });
   assert.deepEqual(o.action, sell.action);
   const me = pool.state.players.find((p) => p.id === pool.viewer)!;
-  assert.equal(o.changes.find((c) => c.label === "Kasse")!.after, me.cash + sell.price!);
-  const kurs = o.changes.find((c) => c.label === "Kurs");
-  if (sell.newPrice !== null && sell.newPrice !== row.price) assert.deepEqual(kurs, { label: "Kurs", before: row.price, after: sell.newPrice, money: true });
+  assert.equal(o.changes.find((c) => c.label === "Cash")!.after, me.cash + sell.price!);
+  const kurs = o.changes.find((c) => c.label === "Price");
+  if (sell.newPrice !== null && sell.newPrice !== row.price) assert.deepEqual(kurs, { label: "Price", before: row.price, after: sell.newPrice, money: true });
   else assert.equal(kurs, undefined);
-  assert.deepEqual(o.changes.find((c) => c.label === "Dein Anteil"), { label: "Dein Anteil", before: `${row.mine} %`, after: `${row.mine - sell.percent} %`, money: false });
-  assert.equal(o.confirmLabel, "Verkaufen");
+  assert.deepEqual(o.changes.find((c) => c.label === "Your holding"), { label: "Your holding", before: `${row.mine} %`, after: `${row.mine - sell.percent} %`, money: false });
+  assert.equal(o.confirmLabel, "Sell");
 });
 
 test("order: nothing chosen locks the main button with a reason", () => {
@@ -95,7 +95,7 @@ test("par: the price of the president's share from the view, the cell from the a
   assert.deepEqual(m.rows.flat().filter((c) => c?.chosen).map((c) => [c!.row, c!.col]), [[offer.cell!.row, offer.cell!.col]]);
   const o = orderModel(par, rows, { corp: row.id, key: offer.key });
   assert.deepEqual(o.action, offer.action);
-  assert.equal(o.confirmLabel, "Gründen");
+  assert.equal(o.confirmLabel, "Found");
   assert.deepEqual(parCell("90,1,0"), { row: 1, col: 0 });
   assert.equal(parCell("x"), null);
 });
@@ -131,7 +131,7 @@ test("sheet: the offers of the focused row are buttons with the label of the off
   for (const b of offers) assert.ok(textOf(b).length > 3);
   offers[0]!.on.click!(new Event("click"));
   assert.deepEqual(picked, [[SELL, offers[0]!.attrs["data-key"]!]]);
-  assert.match(offerLabel(row.sells[0]!, row), new RegExp(`^${row.sells[0]!.percent} % verkaufen, £${row.sells[0]!.price}$`));
+  assert.match(offerLabel(row.sells[0]!, row), new RegExp(`^Sell ${row.sells[0]!.percent} %, £${row.sells[0]!.price}$`));
   // Buying: the treasury offers and par prices in "Aktienmarkt", the market's shares in "Open Market".
   for (const r of rows) {
     const stock = offersFor(r, "stock", "buy"), market = offersFor(r, "market", "buy");
@@ -178,7 +178,7 @@ test("holdings: the viewer's shares are listed in the sheet, one button per corp
   assert.deepEqual(opened, [mine[0]!.id]);
 });
 
-test("tabs: Aktienmarkt lists what treasuries offer, Open Market what the market holds; the tabs replace the map button (#408)", () => {
+test("tabs: Stock market lists what treasuries offer, Open Market what the market holds; the tabs replace the map button (#408)", () => {
   const rows = corpRows(pool);
   const heads = (tab: "stock" | "market") => find(sheetNode(input(pool, { tab }), noop), (n) => n.tag === "button" && n.attrs.class === "stock-rowbtn").length;
   assert.equal(heads("stock"), rows.filter((r) => inTab(r, "stock")).length);
@@ -186,11 +186,11 @@ test("tabs: Aktienmarkt lists what treasuries offer, Open Market what the market
   assert.ok(rows.some((r) => r.market > 0) && rows.some((r) => r.market === 0 || r.treasury === 0), "the fixture needs both kinds");
   const tree = sheetNode(input(pool), noop);
   const tabs = find(tree, (n) => n.tag === "button" && n.attrs.role === "tab");
-  assert.deepEqual(tabs.map((t) => textOf(t)), ["Aktienmarkt", "Open Market"]);
+  assert.deepEqual(tabs.map((t) => textOf(t)), ["Stock market", "Open Market"]);
   assert.equal(find(tree, (n) => n.attrs.class === "stock-map").length, 0);
 });
 
-test("dialog: a focused corporation opens a modal with its offers, the order and Abbrechen once one is chosen; nothing is open without focus (#407, #408)", () => {
+test("dialog: a focused corporation opens a modal with its offers, the order and Cancel once one is chosen; nothing is open without focus (#407, #408)", () => {
   assert.equal(find(sheetNode(input(pool), noop), (n) => n.attrs.class === "kit-dialog").length, 0);
   const row = corpRows(pool).find((r) => r.id === SELL)!;
   const closed: number[] = [], confirmed: number[] = [];
@@ -202,7 +202,7 @@ test("dialog: a focused corporation opens a modal with its offers, the order and
   assert.equal(find(dlg, (n) => n.attrs.class?.includes("kit-main-btn") === true).length, 0, "no order before a choice");
   const chosen = sheetNode(input(pool, { focus: SELL, mode: "sell", sel: { corp: SELL, key: row.sells[0]!.key } }), h);
   const dlg2 = find(chosen, (n) => n.attrs.class === "kit-dialog")[0]!;
-  assert.match(textOf(dlg2), /verkaufen/);
+  assert.match(textOf(dlg2), /Sell/);
   const main = find(dlg2, (n) => n.attrs.class?.includes("kit-main-btn") === true)[0]!;
   main.on.click!(new Event("click"));
   assert.deepEqual(confirmed, [1]);
@@ -223,8 +223,8 @@ test("a market offer is labelled as taken from the market", () => {
   const rows = corpRows(pool);
   const row = rows.find((r) => r.buys.length > 0)!;
   const o = { ...row.buys[0]!, source: "market" };
-  assert.match(offerLabel(o, row), /aus dem Markt/);
-  assert.match(offerLabel(row.buys[0]!, row), /aus dem Schatzamt/);
+  assert.match(offerLabel(o, row), /from the Open Market/);
+  assert.match(offerLabel(row.buys[0]!, row), /from the Treasury/);
 });
 
 test("order: in a stock round the head names the players in this round's order; outside one, the order of the next stock round (#406)", () => {
@@ -232,13 +232,13 @@ test("order: in a stock round the head names the players in this round's order; 
   const now = [...pool.state.players].sort((a, b) => a.order - b.order).map((p) => p.name);
   const [inStock] = names(pool);
   assert.ok(inStock, "the order is shown");
-  assert.match(inStock!, /Reihenfolge dieser Aktienrunde/);
+  assert.match(inStock!, /Order of this Stock Round/);
   assert.ok(inStock!.indexOf(now[0]!) < inStock!.indexOf(now[1]!) && inStock!.indexOf(now[1]!) < inStock!.indexOf(now[3]!), inStock);
   const next = pool.state.meta.priority.map((id) => pool.state.players.find((p) => p.id === id)!.name);
   assert.notDeepEqual(next, now, "the fixture needs a different next order");
   const operating: Game = { ...pool, state: { ...pool.state, meta: { ...pool.state.meta, round: { ...pool.state.meta.round, type: "operating" } } } };
   const [inOperating] = names(operating);
-  assert.match(inOperating!, /Reihenfolge der nächsten Aktienrunde/);
+  assert.match(inOperating!, /Order of the next Stock Round/);
   assert.ok(inOperating!.indexOf(next[0]!) < inOperating!.indexOf(next[1]!) && inOperating!.indexOf(next[1]!) < inOperating!.indexOf(next[3]!), inOperating!);
 });
 
@@ -288,9 +288,9 @@ test("kurstafel: the cell says what its arrows and its par mark mean in words (c
   const tree = sheetNode(input(pool), noop);
   const cells = find(tree, (n) => n.attrs.class === "stock-cell");
   const labels = cells.map((n) => String(n.attrs["aria-label"]));
-  assert.ok(labels.some((l) => /Major-Par A/.test(l)), "major par named");
-  assert.ok(labels.some((l) => /Regional-Par A/.test(l)), "regional par named");
-  assert.ok(labels.some((l) => /nach rechts/.test(l)) && labels.some((l) => /nach unten/.test(l)) && labels.some((l) => /nach oben/.test(l)), "arrows named");
+  assert.ok(labels.some((l) => /Major par A/.test(l)), "major par named");
+  assert.ok(labels.some((l) => /Regional par A/.test(l)), "regional par named");
+  assert.ok(labels.some((l) => /Arrow right/.test(l)) && labels.some((l) => /Arrow down/.test(l)) && labels.some((l) => /Arrow up/.test(l)), "arrows named");
   // The arrows sit in a strip that is hidden from screen readers (the aria-label above says it in words).
   const strips = find(tree, (n) => n.attrs.class === "stock-cell-arrows");
   assert.ok(strips.length > 0 && strips.every((n) => n.attrs["aria-hidden"] === "true"));
@@ -367,7 +367,7 @@ test("kurstafel: the MAJOR label has a long and a short form; the legend says th
     assert.equal(find(n, (x) => x.attrs.class === "stock-major-long").length, 1);
     assert.equal(find(n, (x) => x.attrs.class === "stock-major-short").length, 1);
   }
-  assert.match(textOf(find(tree, (n) => n.attrs["data-type"] === "convert_range" && n.tag === "li")[0]!), /MAJOR A bis F/);
+  assert.match(textOf(find(tree, (n) => n.attrs["data-type"] === "convert_range" && n.tag === "li")[0]!), /MAJOR A to F/);
 });
 
 test("kurstafel: arrows sit in their own strip above the price, never over it (#484)", () => {
