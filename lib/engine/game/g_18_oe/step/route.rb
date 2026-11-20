@@ -147,8 +147,13 @@ module Engine
             return if @game.loading
             return unless (required = @game.orient_express_required(action.entity, action.routes))
 
-            raise GameError, "#{@game.class::ORIENT_EXPRESS_REQUIRED} Routes with it earn "\
-                             "#{@game.format_currency(@game.routes_revenue(required))}."
+            what = if required[:combine]
+                     "Combining #{required[:combine].map(&:name).sort.join(', ')} (§12.1) and running it earns"
+                   else
+                     'Routes with it earn'
+                   end
+            raise GameError, "#{@game.class::ORIENT_EXPRESS_REQUIRED} #{what} "\
+                             "#{@game.format_currency(required[:revenue])}."
           end
 
           def remove_combined_trains!
