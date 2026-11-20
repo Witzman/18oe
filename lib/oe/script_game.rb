@@ -53,7 +53,7 @@ module Oe
     end
 
     Result = Struct.new(:slice, :status, :actions, :seed, :game_id, :ledger, :missing, :finished, :standings,
-                        :seconds, :detail, :targets, keyword_init: true) do
+                        :seconds, :detail, :targets, :phase, keyword_init: true) do
       def ok?
         %i[finished covered].include?(status) && missing.empty? && ledger.problems.empty?
       end
@@ -114,6 +114,11 @@ module Oe
 
     def self.games(slice)
       slice(slice).fetch("games").size
+    end
+
+    # Seats of a game of the slice (`players:` in the slice file, 4 without it, #481).
+    def self.players(slice, game)
+      slice(slice).fetch("games").fetch(game)["players"] || 4
     end
 
     def run
@@ -243,6 +248,9 @@ module Oe
         return reservable(best).sample(random: @rng)
       end
 
+      merge = start_merge(round, step, prompt, missing)
+      return merge if merge
+
       starve = starve_presidents(round, step, prompt, missing)
       return starve if starve
 
@@ -258,7 +266,7 @@ module Oe
     # The offer of a trade range (§10.4, #223): a small price inside the range, so the buyer can pay.
     def trade_offer_from(range)
       price = [[5, range["min"]].max, range["max"]].min
-      action = { "type" => range["type"], "entity" => range["entity"], "price" => price }
+      action = { "type" => range["type"], "entity" => range["entity"], "entity_type" => "player", "price" => price }
       action.merge(range["type"] == "buy_company" ? { "company" => range["company"] } : { "corporation" => range["company"] })
     end
 
@@ -308,6 +316,17 @@ module Oe
                else return nil
                end
       prompt["actions"].find { |a| wanted.call(a) && corporation_type(a["entity"]) == :major }
+    end
+
+    # A merge the president makes himself starts with a choice of the minor's id (no target; the choices with a
+    # target are the offers). It is no target of its own (its key carries the id), so the bot takes it only by
+    # chance; while the merge step's action is missing the director chooses a minor (#481).
+    MERGE_TARGET = "stock/MergeMinor/merge"
+
+    def start_merge(round, step, prompt, missing)
+      return nil unless round == "stock" && step == "BuySellParShares" && missing.include?(MERGE_TARGET)
+
+      prompt["actions"].find { |a| a["type"] == "choose" && !a["target"] && corporation_type(a["choice"]) == :minor }
     end
 
     def reserve_question?(action)
@@ -361,7 +380,8 @@ module Oe
       @ledger.problem(:not_finished, "stopped with #{status} after #{count} actions") if @finish && !finished
       Result.new(slice: "#{@slice_name} / #{@game_name}", status: status, actions: count, seed: @seed, game_id: @game_id, ledger: @ledger,
                  missing: missing, finished: finished, standings: view["meta"]["standings"],
-                 seconds: (clock - started).round(1), detail: nil, targets: @targets)
+                 seconds: (clock - started).round(1), detail: nil, targets: @targets,
+                 phase: "#{@mirror.phase.name} (turn #{@mirror.turn})")
     end
 
     def abort_result(status, detail, started)

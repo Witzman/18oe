@@ -34,6 +34,7 @@ require_relative 'step/merge_offer'
 require_relative 'step/merge_token'
 require_relative 'step/concession'
 require_relative 'step/reserve_share'
+require_relative 'step/protect_share'
 require_relative 'step/trade_offer'
 require_relative 'step/orient_express_bonus'
 require_relative 'step/route'
@@ -1132,8 +1133,11 @@ module Engine
           minor.placed_tokens.any? { |token| nodes.key?(token.city) }
         end
 
+        # §10.5: a treasury share, else one from the Open Market; §14.4 (2), S. 43: a share in custodianship is the
+        # one "exchanged when merging in a minor" (#510).
         def merge_share(major)
-          major.treasury_shares.find { |share| !share.president } ||
+          treasury = major.treasury_shares.reject(&:president)
+          treasury.find { |share| bbbt_custody?(share) } || treasury.first ||
             @share_pool.shares_by_corporation[major].first
         end
 
@@ -1577,6 +1581,7 @@ module Engine
             G18OE::Step::MergeDiscardTrain,
             G18OE::Step::MergeMinor,
             G18OE::Step::ReserveShare,
+            G18OE::Step::ProtectShare,
             G18OE::Step::MergeOffer,
             G18OE::Step::TradeOffer,
             G18OE::Step::BuySellParShares,

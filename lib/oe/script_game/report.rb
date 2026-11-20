@@ -20,6 +20,7 @@ module Oe
         out << "Slice #{result.slice}: game #{result.game_id}, seed #{result.seed}, #{result.actions} actions in #{result.seconds} s, " \
                "#{result.finished ? 'finished' : "NOT finished (#{result.status})"}"
         out << "Standings: #{result.standings.map { |s| "#{s['player']}=#{s['value']}" }.join(' ')}" if result.standings && result.finished
+        out << "Train phase at the end: #{result.phase}" if result.phase
         out << ""
         out << "Executed (#{ledger.executed.size} combinations):"
         ledger.executed.sort.each { |key, n| out << format("  %-58s %5d%s", key, n, result.targets.include?(key) ? "" : "  (extra)") }

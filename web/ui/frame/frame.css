@@ -144,6 +144,10 @@
 .frame-kinds { display: flex; flex-direction: column; gap: 6px; }
 .frame-kind, .frame-kind-back { width: 100%; text-align: left; overflow-wrap: anywhere; }
 .frame-kind-pick { margin: 0 0 6px; }
+/* Options of a kind that a panel draws (issue 497, S3): one full-width button per corporation. */
+.frame-options { display: flex; flex-direction: column; gap: 6px; padding: 6px 0; }
+.frame-option { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; overflow-wrap: anywhere; }
+.frame-option .muted { flex: 1; }
 .frame-kind-head { display: flex; flex-direction: column; gap: 6px; }
 .frame-range { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .frame-range input { width: 7rem; }

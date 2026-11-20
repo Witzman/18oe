@@ -154,16 +154,58 @@ const CHECKS_BUY = String.raw`(async () => {
   if (rows.some((r) => !/Markt \d+/.test(r.textContent))) fail("a corporation without market shares in the Open Market tab");
 })()`;
 
+// Pass is a kind of the action box without options (#497 S3): step 1 button, then the one entry, then the main button.
 const CHECKS_PASS = String.raw`(async () => {
   const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const side = document.querySelector('.stock-head [data-action="pass"]') || fail("no pass button");
-  if (!/Passen/.test(side.textContent)) fail("label " + side.textContent);
-  if (side.getBoundingClientRect().height < 43.5) fail("pass button under 44px");
-  side.click();
+  if (document.querySelector('.stock-head [data-action="pass"]')) fail("the head still has a pass button");
+  const kind = document.querySelector('.frame-kind[data-kind="pass"]') || fail("no kind Passen in step 1");
+  if (!/Passen/.test(kind.textContent)) fail("label " + kind.textContent);
+  if (kind.getBoundingClientRect().height < 43.5) fail("kind button under 44px");
+  kind.click();
+  await sleep(50);
+  const entry = document.querySelector('.frame-entry[data-type="pass"]') || fail("no pass entry in step 2");
+  entry.click();
+  await sleep(50);
+  const main = document.querySelector(".frame-panel .kit-main-btn") || fail("no main button");
+  main.click();
   await sleep(600);
   const p = await (await fetch("/__posted")).json();
   if (p.length !== 1) fail("pass not sent once: " + p.length);
+})()`;
+
+// The box leads by kind, the sheet follows it (#497 S3): buy shows only cards with a purchase, the box lists them, back shows all.
+const CHECKS_BOX = String.raw`(async () => {
+  const fail = (m) => { throw new Error(m); };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const q = (s) => document.querySelector(s), qa = (s) => [...document.querySelectorAll(s)];
+  const all = qa(".stock-row").length;
+  const kinds = qa(".frame-kind").map((b) => b.dataset.kind);
+  for (const k of ["buy", "sell", "pass"]) if (!kinds.includes(k)) fail("step 1 lacks the kind " + k + ": " + kinds);
+  if (qa(".frame-option").length) fail("options before a kind is chosen");
+  if (qa(".frame-kind").some((b) => b.getBoundingClientRect().height < 43.5)) fail("a kind button under 44px");
+  q('.frame-kind[data-kind="buy"]').click();
+  await sleep(100);
+  if (qa(".frame-kind").length) fail("other kinds still visible in step 2");
+  const opts = qa(".frame-option");
+  if (!opts.length) fail("no corporation in the box");
+  if (opts.some((b) => b.getBoundingClientRect().height < 43.5)) fail("an option under 44px");
+  const rows = qa(".stock-row");
+  if (rows.length !== opts.length) fail("cards " + rows.length + " vs box " + opts.length);
+  if (!q(".stock-sheet")) fail("the sheet is not shown for the kind");
+  if (q('.stock-hold')) fail("holdings are offered while buying");
+  opts[0].click();
+  await sleep(100);
+  const dlg = q(".kit-dialog") || fail("an option of the box opens no dialog");
+  if (dlg.querySelector('.stock-offer:not([data-kind="buy"])')) fail("the dialog offers more than the kind");
+  q(".kit-dialog .kit-side-btn").click();
+  await sleep(100);
+  if (q(".kit-dialog")) fail("closing the dialog left it open");
+  if (!qa(".frame-option").length) fail("closing the dialog left the kind (Abbrechen is not Zurück)");
+  q(".frame-kind-back").click();
+  await sleep(100);
+  if (qa(".stock-row").length !== all) fail("back did not show all cards again");
+  if (!qa(".frame-kind").length) fail("back did not show step 1");
 })()`;
 
 const CHECKS_MAP = String.raw`(async () => {
@@ -207,7 +249,11 @@ test("stock sheet in the browser: choosing a sale sends nothing, shows the price
   assert.equal(posted[0]!.seq, game.seq);
 });
 
-test("stock sheet in the browser: the pass button sends the offered pass", { skip }, async () => {
+test("stock sheet in the browser: the box leads by kind, the sheet shows only that kind's cards, back shows all", { skip }, async () => {
+  await scenario("stock-pool", CHECKS_BOX);
+});
+
+test("stock sheet in the browser: the box's kind Passen sends the offered pass", { skip }, async () => {
   const { posted, game } = await scenario("stock-pool", CHECKS_PASS);
   assert.deepEqual(posted[0]!.action, game.state.prompt.actions.find((a: Record<string, unknown>) => a.type === "pass"));
 });
