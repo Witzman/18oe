@@ -46,6 +46,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.BuyTrain": e("Zug kaufen", "Buy train", "§11.6"),
   "step.ReserveShare": e("Reservierte Aktie", "Reserved share", "§9"),
   "step.ProtectShare": e("Kursschutz: Barclay, Bevan, Barclay and Tritton", "Protect the share price (Barclay, Bevan, Barclay and Tritton)", "§14"),
+  "step.CustodyShare": e("Custodianship (Barclay, Bevan, Barclay and Tritton)", "Custodianship (Barclay, Bevan, Barclay and Tritton)", "§14.4"),
   "step.Dividend": e("Dividende wählen", "Dividend", "§11.4"),
   "step.HomeToken": e("Heimatstation setzen", "Home token", "§9.3, §11.2"),
   "step.Token": e("Station setzen", "Place token", "§11.2"),

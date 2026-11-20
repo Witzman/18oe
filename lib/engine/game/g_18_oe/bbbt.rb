@@ -8,8 +8,9 @@ module Engine
       # value of an owned regional or major that still has its par value marker (#513; also in that RR's OR,
       # Step::BbbtRepar), (2) custodianship and (3) protection of a share value marker against DOWN. While the
       # owner's regional converts, (1) is the free choice of the new major's par value (#78, kept as a special case).
-      # (3) is also offered at the moment another player sells (#476, Step::ProtectShare); the use at a foreign
-      # purchase for (2) is not built yet. (1) and (2) remove the private at once (§6.1), (3) at the end of the SR.
+      # (3) is also offered at the moment another player sells (#476, Step::ProtectShare), (2) at the moment another
+      # player buys a share of the owner's RR (#514, Step::CustodyShare). (1) and (2) remove the private at once
+      # (§6.1), (3) at the end of the SR.
       module Bbbt
         BBBT_CUSTODY = 'bbbt_custody'
         BBBT_PROTECT = 'bbbt_protect'
@@ -138,8 +139,7 @@ module Engine
           bundle.shares.any? { |share| bbbt_custody?(share) && @bbbt_custody[share] != entity }
         end
 
-        def bbbt_custody!(company, corporation)
-          share = bbbt_custody_share(corporation)
+        def bbbt_custody!(company, corporation, share = bbbt_custody_share(corporation))
           raise GameError, "No share of #{corporation.name} can be put into custodianship" unless share
 
           owner = company.owner
@@ -149,6 +149,28 @@ module Engine
           # §6.1 (#513): the private leaves the game at once; its marker stays on the share until it is bought or
           # exchanged at a minor's merge (§14.4 (2)), kept in @bbbt_custody.
           company.close!
+        end
+
+        # §14.4 (2), "at the moment another player is purchasing a share of stock in the owning player's RR" (#514,
+        # owner's decision A): the owner of the private if the purchase of `bundle` by `buyer` (a share from the
+        # treasury of a RR whose president is the owner) could be stopped by custodianship, else nil. Of a regional
+        # only while both secondary shares are in its treasury; never the president's share.
+        def bbbt_purchase_window_owner(buyer, bundle)
+          company = bbbt_company
+          return if company.nil? || company.closed? || @bbbt_used || face_down_private?(company)
+
+          owner = company.owner
+          corporation = bundle.corporation
+          return unless owner&.player? && owner != buyer && corporation.owner == owner
+          return if bundle.presidents_share || bundle.owner != corporation.ipo_owner || !bbbt_custody_share(corporation)
+
+          owner
+        end
+
+        # The owner answers the window with "custody": the share being bought goes into custodianship.
+        def bbbt_custody_at_purchase!(company, bundle)
+          bbbt_custody!(company, bundle.corporation, bundle.shares.first)
+          @bbbt_used = true
         end
 
         # §14.4 (3): the share value marker of any RR (also a foreign one) may not move DOWN for the rest of the SR.
