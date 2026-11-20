@@ -8,7 +8,8 @@ module Engine
       # owner's own turn of a stock round (the private choices of Step::BuySellParShares). (1) re-setting a par
       # value is, by the owner's decision (#78/#466), used only when a regional of the owner converts to a major:
       # a free choice from the major par list instead of the letter mapping (deviates from the wording of §14.4,
-      # which also allows the OR). The use at the moment another player acts is not built yet (see the issue).
+      # which also allows the OR). (3) is also offered at the moment another player sells (#476, Step::ProtectShare);
+      # the use at a foreign purchase for (2) is not built yet.
       module Bbbt
         BBBT_CUSTODY = 'bbbt_custody'
         BBBT_PROTECT = 'bbbt_protect'
@@ -118,6 +119,31 @@ module Engine
           @bbbt_protected = corporation
           @log << "#{company.owner.name} protects the share value of #{corporation.name} from moving down for the " \
                   "rest of the stock round (#{company.name})"
+        end
+
+        def bbbt_exercised?
+          !!@bbbt_used
+        end
+
+        # §14.4 (3), "at the moment another player is selling a share" (#476, owner's decision A): the owner of the
+        # private if a sale of `bundle` by another player would move the share value marker down and the private can
+        # still protect it, else nil.
+        def bbbt_sale_window_owner(bundle)
+          company = bbbt_company
+          return if company.nil? || company.closed? || @bbbt_used || face_down_private?(company)
+
+          owner = company.owner
+          corporation = bundle.corporation
+          return unless owner&.player? && owner != bundle.owner
+          return if !bbbt_protectable?(corporation) || bbbt_protected?(corporation)
+
+          owner if sell_movement(corporation).to_s.start_with?('down')
+        end
+
+        # The owner answers the window with "protect": same effect as the choice on the owner's own turn.
+        def bbbt_protect_at_sale!(company, corporation)
+          bbbt_protect!(company, corporation)
+          @bbbt_used = true
         end
 
         def bbbt_protected?(corporation)

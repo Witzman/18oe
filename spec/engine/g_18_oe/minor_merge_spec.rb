@@ -144,6 +144,22 @@ describe 'G18OE merging a minor into a major in a Stock Round (§10.5)' do
     expect(game.bank.cash).to eq(bank_before + 120)
   end
 
+  # §14.4 (2), S. 43: a share in custodianship is "exchanged when merging in a minor" (#510).
+  it 'exchanges the share in BBBT custodianship, not the first free one (§14.4 (2))' do
+    major
+    minor
+    bbbt = give_company!(game.players.last, game.company_by_id('BBBT'))
+    game.bbbt_custody!(bbbt, major)
+    reserved = major.treasury_shares.find { |share| game.bbbt_custody?(share) }
+    expect(reserved).not_to be_nil
+    expect(major.treasury_shares.reject(&:president).first).not_to be(reserved)
+
+    expect(game.merge_share(major)).to be(reserved)
+    merge!
+    expect(reserved.owner).to eq(player)
+    expect(game.bbbt_custody?(reserved)).to be(false)
+  end
+
   it 'prefers the treasury when both have shares (§10.5)' do
     major
     to_pool!(major, 1)

@@ -14,13 +14,26 @@
 # are covered by spec/oe/legal_actions_train_variants_spec.rb and spec/engine/g_18_oe/s2_train_scenarios_spec.rb.
 # Forced purchase with conversion (`bankrupt`) is an S1 target. Green tiles are lay_tile (S1).
 #
-# Not yet reachable, left out on purpose:
-# - the director has no steering for these states (it plays what is on offer). Whether the seeded rush
-#   game owns a minor and a major of one player in Train Phase 3+, or a regional with a 25% pair, is not
-#   known without a run; #118 (target-driven director up to phase 8) is the place to steer there.
-# - stock/BuySellParShares/choose:<minor id> (starting a merge) is keyed by the minor's id, so it cannot
-#   be a stable target; the merge is counted as stock/MergeMinor/merge.
+# CI measurement of #481 (rush games, seed 1, 3 to 6 players, plus seed 2 with 4): every game with 4 or more
+# players ends regularly (bank broken) in Train Phase 4, turn 12 to 14, so the Consolidation round (it follows the
+# first Level-5 train) is never played; the 3 player game reaches Phase 5 and plays it. Hence game 2 runs with
+# 3 players (`players: 3` in the slice file; full.yml runs one job per game). The targets under `combos` are reached;
+# the ones under `unreachable` are not.
+# The director steers one thing for S2: it chooses a minor of its own for a merge (ScriptGame#start_merge, the
+# choice carries the minor's id and is no target); without it stock/MergeMinor/merge was never offered.
+# stock/BuySellParShares/choose:<minor id> (starting a merge) is keyed by the minor's id, so it cannot be a
+# stable target; the merge is counted as stock/MergeMinor/merge.
+#
+# Not targets, and why (#481; read by nobody at run time, spec/oe/s2_targets_spec.rb fails if a key here becomes
+# a target or has no scenario). A target the run never reaches turns the CI run red.
 slice: S2
+unreachable:
+  consolidation/Consolidate/convert: >-
+    A regional's president converts it in the Consolidation round only if he still presides a regional then. The rush games that reach the round (game 2, 3 players, Phase 5) offered the round's other actions but not this one (CI runs of #481); 4 to 6 player games end in Train Phase 4 before the round. A small scenario shows the enumerator offers it (spec/oe/s2_targets_spec.rb); steering a game to keep a regional for that round is the target-driven director of #118.
+  consolidation/Consolidate/choose:offer_or_abandon: >-
+    Offered only to the owner of a minor who has no major to merge it into and no regional. The rush games that reach the Consolidation round (game 2, 3 players, Phase 5) did not offer it (CI runs of #481); 4 to 6 player games end in Train Phase 4 before the round. A small scenario shows the enumerator offers it (spec/oe/s2_targets_spec.rb); steering a game to that state is the target-driven director of #118.
+  operating/DiscardTrain/discard_train: >-
+    A corporation is over its train limit only when the limit falls (Phase 4: major 4 to 3, minor and regional 2 to 1; Phase 6: major 3 to 2) while it holds more trains than the new limit. In the rush games no corporation was crowded when the Phase 4 or Phase 5 train was bought (CI runs of #481, 3 to 6 players; the Consolidation round's own discard is a different key, consolidation/DiscardTrain). A small scenario (a major with four 3-trains, spec/oe/s2_targets_spec.rb) shows the enumerator offers it; steering it is the target-driven director of #118.
 games:
   - name: rush game, conversions, merges and discards
     seed: 1
@@ -36,11 +49,14 @@ games:
       - stock/MergeToken/pass
       - stock/MergeDiscardTrain/discard_train
       - stock/MergeDiscardTrain/pass
-      - consolidation/Consolidate/convert
-      - consolidation/Consolidate/choose:offer_or_abandon
+      - operating/ConvertToNational/convert
+      - operating/ConvertToNational/pass
+  - name: rush game with 3 players, consolidation round
+    seed: 1
+    finish: false
+    rush: true
+    players: 3
+    combos:
       - consolidation/Consolidate/choose:offer_or_merge
       - consolidation/MergeOffer/choose:merge_offer
       - consolidation/MergeOffer/pass
-      - operating/ConvertToNational/convert
-      - operating/ConvertToNational/pass
-      - operating/DiscardTrain/discard_train

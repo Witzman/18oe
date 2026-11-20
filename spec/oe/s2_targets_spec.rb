@@ -16,6 +16,7 @@ RSpec.describe "S2 target list, conversions, merges and train discards (#224)" d
   include G18OESpecHelpers
 
   let(:slice) { Oe::ScriptGame.slice("s2") }
+  let(:unreachable) { slice.fetch("unreachable") }
   let(:targets) { slice.fetch("games").flat_map { |g| g["combos"] } }
   let(:script) { Oe::ScriptGame.new(clients: {}, slice: "s2").tap { |s| s.instance_variable_set(:@mirror, game) } }
   let(:game) { new_game }
@@ -166,7 +167,12 @@ RSpec.describe "S2 target list, conversions, merges and train discards (#224)" d
     end
   end
 
-  it "has a scenario for every target and no scenario for a non-target" do
-    expect(SCENARIOS.values.flatten.sort).to eq(targets.sort)
+  it "has a scenario for every target and every unreachable key, and for nothing else" do
+    expect(SCENARIOS.values.flatten.sort).to eq((targets + unreachable.keys).sort)
+  end
+
+  it "keeps a key out of the targets when it is named unreachable, with a reason (#481)" do
+    expect(targets & unreachable.keys).to be_empty
+    expect(unreachable.values).to all(match(/#118/))
   end
 end
