@@ -771,6 +771,8 @@ module Engine
 
           @corporations.each do |corp|
             next if corp.closed? || !corp.floated? || !corp.abilities.include?(@mail_contract_ability)
+            # §9.5: an abandoned charter does not operate; its treasury belongs to the bank.
+            next if abandoned_minor?(corp)
 
             @bank.spend(amount, corp)
             @log << "#{corp.name} receives mail contract of #{format_currency(amount)}"
