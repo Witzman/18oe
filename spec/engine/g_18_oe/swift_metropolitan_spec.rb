@@ -51,6 +51,14 @@ describe 'G18OE Swift Metropolitan Line (§14.10)' do
     expect(offered.map(&:target)).to eq([operator])
   end
 
+  it 'accepts the assignment the enumerator offers (#510)' do
+    round = round_for('4')
+    action = offered.first
+
+    expect { act!(round, action) }.not_to raise_error
+    expect(offered).to be_empty
+  end
+
   it 'offers nothing when no rusted 2+2 is left' do
     round_for('4')
     game.unclaimed_rusted_trains.each { |t| t.rusted = false }
