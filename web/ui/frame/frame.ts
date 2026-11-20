@@ -23,7 +23,7 @@ import { OrderBandView, orBand } from "./or-band.ts";
 import { opSheet, OpSheetView } from "../panels/op-sheet.ts";
 import { roundChip } from "./round-marks.ts";
 import { corpColor, playerRows, roundBar, roundMarkers, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
-import { panelIdle, readCollapsed, readOrderCollapsed, writeCollapsed, writeOrderCollapsed } from "./panel.ts";
+import { panelIdle, readCollapsed, writeCollapsed } from "./panel.ts";
 import { createViews } from "./views.ts";
 import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
 import { versionButton } from "../version.ts";
@@ -87,7 +87,6 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   let busy = false;
   let rangeError: { key: string; text: string } | null = null;
   let collapsed = readCollapsed();
-  let orderCollapsed = readOrderCollapsed();
   let genericOpen: boolean | null = null; // null = automatic (open while there is something to choose)
   let logOpen = false;
   // The full log (#292): fetched from /games/:id/log while the sheet is open; the sheet element lives on
@@ -227,7 +226,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     const b = game ? orBand(game, theme()) : null;
     orderEl.hidden = b === null;
     if (b === null) return orderEl.replaceChildren();
-    put(orderEl, OrderBandView(b, theme(), { collapsed: orderCollapsed, onToggle: () => { orderCollapsed = !orderCollapsed; writeOrderCollapsed(orderCollapsed); drawOrderBand(); } }));
+    put(orderEl, OrderBandView(b, theme()));
   }
 
   // ---- player bar ------------------------------------------------------------------------------

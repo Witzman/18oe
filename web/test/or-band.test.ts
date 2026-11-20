@@ -44,6 +44,7 @@ test("stock round (#416): preview of the next operating order, nobody acting, no
   assert.ok(b && b.preview === true && b.acting === null);
   assert.deepEqual(b.entries.map((e) => e.id), g.state.meta.operating_order.map((o) => o.id));
   assert.ok(b.entries.every((e) => e.state === "next"));
+  assert.deepEqual(find(OrderBandView(b, theme), (n) => n.attrs.class === "order-band-title").map(textOf), ["Turn order"]);
 });
 
 test("no band without an order or when the game is over", () => {
@@ -58,17 +59,18 @@ test("no band without an order or when the game is over", () => {
 test("head bar (#300): short round label and the compact order strip", () => {
   const g = load("operating-route");
   assert.match(roundShort(g), /^OR \d+\.\d+$/);
-  const strip = OrderBandView(orBand(g, theme)!, theme, { collapsed: false, onToggle: () => {} });
+  const strip = OrderBandView(orBand(g, theme)!, theme);
   const items = find(strip, (n) => n.attrs.class === "order-strip-item");
   assert.deepEqual(items.map((n) => n.attrs["data-state"]), ["done", "current", "next", "next", "next", "next"]);
   assert.equal(items.filter((n) => n.attrs["aria-current"] === "step").length, 1);
   // Board look (#478): numbered cells, finished and running ones marked by a sign, not by colour only.
   assert.deepEqual(find(strip, (n) => n.attrs.class === "order-strip-no").map(textOf), ["1", "2", "3", "4", "5", "6"]);
   assert.deepEqual(find(strip, (n) => n.attrs.class === "order-strip-mark").map(textOf), ["✓", "▶", "", "", "", ""]);
-  const folded = OrderBandView(orBand(g, theme)!, theme, { collapsed: true, onToggle: () => {} });
-  assert.equal(find(folded, (n) => n.attrs.class === "order-strip-item").length, 0);
-  const btn = find(folded, (n) => n.tag === "button")[0]!;
-  assert.equal(btn.attrs["aria-expanded"], "false");
+  // #526: no fold button; the owner is a ring in the player colour around the seal.
+  assert.equal(find(strip, (n) => n.tag === "button").length, 0);
+  const rings = find(strip, (n) => n.attrs.class === "order-strip-ring");
+  assert.equal(rings.length, 6);
+  assert.ok(rings.every((n) => /^box-shadow:0 0 0 var\(--shape-order-ring\) var\(--player-p[1-7]\)$/.test(n.attrs.style ?? "")));
   g.state.meta.round = { type: "stock", number: 3, turn: 1, description: null };
   assert.equal(roundShort(g), "SR 3");
 });

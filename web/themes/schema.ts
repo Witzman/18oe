@@ -72,6 +72,8 @@ export const NUMBER_RANGES = {
     hexLineAlpha: [0, 1], paper: [0, 1], radius: [0, 24], barHeight: [32, 96], sideWidth: [240, 480], gap: [4, 24], hit: [32, 64],
     // Panel metrics in px (#298): floating action panel width, top bar height, panel corner radius.
     panelWidth: [240, 400], topbarHeight: [40, 64], panelRadius: [0, 24],
+    // Owner ring around a company seal in the order band, px (#526).
+    orderRing: [1, 8],
     // Portrait bottom sheet (#333): largest share of the body height the open sheet may take, in percent.
     sheetMaxHeight: [30, 70],
     // Map strokes in hex side lengths (they scale with the map like printed lines), alpha 0..1 (#44).
