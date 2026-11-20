@@ -1,7 +1,7 @@
 // The stock sheet panel (#47, ui-spec 4.4): the view "Markt" in the main area. A corporation card opens a dialog to buy
 // or found (#408), a share of the viewer's own opens the dialog to sell (#407); the order and its main button are in
-// the dialog. It claims `buy_shares`, `sell_shares` and `par` of the stock step; the action box (#497 S3) leads by KIND
-// (float, buy, sell; pass is a kind of the box without options) and lists the corporations of the kind as buttons;
+// the dialog. It claims `buy_shares`, `sell_shares` and `par` of the stock step; the action row of the sheet (#527, was the box of #497 S3) leads by KIND
+// (float, buy, sell; pass, merger, trade and the like open in a dialog of the frame) and filters the cards to the kind;
 // the kind the player is in is read from the frame (`frame.kinds.current()`), never kept here, and the sheet then
 // shows only the cards and offers of that kind. Everything else of the step (convert, choose, trades) stays in the generic bar. Choosing only selects; the main
 // button sends (owner decision #137, no undo).
@@ -11,7 +11,7 @@ import type { GameFrame } from "../frame/frame.ts";
 import { toDom } from "../kit/index.ts";
 import type { Kind } from "../frame/kinds.ts";
 import { corpRows, isMarketKind, MARKET_KINDS, marketModel, mustSell, offerOf, orderModel, STOCK_STEP, STOCK_TYPES, type Mode, type Selection, type Tab } from "./stock-model.ts";
-import { kindOptionsNode, sheetNode, type SheetHandlers } from "./stock-sheet.ts";
+import { sheetNode, type SheetHandlers } from "./stock-sheet.ts";
 
 const theme = () => choiceFromRoot(document.documentElement).theme;
 export const MARKET_VIEW = "market";
@@ -46,13 +46,14 @@ export function mountStock(frame: GameFrame): () => void {
     onTab(t) { tab = t; focus = null; sel = null; cellList = null; draw(); },
     onCell(row, col) { frame.discardSelection(); focus = null; sel = null; cellList = `${row},${col}`; draw(); },
     onClose() { focus = null; sel = null; cellList = null; draw(); },
+    onKind(kind) { frame.kinds.choose(kind); },
     onConfirm() {
       const a = game ? orderModel(game, corpRows(game), sel).action : null;
       if (a) frame.send(a);
     },
   };
 
-  const inputOf = (g: Game, rows: ReturnType<typeof corpRows>, kind: Kind | null) => ({ g, theme: theme(), rows, market: marketModel(g, rows, focus, sel), focus, sel, tab, mode: modeOf(kind, mode), must: mustSell(g), cellList, kind });
+  const inputOf = (g: Game, rows: ReturnType<typeof corpRows>, kind: Kind | null) => ({ g, theme: theme(), rows, market: marketModel(g, rows, focus, sel), focus, sel, tab, mode: modeOf(kind, mode), must: mustSell(g), cellList, kind, kinds: frame.kinds.available() });
 
   function draw() {
     const el = host;
@@ -96,11 +97,10 @@ export function mountStock(frame: GameFrame): () => void {
     if (!inStock && wasStock && frame.views.activeId === MARKET_VIEW) frame.views.activate("map");
     wasStock = inStock;
   });
-  // The box offers the corporations of a kind; a tap opens the dialog of the corporation in the sheet (the Markt view).
-  const releaseKinds = MARKET_KINDS.map((k) => frame.kinds.provide(k, (g) => g.state.prompt.step !== STOCK_STEP ? [] : kindOptionsNode(g, theme(), corpRows(g), k, (corp) => {
-    frame.views.activate(MARKET_VIEW);
-    open(corp, modeOf(k, "buy"));
-  })));
+  // The sheet draws the market kinds itself (cards and dialog), so the box has no options for them; providing the kinds keeps
+  // their actions claimed and counted. The kind row of the sheet replaces the box in the stock round (#527).
+  const releaseKinds = MARKET_KINDS.map((k) => frame.kinds.provide(k, () => []));
+  const releaseRow = frame.kinds.useRow();
   // Choosing a market kind in the box brings the sheet forward; the sheet redraws for the kind.
   const stopKinds = frame.kinds.subscribe(() => {
     // The same kinds occur in the concession step (#497 S4), which has its own panel: the sheet stays out of it.
@@ -109,5 +109,5 @@ export function mountStock(frame: GameFrame): () => void {
   });
   const releaseView = frame.views.register({ id: MARKET_VIEW, labelKey: "stock.view", render: ({ container }) => { host = container; draw(); } });
 
-  return () => { stop(); stopKinds(); releaseKinds.forEach((f) => f()); releaseView(); releaseClaims.forEach((f) => f()); };
+  return () => { stop(); stopKinds(); releaseKinds.forEach((f) => f()); releaseRow(); releaseView(); releaseClaims.forEach((f) => f()); };
 }

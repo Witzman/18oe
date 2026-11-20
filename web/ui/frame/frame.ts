@@ -61,7 +61,10 @@ export interface GameFrame {
   // The state stays here, at the frame; a panel never keeps its own copy of the kind.
   // Several panels may provide the same kind (the stock sheet in the stock round, the concession panel in the concession
   // step); each returns no nodes in a step that is not its own. `redraw` redraws the box after a panel's own choice.
-  kinds: { provide: (kind: Kind, options: (g: Game) => VNode[]) => () => void; current: () => Kind | null; subscribe: (fn: () => void) => () => void; redraw: () => void };
+  // The action row (#527): the stock sheet claims the choice of the KIND for its own row (`useRow`, returns the release). While it
+  // is claimed, the stock round has no action box: the row lists `available()` kinds, `choose` picks one (the same kind again
+  // goes back to step 1), and the options of a kind no panel draws (pass, merger, trade, private) open in a dialog of the frame.
+  kinds: { provide: (kind: Kind, options: (g: Game) => VNode[]) => () => void; current: () => Kind | null; subscribe: (fn: () => void) => () => void; redraw: () => void; useRow: () => () => void; available: () => { kind: Kind; count: number }[]; choose: (kind: Kind | null) => void };
   // Special panels follow the game state: called with every new state before the frame draws it (#46).
   subscribe: (fn: (g: Game) => void) => () => void;
 }
@@ -109,6 +112,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   }
   let endOpen = true;
   let panelHides = 0;
+  let rowOwners = 0; // panels that draw the kind row (#527)
   const frame: GameFrame = {} as GameFrame;
   const listeners = new Set<(g: Game) => void>();
   const disposers: (() => void)[] = [];
@@ -173,7 +177,9 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   // failed load shows in the band above (reason and "Jetzt"), this line stays until a state arrives.
   const loadingEl = h("p", { class: "muted frame-loading", role: "status" }, txt("frame.loading").text);
   contextEl.append(loadingEl);
-  const body = h("div", { class: "frame-body" }, mainEl, panelEl, logHost);
+  const kindHost = h("div", { class: "frame-kind-host" });
+  kindHost.hidden = true;
+  const body = h("div", { class: "frame-body" }, mainEl, panelEl, logHost, kindHost);
   logHost.hidden = true;
   const headEl = h("header", { class: "frame-head" }, roundEl, playersEl);
   const root = h("div", { class: "frame" }, headEl, orderEl, band.el, body, versionButton());
@@ -181,6 +187,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const providers = new Map<Kind, Set<(g: Game) => VNode[]>>();
   const stageListeners = new Set<() => void>();
   const model = () => (game ? genericModel(game, claims, new Set(providers.keys())) : null);
+  // The stock round has no action box while a panel draws the kind row (#527): the row and a dialog take its place.
+  const rowed = (): boolean => rowOwners > 0 && game?.state.prompt.step === "BuySellParShares";
   const currentKind = (): Kind | null => {
     const kinds = model()?.kinds?.map((b) => b.kind);
     return kinds ? stageView(kinds, stage).kind : null;
@@ -325,7 +333,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   }
   function onStage(kind: Kind | null) {
     // Back drops a started selection: nothing is sent, nothing stays chosen from the kind left.
-    stage = kind === null ? backStage() : chooseKind(model()?.kinds?.map((b) => b.kind) ?? [], stage, kind);
+    stage = kind === null || kind === stage ? backStage() : chooseKind(model()?.kinds?.map((b) => b.kind) ?? [], stage, kind);
     selected = null; armed = false; rangeError = null;
     drawBar();
     for (const fn of [...stageListeners]) fn();
@@ -345,29 +353,55 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (g.state.meta.finished || !g.state.prompt.viewer_to_act) return who.text;
     return m.count > 0 ? txt("frame.order_idle").text : txt("frame.order_nothing").text;
   }
+  // The order of a choice made in the generic bar: sentence, main button (a dangerous action needs a second click).
+  function selectedOrder(g: Game, m: NonNullable<ReturnType<typeof model>>): VNode[] {
+    if (!selected) return [];
+    const danger = m.groups.flatMap((gr) => gr.entries).find((e) => e.key === actionKey(selected!))?.danger ?? false;
+    const order = Auftrag({
+      sentence: txt(`action.${String(selected.type)}`).text + (danger ? ` ${txt("frame.danger_note").text}` : ""),
+      changes: [], state: busy ? "waiting" : "preview",
+      confirmLabel: danger && armed ? txt("frame.confirm_danger").text : txt("frame.confirm").text,
+      onConfirm: () => { if (danger && !armed) { armed = true; drawBar(); } else send(selected!); },
+      onCancel: () => frame.discardSelection(),
+    });
+    return [v("p", { class: "frame-detailline" }, genericDetail(g, selected)), order];
+  }
+  const genericHandlers = (g: Game, m: NonNullable<ReturnType<typeof model>>): Parameters<typeof GenericBar>[1] =>
+    ({ selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError, stage, onStage, provided: (k: Kind) => [...(providers.get(k) ?? [])].flatMap((fn) => fn(g)) });
+  // #527: the options of a kind that no panel draws (pass, merger, trade, private) in a dialog over the main area; Escape,
+  // the backdrop and "Close" go back to the choice of the kind (nothing is sent). The panels' own kinds stay in the sheet.
+  function drawKindDialog() {
+    const g = game;
+    const m = model();
+    const block = g && m?.kinds && rowed() && g.state.prompt.viewer_to_act && stage !== null ? m.kinds.find((b) => b.kind === stage) : undefined;
+    kindHost.hidden = !block || block.provided === true;
+    if (!g || !m || !block || block.provided) return kindHost.replaceChildren();
+    const wasOpen = kindHost.childElementCount > 0;
+    const close = () => onStage(null);
+    const dialog = toDom(Dialog({
+      id: "frame-kind", title: txt(`kind.${block.kind}`).text, onClose: close,
+      body: [GenericBar(m, genericHandlers(g, m)), ...selectedOrder(g, m)],
+      actions: [v("button", { type: "button", class: "kit-side-btn", "data-action": "close-kind", onclick: close }, txt("stock.close").text)],
+    }));
+    kindHost.replaceChildren(dialog);
+    if (!wasOpen || !kindHost.contains(document.activeElement)) (kindHost.querySelector<HTMLElement>(".frame-entry, .frame-range input, .kit-main-btn") ?? kindHost.querySelector<HTMLElement>("button"))?.focus();
+  }
   function drawBar() {
     const g = game;
     const m = model();
-    if (!g || !m) { put(barMain); put(barTools); return; }
-    const danger = selected !== null && (m.groups.flatMap((gr) => gr.entries).find((e) => e.key === actionKey(selected!))?.danger ?? false);
+    if (!g || !m) { put(barMain); put(barTools); kindHost.hidden = true; kindHost.replaceChildren(); return; }
+    const inRow = rowed();
     // A choice in the generic bar (an action no panel claimed) wins over the panel's order until it is dropped.
     if (orderSlot.spec && !selected) {
       put(barMain, orderView(orderSlot.spec, { busy, armed: orderSlot.armed, onArm: () => orderSlot.arm() }));
-    } else if (selected) {
-      const type = String(selected.type);
-      const order = Auftrag({
-        sentence: txt(`action.${type}`).text + (danger ? ` ${txt("frame.danger_note").text}` : ""),
-        changes: [], state: busy ? "waiting" : "preview",
-        confirmLabel: danger && armed ? txt("frame.confirm_danger").text : txt("frame.confirm").text,
-        onConfirm: () => { if (danger && !armed) { armed = true; drawBar(); } else send(selected!); },
-        onCancel: () => frame.discardSelection(),
-      });
-      put(barMain, v("p", { class: "frame-detailline" }, genericDetail(g, selected)), order);
+    } else if (selected && !inRow) {
+      put(barMain, ...selectedOrder(g, m));
     } else {
       put(barMain, v("p", { class: "frame-sentence" }, orderSentence(g, m)));
     }
     const mine = g.state.prompt.viewer_to_act;
-    const showGeneric = mine && (m.count > 0 || m.unsupported.length > 0);
+    // With the kind row there is no action box: the generic actions are in the row and its dialog (#527).
+    const showGeneric = mine && (m.count > 0 || m.unsupported.length > 0) && !inRow;
     const open = genericOpen ?? showGeneric;
     put(barTools,
       showGeneric ? v("button", { type: "button", class: "frame-toggle", "aria-expanded": String(open), onclick: () => { genericOpen = !open; drawBar(); } }, fillText("frame.generic_open", { n: m.count })) : null,
@@ -376,10 +410,13 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (showGeneric && open) {
       drawerNodes.push(v("section", { class: "frame-drawer-sheet", "aria-label": txt("frame.generic_title").text },
         v("h3", {}, txt("frame.generic_title").text),
-        GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError, stage, onStage, provided: (k: Kind) => [...(providers.get(k) ?? [])].flatMap((fn) => fn(g)) })));
+        GenericBar(m, genericHandlers(g, m))));
+    } else if (inRow && mine && m.unsupported.length > 0) {
+      drawerNodes.push(v("p", { class: "msg-warn" }, fillText("frame.unsupported", { list: m.unsupported.join("; ") })));
     }
     put(drawerEl, ...drawerNodes);
     drawerEl.hidden = drawerNodes.length === 0;
+    drawKindDialog();
     drawLog();
     drawLayout();
     applyBusy();
@@ -393,11 +430,11 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   function drawLayout() {
     // Hidden only while someone asked for it and there is nothing to say (#370); messages and errors always show.
     const idle = panelIdle({
-      order: orderSlot.spec !== null, selected: selected !== null, generic: barTools.childElementCount > 0,
+      order: orderSlot.spec !== null, selected: selected !== null && !rowed(), generic: barTools.childElementCount > 0,
       context: contextEl.querySelector(".op-sheet") !== null || contextSlot.childElementCount > 0 || loadingEl.isConnected,
       message: (message.el.textContent ?? "") !== "", stall: !stallEl.hidden,
     });
-    panelEl.hidden = panelHides > 0 && idle;
+    panelEl.hidden = (panelHides > 0 || rowed()) && idle;
     panelEl.dataset.collapsed = collapsed ? "true" : "false";
     panelToggle.setAttribute("aria-expanded", String(!collapsed));
     const label = txt(collapsed ? "frame.panel_expand" : "frame.panel_collapse").text;
@@ -438,6 +475,12 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
         return () => { set.delete(options); if (set.size === 0 && providers.get(kind) === set) providers.delete(kind); };
       },
       redraw: () => { if (game) drawBar(); },
+      useRow() { rowOwners++; let done = false; return () => { if (done) return; done = true; rowOwners--; if (game) drawBar(); }; },
+      available() {
+        const g = game;
+        return g && rowed() && g.state.prompt.viewer_to_act ? (model()?.kinds ?? []).map((b) => ({ kind: b.kind, count: b.count })) : [];
+      },
+      choose: (kind: Kind | null) => onStage(kind),
       current: currentKind,
       subscribe(fn: () => void) { stageListeners.add(fn); return () => { stageListeners.delete(fn); }; },
     },
