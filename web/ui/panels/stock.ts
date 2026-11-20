@@ -97,13 +97,14 @@ export function mountStock(frame: GameFrame): () => void {
     wasStock = inStock;
   });
   // The box offers the corporations of a kind; a tap opens the dialog of the corporation in the sheet (the Markt view).
-  const releaseKinds = MARKET_KINDS.map((k) => frame.kinds.provide(k, (g) => kindOptionsNode(g, theme(), corpRows(g), k, (corp) => {
+  const releaseKinds = MARKET_KINDS.map((k) => frame.kinds.provide(k, (g) => g.state.prompt.step !== STOCK_STEP ? [] : kindOptionsNode(g, theme(), corpRows(g), k, (corp) => {
     frame.views.activate(MARKET_VIEW);
     open(corp, modeOf(k, "buy"));
   })));
   // Choosing a market kind in the box brings the sheet forward; the sheet redraws for the kind.
   const stopKinds = frame.kinds.subscribe(() => {
-    if (isMarketKind(frame.kinds.current()) && frame.views.activeId !== MARKET_VIEW) frame.views.activate(MARKET_VIEW);
+    // The same kinds occur in the concession step (#497 S4), which has its own panel: the sheet stays out of it.
+    if (game?.state.prompt.step === STOCK_STEP && isMarketKind(frame.kinds.current()) && frame.views.activeId !== MARKET_VIEW) frame.views.activate(MARKET_VIEW);
     draw();
   });
   const releaseView = frame.views.register({ id: MARKET_VIEW, labelKey: "stock.view", render: ({ container }) => { host = container; draw(); } });

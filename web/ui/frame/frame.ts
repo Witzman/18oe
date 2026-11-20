@@ -59,7 +59,9 @@ export interface GameFrame {
   // The two-step box (#497 S3): a panel draws the options of a kind itself (`provide`, returns the release), reads
   // the kind the player is in (`current`: step 2's kind, null in step 1) and is told when the player changes it.
   // The state stays here, at the frame; a panel never keeps its own copy of the kind.
-  kinds: { provide: (kind: Kind, options: (g: Game) => VNode[]) => () => void; current: () => Kind | null; subscribe: (fn: () => void) => () => void };
+  // Several panels may provide the same kind (the stock sheet in the stock round, the concession panel in the concession
+  // step); each returns no nodes in a step that is not its own. `redraw` redraws the box after a panel's own choice.
+  kinds: { provide: (kind: Kind, options: (g: Game) => VNode[]) => () => void; current: () => Kind | null; subscribe: (fn: () => void) => () => void; redraw: () => void };
   // Special panels follow the game state: called with every new state before the frame draws it (#46).
   subscribe: (fn: (g: Game) => void) => () => void;
 }
@@ -177,7 +179,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const headEl = h("header", { class: "frame-head" }, roundEl, playersEl);
   const root = h("div", { class: "frame" }, headEl, orderEl, band.el, body, versionButton());
 
-  const providers = new Map<Kind, (g: Game) => VNode[]>();
+  const providers = new Map<Kind, Set<(g: Game) => VNode[]>>();
   const stageListeners = new Set<() => void>();
   const model = () => (game ? genericModel(game, claims, new Set(providers.keys())) : null);
   const currentKind = (): Kind | null => {
@@ -375,7 +377,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (showGeneric && open) {
       drawerNodes.push(v("section", { class: "frame-drawer-sheet", "aria-label": txt("frame.generic_title").de },
         v("h3", {}, txt("frame.generic_title").de),
-        GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError, stage, onStage, provided: (k: Kind) => providers.get(k)?.(g) ?? [] })));
+        GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError, stage, onStage, provided: (k: Kind) => [...(providers.get(k) ?? [])].flatMap((fn) => fn(g)) })));
     }
     put(drawerEl, ...drawerNodes);
     drawerEl.hidden = drawerNodes.length === 0;
@@ -431,9 +433,12 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     root, band, message, claims, views, setOrder: (spec: OrderSpec) => orderSlot.set(spec), hidePanel: () => { panelHides++; drawLayout(); let done = false; return () => { if (done) return; done = true; panelHides--; drawLayout(); }; }, send: (a: Action) => send(a), slots: { context: contextSlot, main: viewEl }, hooks: {},
     kinds: {
       provide(kind: Kind, options: (g: Game) => VNode[]) {
-        providers.set(kind, options);
-        return () => { if (providers.get(kind) === options) providers.delete(kind); };
+        const set = providers.get(kind) ?? new Set();
+        set.add(options);
+        providers.set(kind, set);
+        return () => { set.delete(options); if (set.size === 0 && providers.get(kind) === set) providers.delete(kind); };
       },
+      redraw: () => { if (game) drawBar(); },
       current: currentKind,
       subscribe(fn: () => void) { stageListeners.add(fn); return () => { stageListeners.delete(fn); }; },
     },
@@ -446,12 +451,13 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       // #294: the map is one of these listeners; before, a throw there left a map-only page. The error also
       // goes to hooks.onRenderError (main.ts sends it to the server log).
       panelError = null;
-      for (const fn of listeners) {
-        try { fn(g); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("panel failed to draw", e); frame.hooks.onRenderError?.(e); }
-      }
+      // The state and the stage are current before the panels hear of the new state: a panel reads `kinds.current()` (#497 S4).
       stage = stageAfterRender(stage, game?.seq ?? null, g.seq);
       if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; seqSince = Date.now(); }
       game = g;
+      for (const fn of listeners) {
+        try { fn(g); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("panel failed to draw", e); frame.hooks.onRenderError?.(e); }
+      }
       try { drawAll(); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("frame failed to draw", e); frame.hooks.onRenderError?.(e); applyBusy(); }
       drawStall();
     },
