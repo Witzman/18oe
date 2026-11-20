@@ -52,6 +52,36 @@ describe 'G18OE Pullman cars (§11.6.2)' do
     expect(game.pullman_market).to eq(1)
   end
 
+  # #508 5b (owner, 2026-11-20): §9.4 step 1 literally. The Pullman M gave the major (§11.6.2) is the major's
+  # and goes to the Open Market; M then owns none. §9.5 line 5 (the car stays with the charter) holds only
+  # for a minor that still owns its Pullman.
+  describe 'Minor M and the formation of a national (#508)' do
+    let(:minor_m) { start_minor!(game, 'M', player, 'IT') }
+
+    it 'sends the Pullman M gave to the major to the Open Market; M owns none' do
+      minor_m
+      game.event_pullmans_available!
+      game.add_minor_charter!(minor_m, lnwr)
+      game.close_corporation(minor_m, quiet: true)
+      expect(game.pullman?(lnwr)).to be(true)
+
+      game.form_national!(lnwr)
+
+      expect(game.pullman?(lnwr)).to be(false)
+      expect(game.pullman?(minor_m)).to be(false)
+      expect(game.abandoned_minor?(minor_m)).to be(true)
+      expect(game.pullman_market).to eq(1)
+      expect(game.pullman_supply).to eq(9)
+    end
+
+    it 'keeps the Pullman with the charter of an abandoned M that still owns it (§9.5 line 5)' do
+      game.event_pullmans_available!
+      game.abandon_minor!(minor_m)
+      expect(game.pullman?(minor_m)).to be(true)
+      expect(game.pullman_market).to eq(0)
+    end
+  end
+
   it 'owns at most one: a second goes to the Open Market' do
     2.times { game.receive_pullman!(lnwr) }
     expect(game.pullman_market).to eq(1)

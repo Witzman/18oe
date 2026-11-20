@@ -43,6 +43,51 @@ describe 'G18OE minor K, Vermilion Seal mail contract (§15.10)' do
     expect(k.cash).to eq(160)
   end
 
+  # #508 5c (owner, 2026-11-20): of the final two ORs only the first is played normally and pays the mail
+  # contract; the second is only "each RR paying again ... the same revenue" (§13, §15.10). With the long
+  # endgame switch (PB 5.3) the last OR is played in full and pays like any OR.
+  describe 'in the final two ORs (§13)' do
+    let(:optional_rules) { [] }
+    let(:game) { new_game(optional_rules: optional_rules) }
+
+    before do
+      at_phase!(game, '3')
+      game.instance_variable_set(:@turn, 3)
+      game.instance_variable_set(:@final_turn, 3)
+      game.instance_variable_set(:@operating_rounds, 2)
+    end
+
+    it 'pays in the first, normally played OR and not in the abbreviated second one' do
+      before = k.cash
+      operating_round_for!(game, 1, setup: true)
+      expect(k.cash - before).to eq(40)
+
+      operating_round_for!(game, 2, setup: true)
+      expect(k.cash - before).to eq(40)
+    end
+
+    it 'pays nothing from the bank in the abbreviated OR' do
+      operating_round_for!(game, 1, setup: true)
+      bank_cash = game.bank.cash
+      operating_round_for!(game, 2, setup: true)
+
+      expect(game.bank.cash).to eq(bank_cash)
+      expect(game.log.map(&:message).grep(/mail contract/).size).to eq(1)
+    end
+
+    context 'with the long endgame switch (PB 5.3)' do
+      let(:optional_rules) { [:long_endgame] }
+
+      it 'pays in the last OR too, played in full' do
+        before = k.cash
+        operating_round_for!(game, 1, setup: true)
+        operating_round_for!(game, 2, setup: true)
+
+        expect(k.cash - before).to eq(80)
+      end
+    end
+  end
+
   it 'logs the payment' do
     operating_round_for!(game, 1, setup: true)
 

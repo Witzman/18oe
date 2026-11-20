@@ -121,10 +121,11 @@ module Engine
         end
 
         # §11.6.2: who gets the £15 royalty for a car bought from Minor M: the major M merged into, else M
-        # itself while it is a floated minor (nobody else is paid).
+        # itself while it is operated by an owner. An abandoned M has no owning major, so nobody is paid
+        # (#508 5a, owner 2026-11-20; §9.5: its cash is the bank's).
         def pullman_royalty_receiver
           holder = pullman_m_holder
-          holder.type == :minor && !holder.floated? ? nil : holder
+          holder.type == :minor && (!holder.floated? || abandoned_minor?(holder)) ? nil : holder
         end
 
         def pullman_from_m_available?
