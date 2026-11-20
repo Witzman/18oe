@@ -6,7 +6,7 @@ import { loadScenes, pickScenes } from "../../bin/boardshots.mjs";
 const scenes = loadScenes();
 
 test("board scenes: unique names, titles, and a recorded game fixture each", () => {
-  assert.ok(scenes.length >= 12);
+  assert.ok(scenes.length >= 14);
   assert.equal(new Set(scenes.map((s) => s.name)).size, scenes.length);
   for (const s of scenes) {
     assert.match(s.name, /^s\d\d-[a-z-]+$/);
