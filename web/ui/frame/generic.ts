@@ -5,7 +5,9 @@ import type { Game, Prompt } from "../../types.ts";
 import { fillText, txt } from "../text.ts";
 import { v, type VNode } from "../kit/vnode.ts";
 import type { Claims } from "./claims.ts";
+import { kindOfAction, KINDS, usesKinds, type Kind } from "./kinds.ts";
 import { playerName } from "./model.ts";
+import { stageView } from "./stage.ts";
 
 export type Action = Record<string, unknown>;
 export type Range = Prompt["ranges"][number];
@@ -13,7 +15,11 @@ export type Range = Prompt["ranges"][number];
 export interface Entry { key: string; action: Action; label: string; detail: string; danger: boolean; tip?: string }
 export interface Group { type: string; label: string; entries: Entry[] }
 export interface RangeEntry { key: string; range: Range; label: string; detail: string }
-export interface GenericModel { groups: Group[]; ranges: RangeEntry[]; unsupported: string[]; count: number }
+/** The entries and ranges of one action kind (#497 S2); only in the stock round and concession steps. */
+export interface KindBlock { kind: Kind; entries: Entry[]; ranges: RangeEntry[] }
+// `groups`/`ranges` stay the flat view of everything the bar offers; `kinds` is the same sorted by kind, or
+// null where the kinds do not apply (every other step stays flat, #498).
+export interface GenericModel { groups: Group[]; ranges: RangeEntry[]; unsupported: string[]; count: number; kinds: KindBlock[] | null }
 
 // Actions that cannot be taken back and need a second click (ui-spec 3.7).
 export const DANGEROUS = new Set(["bankrupt", "discard_train", "scrap_train", "remove_token", "remove_hex_token", "manual_close_company"]);
@@ -80,7 +86,15 @@ export function genericModel(g: Game, claims: Claims): GenericModel {
     detail: `${r.company} · ${fillText("frame.range_bounds", { min: r.min, max: r.max, step: r.step })}`,
   }));
   const unsupported = p.unsupported.filter((u) => !claims.isClaimed(p.step, u.split(/:\s*/).pop() ?? u));
-  return { groups, ranges, unsupported, count: groups.reduce((n, gr) => n + gr.entries.length, 0) + ranges.length };
+  return { groups, ranges, unsupported, count: groups.reduce((n, gr) => n + gr.entries.length, 0) + ranges.length, kinds: usesKinds(g) ? kindBlocks(g, groups, ranges) : null };
+}
+
+/** The unclaimed entries and ranges sorted into kinds, in the fixed order, only kinds with something in them. */
+function kindBlocks(g: Game, groups: Group[], ranges: RangeEntry[]): KindBlock[] {
+  const entries = groups.flatMap((gr) => gr.entries);
+  const rangeKind = (r: RangeEntry) => kindOfAction(g, { type: r.range.type });
+  return KINDS.map((kind) => ({ kind, entries: entries.filter((e) => kindOfAction(g, e.action) === kind), ranges: ranges.filter((r) => rangeKind(r) === kind) }))
+    .filter((b) => b.entries.length + b.ranges.length > 0);
 }
 
 /** The bid or trade offer a range stands for: a normal action, as the legal-action list documents (#91, #202). */
@@ -103,6 +117,9 @@ export interface GenericHandlers {
   onSelect: (entry: Entry) => void;
   onRange: (r: RangeEntry, input: string) => void;
   rangeError: { key: string; text: string } | null;
+  // The chosen kind of the two-step box (#497 S2); only read where the model has kinds.
+  stage?: Kind | null;
+  onStage?: (kind: Kind | null) => void;
 }
 
 function entryButton(e: Entry, h: GenericHandlers): VNode {
@@ -130,8 +147,29 @@ export function GenericBar(m: GenericModel, h: GenericHandlers): VNode {
   v("label", {}, txt("frame.range_label").de, v("input", { type: "number", name: "price", min: String(r.range.min), max: String(r.range.max), step: String(r.range.step), value: String(r.range.min), required: true })),
   v("button", { type: "submit" }, txt("frame.range_pick").de),
   h.rangeError?.key === r.key ? v("span", { class: "msg-error", role: "alert" }, h.rangeError.text) : null);
+  const unsupported = m.unsupported.length > 0 ? v("p", { class: "msg-warn" }, fillText("frame.unsupported", { list: m.unsupported.join("; ") })) : null;
+  if (m.kinds !== null && m.kinds.length > 0) return v("div", { class: "frame-generic frame-staged" }, ...stagedBar(m.kinds, h, range), unsupported);
   return v("div", { class: "frame-generic" },
     m.count === 0 && m.unsupported.length === 0 ? v("p", { class: "muted" }, txt("frame.generic_none").de) : null,
     ...m.groups.map(group), ...m.ranges.map(range),
-    m.unsupported.length > 0 ? v("p", { class: "msg-warn" }, fillText("frame.unsupported", { list: m.unsupported.join("; ") })) : null);
+    unsupported);
+}
+
+/** Step 1: one full-width button per kind. Step 2: the head with the back button, then only that kind's options. */
+function stagedBar(blocks: KindBlock[], h: GenericHandlers, range: (r: RangeEntry) => VNode): VNode[] {
+  const view = stageView(blocks.map((b) => b.kind), h.stage ?? null);
+  const label = (kind: Kind) => txt(`kind.${kind}`).de;
+  if (view.step === 1) {
+    return [v("p", { class: "frame-kind-pick" }, txt("kind.pick").de),
+      v("div", { class: "frame-kinds" }, ...blocks.map((b) => v("button", {
+        type: "button", class: "frame-kind", "data-kind": b.kind, title: txt(`kind.${b.kind}_tip`).de, onclick: () => h.onStage?.(b.kind),
+      }, `${label(b.kind)} (${b.entries.length + b.ranges.length})`)))];
+  }
+  const block = blocks.find((b) => b.kind === view.kind);
+  if (!block) return [];
+  return [v("div", { class: "frame-kind-head", "data-kind": block.kind },
+    view.back ? v("button", { type: "button", class: "frame-kind-back", title: txt("kind.back_tip").de, onclick: () => h.onStage?.(null) }, txt("kind.back").de) : null,
+    v("strong", {}, fillText("kind.step_head", { kind: label(block.kind) }))),
+  v("div", { class: "frame-entries" }, ...block.entries.map((e) => entryButton(e, h))),
+  ...block.ranges.map(range)];
 }
