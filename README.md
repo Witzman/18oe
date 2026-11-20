@@ -125,7 +125,7 @@ Two stages, one definition of "fast": the RSpec tag `:game_flow` (spec/support/t
 | Stage | Workflow | When | What |
 |---|---|---|---|
 | fast | `ci.yml` | every pull request | rspec `--tag ~game_flow` (engine specs, contracts; = `bin/test fast`), typecheck, web unit tests, browser tests only if `web/**` changed (`touch-browser` excluded). Target: under 3 min |
-| milestone | `full.yml` | nightly (cron 02:17 UTC; GitHub starts scheduled runs late, measured 09:37 and 10:41 UTC), tag `v0.*`, manually for any commit | the complete rspec suite (`:game_flow` included), long whole games uncapped, all browser tests incl. `touch-browser`, scripted game, `catalog live` |
+| milestone | `full.yml` | nightly (cron 02:17 UTC; GitHub starts scheduled runs late, measured 09:37 and 10:41 UTC), tag `v0.*`, manually for any commit | the complete rspec suite (`:game_flow` included), long whole games uncapped, all browser tests incl. `touch-browser`, scripted games (slice s1; slice s2 as its own job, one runner per game; #481), `catalog live` |
 
 `full.yml` does NOT run on every push to `main`, and nobody dispatches or waits for it after a merge (#439): a pull
 request is merged on a green fast stage. `full` runs nightly and before a deploy (`bin/deploy-check` in the workshop
