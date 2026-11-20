@@ -15,6 +15,8 @@ import { Auftrag, Dialog, Geld, mitTooltip, Siegel, toDom, v, Wimpel, type VNode
 import { THEME_CHANGED } from "../theme-switch.ts";
 import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
+import type { Kind } from "./kinds.ts";
+import { backStage, chooseKind, stageAfterRender } from "./stage.ts";
 import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
 import { OrderBandView, orBand } from "./or-band.ts";
@@ -74,6 +76,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
 
   let game: Game | null = null;
   let selected: Action | null = null;
+  let stage: Kind | null = null; // two-step box (#497 S2): the chosen kind of action, null = step 1; never stored
   let armed = false;
   let busy = false;
   let rangeError: { key: string; text: string } | null = null;
@@ -309,6 +312,12 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (!game || !frame.session || busy) return;
     void frame.session.send(a, game.seq);
   }
+  function onStage(kind: Kind | null) {
+    // Back drops a started selection: nothing is sent, nothing stays chosen from the kind left.
+    stage = kind === null ? backStage() : chooseKind(model()?.kinds?.map((b) => b.kind) ?? [], stage, kind);
+    selected = null; armed = false; rangeError = null;
+    drawBar();
+  }
   function select(a: Action) { selected = a; armed = false; rangeError = null; drawBar(); }
   function onRange(r: RangeEntry, input: string) {
     if (!game) return;
@@ -355,7 +364,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (showGeneric && open) {
       drawerNodes.push(v("section", { class: "frame-drawer-sheet", "aria-label": txt("frame.generic_title").de },
         v("h3", {}, txt("frame.generic_title").de),
-        GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError })));
+        GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError, stage, onStage })));
     }
     put(drawerEl, ...drawerNodes);
     drawerEl.hidden = drawerNodes.length === 0;
@@ -421,12 +430,13 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       for (const fn of listeners) {
         try { fn(g); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("panel failed to draw", e); frame.hooks.onRenderError?.(e); }
       }
+      stage = stageAfterRender(stage, game?.seq ?? null, g.seq);
       if (!game || game.seq !== g.seq) { selected = null; armed = false; rangeError = null; seqSince = Date.now(); }
       game = g;
       try { drawAll(); } catch (e) { panelError = e instanceof Error ? e.message : String(e); console.error("frame failed to draw", e); frame.hooks.onRenderError?.(e); applyBusy(); }
       drawStall();
     },
-    discardSelection() { selected = null; armed = false; rangeError = null; drawBar(); },
+    discardSelection() { selected = null; armed = false; rangeError = null; drawBar(); }, // keeps the stage: the player stays in the kind
     setBusy(b: boolean) {
       if (b && !busy) busySince = Date.now();
       busy = b;

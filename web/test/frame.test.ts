@@ -13,6 +13,7 @@ import { createClaims } from "../ui/frame/claims.ts";
 import { actionKey, GenericBar, genericModel, rangeAction, rangeValue, type GenericHandlers } from "../ui/frame/generic.ts";
 import { BOT_STALL_MS, corpColor, outlinerCorps, playerRows, roundBar, roundMarkers, stallNotice, whoActs } from "../ui/frame/model.ts";
 import { roundChip } from "../ui/frame/round-marks.ts";
+import { kindOfAction } from "../ui/frame/kinds.ts";
 import { createViews } from "../ui/frame/views.ts";
 import { fillText, txt } from "../ui/text.ts";
 
@@ -25,8 +26,10 @@ test("every offered action of every recorded state is a button that selects exac
   let total = 0;
   for (const [name, g] of Object.entries(games)) {
     const picked: unknown[] = [];
-    const bar = GenericBar(genericModel(g, createClaims()), handlers(picked));
+    const m = genericModel(g, createClaims());
     for (const a of g.state.prompt.actions) {
+      // In the stock round and concession steps the options show only after the kind is chosen (#497 S2, step 2).
+      const bar = GenericBar(m, { ...handlers(picked), stage: m.kinds ? kindOfAction(g, a) : null });
       const btn = find(bar, (n) => n.tag === "button" && n.attrs["data-key"] === actionKey(a));
       assert.equal(btn.length, 1, `${name}: ${JSON.stringify(a)} has no button`);
       btn[0]!.on.click!(new Event("click"));
@@ -345,4 +348,29 @@ test("round chip: marker discs with the running one flagged (not by colour only)
   const plain = roundChip("Auktion", "Auk", null);
   assert.equal(textOf(plain), "Auk");
   assert.equal(find(plain, (n) => n.attrs.class === "round-mark").length, 0);
+});
+
+test("two-step bar (#497 S2): step 1 shows only kind buttons, step 2 only that kind's options with a back button", () => {
+  const g = games["stock"]!;
+  const m = genericModel(g, createClaims());
+  assert.ok(m.kinds !== null && m.kinds.length > 1, "the stock fixture offers several kinds");
+  const taps: unknown[] = [];
+  const h = { ...handlers(), onStage: (k: unknown) => { taps.push(k); } };
+  const one = GenericBar(m, h);
+  assert.equal(find(one, (n) => n.tag === "button" && n.attrs.class === "frame-entry").length, 0);
+  const kindBtns = find(one, (n) => n.tag === "button" && n.attrs.class === "frame-kind");
+  assert.deepEqual(kindBtns.map((b) => b.attrs["data-kind"]), m.kinds!.map((b) => b.kind));
+  kindBtns[0]!.on.click!(new Event("click"));
+  assert.deepEqual(taps, [m.kinds![0]!.kind]);
+  const two = GenericBar(m, { ...h, stage: m.kinds![0]!.kind });
+  assert.equal(find(two, (n) => n.tag === "button" && n.attrs.class === "frame-kind").length, 0, "other kinds are hidden in step 2");
+  assert.equal(find(two, (n) => n.tag === "button" && n.attrs.class === "frame-entry").length, m.kinds![0]!.entries.length);
+  find(two, (n) => n.tag === "button" && n.attrs.class === "frame-kind-back")[0]!.on.click!(new Event("click"));
+  assert.equal(taps.at(-1), null);
+});
+
+test("outside the stock round and concession steps the bar stays flat (#498)", () => {
+  const m = genericModel(games["track"]!, createClaims());
+  assert.equal(m.kinds, null);
+  assert.equal(find(GenericBar(m, handlers()), (n) => n.tag === "button" && n.attrs.class === "frame-kind").length, 0);
 });
