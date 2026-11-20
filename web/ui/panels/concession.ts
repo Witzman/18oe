@@ -7,6 +7,7 @@
 import type { MapGeometry } from "../../render/mapdata.ts";
 import { corpColor, playerName } from "../frame/model.ts";
 import type { MapPreview, MapTargets } from "../../render/map.ts";
+import type { Kind } from "../frame/kinds.ts";
 import type { OrderSpec } from "../frame/order.ts";
 import type { GameFrame } from "../frame/frame.ts";
 import { Geld, Leiter, Siegel, formatGeld, toDom, v, type Step, type VNode } from "../kit/index.ts";
@@ -20,6 +21,9 @@ type Action = Record<string, unknown>;
 
 /** Par values of the share-price table in the order the buttons show them (assumption: the engine's par
  *  prices 90..60, ui-spec 4.3). Values the prompt does not offer are shown dimmed with a reason. */
+/** The kinds of the action box whose options this panel draws (#497 S4). */
+export const FOUNDING_KINDS: readonly Kind[] = ["float_minor", "float_regional", "par_regional"];
+
 export const PAR_PRICES = [90, 80, 75, 70, 65, 60] as const;
 
 export type OfferKind = "minor" | "regional" | "par_only";
@@ -81,6 +85,12 @@ export function offers(g: Game): Offer[] {
   return rows;
 }
 
+/** The kind of the action box an offer belongs to (#497 S4): the same reading as `kindOfAction` gives its par actions. */
+export const offerKind = (o: Offer): Kind => (o.kind === "minor" ? "float_minor" : o.kind === "par_only" ? "par_regional" : "float_regional");
+
+/** The offers of one kind of the box; with no kind (the panel on its own) all of them. */
+export const offersIn = (g: Game, kind: Kind | null): Offer[] => (kind === null ? offers(g) : offers(g).filter((o) => offerKind(o) === kind));
+
 // ---- home token ---------------------------------------------------------------------------------
 /** "Q38-0-0" -> "Q38": the hex of a city id (Engine::Part::Base#id is "<tile id>-<index>"). */
 export const hexOfCity = (city: string): string => city.split("-")[0]!;
@@ -130,8 +140,8 @@ export interface Selection { corp: string | null; price: number | null; city: st
 export const emptySelection = (): Selection => ({ corp: null, price: null, city: null });
 
 /** The selection as the panel uses it: a single offer or a single target is chosen already (ui-spec 4.3). */
-export function effectiveSelection(g: Game, sel: Selection, map: MapGeometry | null): Selection {
-  const o = offers(g);
+export function effectiveSelection(g: Game, sel: Selection, map: MapGeometry | null, kind: Kind | null = null): Selection {
+  const o = offersIn(g, kind);
   const corp = sel.corp !== null && o.some((x) => x.corp === sel.corp) ? sel.corp : o.length === 1 ? o[0]!.corp : null;
   const price = corp !== null && sel.price !== null && o.find((x) => x.corp === corp)?.prices.some((pr) => pr.price === sel.price && pr.action) ? sel.price : null;
   const t = homeTargets(g, map);
@@ -139,8 +149,8 @@ export function effectiveSelection(g: Game, sel: Selection, map: MapGeometry | n
   return { corp, price, city };
 }
 
-export function sentenceFor(g: Game, sel: Selection, map: MapGeometry | null): { text: string; action: Action | null; confirm: string } {
-  const eff = effectiveSelection(g, sel, map);
+export function sentenceFor(g: Game, sel: Selection, map: MapGeometry | null, kind: Kind | null = null): { text: string; action: Action | null; confirm: string } {
+  const eff = effectiveSelection(g, sel, map, kind);
   if (isHomeToken(g)) {
     const t = homeTargets(g, map).find((x) => x.city === eff.city);
     const confirm = txt("concession.confirm_home").de;
@@ -151,7 +161,7 @@ export function sentenceFor(g: Game, sel: Selection, map: MapGeometry | null): {
       : fillText("concession.home_sentence_plain", { place });
     return { text, action: t.action, confirm };
   }
-  const offer = offers(g).find((o) => o.corp === eff.corp);
+  const offer = offersIn(g, kind).find((o) => o.corp === eff.corp);
   if (!offer) return { text: txt("concession.sentence_pick").de, action: null, confirm: txt("concession.confirm_float").de };
   const confirm = txt(offer.kind === "par_only" ? "concession.confirm_par" : "concession.confirm_float").de;
   const opt = offer.prices.find((x) => x.price === eff.price && x.action);
@@ -160,9 +170,9 @@ export function sentenceFor(g: Game, sel: Selection, map: MapGeometry | null): {
 }
 
 /** The order for the action bar; null when it is not the viewer's turn in this step. */
-export function orderFor(g: Game, sel: Selection, map: MapGeometry | null, send: (a: Action) => void): OrderSpec | null {
+export function orderFor(g: Game, sel: Selection, map: MapGeometry | null, send: (a: Action) => void, kind: Kind | null = null): OrderSpec | null {
   if (!(isFounding(g) || isHomeToken(g)) || !g.state.prompt.viewer_to_act) return null;
-  const s = sentenceFor(g, sel, map);
+  const s = sentenceFor(g, sel, map, kind);
   const action = s.action;
   return { sentence: s.text, state: action ? "preview" : "invalid", reason: action ? undefined : s.text, confirmLabel: s.confirm, onConfirm: () => { if (action) send(action); } };
 }
@@ -173,11 +183,11 @@ export type StepKind = "corp" | "price" | "city" | "confirm";
  *  token takes the city, then confirm. A single offer or target is chosen already, so that step is left out. */
 export interface Progress { n: number; total: number; kind: StepKind }
 
-export function progress(g: Game, sel: Selection, map: MapGeometry | null): Progress | null {
+export function progress(g: Game, sel: Selection, map: MapGeometry | null, kind: Kind | null = null): Progress | null {
   if (!g.state.prompt.viewer_to_act) return null;
-  const eff = effectiveSelection(g, sel, map);
+  const eff = effectiveSelection(g, sel, map, kind);
   if (isFounding(g)) {
-    const skip = offers(g).length === 1 ? 1 : 0;
+    const skip = offersIn(g, kind).length === 1 ? 1 : 0;
     const total = 3 - skip;
     if (eff.corp === null) return { n: 1, total, kind: "corp" };
     return eff.price === null ? { n: 2 - skip, total, kind: "price" } : { n: 3 - skip, total, kind: "confirm" };
@@ -191,13 +201,13 @@ export function progress(g: Game, sel: Selection, map: MapGeometry | null): Prog
 }
 
 /** The selection one step back, or null when there is nothing to take back (first step, or the step before was chosen for the viewer). */
-export function backSelection(g: Game, sel: Selection, map: MapGeometry | null): Selection | null {
-  const p = progress(g, sel, map);
+export function backSelection(g: Game, sel: Selection, map: MapGeometry | null, kind: Kind | null = null): Selection | null {
+  const p = progress(g, sel, map, kind);
   if (!p) return null;
-  const eff = effectiveSelection(g, sel, map);
+  const eff = effectiveSelection(g, sel, map, kind);
   if (isFounding(g)) {
     if (p.kind === "confirm") return { corp: eff.corp, price: null, city: null };
-    return p.kind === "price" && offers(g).length > 1 ? emptySelection() : null;
+    return p.kind === "price" && offersIn(g, kind).length > 1 ? emptySelection() : null;
   }
   return p.kind === "confirm" && homeTargets(g, map).length > 1 ? emptySelection() : null;
 }
@@ -260,36 +270,47 @@ function targetButton(t: HomeTarget, selected: boolean, h: Handlers): VNode {
   }, text);
 }
 
-/** The panel content for the context slot of the frame: one step at a time (#409), the zones and the ladder folded below. */
-export function ConcessionPanel(g: Game, sel: Selection, map: MapGeometry | null, h: Handlers, theme: Theme, open: Open = { zones: false, ladder: false }): VNode {
-  const eff = effectiveSelection(g, sel, map);
+/** The founding steps of one kind (#409, #497 S4): the step head with Zurück, the cards of the kind, the par values once one is
+ *  chosen, the help. `kind` null = all offers (the panel on its own); in the box it is the kind the player is in. */
+export function FoundingOptions(g: Game, sel: Selection, map: MapGeometry | null, h: Handlers, theme: Theme, kind: Kind | null = null): VNode[] {
+  const eff = effectiveSelection(g, sel, map, kind);
+  const step = progress(g, sel, map, kind);
+  const back = backSelection(g, sel, map, kind) !== null;
+  const os = offersIn(g, kind);
+  const parOnly = os.some((o) => o.kind === "par_only");
+  const chosen = os.find((o) => o.corp === eff.corp);
+  return [
+    step ? v("div", { class: "concession-stephead" },
+      v("p", { class: "concession-step", role: "status" }, fillText("concession.step", { n: step.n, total: step.total, title: txt(`concession.step_${step.kind}`).de })),
+      back ? v("button", { type: "button", class: "concession-back", onclick: () => h.onBack?.() }, txt("concession.back").de) : null) : null,
+    // Once a corporation is chosen only its card stays, pressed, above the par values.
+    v("div", { class: "concession-cards" }, ...(chosen ? [chosen] : os).map((o) => offerCard(g, o, o.corp === eff.corp, h, theme))),
+    chosen ? priceRow(chosen, eff, h) : null,
+    // Assumption: the engine's help text for the step (D7) is not in the view yet; the two cases are told here.
+    v("p", { class: "muted concession-help" }, txt(step?.kind === "confirm" ? "concession.confirm_hint" : parOnly ? "concession.help_par_only" : "concession.help_float").de),
+  ].filter((n): n is VNode => n !== null);
+}
+
+/** The panel content for the context slot of the frame: one step at a time (#409), the zones and the ladder folded below.
+ *  `boxed` (#497 S4): the founding steps are drawn by the action box (`FoundingOptions`), the panel keeps the rest. */
+export function ConcessionPanel(g: Game, sel: Selection, map: MapGeometry | null, h: Handlers, theme: Theme, open: Open = { zones: false, ladder: false }, opts: { kind?: Kind | null; boxed?: boolean } = {}): VNode {
+  const kind = opts.kind ?? null;
+  const eff = effectiveSelection(g, sel, map, kind);
   const rows = ladder(g);
   const steps: Step[] = rows.map((r) => ({ label: `${r.label} · ${r.mine ? fillText("concession.owner_mine", { who: r.owner }) : r.owner}`, state: r.state }));
   const p = g.state.prompt;
   const mine = p.viewer_to_act;
   const running = rows.find((r) => r.state === "active");
-  const step = progress(g, sel, map);
-  const back = backSelection(g, sel, map) !== null;
   const body: (VNode | null)[] = [];
-  if (step) {
-    body.push(v("div", { class: "concession-stephead" },
-      v("p", { class: "concession-step", role: "status" }, fillText("concession.step", { n: step.n, total: step.total, title: txt(`concession.step_${step.kind}`).de })),
-      back ? v("button", { type: "button", class: "concession-back", onclick: () => h.onBack?.() }, txt("concession.back").de) : null));
-  }
   if (isFounding(g) && mine) {
-    const os = offers(g);
-    const parOnly = os.some((o) => o.kind === "par_only");
-    const chosen = os.find((o) => o.corp === eff.corp);
-    body.push(
-      // Once a corporation is chosen only its card stays, pressed, above the par values.
-      v("div", { class: "concession-cards" }, ...(chosen ? [chosen] : os).map((o) => offerCard(g, o, o.corp === eff.corp, h, theme))),
-      chosen ? priceRow(chosen, eff, h) : null,
-      // Assumption: the engine's help text for the step (D7) is not in the view yet; the two cases are told here.
-      v("p", { class: "muted concession-help" }, txt(step?.kind === "confirm" ? "concession.confirm_hint" : parOnly ? "concession.help_par_only" : "concession.help_float").de));
+    if (!opts.boxed) body.push(...FoundingOptions(g, sel, map, h, theme, kind));
   } else if (isHomeToken(g) && mine) {
-    const corp = String(p.actions[0]?.entity ?? "");
+    const step = progress(g, sel, map);
     body.push(
-      v("p", {}, fillText("concession.home_for", { corp })),
+      v("div", { class: "concession-stephead" },
+        v("p", { class: "concession-step", role: "status" }, fillText("concession.step", { n: step!.n, total: step!.total, title: txt(`concession.step_${step!.kind}`).de })),
+        backSelection(g, sel, map) !== null ? v("button", { type: "button", class: "concession-back", onclick: () => h.onBack?.() }, txt("concession.back").de) : null),
+      v("p", {}, fillText("concession.home_for", { corp: String(p.actions[0]?.entity ?? "") })),
       v("div", { class: "concession-targets" }, ...homeTargets(g, map).map((t) => targetButton(t, t.city === eff.city, h))),
       v("p", { class: "muted concession-help" }, txt(step?.kind === "confirm" ? "concession.confirm_hint" : "concession.home_hint").de));
   } else if (running) {
@@ -322,6 +343,7 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
   const releases: (() => void)[] = [];
   const map = () => opts.map?.() ?? null;
   const pick = mapPick(frame);
+  const theme = () => choiceFromRoot(document.documentElement).theme;
   let wasHome = false;
 
   const mineHome = () => game !== null && isHomeToken(game) && game.state.prompt.viewer_to_act;
@@ -340,13 +362,19 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
     if (id) choose(id);
   });
 
+  // The kind the player is in (#497 S4): read from the frame, never kept here. Only the founding step has kinds;
+  // null in step 1 (several kinds offered, none chosen yet) and everywhere else.
+  const founding = () => game !== null && isFounding(game) && game.state.prompt.viewer_to_act;
+  const kind = (): Kind | null => (founding() ? frame.kinds.current() : null);
+  // The founding options live in the box: a choice redraws the box as well as the panel's order.
+  const redrawAll = () => { draw(); frame.kinds.redraw(); };
   const open: Open = { zones: false, ladder: false };
   const handlers: Handlers = {
-    onBack: () => { if (game) sel = backSelection(game, sel, map()) ?? sel; draw(); },
+    onBack: () => { if (game) sel = backSelection(game, sel, map(), kind()) ?? sel; redrawAll(); },
     onToggle: (part, isOpen) => { open[part] = isOpen; },
-    onCorp: (corp) => { sel = { corp, price: null, city: null }; draw(); },
-    onPrice: (corp, price) => { sel = { corp, price, city: null }; draw(); },
-    onCity: (city) => { sel = { corp: null, price: null, city }; draw(); },
+    onCorp: (corp) => { sel = { corp, price: null, city: null }; redrawAll(); },
+    onPrice: (corp, price) => { sel = { corp, price, city: null }; redrawAll(); },
+    onCity: (city) => { sel = { corp: null, price: null, city }; redrawAll(); },
   };
   // The list stays (iPad, 44 px targets); a row also flies to its city.
   const listHandlers: Handlers = { ...handlers, onCity: (city) => { handlers.onCity(city); const t = game ? homeTargets(game, map()).find((x) => x.city === city) : undefined; if (t) pick.flyTo(t.hex); } };
@@ -366,15 +394,21 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
     owns = true;
     // The claims only hold while this panel owns the step: HomeToken also occurs in other rounds.
     claim(isFounding(g) || isHomeToken(g));
-    frame.slots.context.replaceChildren(toDom(ConcessionPanel(g, sel, map(), listHandlers, choiceFromRoot(document.documentElement).theme, open)));
+    const k = kind();
+    frame.slots.context.replaceChildren(toDom(ConcessionPanel(g, sel, map(), listHandlers, theme(), open, { kind: k, boxed: true })));
     const home = isHomeToken(g) && g.state.prompt.viewer_to_act;
     if (home && !wasHome) { pick.toMap(); const t = homeTargets(g, map())[0]; if (t) pick.flyTo(t.hex); }
     wasHome = home;
     pick.show(home ? homeMapTargets(g, map()) : null, home ? homePreview(g, sel, map()) : null);
-    const spec = orderFor(g, sel, map(), (a) => frame.send(a));
+    // Step 1 of the box (a kind still to choose) has no order: the box says "pick an action".
+    const spec = founding() && k === null ? null : orderFor(g, sel, map(), (a) => frame.send(a), k);
     if (spec) releaseOrder = frame.setOrder(spec);
   }
 
+  // The options of the three founding kinds are drawn by this panel into the box (#497 S4); in any other step they are empty.
+  const releaseKinds = FOUNDING_KINDS.map((k) => frame.kinds.provide(k, (g) => (founding() && game === g ? FoundingOptions(g, sel, map(), listHandlers, theme(), k) : [])));
+  // The player left the kind (Zurück of the box) or took another: what was chosen belongs to the kind left.
+  const offKinds = frame.kinds.subscribe(() => { sel = emptySelection(); draw(); frame.kinds.redraw(); });
   const off = frame.subscribe((g) => {
     if (g.seq !== seq) { seq = g.seq; sel = emptySelection(); }
     game = g;
@@ -384,6 +418,6 @@ export function mountConcession(frame: GameFrame, opts: { map?: () => MapGeometr
     selectCity: (city) => { if (game && homeTargets(game, map()).some((t) => t.city === city)) handlers.onCity(city); },
     targets: () => (game ? homeTargets(game, map()) : []),
     refresh: draw,
-    stop: () => { off(); releaseOrder?.(); claim(false); pick.stop(); if (owns) frame.slots.context.replaceChildren(); },
+    stop: () => { off(); offKinds(); releaseKinds.forEach((f) => f()); releaseOrder?.(); claim(false); pick.stop(); if (owns) frame.slots.context.replaceChildren(); },
   };
 }
