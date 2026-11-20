@@ -257,6 +257,9 @@ module Oe
       held = hold_regional(round, step, prompt, missing)
       return held if held
 
+      crowd = crowd_trains(round, step, prompt, missing)
+      return crowd if crowd
+
       range = prompt["ranges"].find { |r| missing.include?(key(round, step, r)) }
       return nil unless range
 
@@ -347,6 +350,29 @@ module Oe
       @held_regional ||= converts.first["entity"]
       other = converts.find { |a| a["entity"] != @held_regional }
       other || prompt["actions"].find { |a| a["type"] == "pass" }
+    end
+
+    # A corporation is over its train limit only when the limit falls (Phase 4: major 4 to 3, minor and regional 2 to 1)
+    # while it holds more trains than the new one (#224). The bot buys a train per turn only while it is affordable and
+    # often stays below the limit. While the discard is missing, the director fills every corporation up to its limit
+    # in Phases 2 and 3 with the cheapest depot train offered, so the purchase of the first 4 train by anybody leaves
+    # the full ones crowded. Everything else is the bot's play.
+    DISCARD_TARGET = "operating/DiscardTrain/discard_train"
+
+    def crowd_trains(round, step, prompt, missing)
+      return nil unless round == "operating" && step == "BuyTrain" && missing.include?(DISCARD_TARGET)
+      return nil unless %w[2 3].include?(@mirror.phase.name)
+
+      depot = prompt["actions"].select do |a|
+        next false unless a["type"] == "buy_train"
+
+        train = @mirror.train_by_id(a["train"])
+        train && !train.owned_by_corporation? && (a["variant"].nil? || a["variant"] == train.variants.keys.first)
+      end
+      corporation = @mirror.corporation_by_id(depot.first&.fetch("entity"))
+      return nil unless corporation && corporation.trains.size < @mirror.train_limit(corporation)
+
+      depot.min_by { |a| a["price"] }
     end
 
     def reserve_question?(action)
