@@ -1203,10 +1203,37 @@ module Engine
           end
         end
 
+        # The merge closed the minor (Step::MergeToken); it reopens in the state abandon_minor! leaves.
+        def abandon_merged_minor!(minor, corporation)
+          green_junction_remove!(back_to_charter: true) if minor.id == GREEN_JUNCTION_ID && green_junction_holder?(corporation)
+          (@merged_minor_abilities.delete(minor) || []).each do |ability|
+            next unless corporation.abilities.include?(ability)
+
+            corporation.remove_ability(ability)
+            minor.add_ability(ability)
+          end
+          share = minor.presidents_share
+          holdings = share.owner.shares_by_corporation
+          holdings.delete(minor) if holdings.key?(minor) && holdings[minor] == [share]
+          share.owner = minor
+          minor.shares_by_corporation[minor] = [share]
+          share.buyable = false
+          minor.reopen!
+          minor.ipoed = true
+          minor.floated = true
+          minor.owner = nil
+          @corporations << minor unless @corporations.include?(minor)
+          @log << "#{minor.name} is abandoned (§9.5)"
+        end
+
         def add_minor_charter!(minor, major)
+          # §10.5 (Nationals only): the minor is abandoned (§9.5); Step::MergeToken does that once the merge
+          # has closed it (abandon_merged_minor!). It is no merged minor of the national: its ability (C),
+          # Pullman (M) and zone stay with the charter.
+          return if major.type == :national
+
           @merged_minors[major] << minor
           pullman_on_merge!(minor, major)
-          return unless major.type == :major
 
           pay_minor_a_bonus!(minor, major) if minor.id == 'A'
           # Remembered per minor: the abilities go back to its charter when it is abandoned (§9.5).
@@ -2065,29 +2092,6 @@ module Engine
         def national_merged_minors_off!(corporation)
           (@merged_minors.delete(corporation) || []).each { |minor| abandon_merged_minor!(minor, corporation) }
           clear_graph
-        end
-
-        # The merge closed the minor (Step::MergeToken); it reopens in the state abandon_minor! leaves.
-        def abandon_merged_minor!(minor, corporation)
-          green_junction_remove!(back_to_charter: true) if minor.id == GREEN_JUNCTION_ID && green_junction_holder?(corporation)
-          (@merged_minor_abilities.delete(minor) || []).each do |ability|
-            next unless corporation.abilities.include?(ability)
-
-            corporation.remove_ability(ability)
-            minor.add_ability(ability)
-          end
-          share = minor.presidents_share
-          holdings = share.owner.shares_by_corporation
-          holdings.delete(minor) if holdings.key?(minor) && holdings[minor] == [share]
-          share.owner = minor
-          minor.shares_by_corporation[minor] = [share]
-          share.buyable = false
-          minor.reopen!
-          minor.ipoed = true
-          minor.floated = true
-          minor.owner = nil
-          @corporations << minor unless @corporations.include?(minor)
-          @log << "#{minor.name} is abandoned (§9.5)"
         end
 
         # §11.2.2: "If the token on the White Cliffs Ferry token position is removed due to the
