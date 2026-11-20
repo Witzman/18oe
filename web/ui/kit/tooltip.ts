@@ -13,7 +13,7 @@ export interface TipContent {
   text?: string;
   rows?: TipRow[];
   total?: TipRow;
-  /** Rulebook or issue reference, e.g. "Regeln §9.2" or "#112". */
+  /** Rulebook or issue reference, e.g. "Rulebook §9.2" or "#112". */
   source?: string;
 }
 
@@ -34,7 +34,7 @@ export function Tooltip(c: TipContent, id: string): VNode {
     c.text ? v("span", { class: "kit-tip-text" }, c.text) : null,
     ...(c.rows ?? []).map((r) => row(r, "kit-tip-row")),
     c.total ? row(c.total, "kit-tip-row kit-tip-total") : null,
-    c.source ? v("small", { class: "kit-tip-source" }, `Quelle: ${c.source}`) : null);
+    c.source ? v("small", { class: "kit-tip-source" }, `Source: ${c.source}`) : null);
 }
 
 /** Wraps a trigger so the tooltip shows on hover and keyboard focus (CSS) and is announced (aria-describedby). */

@@ -68,11 +68,11 @@ export const obligationOpen = (g: Game): boolean => {
 
 function reasonFor(g: Game, row: { name: string; price: number; reserved: boolean }, corp: Corporation | null): string {
   const ctx = g.state.prompt.context?.train;
-  if (obligationOpen(g) && !row.reserved) return txt("train.invalid_reserved").de;
+  if (obligationOpen(g) && !row.reserved) return txt("train.invalid_reserved").text;
   if (ctx && ctx.count >= ctx.limit) return fillText("train.invalid_limit", { n: ctx.limit, phase: g.state.meta.phase.name });
   const short = row.price - budget(g, corp);
   if (short > 0) return fillText("train.invalid_cash", { missing: formatGeld(short) });
-  return txt("train.invalid_now").de;
+  return txt("train.invalid_now").text;
 }
 
 /** What buying this train sets off, from the schedule (#123): a new phase, trains that rust. */
@@ -151,11 +151,11 @@ export function sentenceFor(g: Game, sel: TrainSelection): Sentence {
   const row = trainRows(g).find((r) => r.id === eff.train);
   const corp = buyer(g);
   const none = { action: null, changes: [], warn: null };
-  if (!row || !corp) return { text: txt("train.sentence_pick").de, ...none };
+  if (!row || !corp) return { text: txt("train.sentence_pick").text, ...none };
   if (eff.price === null) return { text: fillText("train.sentence_pick_price", { train: row.name }), ...none };
   const action = row.options.find((o) => o.price === eff.price)?.action ?? null;
   const price = eff.price;
-  const source = row.owner === null ? txt("train.source_works").de : fillText("train.source_corp", { corp: row.owner });
+  const source = row.owner === null ? txt("train.source_works").text : fillText("train.source_corp", { corp: row.owner });
   const changes: Change[] = [{ label: fillText("train.change_cash", { who: corp.id }), before: formatGeld(corp.cash), after: formatGeld(Math.max(corp.cash - price, 0)) }];
   const chip = Math.max(price - corp.cash, 0);
   const pres = corp.president ? g.state.players.find((p) => p.id === corp.president) : undefined;
@@ -172,8 +172,8 @@ export function orderFor(g: Game, sel: TrainSelection, send: (a: Action) => void
   const action = s.action;
   return {
     sentence: s.text, changes: s.changes, state: action ? "preview" : "invalid", reason: action ? undefined : s.text,
-    confirmLabel: txt("train.confirm").de, onConfirm: () => { if (action) send(action); },
-    side: pass ? [{ label: txt("train.pass").de, onClick: () => send(pass) }] : [],
+    confirmLabel: txt("train.confirm").text, onConfirm: () => { if (action) send(action); },
+    side: pass ? [{ label: txt("train.pass").text, onClick: () => send(pass) }] : [],
   };
 }
 
@@ -183,17 +183,17 @@ export interface TrainHandlers { onTrain: (id: string) => void; onPrice: (id: st
 function pullmanGroup(g: Game, sel: TrainSelection, h: TrainHandlers): VNode | null {
   const rows = pullmanRows(g);
   if (rows.length === 0) return null;
-  return v("div", { class: "train-group train-pullman", role: "group", "aria-label": txt("train.group_pullman").de },
-    v("p", { class: "train-group-title muted" }, txt("train.group_pullman").de),
+  return v("div", { class: "train-group train-pullman", role: "group", "aria-label": txt("train.group_pullman").text },
+    v("p", { class: "train-group-title muted" }, txt("train.group_pullman").text),
     v("div", { class: "train-list", role: "list" }, ...rows.map((r) => v("button", {
       type: "button", class: "train-row", "data-pullman": r.choice, "aria-pressed": String(r.choice === sel.pullman),
       "data-state": r.choice === sel.pullman ? "selected" : "normal", onclick: () => h.onPullman?.(r.choice),
     }, v("strong", { class: "train-name" }, r.label)))),
-    v("small", { class: "train-hint muted" }, txt("train.pullman_help").de));
+    v("small", { class: "train-hint muted" }, txt("train.pullman_help").text));
 }
 
 function rowButton(r: TrainRow, selected: boolean, mine: boolean, h: TrainHandlers): VNode {
-  const source = r.owner === null ? txt("train.source_works").de : fillText("train.source_corp", { corp: r.owner });
+  const source = r.owner === null ? txt("train.source_works").text : fillText("train.source_corp", { corp: r.owner });
   const valid = r.options.length > 0;
   return v("button", {
     type: "button", class: "train-row", "data-train": r.id, "data-reserved": String(r.reserved), "aria-pressed": String(selected),
@@ -204,7 +204,7 @@ function rowButton(r: TrainRow, selected: boolean, mine: boolean, h: TrainHandle
   v("span", { class: "train-price" }, Geld(r.price)),
   // The group says "depot"; a depot row only says how many are left, a corporation's row whose it is.
   v("span", { class: "train-source muted", title: source }, [r.owner === null ? null : source, r.left !== null ? fillText("train.left", { n: r.left }) : null].filter(Boolean).join(" · ")),
-  r.reserved ? v("span", { class: "train-mark" }, txt("train.reserved").de) : null,
+  r.reserved ? v("span", { class: "train-mark" }, txt("train.reserved").text) : null,
   r.hint ? v("small", { class: "train-hint muted" }, r.hint) : null,
   r.reason ? v("small", { class: "train-reason" }, r.reason) : null);
 }
@@ -227,18 +227,18 @@ export function TrainPanel(g: Game, sel: TrainSelection, h: TrainHandlers): VNod
   const ins = insolvencyLines(g);
   // Grouped as in the mock (#302): the depot first, then trains of other corporations; the step title stands
   // in the panel head.
-  const group = (key: string, list: TrainRow[]) => list.length === 0 ? null : v("div", { class: "train-group", role: "group", "aria-label": txt(key).de },
-    v("p", { class: "train-group-title muted" }, txt(key).de),
+  const group = (key: string, list: TrainRow[]) => list.length === 0 ? null : v("div", { class: "train-group", role: "group", "aria-label": txt(key).text },
+    v("p", { class: "train-group-title muted" }, txt(key).text),
     v("div", { class: "train-list", role: "list" }, ...list.map((r) => rowButton(r, r.id === eff.train, mine, h))));
-  return v("section", { class: "train-panel", "aria-label": txt("train.title").de },
+  return v("section", { class: "train-panel", "aria-label": txt("train.title").text },
     duty ? v("p", { class: "train-duty" }, duty) : null,
-    rows.length === 0 ? v("p", { class: "muted" }, txt("train.depot_empty").de) : null,
+    rows.length === 0 ? v("p", { class: "muted" }, txt("train.depot_empty").text) : null,
     group("train.group_depot", rows.filter((r) => r.owner === null)),
     group("train.group_corp", rows.filter((r) => r.owner !== null)),
     chosen && chosen.options.length > 1 ? priceRow(chosen, eff.price, h) : null,
     pullmanGroup(g, sel, h),
     warn ? v("p", { class: "train-warn", role: "status" }, warn) : null,
-    ins.length > 0 ? v("div", { class: "train-insolvency" }, v("h4", {}, txt("train.insolvency").de), v("ul", {}, ...ins.map((t) => v("li", {}, t)))) : null);
+    ins.length > 0 ? v("div", { class: "train-insolvency" }, v("h4", {}, txt("train.insolvency").text), v("ul", {}, ...ins.map((t) => v("li", {}, t)))) : null);
 }
 
 // ---- mount --------------------------------------------------------------------------------------

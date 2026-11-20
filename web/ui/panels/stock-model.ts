@@ -101,7 +101,7 @@ export function holdersOf(g: Game, c: Corporation): Holder[] {
   for (const [id, percent] of sum) {
     if (percent <= 0) continue;
     const at = g.state.players.findIndex((p) => p.id === id);
-    if (id === "ipo" || id === "market") out.push({ kind: id, id, name: txt(id === "ipo" ? "stock.source_ipo" : "stock.source_market").de, seat: 0, percent, president: false });
+    if (id === "ipo" || id === "market") out.push({ kind: id, id, name: txt(id === "ipo" ? "stock.source_ipo" : "stock.source_market").text, seat: 0, percent, president: false });
     else out.push({ kind: "player", id, name: playerName(g, id), seat: at + 1, percent, president: id === c.president });
   }
   const rank = (h: Holder) => (h.kind === "player" ? (h.president ? 0 : 1) : h.kind === "market" ? 2 : 3);
@@ -298,27 +298,27 @@ export function orderModel(g: Game, rows: CorpRow[], sel: Selection | null): Sto
   const row = sel ? rows.find((r) => r.id === sel.corp) : undefined;
   const me = g.state.players.find((p) => p.id === g.viewer);
   if (!offer || !row || !me || !g.state.prompt.viewer_to_act) {
-    return { action: null, sentence: txt("stock.none_selected").de, changes: [], state: "invalid", reason: txt("stock.none_reason").de, confirmLabel: txt("stock.confirm_none").de };
+    return { action: null, sentence: txt("stock.none_selected").text, changes: [], state: "invalid", reason: txt("stock.none_reason").text, confirmLabel: txt("stock.confirm_none").text };
   }
   const changes: OrderChange[] = [];
   const cost = offer.kind === "buy" ? offer.price : offer.kind === "par" ? offer.cost : null;
   const gain = offer.kind === "sell" ? offer.price : null;
-  if (cost !== null) changes.push({ label: txt("stock.change_cash").de, before: me.cash, after: me.cash - cost, money: true });
-  if (gain !== null) changes.push({ label: txt("stock.change_cash").de, before: me.cash, after: me.cash + gain, money: true });
+  if (cost !== null) changes.push({ label: txt("stock.change_cash").text, before: me.cash, after: me.cash - cost, money: true });
+  if (gain !== null) changes.push({ label: txt("stock.change_cash").text, before: me.cash, after: me.cash + gain, money: true });
   const certs = offer.kind === "par" ? (row.tier === "minor" ? 0 : 1) : offer.kind === "buy" ? offer.certs : -offer.certs;
-  if (certs !== 0) changes.push({ label: txt("stock.change_certs").de, before: fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit }), after: fillText("stock.certs_of", { n: me.certs + certs, limit: me.cert_limit }), money: false });
+  if (certs !== 0) changes.push({ label: txt("stock.change_certs").text, before: fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit }), after: fillText("stock.certs_of", { n: me.certs + certs, limit: me.cert_limit }), money: false });
   if (offer.kind === "sell") {
-    changes.push({ label: txt("stock.change_hold").de, before: pct(row.mine), after: pct(row.mine - offer.percent), money: false });
-    if (offer.newPrice !== null && row.price !== null && offer.newPrice !== row.price) changes.push({ label: txt("stock.change_price").de, before: row.price, after: offer.newPrice, money: true });
+    changes.push({ label: txt("stock.change_hold").text, before: pct(row.mine), after: pct(row.mine - offer.percent), money: false });
+    if (offer.newPrice !== null && row.price !== null && offer.newPrice !== row.price) changes.push({ label: txt("stock.change_price").text, before: row.price, after: offer.newPrice, money: true });
   }
-  if (offer.kind === "buy") changes.push({ label: txt("stock.change_hold").de, before: pct(row.mine), after: pct(row.mine + offer.percent), money: false });
+  if (offer.kind === "buy") changes.push({ label: txt("stock.change_hold").text, before: pct(row.mine), after: pct(row.mine + offer.percent), money: false });
   const money = (n: number | null) => (n === null ? "—" : formatGeld(n));
   const sentence = offer.kind === "buy"
     ? fillText(offer.source === "market" ? "stock.buy_market" : "stock.buy_ipo", { corp: row.id, pct: offer.percent, price: money(offer.price) })
     : offer.kind === "sell"
       ? fillText("stock.sell", { corp: row.id, pct: offer.percent, price: money(offer.price) })
       : fillText(row.tier === "minor" ? "stock.par_minor" : "stock.par", { corp: row.id, par: formatGeld(offer.price), cost: money(offer.cost) });
-  const confirmLabel = offer.kind === "buy" ? txt("stock.confirm_buy").de : offer.kind === "sell" ? txt("stock.confirm_sell").de : txt("stock.confirm_par").de;
+  const confirmLabel = offer.kind === "buy" ? txt("stock.confirm_buy").text : offer.kind === "sell" ? txt("stock.confirm_sell").text : txt("stock.confirm_par").text;
   return { action: offer.action, sentence, changes, state: "preview", confirmLabel };
 }
 
@@ -339,6 +339,6 @@ export function mustSell(g: Game): MustSell | null {
 /** Why a row has nothing to choose, only from numbers in the view (ui-spec 3.5); null when it is merely not offered. */
 export function blockedReason(g: Game, r: CorpRow): string | null {
   if (!g.state.prompt.viewer_to_act || r.actionable || r.tier === "minor") return null;
-  if (r.state === "open") return txt("stock.why_unfounded").de;
+  if (r.state === "open") return txt("stock.why_unfounded").text;
   return null;
 }

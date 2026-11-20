@@ -27,7 +27,7 @@ export async function fetchServerVersion(fetchFn: FetchLike = (i) => fetch(i, { 
 
 /** Eine Zeile, die sich in Rückmeldungen kopieren lässt. */
 export function versionLine(server: ServerVersion | null, page: string = pageVersion()): string {
-  const none = txt("version.unknown").de;
+  const none = txt("version.unknown").text;
   return fillText("version.line", { version: server?.version ?? page, build: server?.build ?? none, engine: server?.engine ?? none });
 }
 
@@ -37,26 +37,26 @@ export function isStale(server: ServerVersion | null, page: string = pageVersion
 }
 
 function rows(server: ServerVersion | null, page: string): [string, string][] {
-  const none = txt("version.unknown").de;
+  const none = txt("version.unknown").text;
   return [
-    [txt("version.page").de, page],
-    [txt("version.server").de, server?.version ?? none],
-    [txt("version.build").de, server?.build ?? none],
-    [txt("version.engine").de, server?.engine ?? none],
+    [txt("version.page").text, page],
+    [txt("version.server").text, server?.version ?? none],
+    [txt("version.build").text, server?.build ?? none],
+    [txt("version.engine").text, server?.engine ?? none],
   ];
 }
 
 function details(server: ServerVersion | null, page: string): HTMLElement {
   return h("div", { class: "version-body" },
     h("dl", {}, ...rows(server, page).flatMap(([k, val]) => [h("dt", {}, k), h("dd", {}, val)])),
-    isStale(server, page) ? h("p", { class: "error", role: "alert" }, txt("version.stale").de) : null,
-    h("p", { class: "muted" }, txt("version.report").de));
+    isStale(server, page) ? h("p", { class: "error", role: "alert" }, txt("version.stale").text) : null,
+    h("p", { class: "muted" }, txt("version.report").text));
 }
 
 /** Fußzeile für die Anmeldeseiten: eine Zeile, füllt sich, sobald /healthz antwortet. */
 export function versionFooter(fetchFn?: FetchLike): HTMLElement {
   const page = pageVersion();
-  const el = h("footer", { class: "version-note muted" }, `${txt("version.label").de} ${page}`);
+  const el = h("footer", { class: "version-note muted" }, `${txt("version.label").text} ${page}`);
   void fetchServerVersion(fetchFn).then((server) => {
     el.textContent = versionLine(server, page);
     el.toggleAttribute("data-stale", isStale(server, page));
@@ -68,13 +68,13 @@ export function versionFooter(fetchFn?: FetchLike): HTMLElement {
 export function versionButton(fetchFn?: FetchLike): HTMLElement {
   const page = pageVersion();
   let server: ServerVersion | null = null;
-  const dialog = h("dialog", { class: "version-dialog", "aria-label": txt("version.title").de });
-  const open = h("button", { type: "button", class: "version-open", title: txt("version.title").de }, page);
+  const dialog = h("dialog", { class: "version-dialog", "aria-label": txt("version.title").text });
+  const open = h("button", { type: "button", class: "version-open", title: txt("version.title").text }, page);
   const draw = () => {
     dialog.replaceChildren(
-      h("h2", {}, txt("version.title").de),
+      h("h2", {}, txt("version.title").text),
       details(server, page),
-      h("form", { method: "dialog" }, h("button", {}, txt("version.close").de)));
+      h("form", { method: "dialog" }, h("button", {}, txt("version.close").text)));
     open.textContent = server?.version ?? page;
     open.toggleAttribute("data-stale", isStale(server, page));
   };

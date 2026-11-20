@@ -29,7 +29,7 @@ export function roundMarkers(g: Game): RoundMarkers | null {
   const r = m.round;
   if (m.finished || (r.type !== "stock" && r.type !== "operating")) return null;
   const ors = Math.max(m.phase.operating_rounds, r.type === "operating" ? r.turn : 1);
-  const markers: RoundMarker[] = [{ key: "stock", label: txt("round.mark_stock").de, active: r.type === "stock" }];
+  const markers: RoundMarker[] = [{ key: "stock", label: txt("round.mark_stock").text, active: r.type === "stock" }];
   for (let n = 1; n <= ors; n++) markers.push({ key: `or${n}`, label: fillText("round.mark_or", { n }), active: r.type === "operating" && r.turn === n });
   return { markers, set: r.number };
 }
@@ -48,15 +48,15 @@ export function corpColor(theme: Theme, g: Game, id: string): string {
 }
 
 export function stepLabel(step: string | null): string {
-  if (!step) return txt("frame.step_none").de;
+  if (!step) return txt("frame.step_none").text;
   const e = txt(`step.${step}`);
-  return e.de === `step.${step}` ? fillText("frame.step_unknown", { step }) : e.de;
+  return e.text === `step.${step}` ? fillText("frame.step_unknown", { step }) : e.text;
 }
 
 export function roundLabel(g: Game): string {
   const r = g.state.meta.round;
-  if (g.state.meta.finished) return txt("frame.over").de;
-  const name = txt(`round.${r.type}`).de;
+  if (g.state.meta.finished) return txt("frame.over").text;
+  const name = txt(`round.${r.type}`).text;
   if (r.type === "operating" && r.number !== null) return fillText("frame.round_nt", { name, n: r.number, t: r.turn });
   if (r.number !== null) return fillText("frame.round_n", { name, n: r.number });
   return name;
@@ -65,9 +65,9 @@ export function roundLabel(g: Game): string {
 // Short round label for the head bar (#300): "BR 2.1", "AR 3"; types without a short name show the long one.
 export function roundShort(g: Game): string {
   const r = g.state.meta.round;
-  if (g.state.meta.finished) return txt("frame.over").de;
+  if (g.state.meta.finished) return txt("frame.over").text;
   const e = txt(`round.${r.type}_short`);
-  const name = e.de === `round.${r.type}_short` ? txt(`round.${r.type}`).de : e.de;
+  const name = e.text === `round.${r.type}_short` ? txt(`round.${r.type}`).text : e.text;
   if (r.type === "operating" && r.number !== null) return `${name} ${r.number}.${r.turn}`;
   return r.number !== null ? `${name} ${r.number}` : name;
 }
@@ -76,7 +76,7 @@ export function whoActs(g: Game, theme: Theme): WhoInfo {
   const m = g.state.meta;
   const mine = g.state.prompt.viewer_to_act;
   if (m.finished) {
-    return { text: fillText("frame.finished", { winner: m.winner ? playerName(g, m.winner) : txt("frame.unknown").de }), mine: false, corp: null };
+    return { text: fillText("frame.finished", { winner: m.winner ? playerName(g, m.winner) : txt("frame.unknown").text }), mine: false, corp: null };
   }
   const cur = m.current;
   const corp = cur?.kind === "corporation" ? g.state.corporations.find((c) => c.id === cur.id) : undefined;
@@ -90,7 +90,7 @@ export function whoActs(g: Game, theme: Theme): WhoInfo {
     const who = corp.president ? playerName(g, corp.president) : names;
     return { text: fillText("frame.who_other", { who, corp: corp.id }), mine: false, corp: seal };
   }
-  return { text: names ? fillText("frame.who_players", { names }) : txt("frame.who_nobody").de, mine: false, corp: null };
+  return { text: names ? fillText("frame.who_players", { names }) : txt("frame.who_nobody").text, mine: false, corp: null };
 }
 
 export function roundBar(g: Game, theme: Theme): RoundBarModel {
@@ -127,11 +127,11 @@ export function stallNotice(g: Game, waitedMs: number): StallNotice | null {
   if (g.state.meta.finished) return null;
   const p = g.state.prompt;
   const acting = g.state.meta.active_players;
-  if (acting.length === 0) return { kind: "nobody", tone: "error", text: txt("frame.stall_nobody").de };
+  if (acting.length === 0) return { kind: "nobody", tone: "error", text: txt("frame.stall_nobody").text };
   if (p.viewer_to_act) {
     // Older states (recorded before #124) lack ranges or choices.
     const offered = (p.actions?.length ?? 0) + (p.ranges?.length ?? 0) + (p.choices?.length ?? 0);
-    return offered === 0 ? { kind: "no_action", tone: "error", text: txt("frame.stall_no_action").de } : null;
+    return offered === 0 ? { kind: "no_action", tone: "error", text: txt("frame.stall_no_action").text } : null;
   }
   const rows = playerRows(g).filter((r) => r.toAct);
   const names = rows.map((r) => r.name).join(", ");

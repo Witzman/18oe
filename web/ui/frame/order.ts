@@ -23,7 +23,7 @@ export interface OrderSpec {
   /** "preview" (default, confirmable), "valid" (normal), "invalid" (main button locked, `reason` explains). */
   state?: Extract<State, "preview" | "valid" | "invalid">;
   reason?: string;
-  /** Label of the one main button; default "Ausführen". */
+  /** Label of the one main button; default "Execute". */
   confirmLabel?: string;
   /** Called on confirm. Panels send through `frame.send(action)`. */
   onConfirm: () => void;
@@ -39,9 +39,9 @@ export interface OrderContext { busy: boolean; armed: boolean; onArm: () => void
 export function orderView(spec: OrderSpec, ctx: OrderContext): VNode {
   const state: State = ctx.busy ? "waiting" : (spec.state ?? "preview");
   const order = Auftrag({
-    sentence: spec.sentence + (spec.danger ? ` ${txt("frame.danger_note").de}` : ""),
+    sentence: spec.sentence + (spec.danger ? ` ${txt("frame.danger_note").text}` : ""),
     changes: spec.changes ?? [], state, reason: spec.reason, showCancel: false,
-    confirmLabel: spec.danger && ctx.armed ? txt("frame.confirm_danger").de : (spec.confirmLabel ?? txt("frame.confirm").de),
+    confirmLabel: spec.danger && ctx.armed ? txt("frame.confirm_danger").text : (spec.confirmLabel ?? txt("frame.confirm").text),
     onConfirm: () => { if (spec.danger && !ctx.armed) ctx.onArm(); else spec.onConfirm(); },
   });
   const side = (spec.side ?? []).map((b) => v("button", {

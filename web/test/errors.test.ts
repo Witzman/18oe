@@ -48,7 +48,7 @@ test("success: sends action with the selection's seq, adopts the full state, pau
 test("422 rejected: engine text unchanged, selection stays, no reload, console.warn with the action", async () => {
   const { session, log, calls } = setup(() => json(422, { error: "rejected", message: "You cannot afford it" }));
   assert.equal(await session.send(action, 4), null);
-  assert.deepEqual(log.said, [[txt("msg.rejected").de.replace("{message}", "You cannot afford it"), "error"]]);
+  assert.deepEqual(log.said, [[txt("msg.rejected").text.replace("{message}", "You cannot afford it"), "error"]]);
   assert.equal(log.discarded, 0);
   assert.equal(reloads(calls), 0);
   assert.equal(log.warned.length, 1);
@@ -59,7 +59,7 @@ test("422 rejected: engine text unchanged, selection stays, no reload, console.w
 test("409 conflict: selection dropped, state reloaded, warning tone", async () => {
   const { session, log, calls } = setup(() => json(409, { error: "conflict", message: "stale" }));
   await session.send(action, 4);
-  assert.deepEqual(log.said, [[txt("msg.conflict").de, "warn"]]);
+  assert.deepEqual(log.said, [[txt("msg.conflict").text, "warn"]]);
   assert.equal(log.discarded, 1);
   assert.equal(reloads(calls), 1);
   assert.deepEqual(log.adopted, [9]);
@@ -68,7 +68,7 @@ test("409 conflict: selection dropped, state reloaded, warning tone", async () =
 test("403: selection dropped, state reloaded, not-your-turn text", async () => {
   const { session, log } = setup(() => json(403, { error: "not_your_turn", message: "x" }));
   await session.send(action, 4);
-  assert.deepEqual(log.said, [[txt("msg.not_your_turn").de, "error"]]);
+  assert.deepEqual(log.said, [[txt("msg.not_your_turn").text, "error"]]);
   assert.equal(log.discarded, 1);
   assert.deepEqual(log.adopted, [9]);
 });
@@ -83,7 +83,7 @@ test("401: goes to login, no message", async () => {
 test("400: program error text, logged, state reloaded", async () => {
   const { session, log } = setup(() => json(400, { error: "bad_request", message: "bad seq" }));
   await session.send(action, 4);
-  assert.deepEqual(log.said, [[txt("msg.bad_request").de.replace("{message}", "bad seq"), "error"]]);
+  assert.deepEqual(log.said, [[txt("msg.bad_request").text.replace("{message}", "bad seq"), "error"]]);
   assert.equal(log.warned.length, 1);
   assert.deepEqual(log.adopted, [9]);
 });
@@ -100,7 +100,7 @@ test("network lost: selection stays, nothing reloaded, action is not resent", as
   const { session, log } = setup(() => { posts++; throw new TypeError("fetch failed"); });
   assert.equal(await session.send(action, 4), null);
   assert.equal(posts, 1);
-  assert.deepEqual(log.said, [[txt("msg.network_action").de, "error"]]);
+  assert.deepEqual(log.said, [[txt("msg.network_action").text, "error"]]);
   assert.equal(log.discarded, 0);
   assert.equal(log.adopted.length, 0);
   assert.equal(log.resumed, 1);

@@ -6,8 +6,8 @@ const colors = { accent: "#aa0000", panel: "#ffffff", ink: "#111111" };
 const decode = (href: string) => decodeURIComponent(href.replace("data:image/svg+xml,", ""));
 
 test("title: dot only when the viewer is to act; lobby without game number", () => {
-  assert.equal(pageTitle(true, 12), "(●) 18OE · Partie 12");
-  assert.equal(pageTitle(false, 12), "18OE · Partie 12");
+  assert.equal(pageTitle(true, 12), "(●) 18OE · Game 12");
+  assert.equal(pageTitle(false, 12), "18OE · Game 12");
   assert.equal(pageTitle(true, null), "(●) 18OE");
   assert.equal(pageTitle(false, null), "18OE");
 });
@@ -30,10 +30,10 @@ test("applyAttention writes title and one icon link, reusing it on the next call
     createElement: () => ({ rel: "", href: "", type: "" }),
   } as unknown as Document;
   applyAttention(true, 7, doc);
-  assert.equal(doc.title, "(●) 18OE · Partie 7");
+  assert.equal(doc.title, "(●) 18OE · Game 7");
   assert.match(decode(links[0]!.href), /<circle/);
   applyAttention(false, 7, doc);
-  assert.equal(doc.title, "18OE · Partie 7");
+  assert.equal(doc.title, "18OE · Game 7");
   assert.equal(links.length, 1);
   assert.doesNotMatch(decode(links[0]!.href), /<circle/);
 });

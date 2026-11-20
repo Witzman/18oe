@@ -44,7 +44,7 @@ test("every action type of the fixtures has a German label, and the group count 
   for (const [name, g] of Object.entries(games)) {
     const m = genericModel(g, createClaims());
     assert.equal(m.count, g.state.prompt.actions.length + g.state.prompt.ranges.length, name);
-    for (const gr of m.groups) assert.notEqual(txt(`action.${gr.type}`).de, `action.${gr.type}`, `${name} ${gr.type}`);
+    for (const gr of m.groups) assert.notEqual(txt(`action.${gr.type}`).text, `action.${gr.type}`, `${name} ${gr.type}`);
   }
 });
 
@@ -95,16 +95,16 @@ test("round bar: phases, round label, who acts (mine, other player, corporation)
   const g = games["track"]!;
   const m = roundBar(g, theme);
   assert.equal(m.rrPhase, g.state.meta.rr_phase);
-  assert.equal(m.round, fillText("frame.round_nt", { name: txt("round.operating").de, n: g.state.meta.round.number!, t: g.state.meta.round.turn }));
+  assert.equal(m.round, fillText("frame.round_nt", { name: txt("round.operating").text, n: g.state.meta.round.number!, t: g.state.meta.round.turn }));
   assert.equal(m.bank, g.state.bank.cash);
   assert.equal(m.who.mine, true);
-  assert.ok(m.who.text.startsWith(txt("frame.who_mine").de.split("{")[0]!));
+  assert.ok(m.who.text.startsWith(txt("frame.who_mine").text.split("{")[0]!));
   assert.ok(m.who.corp, "a corporation acts in the operating round");
   const other = structuredClone(g);
   other.state.prompt.viewer_to_act = false;
   const w = whoActs(other, theme);
   assert.equal(w.mine, false);
-  assert.ok(w.text.length > 0 && !w.text.startsWith(txt("frame.who_mine").de.split("{")[0]!));
+  assert.ok(w.text.length > 0 && !w.text.startsWith(txt("frame.who_mine").text.split("{")[0]!));
   const done = structuredClone(g);
   done.state.meta.finished = true;
   done.state.meta.winner = done.state.players[0]!.id;
@@ -209,7 +209,7 @@ test("order: a panel sets sentence, changes, one main button and side buttons; r
   const text = textOf(view);
   assert.ok(text.includes("PLM 10 %") && text.includes("£260") && text.includes("£95") && text.includes("Kaufen") && text.includes("Passen"));
   assert.equal(find(view, (x) => x.tag === "button" && String(x.attrs.class).includes("kit-main-btn")).length, 1, "exactly one main button");
-  assert.ok(!text.includes("Abbrechen"), "no cancel unless the panel lists one");
+  assert.ok(!text.includes("Cancel"), "no cancel unless the panel lists one");
   main(view).on.click!(new Event("click"));
   buttons(view).find((b) => textOf(b) === "Passen")!.on.click!(new Event("click"));
   assert.deepEqual(sent, ["buy", "pass"]);
@@ -252,7 +252,7 @@ test("order: danger needs a second click; setting a new order resets the arming"
   main(render()).on.click!(new Event("click"));
   assert.equal(sent, 0);
   assert.ok(slot.armed);
-  assert.ok(textOf(main(render())).includes(txt("frame.confirm_danger").de));
+  assert.ok(textOf(main(render())).includes(txt("frame.confirm_danger").text));
   main(render()).on.click!(new Event("click"));
   assert.equal(sent, 1);
   slot.set(spec);
@@ -313,7 +313,7 @@ test("round markers: operating round shows Stock and OR 1..n with the running OR
   g.state.meta.phase.operating_rounds = 2;
   const r = roundMarkers(g)!;
   assert.deepEqual(r.markers.map((m) => [m.key, m.active]), [["stock", false], ["or1", false], ["or2", true]]);
-  assert.deepEqual(r.markers.map((m) => m.label), [txt("round.mark_stock").de, fillText("round.mark_or", { n: 1 }), fillText("round.mark_or", { n: 2 })]);
+  assert.deepEqual(r.markers.map((m) => m.label), [txt("round.mark_stock").text, fillText("round.mark_or", { n: 1 }), fillText("round.mark_or", { n: 2 })]);
   assert.equal(r.set, 3);
   g.state.meta.phase.operating_rounds = 3;
   assert.equal(roundMarkers(g)!.markers.length, 4);
@@ -339,12 +339,12 @@ test("round chip: marker discs with the running one flagged (not by colour only)
   const g = structuredClone(games["track"]!);
   g.state.meta.round = { type: "operating", number: 2, turn: 1, description: null };
   g.state.meta.phase.operating_rounds = 2;
-  const chip = roundChip("Betriebsrunde 2.1", "BR 2.1", roundMarkers(g));
+  const chip = roundChip("Operating Round 2.1", "OR 2.1", roundMarkers(g));
   const marks = find(chip, (n) => n.attrs.class === "round-mark");
   assert.deepEqual(marks.map((n) => n.attrs["data-active"]), ["false", "true", "false"]);
   assert.equal(find(chip, (n) => n.attrs["aria-current"] === "step").length, 1);
-  assert.match(textOf(marks[1]!), new RegExp(txt("frame.round_marker_active").de));
-  assert.match(String(chip.attrs["aria-label"]), /Betriebsrunde 2\.1/);
+  assert.match(textOf(marks[1]!), new RegExp(txt("frame.round_marker_active").text));
+  assert.match(String(chip.attrs["aria-label"]), /Operating Round 2\.1/);
   const plain = roundChip("Auktion", "Auk", null);
   assert.equal(textOf(plain), "Auk");
   assert.equal(find(plain, (n) => n.attrs.class === "round-mark").length, 0);

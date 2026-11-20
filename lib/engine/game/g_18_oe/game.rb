@@ -84,6 +84,9 @@ module Engine
           %w[40 50 55 60 65 70],
           %w[30 40 50 55 60],
         ].freeze
+        # Certificate limits for 3 to 7 players: Info Board "Game Limits" (stock board).
+        # ASSUMPTION, no source (#521): 2 players => 99 (no limit). Neither the Info Board,
+        # Rulebook 4.1 nor Playbook 5.4 gives a 2-player figure; owner decided 2026-11-20 to keep it.
         CERT_LIMIT = { 2 => 99, 3 => 48, 4 => 36, 5 => 29, 6 => 24, 7 => 20 }.freeze
         # Standard game: £5,400 total / num_players, rounded up to nearest £5.
         # 2-player variant uses without-concessions formula (£5,200 / 2 = £2,600).
@@ -96,6 +99,9 @@ module Engine
         MUST_SELL_IN_BLOCKS = false
         HOME_TOKEN_TIMING = :float
         TILE_RESERVATION_BLOCKS_OTHERS = :always
+        # §11.1.9, last paragraph: the president of the railroad whose home station sits on a laid metropolis tile
+        # chooses its position, not the railroad that laid the tile (workshop #523)
+        TOKEN_PLACEMENT_ON_TILE_LAY_ENTITY = :owner
         TILE_UPGRADES_MUST_USE_MAX_EXITS = [:cities].freeze
         # bank-break ends current OR; first level-8 purchase ends after one more full OR set
         GAME_END_CHECK = { bank: :current_or, final_phase: :one_more_full_or_set }.freeze

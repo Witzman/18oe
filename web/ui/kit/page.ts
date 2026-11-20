@@ -10,9 +10,9 @@ import { nextSort } from "./table.ts";
 // not engine ids) fall back to the placeholders company.c1..c6.
 const corps = (theme: Theme): Corp[] => [
   { sym: "PLM", name: "Paris-Lyon-Méditerranée", color: companyBg(theme, "PLM") },
-  { sym: "KK", name: "Kaiserlich-Königliche Staatsbahn", color: companyBg(theme, "KK", ["", "KK"]) },
-  { sym: "DR", name: "Deutsche Reichsbahn", color: companyBg(theme, "DR", ["", "", "", "DR"]) },
-  { sym: "SNCB", name: "Belgische Staatsbahn", color: companyBg(theme, "SNCB", ["", "", "", "", "", "SNCB"]) },
+  { sym: "KK", name: "Imperial and Royal State Railways", color: companyBg(theme, "KK", ["", "KK"]) },
+  { sym: "DR", name: "German Imperial Railways", color: companyBg(theme, "DR", ["", "", "", "DR"]) },
+  { sym: "SNCB", name: "Belgian State Railways", color: companyBg(theme, "SNCB", ["", "", "", "", "", "SNCB"]) },
 ];
 const PLAYERS = ["Anna", "Ben", "Clara", "Dirk", "Eva", "Finn", "Gita"].map((name, i) => ({ seat: i + 1, name }));
 const rowsOf = (c: Corp[]) => [
@@ -21,7 +21,7 @@ const rowsOf = (c: Corp[]) => [
 ];
 type Row = ReturnType<typeof rowsOf>[number];
 
-const label = (s: State) => ({ normal: "normal", hover: "Hover", valid: "gültig", selected: "ausgewählt", invalid: "ungültig", preview: "Vorschau", waiting: "wartet" })[s];
+const label = (s: State) => ({ normal: "normal", hover: "hover", valid: "valid", selected: "selected", invalid: "invalid", preview: "preview", waiting: "waiting" })[s];
 const section = (title: string, ...rows: [string, ...VNode[]][]) =>
   v("section", {}, v("h2", {}, title), v("dl", { class: "kit-grid" }, ...rows.flatMap(([k, ...vs]) => [v("dt", {}, k), v("dd", {}, ...vs)])));
 
@@ -29,28 +29,28 @@ export function kitSections(theme: Theme, state: { sort?: Sort; dialog: boolean 
   const CORPS = corps(theme);
   const ROWS = rowsOf(CORPS);
   const columns = [
-    { key: "corp", label: "Firma", sortBy: (r: Row) => r.corp.sym, cell: (r: Row) => Siegel(r.corp, { theme, size: "s" }) },
-    { key: "cash", label: "Kasse", align: "right" as const, sortBy: (r: Row) => r.cash, cell: (r: Row) => Geld(r.cash) },
-    { key: "certs", label: "Zertifikate", align: "right" as const, sortBy: (r: Row) => r.certs, cell: (r: Row) => `${r.certs} / 20` },
+    { key: "corp", label: "Corporation", sortBy: (r: Row) => r.corp.sym, cell: (r: Row) => Siegel(r.corp, { theme, size: "s" }) },
+    { key: "cash", label: "Cash", align: "right" as const, sortBy: (r: Row) => r.cash, cell: (r: Row) => Geld(r.cash) },
+    { key: "certs", label: "Certificates", align: "right" as const, sortBy: (r: Row) => r.certs, cell: (r: Row) => `${r.certs} / 20` },
   ];
-  const tip = { title: "Baukosten V41", term: "Terrain cost", rows: [{ label: "Gelände", amount: 20 }, { label: "Zonenrabatt", amount: -5 }, { label: "Fähre £5 × 3", amount: 15 }], total: { label: "Summe", amount: 30 }, source: "Regeln §11.3" };
+  const tip = { title: "Track cost V41", term: "Terrain cost", rows: [{ label: "Terrain", amount: 20 }, { label: "Zone discount", amount: -5 }, { label: "Ferry £5 × 3", amount: 15 }], total: { label: "Total", amount: 30 }, source: "Rulebook §11.3" };
   const order = (s: State) => Auftrag({
-    sentence: "PLM 10 % aus dem Markt kaufen, £165", state: s,
-    changes: [{ label: "Kasse", before: Geld(260), after: Geld(95) }, { label: "Zertifikate", before: "11", after: "12 von 20" }],
-    reason: s === "invalid" ? "Die Kasse reicht nicht (£165 nötig, £95 da)." : undefined,
+    sentence: "PLM: buy 10 % from the Open Market for £165.", state: s,
+    changes: [{ label: "Cash", before: Geld(260), after: Geld(95) }, { label: "Certificates", before: "11", after: "12 of 20" }],
+    reason: s === "invalid" ? "Not enough cash (£165 needed, £95 available)." : undefined,
   });
   return [
-    section("Siegel", ["Alle 36 (Minors, Regionals)", ...Object.keys(theme.companies).map((sym) => Siegel({ sym, color: theme.companies[sym]!.bg }, { theme }))], ...STATES.map((s): [string, ...VNode[]] => [label(s), ...CORPS.map((c) => Siegel(c, { theme, state: s })), Siegel(CORPS[0]!, { theme, state: s, size: "l" })])),
-    section("Wimpel", ...STATES.map((s): [string, ...VNode[]] => [label(s), ...PLAYERS.slice(0, 3).map((p) => Wimpel(p, { theme, state: s }))]),
-      ["alle 7 Farben", ...PLAYERS.map((p) => Wimpel(p, { theme }))]),
-    section("Geld", ["Beträge", Geld(0), Geld(5), Geld(1250), Geld(-40)], ["Änderung", Geld(5, { delta: true }), Geld(-5, { delta: true })]),
-    section("Tabelle", ["sortierbar", Tabelle(columns, ROWS, { caption: "Firmen", sort: state.sort, onSort: act.sort })],
-      ["Zeilenzustände", Tabelle(columns.slice(0, 2), ROWS.slice(0, 1).flatMap((r) => STATES.map(() => r)), { caption: "Je Zustand eine Zeile", wrapClass: "kit-table-all", rowState: (_, i) => STATES[i]!, rowReason: () => "Jetzt nicht möglich" })]),
-    section("Tooltip", ["Aufschlüsselung", v("div", { class: "kit-tip-demo" }, mitTooltip(v("button", { type: "button" }, "Legen £30"), tip), " ", v("span", {}, "(Hover oder Tab)"))],
-      ["ungültig, Grund", v("div", { class: "kit-tip-demo" }, mitTooltip(v("button", { type: "button", disabled: true }, "Token setzen"), { title: "Jetzt nicht möglich", term: "No free token", reason: "Kein freier Token mehr." }))]),
-    section("Dialog", ["Öffnen", v("button", { type: "button", onclick: () => act.dialog(true) }, "Dialog zeigen"), v("span", { class: "muted" }, "liegt nur über dem Hauptbereich, die Rundenleiste bleibt frei")]),
-    section("Leiter", ["Schritte", Leiter(stepsAt(["Auktion", "Konzession", "Aktien", "Betrieb"], 2), "Rundenablauf")], ["erster Schritt", Leiter(stepsAt(["Bauen", "Token", "Fahren", "Zahlen"], 0), "Betriebsschritte")]),
-    section("Auftrag", ...STATES.map((s): [string, ...VNode[]] => [label(s), order(s)])),
+    section("Seal", ["All 36 (minors, regionals)", ...Object.keys(theme.companies).map((sym) => Siegel({ sym, color: theme.companies[sym]!.bg }, { theme }))], ...STATES.map((s): [string, ...VNode[]] => [label(s), ...CORPS.map((c) => Siegel(c, { theme, state: s })), Siegel(CORPS[0]!, { theme, state: s, size: "l" })])),
+    section("Pennant", ...STATES.map((s): [string, ...VNode[]] => [label(s), ...PLAYERS.slice(0, 3).map((p) => Wimpel(p, { theme, state: s }))]),
+      ["all 7 colours", ...PLAYERS.map((p) => Wimpel(p, { theme }))]),
+    section("Money", ["Amounts", Geld(0), Geld(5), Geld(1250), Geld(-40)], ["Change", Geld(5, { delta: true }), Geld(-5, { delta: true })]),
+    section("Table", ["sortable", Tabelle(columns, ROWS, { caption: "Corporations", sort: state.sort, onSort: act.sort })],
+      ["Row states", Tabelle(columns.slice(0, 2), ROWS.slice(0, 1).flatMap((r) => STATES.map(() => r)), { caption: "One row per state", wrapClass: "kit-table-all", rowState: (_, i) => STATES[i]!, rowReason: () => "Not possible now" })]),
+    section("Tooltip", ["Breakdown", v("div", { class: "kit-tip-demo" }, mitTooltip(v("button", { type: "button" }, "Lay £30"), tip), " ", v("span", {}, "(hover or Tab)"))],
+      ["invalid, reason", v("div", { class: "kit-tip-demo" }, mitTooltip(v("button", { type: "button", disabled: true }, "Place token"), { title: "Not possible now", term: "No free token", reason: "No free token left." }))]),
+    section("Dialog", ["Open", v("button", { type: "button", onclick: () => act.dialog(true) }, "Show dialog"), v("span", { class: "muted" }, "covers only the main area, the round bar stays free")]),
+    section("Ladder", ["Steps", Leiter(stepsAt(["Auction", "Concession", "Stock", "Operating"], 2), "Round sequence")], ["first step", Leiter(stepsAt(["Track", "Token", "Run", "Dividend"], 0), "Operating steps")]),
+    section("Order", ...STATES.map((s): [string, ...VNode[]] => [label(s), order(s)])),
   ];
 }
 
@@ -61,13 +61,13 @@ export function kitPage(): HTMLElement {
   const draw = () => {
     const theme = choiceFromRoot(document.documentElement).theme;
     const dialog = st.dialog
-      ? Dialog({ title: "Zug beenden?", body: ["Du kannst danach nicht mehr bauen."], onClose: () => { st.dialog = false; draw(); },
-          actions: [v("button", { type: "button", onclick: () => { st.dialog = false; draw(); } }, "Abbrechen"), v("button", { type: "button", class: "kit-main-btn", onclick: () => { st.dialog = false; draw(); } }, "Zug beenden")] })
+      ? Dialog({ title: "End the turn?", body: ["You cannot lay track afterwards."], onClose: () => { st.dialog = false; draw(); },
+          actions: [v("button", { type: "button", onclick: () => { st.dialog = false; draw(); } }, "Cancel"), v("button", { type: "button", class: "kit-main-btn", onclick: () => { st.dialog = false; draw(); } }, "End the turn")] })
       : null;
-    const stage = v("div", { class: "kit-stage" }, v("div", { class: "kit-roundbar" }, `Rundenleiste (bleibt frei) · Theme ${theme.name}`), v("div", { class: "kit-main" }, "Hauptbereich", dialog));
+    const stage = v("div", { class: "kit-stage" }, v("div", { class: "kit-roundbar" }, `Round bar (stays free) · theme ${theme.name}`), v("div", { class: "kit-main" }, "Main area", dialog));
     const sections = kitSections(theme, st, { sort: (k) => { st.sort = nextSort(st.sort, k); draw(); }, dialog: (o) => { st.dialog = o; draw(); } });
     root.replaceChildren(
-      toDom(v("h1", {}, "Bausteine")), toDom(v("p", { class: "muted" }, "Alle Bausteine in allen Zuständen. Theme über das Menü „Look“ unten rechts.")),
+      toDom(v("h1", {}, "Components")), toDom(v("p", { class: "muted" }, "All components in all states. Change the theme in the \"Look\" menu at the bottom right.")),
       toDom(stage), ...sections.map(toDom));
   };
   draw();

@@ -5,7 +5,7 @@ import { TILE_STYLES, type TileStyle } from "../themes/schema.ts";
 import { h } from "./dom.ts";
 
 export const THEME_CHANGED = "oe:themechange";
-const TILE_LABEL: Record<TileStyle, string> = { full: "Vollfläche", inner: "Innenrahmen" };
+const TILE_LABEL: Record<TileStyle, string> = { full: "Full area", inner: "Inner frame" };
 
 function storage(): KeyValue | null {
   try { return window.localStorage; } catch { return null; }
@@ -31,7 +31,7 @@ export function themeSwitch(): HTMLElement {
       h("summary", {}, "Look"),
       h("div", { class: "row", role: "group", "aria-label": "Theme" }, h("span", {}, "Theme"),
         ...themes.map((t) => pick(t.name, t.id === choice.theme.id, () => saveTheme(storage(), t.id)))),
-      h("div", { class: "row", role: "group", "aria-label": "Kachelstil" }, h("span", {}, "Kachel"),
+      h("div", { class: "row", role: "group", "aria-label": "Tile style" }, h("span", {}, "Tile"),
         ...TILE_STYLES.map((s) => pick(TILE_LABEL[s], s === choice.tileStyle,
           () => saveTileStyle(storage(), s === choice.theme.shape.tileStyle ? null : s)))),
       h("div", { class: "swatch", "aria-hidden": "true" },

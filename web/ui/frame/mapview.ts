@@ -39,7 +39,7 @@ export function loadGeometry(api: Api): Promise<MapGeometry> {
 export function mountMapView(frame: GameFrame, api: Api): () => void {
   const host = h("div", { class: "frame-map" });
   const status = h("div", { class: "frame-map-status", role: "status" });
-  const retry = h("button", { type: "button", class: "frame-map-retry" }, txt("map.retry").de);
+  const retry = h("button", { type: "button", class: "frame-map-retry" }, txt("map.retry").text);
   let map: MapView | null = null;
   let game: Game | null = null;
   let loading: Promise<MapView | null> | null = null;
@@ -49,7 +49,7 @@ export function mountMapView(frame: GameFrame, api: Api): () => void {
   const unsubs: (() => void)[] = [];
 
   const say = (key: string | null, withRetry = false) => {
-    status.replaceChildren(...(key ? [h("p", {}, txt(key).de), ...(withRetry ? [retry] : [])] : []));
+    status.replaceChildren(...(key ? [h("p", {}, txt(key).text), ...(withRetry ? [retry] : [])] : []));
     status.hidden = key === null;
   };
   const emit = (event: MapEvent) => (d: MapEventData) => { for (const f of subs.get(event) ?? []) f(d); };

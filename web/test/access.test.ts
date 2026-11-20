@@ -29,7 +29,7 @@ test("every server code of /register and /login has its own readable text", () =
   const seen = new Set<string>();
   for (const [status, code] of cases) {
     const text = errorText(new ApiError(status, code, "english server text"));
-    assert.equal(text, txt(`access.err_${code}`).de);
+    assert.equal(text, txt(`access.err_${code}`).text);
     assert.ok(!text.includes("english server text"), code);
     seen.add(text);
   }
@@ -37,14 +37,14 @@ test("every server code of /register and /login has its own readable text", () =
 });
 
 test("network and unknown errors fall back to a generic text", () => {
-  assert.equal(errorText(new ApiError(0, "network", "x")), txt("access.err_network").de);
+  assert.equal(errorText(new ApiError(0, "network", "x")), txt("access.err_network").text);
   assert.match(errorText(new ApiError(500, "internal_error", "boom")), /boom/);
   assert.match(errorText(new Error("odd")), /odd/);
 });
 
 test("title screen (#280): game title text exists, the scene styles use theme tokens only", async () => {
   const { readFileSync } = await import("node:fs");
-  assert.equal(txt("access.game_title").de, "On the Rails of the Orient Express");
+  assert.equal(txt("access.game_title").text, "On the Rails of the Orient Express");
   const css = readFileSync(new URL("../theme.css", import.meta.url), "utf8");
   const section = css.slice(css.indexOf("/* Title and login screen (issue 280)"), css.indexOf("/* Lobby, issue 211"));
   assert.ok(section.includes(".title-stage"));

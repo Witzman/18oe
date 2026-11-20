@@ -52,9 +52,9 @@ test("a viewer who is not to act chooses nothing", () => {
 test("buying a top-row private at its face value: exact action, cash before and after", () => {
   const o = orderModel(start, { id: "PeC", amount: "20" });
   assert.equal(o.state, "preview");
-  assert.match(o.sentence, /Kaufen: Ponts et Chaussees für £20/);
-  assert.equal(o.confirmLabel, "Kaufen £20");
-  assert.deepEqual(o.changes, [{ label: "Kasse nach Zuschlag", before: 1350, after: 1330 }]);
+  assert.match(o.sentence, /Buy Ponts et Chaussees for £20/);
+  assert.equal(o.confirmLabel, "Buy £20");
+  assert.deepEqual(o.changes, [{ label: "Cash after purchase", before: 1350, after: 1330 }]);
   const range = start.state.prompt.ranges.find((r) => r.company === "PeC")!;
   assert.deepEqual(o.action, rangeAction(start, range, 20));
   assert.deepEqual(o.action, { type: "bid", entity: "p0", entity_type: "player", company: "PeC", price: 20 });
@@ -62,14 +62,14 @@ test("buying a top-row private at its face value: exact action, cash before and 
 
 test("a lower-row lot is a bid in advance; the amount must be on the offered grid", () => {
   const ok = orderModel(start, { id: "BBBT", amount: "45" });
-  assert.match(ok.sentence, /Gebot vormerken: Barclay, Bevan, Barclay and Tritton mit £45/);
-  assert.equal(ok.confirmLabel, "Bieten £45");
+  assert.match(ok.sentence, /Place bid on Barclay, Bevan, Barclay and Tritton: £45/);
+  assert.equal(ok.confirmLabel, "Bid £45");
   assert.equal(ok.action!.price, 45);
   for (const amount of ["", "39", "42", "1351", "abc"]) {
     const bad = orderModel(start, { id: "BBBT", amount });
     assert.equal(bad.state, "invalid", amount);
     assert.equal(bad.action, null, amount);
-    assert.match(bad.reason!, /mindestens £40, höchstens £1\.350 \(deine Kasse\), in Schritten von £5/);
+    assert.match(bad.reason!, /at least £40, at most £1\.350 \(your cash\), in steps of £5/);
   }
   assert.equal(orderModel(start, null).action, null);
   assert.equal(orderModel(start, { id: "NOPE", amount: "20" }).action, null);
@@ -79,10 +79,10 @@ test("a top-row minor: face value buys, more starts the auction among all", () =
   const a = card(minorTop, "A");
   assert.equal(modeFor(minorTop, a, 120), "buy");
   assert.equal(modeFor(minorTop, a, 130), "bid");
-  assert.equal(orderModel(minorTop, { id: "A", amount: "120" }).confirmLabel, "Kaufen £120");
+  assert.equal(orderModel(minorTop, { id: "A", amount: "120" }).confirmLabel, "Buy £120");
   const o = orderModel(minorTop, { id: "A", amount: "130" });
-  assert.equal(o.confirmLabel, "Bieten £130");
-  assert.match(o.sentence, /^Bieten: /);
+  assert.equal(o.confirmLabel, "Bid £130");
+  assert.match(o.sentence, /^Bid on /);
   assert.equal(o.action!.price, 130);
   // The step offers a bid on the later rows too, never the same as a purchase.
   assert.equal(modeFor(minorTop, card(minorTop, "D"), 120), "bid");
@@ -95,8 +95,8 @@ test("running auction: only the lot at auction can be bid on, with its range; th
   const picks = m.rows.flatMap((r) => r.cards).filter((c) => c.state === "pick");
   assert.deepEqual(picks.map((c) => c.card.id), ["A"]);
   const blocked = m.rows.flatMap((r) => r.cards).find((c) => c.card.id === "B")!;
-  assert.match(blocked.why!, /Erst nach der Versteigerung um Silver Banner Line/);
-  assert.equal(orderModel(open, { id: "A", amount: "135" }).confirmLabel, "Bieten £135");
+  assert.match(blocked.why!, /Only after the auction for Silver Banner Line/);
+  assert.equal(orderModel(open, { id: "A", amount: "135" }).confirmLabel, "Bid £135");
   assert.equal(orderModel(open, { id: "A", amount: "1215" }).action, null); // above the offered maximum
 });
 
@@ -124,11 +124,11 @@ test("sheet tree: lots are buttons that select by id; the running lot and the am
   assert.deepEqual(picked, ["WS"]);
   assert.equal(find(tree, (n) => n.attrs["data-card"] === "BBBT")[0]!.attrs["aria-pressed"], "true");
   assert.equal(find(tree, (n) => n.tag === "input").length, 1);
-  assert.match(textOf(tree), /Deine Kasse/);
+  assert.match(textOf(tree), /Your cash/);
 
   const run = sheetNode(sheetModel(open, "A")!, open, { id: "A", amount: "135" }, theme, noop);
-  assert.match(textOf(run), /Versteigerung um Silver Banner Line/);
-  assert.match(textOf(run), /Höchstgebot £130 von p3/);
+  assert.match(textOf(run), /Auction for Silver Banner Line/);
+  assert.match(textOf(run), /High bid £130 by p3/);
   assert.equal(find(run, (n) => n.attrs["data-running"] === "true").length, 1);
 });
 
@@ -140,19 +140,19 @@ test("amount form: a fixed price has no field; a bad amount is marked and named"
   assert.equal(input.attrs.min, "40"); assert.equal(input.attrs.max, "1350"); assert.equal(input.attrs.step, "5");
   let got = "";
   bidForm(start, { id: "BBBT", amount: "40" }, { ...noop, onAmount: (v) => { got = v; } });
-  assert.match(textOf(bidForm(start, null, noop)!), /Wähle ein Los/); // my turn: the region stays, so the board does not jump
+  assert.match(textOf(bidForm(start, null, noop)!), /Choose a lot/); // my turn: the region stays, so the board does not jump
   const idle = { ...start, state: { ...start.state, prompt: { ...start.state.prompt, viewer_to_act: false } } } as Game;
   assert.equal(bidForm(idle, null, noop), null);
   assert.equal(got, "");
 });
 
-test("Eröffnung: who owns what, kind from the id", () => {
+test("Opening: who owns what, kind from the id", () => {
   const rows = openingModel(bids);
   assert.equal(rows.length, 4);
   const p0 = rows.find((r) => r.player === "p0")!;
   assert.deepEqual(p0.items.map((i) => [i.id, i.kind]), [["PeC", "private"]]);
   assert.match(textOf(openingNode(rows, theme)), /Ponts et Chaussees/);
-  assert.match(textOf(openingNode(openingModel(start), theme)), /noch nichts gekauft/);
+  assert.match(textOf(openingNode(openingModel(start), theme)), /nothing bought yet/);
 });
 
 // ---- #256: ability text from the catalog, home line of the minor lots ----
@@ -203,7 +203,7 @@ test("sheet node: short line and home line stay visible on the card, the tooltip
   const pec = find(node, (n) => n.attrs["data-card"] === "PeC")[0]!;
   assert.match(textOf(pec), /Closes in phase 3\./);
   const a = find(node, (n) => n.attrs["data-card"] === "A")[0]!;
-  assert.match(textOf(a), /Heimat frei wählbar/);
+  assert.match(textOf(a), /Home chosen freely/);
   assert.match(textOf(a), /£\d+/);
   const tips = find(node, (n) => n.attrs.class === "kit-tip-text" && textOf(n).includes("Pays double"));
   assert.equal(tips.length, 1);
@@ -229,13 +229,13 @@ test("lot dialog (#368): no selection, no dialog; a chosen lot opens one with fo
   const d = lotDialog(start, { id: "BBBT", amount: "40" }, h)!;
   assert.equal(find(d, (n) => n.attrs.role === "dialog").length, 1);
   assert.equal(find(d, (n) => n.tag === "input").length, 1);
-  assert.match(textOf(d), /Bieten/);
+  assert.match(textOf(d), /Bid/);
   find(d, (n) => n.attrs.class === "kit-main-btn")[0]!.on.click!(new Event("click"));
   const btns = find(d, (n) => n.tag === "button");
-  btns.find((b) => textOf(b) === "Abbrechen")!.on.click!(new Event("click"));
-  btns.find((b) => textOf(b) === "Passen")!.on.click!(new Event("click"));
+  btns.find((b) => textOf(b) === "Cancel")!.on.click!(new Event("click"));
+  btns.find((b) => textOf(b) === "Pass")!.on.click!(new Event("click"));
   assert.deepEqual(calls, ["confirm", "cancel", "pass"]);
-  // backdrop click and Escape close it, same as Abbrechen
+  // backdrop click and Escape close it, same as Cancel
   find(d, (n) => n.attrs.class === "kit-backdrop")[0]!.on.click!({ target: 1, currentTarget: 1 } as unknown as Event);
   assert.equal(calls.at(-1), "cancel");
 });
@@ -252,7 +252,7 @@ test("sheet (#368): the dialog sits in the tree only while a lot is chosen; pass
   const without = sheetNode(sheetModel(start, null)!, start, null, theme, noop);
   assert.equal(find(without, (n) => n.attrs.role === "dialog").length, 0);
   assert.equal(find(without, (n) => n.attrs["data-action"] === "pass").length, 1);
-  assert.match(textOf(without), /Wähle ein Los/);
+  assert.match(textOf(without), /Choose a lot/);
   const withSel = sheetNode(sheetModel(start, "BBBT")!, start, { id: "BBBT", amount: "40" }, theme, noop);
   assert.equal(find(withSel, (n) => n.attrs.role === "dialog").length, 1);
   assert.equal(find(withSel, (n) => n.attrs.class === "auction-stage").length, 1);
