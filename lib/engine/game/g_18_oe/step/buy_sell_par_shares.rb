@@ -375,7 +375,7 @@ module Engine
 
           def reservation_prompt?(action)
             return false unless @game.reserved_shares?
-            return false if @game.turn != 1 || @converting || @round.pending_share_buy
+            return false if @game.turn != 1 || @converting || @round.pending_share_buy || pending_custody_buy?
 
             bundle = action.bundle
             corporation = bundle.corporation
@@ -389,6 +389,8 @@ module Engine
             return process_insolvent_buyback(action) if insolvent_buyback?(action.bundle)
 
             unless reservation_prompt?(action)
+              return if hold_buy_for_bbbt?(action)
+
               super
               # §8.2: buying a parred regional's president share floats it; the 18th float removes the rest (#348).
               @game.close_unfloated_regionals_at_maximum!
@@ -596,6 +598,23 @@ module Engine
 
             @round.pending_share_sale = action
             true
+          end
+
+          # §14.4 (2) (#514): a purchase of a share of the private owner's RR waits for the owner (Step::CustodyShare).
+          # After a declined reservation (Step::ReserveShare) the window still follows; once answered it is not asked
+          # again for the same purchase.
+          def hold_buy_for_bbbt?(action)
+            # only in a stock round (the consolidation round has no Step::CustodyShare)
+            return false if !@round.respond_to?(:pending_custody_buy) || pending_custody_buy?
+            return false if @converting || @converted || !@game.bbbt_purchase_window_owner(action.entity, action.bundle)
+
+            check_legal_buy(action.entity, action.bundle, swap: action.swap)
+            @round.pending_custody_buy = action
+            true
+          end
+
+          def pending_custody_buy?
+            @round.respond_to?(:pending_custody_buy) && !@round.pending_custody_buy.nil?
           end
 
           def process_convert(action)
