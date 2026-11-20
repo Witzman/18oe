@@ -9,7 +9,7 @@ import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
 import { kindOfAction, type Kind } from "../ui/frame/kinds.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { corpRows, holdings, inTab, marketModel, offerKind, offersOfKind, rowsForKind, sealStack, mustSell, offersFor, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
+import { corpRows, parTableModel, holdings, inTab, marketModel, offerKind, offersOfKind, rowsForKind, sealStack, mustSell, offersFor, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
 import { kindOptionsNode, offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
@@ -462,4 +462,29 @@ test("box: a provided kind is a step-1 button with its offer count, its options 
   assert.equal(m.count - plain.count, m.kinds!.filter((b) => b.provided).reduce((n, b) => n + b.count, 0), "the claimed actions count in the box");
   const pass = m.kinds!.find((b) => b.kind === "pass");
   assert.ok(pass && !pass.provided && pass.entries.length === 1, "pass is not claimed any more: a generic entry of the kind pass");
+});
+
+// ---- Par Prices table (#478): the four columns of the board, from the market itself ------------------------
+
+test("par table: Regional A-C, Regional D-F, Major A-C, Major D-F, each from the dearest letter down", () => {
+  const t = parTableModel(pool, marketModel(pool, corpRows(pool), null, null));
+  const view = t.columns.map((col) => col.map((f) => `${f.tier[0]}${f.letter}${f.price}`));
+  assert.deepEqual(view, [["rC70", "rB65", "rA60"], ["rF90", "rE80", "rD75"], ["mC90", "mB80", "mA75"], ["mF120", "mE110", "mD100"]]);
+});
+
+test("par table: a par offered to the corporation in focus is valid, a founded corporation sits on its par price", () => {
+  const rows = corpRows(par);
+  const focus = rows.find((r) => r.pars.length > 0)!;
+  const t = parTableModel(par, marketModel(par, rows, focus.id, null));
+  const valid = t.columns.flat().filter((f) => f.valid);
+  assert.ok(valid.length > 0 && valid.length <= focus.pars.length);
+  assert.ok(t.columns.flat().filter((f) => f.corps.length > 0).every((f) => par.state.corporations.filter((c) => f.corps.includes(c.id)).every((c) => c.par_price === f.price)));
+});
+
+test("par table: the sheet shows twelve labelled fields in four columns", () => {
+  const tree = sheetNode(input(pool), noop);
+  assert.equal(find(tree, (n) => n.attrs.class === "stock-par-col").length, 4);
+  const fields = find(tree, (n) => n.attrs["data-par-field"] !== undefined);
+  assert.equal(fields.length, 12);
+  assert.ok(fields.every((n) => /^(Regional|Major) [A-F], £?\d+/.test(String(n.attrs["aria-label"]))), "every field names tier, letter and price");
 });

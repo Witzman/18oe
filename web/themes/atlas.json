@@ -81,7 +81,8 @@
     "signNorth": "#35587a",
     "signNorthInk": "#efe5cc",
     "signMed": "#3f6a58",
-    "signMedInk": "#efe5cc"
+    "signMedInk": "#efe5cc",
+    "parRule": "#b9ad8e"
   },
   "company": {
     "c1": "#3f6f9a",

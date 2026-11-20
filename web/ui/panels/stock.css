@@ -104,17 +104,36 @@
 .stock-legend [data-mark="valid"]::before { outline: 2px solid var(--map-valid); }
 .stock-legend [data-mark="preview"]::before { outline: 2px dashed var(--map-preview); }
 
+/* Par Prices (#478): a light panel with the tier and letter between the price on both sides, three rows split by dashed rules, four columns
+   (Regional A-C, D-F, Major A-C, D-F). Fields the corporation in focus can be founded at are buttons; the others only show. */
+.stock-par { max-width: 38rem; margin-inline: auto; width: 100%; box-sizing: border-box; background: var(--stock-cell); color: var(--stock-cell-ink); border-radius: var(--shape-radius); padding: var(--space-sm) var(--space-md); min-width: 0; }
+.stock-par-title { margin: 0; text-align: center; font-family: var(--font-head); font-size: var(--type-lg); }
+.stock-par-sub { margin: 0 0 var(--space-sm); text-align: center; font-size: var(--type-sm); font-weight: 700; }
+.stock-par-table { column-gap: var(--space-sm); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stock-par-col { display: grid; grid-template-rows: repeat(3, minmax(var(--shape-hit), auto)); }
+.stock-par-field { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; column-gap: 4px; min-height: var(--shape-hit); min-width: 0; padding: 2px 6px; border: 0; border-top: 2px dashed var(--stock-par-rule); border-radius: 0; background: transparent; color: inherit; font: inherit; font-size: var(--type-sm); font-variant-numeric: tabular-nums; text-align: center; }
+.stock-par-col:not(:last-child) .stock-par-field { border-right: 0; }
+.stock-par-field[data-tier="major"] .stock-par-name { color: var(--stock-major-ink); }
+.stock-par-field[data-tier="regional"] .stock-par-name { color: var(--stock-par); }
+.stock-par-name { font-size: var(--type-xs); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.stock-par-corps { grid-column: 1 / -1; font-size: var(--type-xs); font-weight: 700; }
+.stock-par-field:is(button) { cursor: pointer; }
+.stock-par-field[data-valid="true"] { outline: 3px solid var(--map-valid); outline-offset: -3px; }
+@container (max-width: 1px) { .stock-par-name { display: none; } }
+@media (max-width: 700px) { .stock-par-table { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stock-par-name { font-size: .6rem; } }
+
 /* Layout. Wide landscape (PC, iPad landscape): the viewer's shares left above the floating panel, cards (and below them the
    market) right of it, nothing scrolls. Portrait and narrow: one column, room for the bottom sheet below. */
 .stock-sheet { --panel-room: calc(var(--shape-panel-width) + 2 * var(--shape-gap)); }
 .stock-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--shape-gap); }
 @media (min-width: 1000px) and (orientation: landscape) {
   .stock-sheet { padding-left: var(--shape-gap); }
-  .stock-body { grid-template-columns: var(--panel-room) minmax(0, 1fr); grid-template-rows: auto 1fr; margin-left: calc(-1 * var(--shape-gap)); }
-  .stock-hold-box { grid-column: 1; grid-row: 1 / 3; padding-left: var(--shape-gap); align-self: start; }
+  .stock-body { grid-template-columns: var(--panel-room) minmax(0, 1fr); grid-template-rows: auto 1fr auto; margin-left: calc(-1 * var(--shape-gap)); }
+  .stock-hold-box { grid-column: 1; grid-row: 1 / 4; padding-left: var(--shape-gap); align-self: start; }
   .stock-hold-list { grid-template-columns: minmax(0, 1fr); width: var(--shape-panel-width); }
   .stock-list { grid-column: 2; grid-row: 1; }
   .stock-grid { grid-column: 2; grid-row: 2; }
+  .stock-par { grid-column: 2; grid-row: 3; }
 }
 
 /* Portrait / narrow: keep the cards clear of the bottom sheet (collapsed height). */
