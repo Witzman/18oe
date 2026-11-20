@@ -168,6 +168,7 @@ describe 'G18OE place token (§11.2)' do
       thin_treasury!(sb)
       lnwr = start_major!(game, 'LNWR', game.players.last)
       round = operating_round_for!(game)
+      round.next_entity! until round.current_entity == lnwr # SB operates first (regional); LNWR lays the tile
       step = round_step(round, Engine::Game::G18OE::Step::Track)
       hex = game.hex_by_id('R55')
       old_tile = hex.tile
@@ -176,12 +177,23 @@ describe 'G18OE place token (§11.2)' do
       game.graph.clear
       round.clear_cache!
 
-      # who chooses is not asserted here: the engine lets the laying railroad place the token
-      # (TOKEN_PLACEMENT_ON_TILE_LAY_ENTITY = :current_operator), §11.1.9 says SB's president (workshop #520)
-      chooser = round.active_step.current_entity
-      targets = Oe::LegalActions.new(game, limit: nil).token_targets(round.active_step, chooser)
+      # §11.1.9: SB's president chooses, not the railroad that laid the tile (TOKEN_PLACEMENT_ON_TILE_LAY_ENTITY
+      # = :owner, workshop #523); SB's token is taken off the tile first
+      expect(hex.tile.cities.flat_map(&:tokens).compact).to be_empty
+      expect(round.active_step).to be_a(Engine::Step::HomeToken)
+      expect(round.active_step.current_entity).to eq(sb)
+      expect(sb.owner).not_to eq(lnwr.owner)
+      expect(game.active_players).to eq([sb.owner]) # the seat the bot and the UI ask
+      targets = Oe::LegalActions.new(game, limit: nil).token_targets(round.active_step, sb)
       expect(targets.map { |city| hex.tile.cities.index(city) }.sort).to eq([1, 2])
-      expect { choose(round, chooser, hex, 0) }.to raise_error(Engine::GameError, /Right-of-Way/)
+      expect { choose(round, sb, hex, 0) }.to raise_error(Engine::GameError, /Right-of-Way/)
+      expect { choose(round, lnwr, hex, 1) }.to raise_error(Engine::GameError)
+
+      choose(round, sb, hex, 1)
+
+      expect(hex.tile.cities[1].tokened_by?(sb)).to be(true)
+      expect(round.active_step).to be_a(Engine::Game::G18OE::Step::Track)
+      expect(round.current_entity).to eq(lnwr)
     end
 
     it 'leaves every position open when yellow track reaches a stop from each of them' do
