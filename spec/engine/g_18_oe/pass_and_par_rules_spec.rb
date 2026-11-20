@@ -177,4 +177,87 @@ describe 'G18OE pass and par rules by phase (#493)' do
       expect(round.active_step.actions(player)).to include('pass')
     end
   end
+
+  # Rulebook S. 15 (5.1.5): "players cannot pass until they have no remaining minors or regionals".
+  # S. 26 (10.6): no pass while an own minor can merge into an own major/national, or while an own major has not floated.
+  describe 'Consolidation pass block in both directions (5.1.5 S. 15, 10.6 S. 26)' do
+    let(:round) do
+      allow(game).to receive(:major_phase?).and_return(true)
+      game.instance_variable_set(:@turn, 2)
+      enter_round!(game, game.new_consolidation_round)
+    end
+    let(:owner) { round.current_entity }
+    let(:step) { round.active_step }
+
+    def minor!
+      round
+      game.phase.next!
+      start_minor!(game, 'B', owner, 'SP')
+    end
+
+    it '(a) blocks pass for a minor that may merge into an own major (10.6, S. 26)' do
+      minor = minor!
+      start_major!(game, 'PLM', owner)
+
+      expect(step.can_merge?(owner, minor)).to be(true)
+      expect(step.actions(owner)).not_to include('pass')
+    end
+
+    it '(b) blocks pass for a minor with no own merge target (5.1.5, S. 15), offer still possible' do
+      minor = minor!
+      start_major!(game, 'LNWR', game.players[1])
+
+      expect(step.can_merge?(owner, minor)).to be(false)
+      expect(step.actions(owner)).not_to include('pass')
+      expect(step.entity_choices(minor)).to include('offer_or_abandon')
+    end
+
+    it '(b) allows pass once the minor is abandoned and no minor or regional is left (9.5, 5.1.5)' do
+      minor = minor!
+      expect(step.actions(owner)).not_to include('pass')
+
+      game.abandon_minor!(minor)
+
+      expect(minor.owner).to be_nil
+      expect(step.actions(owner)).to include('pass')
+    end
+
+    it '(c) allows pass with only floated majors (10.6, S. 26)' do
+      major = start_major!(game, 'LNWR', owner)
+      round
+      take_treasury_shares!(game, owner, major, 1)
+
+      expect(major.floated?).to be(true)
+      expect(step.actions(owner)).to include('pass')
+    end
+
+    it '(d) blocks pass for a player presiding a regional (5.1.5, S. 15)' do
+      round
+      start_regional!(game, 'LNWR', owner)
+
+      expect(step.actions(owner)).not_to include('pass')
+    end
+
+    # The engine knows no major with floated? == false: floated? is sticky and only floated regionals
+    # convert (checked below). The unfloated major of 10.6 is therefore reachable only as an
+    # unconverted regional, and the regional block (d) is the pass block for it.
+    describe 'unfloated major = unconverted regional (10.6, Designer\'s Note S. 26)' do
+      it 'blocks pass for a regional that has not converted to a major yet' do
+        round
+        regional = start_regional!(game, 'LNWR', owner)
+
+        expect(regional.type).to eq(:regional)
+        expect(step.actions(owner)).not_to include('pass')
+      end
+
+      it 'has no floated? == false major after conversion, so no other path exists' do
+        round
+        regional = start_regional!(game, 'LNWR', owner)
+        convert!(round, regional)
+
+        expect(regional.type).to eq(:major)
+        expect(regional.floated?).to be(true)
+      end
+    end
+  end
 end
