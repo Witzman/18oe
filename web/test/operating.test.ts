@@ -8,7 +8,7 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { choiceLabel, choiceTip, genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, portAuthorityOptions, pullmanOptions, runLines, runModel, runSentence } from "../ui/panels/operating-model.ts";
+import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, portAuthorityOptions, portSign, pullmanOptions, runLines, runModel, runSentence } from "../ui/panels/operating-model.ts";
 import { DividendPanel, OperatingPanel, RoutePanel } from "../ui/panels/operating.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
@@ -177,7 +177,13 @@ test("#56: the Route step offers the port authority markers a major may buy; a c
   assert.deepEqual(pullmanOptions(g), [], "a marker choice is not a Pullman");
   const sent: unknown[] = [];
   const panel = RoutePanel(g, (a) => sent.push(a));
-  assert.match(textOf(panel), /Buy the North Sea port authority marker/);
+  // The look changed (#478): the button is the board's sign, area name from text.ts and the price from the engine's label.
+  const sign = find(panel, (n) => n.attrs["data-port-authority"] === "port_authority:north_sea")[0]!;
+  assert.equal(sign.attrs["data-area"], "north_sea");
+  assert.match(textOf(sign), /Nordsee/);
+  assert.match(textOf(sign), /£125/);
+  assert.match(String(sign.attrs.title), /Buy the North Sea port authority marker/);
+  assert.deepEqual(portSign({ choice: "port_authority:mediterranean", label: "Buy it", action: choose }), { area: "mediterranean", price: null });
   find(panel, (n) => n.attrs["data-port-authority"] === "port_authority:north_sea")[0]!.on.click!(new Event("click"));
   assert.deepEqual(sent, [choose]);
   assert.deepEqual(portAuthorityOptions(load("operating-route")), []);

@@ -111,6 +111,12 @@ for (const t of themes) {
       ["regional par mark on stock cell", t.stock.par, t.stock.cell, 3],
       ["major par label on stock cell", t.stock.majorInk, t.stock.cell, 4.5],
       ["arrow on stock cell", t.stock.arrow, t.stock.cell, 4.5],
+      // Rundenanzeiger, Betriebsreihenfolge, Hafenschilder (#478 slice 2).
+      ["running round disc ink", t.stock.roundOnInk, t.stock.roundOn, 4.5],
+      ["running round disc on board", t.stock.roundOn, t.stock.field, 1.5],
+      ["finished order cell ink", t.stock.orderDoneInk, t.stock.orderDone, 4.5],
+      ["North Sea sign ink", t.stock.signNorthInk, t.stock.signNorth, 4.5],
+      ["Mediterranean sign ink", t.stock.signMedInk, t.stock.signMed, 4.5],
     ];
     for (const [what, fg, bg, min] of pairs) {
       const c = contrast(fg, bg);

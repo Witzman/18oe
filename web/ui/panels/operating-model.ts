@@ -25,6 +25,10 @@ function routeChoices(g: Game, prefix: string): PullmanOption[] {
 /** The trains the viewer may attach the Pullman to (§11.3.9, #55): the `choose` actions `pullman_on:<train>` of the Route step. */
 export const pullmanOptions = (g: Game): PullmanOption[] => routeChoices(g, "pullman_on:");
 /** The port authority markers the viewer's major may still buy (§11.3.5, #56): `port_authority:<area>`; the Route step is the last that offers them. */
+/** Water area and price of a port authority choice as the sign shows them (#478): the area from the choice id, the price taken from the engine's label ("... (£125)"), never hard-coded; null price when the label has none. */
+export function portSign(o: PullmanOption): { area: string; price: string | null } {
+  return { area: o.choice.slice("port_authority:".length), price: /\(([^()]*\d[^()]*)\)\s*$/.exec(o.label)?.[1] ?? null };
+}
 export const portAuthorityOptions = (g: Game): PullmanOption[] => routeChoices(g, "port_authority:");
 
 /** Operating steps in rule order (rulebook 11); the ladder marks the current one. */

@@ -88,11 +88,14 @@ export function OrderBandView(b: OrBand, theme: Theme, opts: { collapsed: boolea
   const label = txt(b.preview ? "frame.order_band_next" : "frame.head_order").de;
   const toggleLabel = txt(opts.collapsed ? "frame.order_band_expand" : "frame.order_band_collapse").de;
   const list = v("ol", { class: "order-strip", "aria-label": label },
-    ...b.entries.map((e) => v("li", {
+    ...b.entries.map((e, i) => v("li", {
       class: "order-strip-item", "data-id": e.id, "data-state": e.state, "data-mine": e.mine ? "true" : "false",
       "aria-current": e.state === "current" ? "step" : undefined,
       title: `${e.id} · ${e.name} · ${e.tier} · ${ownerText(e)} · ${txt(`op.state_${e.state}`).de}`,
     },
+    // Board look (#478): a numbered cell; the finished and the running cell carry a mark besides the colour (#190).
+    v("span", { class: "order-strip-no", "aria-hidden": "true" }, String(i + 1)),
+    v("span", { class: "order-strip-mark", "aria-hidden": "true" }, e.state === "done" ? "✓" : e.state === "current" ? "▶" : ""),
     Siegel({ sym: e.id, color: e.color, name: e.name }, { theme, size: "s" }),
     v("span", { class: "order-strip-owner" }, e.mine ? txt("op.you").de : e.owner ?? "?"),
     v("span", { class: "or-sr" }, ` ${txt(`op.state_${e.state}`).de}`))));
