@@ -15,6 +15,8 @@ export const COLOR_KEYS = {
     "seaNorth", "seaMed", "seaMarkNorth", "seaMarkMed", "seaMarkRing", "seaMarkInk",
     // Base surfaces (#477): the tint that lightens the sea towards the coast, and the foam along it.
     "seaCoast", "coastFoam",
+    // Names on the board (#461): the pale zone names on the land, the sea names on the water.
+    "zoneName", "seaName",
     "label", "labelHalo", "valid", "selected", "invalid", "preview", "shadow",
   ],
   ui: ["bg", "panel", "panelAlt", "ink", "faint", "rule", "accent", "accentInk", "bar", "barInk", "error", "ok", "warn", "info", "overlay"],
@@ -95,6 +97,8 @@ export const NUMBER_RANGES = {
     seaTint: [0, 1], seaHexLineAlpha: [0, 1], seaZoneDash: [0.05, 1], seaZoneGap: [0.05, 1], seaZoneWidth: [0.005, 0.2], seaMarkRadius: [0.15, 1],
     // Zone lines of the board (#477), in side lengths: ring of the zone circles as a fraction of their radius; the black
     // dashed track-rights boundary: dash, gap and width.
+    // Names (#461), in side lengths: size of the zone names and of the sea names, their alpha (0 = none).
+    zoneNameSize: [0.2, 3], seaNameSize: [0.2, 3], zoneNameAlpha: [0, 1], seaNameAlpha: [0, 1],
     seaMarkRing: [0.02, 0.4], rightsDash: [0.05, 1.5], rightsGap: [0.05, 1.5], rightsWidth: [0.02, 0.4],
     // Base surfaces (#477), in side lengths: how far the sea gradient reaches from the coast, the alpha it has at the coast;
     // width and alpha of the foam fringe (0 = none).

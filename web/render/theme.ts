@@ -44,6 +44,11 @@ export interface RenderTheme {
   seaZoneGap: number;
   seaZoneWidth: number;
   seaMarkRadius: number;
+  /** Zone and sea names (#461): size in side lengths and alpha. */
+  zoneNameSize: number;
+  seaNameSize: number;
+  zoneNameAlpha: number;
+  seaNameAlpha: number;
   /** Zone circle ring (fraction of the radius) and the track-rights dashes (#477), in side lengths. */
   seaMarkRing: number;
   rightsDash: number;
@@ -115,6 +120,10 @@ export function renderTheme(choice: Pick<Choice, "theme" | "tileStyle">): Render
     seaZoneGap: t.shape.seaZoneGap,
     seaZoneWidth: t.shape.seaZoneWidth,
     seaMarkRadius: t.shape.seaMarkRadius,
+    zoneNameSize: t.shape.zoneNameSize,
+    seaNameSize: t.shape.seaNameSize,
+    zoneNameAlpha: t.shape.zoneNameAlpha,
+    seaNameAlpha: t.shape.seaNameAlpha,
     seaMarkRing: t.shape.seaMarkRing,
     rightsDash: t.shape.rightsDash,
     rightsGap: t.shape.rightsGap,
