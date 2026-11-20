@@ -96,6 +96,9 @@ module Engine
         MUST_SELL_IN_BLOCKS = false
         HOME_TOKEN_TIMING = :float
         TILE_RESERVATION_BLOCKS_OTHERS = :always
+        # §11.1.9, last paragraph: the president of the railroad whose home station sits on a laid metropolis tile
+        # chooses its position, not the railroad that laid the tile (workshop #523)
+        TOKEN_PLACEMENT_ON_TILE_LAY_ENTITY = :owner
         TILE_UPGRADES_MUST_USE_MAX_EXITS = [:cities].freeze
         # bank-break ends current OR; first level-8 purchase ends after one more full OR set
         GAME_END_CHECK = { bank: :current_or, final_phase: :one_more_full_or_set }.freeze
