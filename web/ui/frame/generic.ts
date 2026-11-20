@@ -16,7 +16,9 @@ export interface Entry { key: string; action: Action; label: string; detail: str
 export interface Group { type: string; label: string; entries: Entry[] }
 export interface RangeEntry { key: string; range: Range; label: string; detail: string }
 /** The entries and ranges of one action kind (#497 S2); only in the stock round and concession steps. */
-export interface KindBlock { kind: Kind; entries: Entry[]; ranges: RangeEntry[] }
+// A `provided` kind (#497 S3) is one whose options a panel draws itself into the box (the stock sheet's corporations):
+// its entries stay empty, `count` is the number of offered actions of the kind.
+export interface KindBlock { kind: Kind; entries: Entry[]; ranges: RangeEntry[]; count: number; provided?: boolean }
 // `groups`/`ranges` stay the flat view of everything the bar offers; `kinds` is the same sorted by kind, or
 // null where the kinds do not apply (every other step stays flat, #498).
 export interface GenericModel { groups: Group[]; ranges: RangeEntry[]; unsupported: string[]; count: number; kinds: KindBlock[] | null }
@@ -67,7 +69,7 @@ export function actionDetail(g: Game, a: Action): string {
   return [...parts, who].filter(Boolean).join(" · ");
 }
 
-export function genericModel(g: Game, claims: Claims): GenericModel {
+export function genericModel(g: Game, claims: Claims, provided: ReadonlySet<Kind> = new Set()): GenericModel {
   const p = g.state.prompt;
   const open = (type: string) => !claims.isClaimed(p.step, type);
   const byType = new Map<string, Entry[]>();
@@ -86,15 +88,21 @@ export function genericModel(g: Game, claims: Claims): GenericModel {
     detail: `${r.company} · ${fillText("frame.range_bounds", { min: r.min, max: r.max, step: r.step })}`,
   }));
   const unsupported = p.unsupported.filter((u) => !claims.isClaimed(p.step, u.split(/:\s*/).pop() ?? u));
-  return { groups, ranges, unsupported, count: groups.reduce((n, gr) => n + gr.entries.length, 0) + ranges.length, kinds: usesKinds(g) ? kindBlocks(g, groups, ranges) : null };
+  const kinds = usesKinds(g) ? kindBlocks(g, groups, ranges, provided) : null;
+  // The actions a panel claimed but offers in the box as a provided kind count as well: the box is not empty for them.
+  const own = kinds ? kinds.filter((b) => b.provided).reduce((n, b) => n + b.count, 0) : 0;
+  return { groups, ranges, unsupported, count: groups.reduce((n, gr) => n + gr.entries.length, 0) + ranges.length + own, kinds };
 }
 
 /** The unclaimed entries and ranges sorted into kinds, in the fixed order, only kinds with something in them. */
-function kindBlocks(g: Game, groups: Group[], ranges: RangeEntry[]): KindBlock[] {
+function kindBlocks(g: Game, groups: Group[], ranges: RangeEntry[], provided: ReadonlySet<Kind>): KindBlock[] {
   const entries = groups.flatMap((gr) => gr.entries);
   const rangeKind = (r: RangeEntry) => kindOfAction(g, { type: r.range.type });
-  return KINDS.map((kind) => ({ kind, entries: entries.filter((e) => kindOfAction(g, e.action) === kind), ranges: ranges.filter((r) => rangeKind(r) === kind) }))
-    .filter((b) => b.entries.length + b.ranges.length > 0);
+  return KINDS.map((kind): KindBlock => {
+    if (provided.has(kind)) return { kind, entries: [], ranges: [], count: g.state.prompt.actions.filter((a) => kindOfAction(g, a) === kind).length, provided: true };
+    const es = entries.filter((e) => kindOfAction(g, e.action) === kind), rs = ranges.filter((r) => rangeKind(r) === kind);
+    return { kind, entries: es, ranges: rs, count: es.length + rs.length };
+  }).filter((b) => b.count > 0);
 }
 
 /** The bid or trade offer a range stands for: a normal action, as the legal-action list documents (#91, #202). */
@@ -120,6 +128,8 @@ export interface GenericHandlers {
   // The chosen kind of the two-step box (#497 S2); only read where the model has kinds.
   stage?: Kind | null;
   onStage?: (kind: Kind | null) => void;
+  // The options of a provided kind (#497 S3), drawn by the panel that provides them.
+  provided?: (kind: Kind) => VNode[];
 }
 
 function entryButton(e: Entry, h: GenericHandlers): VNode {
@@ -163,13 +173,14 @@ function stagedBar(blocks: KindBlock[], h: GenericHandlers, range: (r: RangeEntr
     return [v("p", { class: "frame-kind-pick" }, txt("kind.pick").de),
       v("div", { class: "frame-kinds" }, ...blocks.map((b) => v("button", {
         type: "button", class: "frame-kind", "data-kind": b.kind, title: txt(`kind.${b.kind}_tip`).de, onclick: () => h.onStage?.(b.kind),
-      }, `${label(b.kind)} (${b.entries.length + b.ranges.length})`)))];
+      }, `${label(b.kind)} (${b.count})`)))];
   }
   const block = blocks.find((b) => b.kind === view.kind);
   if (!block) return [];
   return [v("div", { class: "frame-kind-head", "data-kind": block.kind },
     view.back ? v("button", { type: "button", class: "frame-kind-back", title: txt("kind.back_tip").de, onclick: () => h.onStage?.(null) }, txt("kind.back").de) : null,
     v("strong", {}, fillText("kind.step_head", { kind: label(block.kind) }))),
-  v("div", { class: "frame-entries" }, ...block.entries.map((e) => entryButton(e, h))),
+  block.provided ? v("div", { class: "frame-options", "data-kind": block.kind }, ...(h.provided?.(block.kind) ?? []))
+    : v("div", { class: "frame-entries" }, ...block.entries.map((e) => entryButton(e, h))),
   ...block.ranges.map(range)];
 }
