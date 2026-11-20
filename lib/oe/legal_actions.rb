@@ -521,7 +521,7 @@ module Oe
         A::BuyCompany.new(entity, company: company, price: company.value)
       end
       step.purchasable_companies(entity).each do |company|
-        actions.concat(trade_offers(step, entity, company) { |price| A::BuyCompany.new(entity, company: company, price: price) })
+        actions.concat(trade_offers(step, entity, company) { |price, give| A::BuyCompany.new(entity, company: company, price: price, give: give) })
       end
       actions
     end
@@ -530,7 +530,9 @@ module Oe
       @game.corporations.flat_map do |corporation|
         next [] unless step.can_buy_corporation?(entity, corporation)
 
-        trade_offers(step, entity, corporation) { |price| A::BuyCorporation.new(entity, corporation: corporation, price: price) }
+        trade_offers(step, entity, corporation) do |price, give|
+          A::BuyCorporation.new(entity, corporation: corporation, price: price, give: give)
+        end
       end
     end
 
@@ -541,7 +543,18 @@ module Oe
         @ranges << { type: type, entity: entity.id, company: target.id, min: min, max: max, step: 1 } if max >= min
         return []
       end
-      sample(amounts(min, max, 5)).map { |price| yield price }
+      offers = sample(amounts(min, max, 5)).map { |price| yield price, [] }
+      offers + trade_swaps(step, entity, target, min, max) { |price, give| yield price, give }
+    end
+
+    # §10.4 (#517): offers that give one of the buyer's own minors / face up privates; the other
+    # side's extra objects and bigger bundles are the UI's to build (the engine takes any list).
+    def trade_swaps(step, entity, target, min, max)
+      swaps = step.tradable_objects(entity).flat_map do |object|
+        sample(amounts(min, max, 5)).map { |price| yield price, [object] }
+      end
+      swaps = swaps.select { |action| step.valid_trade_objects?(action, target) }
+      sample(swaps)
     end
 
     # ---- choose -----------------------------------------------------------

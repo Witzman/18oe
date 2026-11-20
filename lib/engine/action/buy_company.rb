@@ -1,16 +1,21 @@
 # frozen_string_literal: true
 
 require_relative 'base'
+require_relative 'trade_objects'
 
 module Engine
   module Action
     class BuyCompany < Base
+      include TradeObjects
+
       attr_reader :entity, :company, :price
 
       REQUIRED_ARGS = %i[company price].freeze
 
-      def initialize(entity, company:, price:)
+      def initialize(entity, company:, price:, give: [], also: [])
         super(entity)
+        @give = give
+        @also = also
         @company = company
         @price = price
       end
@@ -19,14 +24,14 @@ module Engine
         {
           company: game.company_by_id(h['company']),
           price: h['price'],
-        }
+        }.merge(trade_objects_from_h(h, game))
       end
 
       def args_to_h
         {
           'company' => @company.id,
           'price' => @price,
-        }
+        }.merge(trade_objects_to_h)
       end
     end
   end
