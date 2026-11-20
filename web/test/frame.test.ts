@@ -11,7 +11,8 @@ import type { Game } from "../types.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { actionKey, GenericBar, genericModel, rangeAction, rangeValue, type GenericHandlers } from "../ui/frame/generic.ts";
-import { BOT_STALL_MS, corpColor, outlinerCorps, playerRows, roundBar, stallNotice, whoActs } from "../ui/frame/model.ts";
+import { BOT_STALL_MS, corpColor, outlinerCorps, playerRows, roundBar, roundMarkers, stallNotice, whoActs } from "../ui/frame/model.ts";
+import { roundChip } from "../ui/frame/round-marks.ts";
 import { createViews } from "../ui/frame/views.ts";
 import { fillText, txt } from "../ui/text.ts";
 
@@ -300,4 +301,48 @@ test("stall notice: a bot on turn is a warning only after BOT_STALL_MS without a
   const human = structuredClone(g);
   human.seats = human.seats.map((s) => ({ ...s, kind: "human" as const }));
   assert.equal(stallNotice(human, 10 * BOT_STALL_MS)?.kind, "waiting");
+});
+
+// Round indicator as on the board (#478): Stock / OR 1 / OR 2 markers, the running one active; other round types keep the text chip.
+test("round markers: operating round shows Stock and OR 1..n with the running OR active, stock round the Stock marker", () => {
+  const g = structuredClone(games["track"]!);
+  g.state.meta.round = { type: "operating", number: 3, turn: 2, description: null };
+  g.state.meta.phase.operating_rounds = 2;
+  const r = roundMarkers(g)!;
+  assert.deepEqual(r.markers.map((m) => [m.key, m.active]), [["stock", false], ["or1", false], ["or2", true]]);
+  assert.deepEqual(r.markers.map((m) => m.label), [txt("round.mark_stock").de, fillText("round.mark_or", { n: 1 }), fillText("round.mark_or", { n: 2 })]);
+  assert.equal(r.set, 3);
+  g.state.meta.phase.operating_rounds = 3;
+  assert.equal(roundMarkers(g)!.markers.length, 4);
+  g.state.meta.phase.operating_rounds = 1; // the turn still counts: never fewer markers than the running OR
+  assert.equal(roundMarkers(g)!.markers.filter((m) => m.active).length, 1);
+  g.state.meta.round = { type: "stock", number: 3, turn: 1, description: null };
+  g.state.meta.phase.operating_rounds = 2;
+  assert.deepEqual(roundMarkers(g)!.markers.map((m) => [m.key, m.active]), [["stock", true], ["or1", false], ["or2", false]]);
+});
+
+test("round markers: no markers for auction, concession, consolidation phases and at the end of the game", () => {
+  const g = structuredClone(games["track"]!);
+  for (const type of ["auction", "concession", "consolidation"]) {
+    g.state.meta.round = { type, number: null, turn: 1, description: null };
+    assert.equal(roundMarkers(g), null, type);
+  }
+  g.state.meta.round = { type: "operating", number: 1, turn: 1, description: null };
+  g.state.meta.finished = true;
+  assert.equal(roundMarkers(g), null);
+});
+
+test("round chip: marker discs with the running one flagged (not by colour only), text chip without markers", () => {
+  const g = structuredClone(games["track"]!);
+  g.state.meta.round = { type: "operating", number: 2, turn: 1, description: null };
+  g.state.meta.phase.operating_rounds = 2;
+  const chip = roundChip("Betriebsrunde 2.1", "BR 2.1", roundMarkers(g));
+  const marks = find(chip, (n) => n.attrs.class === "round-mark");
+  assert.deepEqual(marks.map((n) => n.attrs["data-active"]), ["false", "true", "false"]);
+  assert.equal(find(chip, (n) => n.attrs["aria-current"] === "step").length, 1);
+  assert.match(textOf(marks[1]!), new RegExp(txt("frame.round_marker_active").de));
+  assert.match(String(chip.attrs["aria-label"]), /Betriebsrunde 2\.1/);
+  const plain = roundChip("Auktion", "Auk", null);
+  assert.equal(textOf(plain), "Auk");
+  assert.equal(find(plain, (n) => n.attrs.class === "round-mark").length, 0);
 });

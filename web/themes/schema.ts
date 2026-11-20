@@ -19,7 +19,9 @@ export const COLOR_KEYS = {
   ],
   ui: ["bg", "panel", "panelAlt", "ink", "faint", "rule", "accent", "accentInk", "bar", "barInk", "error", "ok", "warn", "info", "overlay"],
   // Kurstafel as on the board (#478): dark board, light cells, price ink, red major par outline and its label, arrows, regional par mark.
-  stock: ["field", "cell", "cellInk", "major", "majorInk", "arrow", "par"],
+  // Rundenanzeiger, Betriebsreihenfolge and port authority signs as on the board (slice 2): running round disc,
+  // finished cell of the operating order, the two blue/green signs and their ink.
+  stock: ["field", "cell", "cellInk", "major", "majorInk", "arrow", "par", "roundOn", "roundOnInk", "orderDone", "orderDoneInk", "signNorth", "signNorthInk", "signMed", "signMedInk"],
   // Fallback palette for company ids without an entry in `companies` (unknown or future ids).
   company: ["c1", "c2", "c3", "c4", "c5", "c6"],
   player: ["p1", "p2", "p3", "p4", "p5", "p6", "p7"],
