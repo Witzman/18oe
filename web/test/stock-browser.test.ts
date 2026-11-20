@@ -130,8 +130,11 @@ const CHECKS_BUY = String.raw`(async () => {
   const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s);
-  const tabs = [...document.querySelectorAll('.stock-tabs [role="tab"]')].map((t) => t.textContent);
-  if (tabs.join("|") !== "Stock market|Open Market") fail("tabs " + tabs);
+  const sw = q('.frame-tabs .stock-switch') || fail("no Market switch behind the tab");
+  if (sw.previousElementSibling?.textContent !== "Market") fail("the switch does not follow the Market tab");
+  if (sw.getBoundingClientRect().height < 43.5) fail("switch under 44px");
+  if ([...sw.options].map((o) => o.textContent).join("|") !== "Stock market|Open Market") fail("options");
+  if (q(".stock-sheet .stock-switch, .stock-tabs")) fail("the sheet still has its own tabs");
   let offers = [];
   for (const row of [...document.querySelectorAll(".stock-row")].filter((r) => r.dataset.actionable === "true")) {
     row.querySelector(".stock-rowbtn").click();
@@ -147,8 +150,9 @@ const CHECKS_BUY = String.raw`(async () => {
   if (offers.some((b) => b.dataset.kind === "buy" && /Open Market,/.test(b.textContent))) fail("market shares in the Aktienmarkt tab");
   q(".kit-backdrop").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await sleep(50);
-  document.querySelector('.stock-tabs [data-tab="market"]').click();
+  sw.value = "market"; sw.dispatchEvent(new Event("change", { bubbles: true }));
   await sleep(50);
+  if (q(".frame-tabs .stock-switch").value !== "market") fail("the switch lost its choice");
   const rows = [...document.querySelectorAll(".stock-row")];
   if (!rows.length) fail("Open Market lists no corporation");
   if (rows.some((r) => !/Open Market \d+/.test(r.textContent))) fail("a corporation without market shares in the Open Market tab");

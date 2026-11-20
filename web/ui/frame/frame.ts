@@ -342,10 +342,10 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   function drawMain() {
     const list = views.list;
     // The log link sits right after the tabs and is always there, also with a single view (#370).
-    put(tabsEl, ...(list.length > 1 ? list.map((d) => v("button", {
+    put(tabsEl, ...(list.length > 1 ? list.flatMap((d) => [v("button", {
       type: "button", role: "tab", "aria-selected": String(d.id === views.activeId),
       onclick: () => views.activate(d.id),
-    }, txt(d.labelKey).text)) : []),
+    }, txt(d.labelKey).text), d.id === views.activeId ? d.tabExtra?.() ?? null : null]) : []),
       v("button", { type: "button", class: "frame-log-link", title: txt("frame.log_hint").text, "aria-haspopup": "dialog", onclick: () => { logOpen = true; drawLog(); } }, txt("frame.log").text));
     views.active?.render({ container: viewEl });
   }

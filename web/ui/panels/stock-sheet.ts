@@ -259,6 +259,14 @@ export function stockDialog(i: SheetInput, h: SheetHandlers): VNode | null {
   });
 }
 
+/** The switch behind the Market tab (#529): Stock market or Open Market, one selector; the frame puts it into its tab row. */
+export function marketSwitchNode(tab: Tab, onTab: (t: Tab) => void): VNode {
+  return v("select", {
+    class: "stock-switch", "aria-label": txt("stock.switch_label").text,
+    onchange: (e: Event) => onTab((e.target as HTMLSelectElement).value as Tab),
+  }, ...(["stock", "market"] as const).map((t) => v("option", { value: t, selected: tab === t }, txt(`stock.tab_${t}`).text)));
+}
+
 export function sheetNode(i: SheetInput, h: SheetHandlers): VNode {
   const me = i.g.state.players.find((p) => p.id === i.g.viewer);
   const p = i.g.state.prompt;
@@ -269,8 +277,6 @@ export function sheetNode(i: SheetInput, h: SheetHandlers): VNode {
     v("header", { class: "stock-head" },
       status ? v("p", { class: "stock-status", role: "status" }, status) : v("h2", {}, txt("stock.title").text),
       kindRowNode(i, h),
-      v("div", { class: "stock-tabs", role: "tablist" },
-        ...(["stock", "market"] as const).map((t) => v("button", { type: "button", role: "tab", "data-tab": t, "aria-selected": String(i.tab === t), onclick: () => h.onTab(t) }, txt(`stock.tab_${t}`).text))),
       orderLine(i.g),
       me ? v("span", { class: "stock-cash" }, `${txt("stock.cash").text} `, Geld(me.cash), ` · ${txt("stock.certs").text} ${fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit })}`) : null),
     i.must ? v("p", { class: "stock-warn", role: "alert" }, fillText("stock.must_sell", { limit: i.must.limit, certs: i.must.certs })) : null,
