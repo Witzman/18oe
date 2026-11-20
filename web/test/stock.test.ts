@@ -7,9 +7,10 @@ import { themes } from "../themes/index.ts";
 import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
+import { kindOfAction, type Kind } from "../ui/frame/kinds.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { corpRows, holdings, inTab, marketModel, sealStack, mustSell, offersFor, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
-import { offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
+import { corpRows, holdings, inTab, marketModel, offerKind, offersOfKind, rowsForKind, sealStack, mustSell, offersFor, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
+import { kindOptionsNode, offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
 const pool = load("stock-pool"), par = load("stock-par");
@@ -390,4 +391,75 @@ test("par step: valid par cells, the chosen one and its dialog on the nine-row g
   const tree = sheetNode(input(par, { focus: row.id, sel: { corp: row.id, key: offer.key } }), noop);
   assert.equal(find(tree, (n) => n.attrs.class === "stock-cell" && n.attrs["data-valid"] === "true").length, row.pars.length);
   assert.equal(find(tree, (n) => n.attrs.class === "stock-cell" && n.attrs["data-chosen"] === "true").length, 1);
+});
+
+// ---- #497 S3: the sheet follows the kind of the action box ------------------------------------------------
+
+test("kinds: every offer of a row falls in the kind kindOfAction gives its action (one reading, no second rule)", () => {
+  for (const g of [pool, par]) {
+    for (const r of corpRows(g)) {
+      for (const o of [...r.buys, ...r.sells, ...r.pars]) assert.equal(offerKind(o, r), kindOfAction(g, o.action), `${r.id} ${o.key}`);
+    }
+  }
+});
+
+test("kinds: a market kind keeps only the cards and offers of that kind; no kind keeps all; a kind of another panel has no offer", () => {
+  const rows = corpRows(pool);
+  const all = rows.flatMap((r) => [...r.buys, ...r.sells, ...r.pars]).length;
+  assert.equal(rowsForKind(rows, null).length, rows.length);
+  const counts = (["buy", "sell", "float_regional", "float_minor"] as Kind[]).map((k) => rowsForKind(rows, k).flatMap((r) => { const o = offersOfKind(r, k); return [...o.buys, ...o.sells, ...o.pars]; }).length);
+  assert.equal(counts.reduce((a, b) => a + b, 0), all, "the four market kinds together hold every offer, none twice");
+  const buy = rowsForKind(rows, "buy");
+  assert.ok(buy.length > 0 && buy.every((r) => r.buys.length > 0));
+  assert.ok(buy.every((r) => { const o = offersFor(r, "stock", "sell", "buy"); return o.sells.length === 0 && o.pars.length === 0 && o.buys.length === r.buys.length; }), "the kind replaces mode and tab");
+  const sell = rowsForKind(rows, "sell");
+  assert.ok(sell.length > 0 && sell.every((r) => r.sells.length > 0));
+  const none = offersFor(rows[0]!, "stock", "buy", "pass");
+  assert.equal(none.buys.length + none.sells.length + none.pars.length, 0);
+  assert.equal(rowsForKind(rows, "pass").length, rows.length, "a kind without options of this sheet leaves the cards alone");
+  assert.deepEqual(offersFor(rows[0]!, "stock", "buy"), offersFor(rows[0]!, "stock", "buy", null));
+});
+
+test("kinds: par of a regional is float_regional, of a minor float_minor; they list only the corporations of that tier", () => {
+  const rows = corpRows(par);
+  for (const k of ["float_regional", "float_minor"] as Kind[]) {
+    for (const r of rowsForKind(rows, k)) assert.equal(r.tier === "minor", k === "float_minor", `${r.id} under ${k}`);
+  }
+});
+
+test("sheet: with a kind chosen the cards are those of the kind and the dialog shows only its offers; the head has no pass button", () => {
+  const sheet = (kind: Kind | null, o: Partial<SheetInput> = {}) => sheetNode(input(pool, { kind, ...o }), noop);
+  assert.equal(find(sheet(null), (n) => n.attrs["data-action"] === "pass").length, 0, "pass is a kind of the box, not a head button");
+  const cards = (kind: Kind | null) => find(sheet(kind), (n) => n.attrs.class === "stock-row").map((n) => n.attrs["data-corp"]);
+  assert.deepEqual(cards("buy").sort(), rowsForKind(corpRows(pool), "buy").map((r) => r.id).sort());
+  const row = corpRows(pool).find((r) => r.buys.length > 0 && r.sells.length > 0);
+  if (row) {
+    const dlg = find(sheet("buy", { focus: row.id }), (n) => n.attrs.class === "kit-dialog")[0]!;
+    assert.equal(find(dlg, (n) => n.attrs.class === "stock-offer").length, row.buys.length);
+    assert.equal(find(dlg, (n) => n.attrs.class === "stock-offer" && n.attrs["data-kind"] === "sell").length, 0);
+  }
+});
+
+test("box options (variant A): one button per corporation of the kind, each opens that corporation", () => {
+  const rows = corpRows(pool);
+  const opened: string[] = [];
+  const nodes = kindOptionsNode(pool, theme, rows, "buy", (c) => opened.push(c));
+  assert.deepEqual(nodes.map((n) => n.attrs["data-corp"]), rowsForKind(rows, "buy").map((r) => r.id));
+  nodes[0]!.on.click!(new Event("click"));
+  assert.deepEqual(opened, [nodes[0]!.attrs["data-corp"]]);
+});
+
+test("box: a provided kind is a step-1 button with its offer count, its options are the panel's, pass is a plain kind", () => {
+  const claims = createClaims();
+  STOCK_TYPES.forEach((t) => claims.claim(STOCK_STEP, t));
+  const plain = genericModel(pool, claims);
+  assert.ok(!plain.kinds!.some((b) => b.kind === "buy"), "claimed and not provided: the kind is absent");
+  const provided = new Set<Kind>(["float_regional", "float_minor", "buy", "sell"]);
+  const m = genericModel(pool, claims, provided);
+  const buy = m.kinds!.find((b) => b.kind === "buy")!;
+  assert.ok(buy.provided && buy.entries.length === 0);
+  assert.equal(buy.count, pool.state.prompt.actions.filter((a) => a.type === "buy_shares").length);
+  assert.equal(m.count - plain.count, m.kinds!.filter((b) => b.provided).reduce((n, b) => n + b.count, 0), "the claimed actions count in the box");
+  const pass = m.kinds!.find((b) => b.kind === "pass");
+  assert.ok(pass && !pass.provided && pass.entries.length === 1, "pass is not claimed any more: a generic entry of the kind pass");
 });
