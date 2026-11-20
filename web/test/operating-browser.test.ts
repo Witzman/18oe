@@ -71,7 +71,17 @@ const HEAD = String.raw`const fail = (m) => { throw new Error(m); };
 
 const ROUTE = String.raw`(async () => {
   ${HEAD}
-  if (!q(".frame-panel .op-sheet") || !/B · you/.test(q(".op-sheet").textContent)) fail("head");
+  if (!q(".frame-actionrow .op-sheet") || !/B · you/.test(q(".op-sheet").textContent)) fail("head not in the action row");
+  if (q(".frame-panel") && !q(".frame-panel").hidden) fail("action box still over the map (#528)");
+  const rowBox = q(".frame-actionrow").getBoundingClientRect(), mapBox = q(".frame-map").getBoundingClientRect();
+  if (rowBox.bottom > mapBox.top + 1) fail("the row covers the map");
+  if (!q(".frame-kind-host .kit-dialog .op-table")) fail("the run is not in the step dialog");
+  if (!q(".frame-actionrow .kit-main-btn")) fail("main button not in the row");
+  q('[data-action="close-step"]').click(); await sleep(100);
+  if (q(".frame-kind-host .kit-dialog")) fail("dialog stays after Close");
+  if (!q(".frame-step-open") || q(".frame-step-open").hidden) fail("no way to reopen the choice");
+  small(".frame-step-open"); q(".frame-step-open").click(); await sleep(100);
+  if (!q(".frame-kind-host .kit-dialog .op-table")) fail("dialog does not reopen");
   if (document.querySelectorAll(".op-strip li").length !== 5 || !/Run/.test(q('.op-strip [aria-current="step"]').textContent)) fail("step strip");
   if (q(".op-note") || q(".track-hint")) fail("rules text in the panel");
   const rows = document.querySelectorAll(".op-table tbody tr");
