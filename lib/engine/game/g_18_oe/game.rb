@@ -15,6 +15,7 @@ require_relative 'national'
 require_relative 'step/consolidate'
 require_relative 'step/hochberg_token'
 require_relative 'step/sml_train'
+require_relative 'step/bbbt_repar'
 require_relative 'green_junction'
 require_relative 'krasnaya_strela'
 require_relative 'port_authority'
@@ -1608,6 +1609,7 @@ module Engine
             Engine::Step::HomeToken,
             G18OE::Step::HochbergToken,
             G18OE::Step::SmlTrain,
+            G18OE::Step::BbbtRepar,
             G18OE::Step::SpecialTrack,
             G18OE::Step::HomeHexConsent,
             G18OE::Step::Track,
