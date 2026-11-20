@@ -61,7 +61,7 @@ const dotIcon = (on: boolean) => String.raw`(() => {
 
 const GAME_CHECKS = (on: boolean) => String.raw`(async () => {
   await new Promise((r) => setTimeout(r, 400));
-  const want = ${on} ? "(●) 18OE · Partie 1" : "18OE · Partie 1";
+  const want = ${on} ? "(●) 18OE · Game 1" : "18OE · Game 1";
   if (document.title !== want) throw new Error("title: " + document.title);
   ${dotIcon(on)};
   const who = document.querySelector(".frame-who");

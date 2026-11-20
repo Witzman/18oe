@@ -42,9 +42,9 @@ test("order: preview on the slot, sentence with price, cash and tokens before/af
   assert.deepEqual(previewFor(g, "57-7-0"), { hex: "AC16", city: 0, corp: "G" });
   const o = orderFor(g, "57-7-0", (a) => sent.push(a))!;
   assert.equal(o.state, "preview");
-  assert.match(o.sentence, /G setzt eine Station in AC16 \(Stadt 1\) für £20/);
-  assert.deepEqual(o.changes!.map((c) => [c.label, c.before, c.after]), [["Kasse G", "£20", "£0"], ["Stationen übrig", "1", "0"]]);
-  assert.deepEqual(o.side!.map((s) => s.label), ["Keine Station"]);
+  assert.match(o.sentence, /G places a token in AC16 \(city 1\) for £20/);
+  assert.deepEqual(o.changes!.map((c) => [c.label, c.before, c.after]), [["Cash G", "£20", "£0"], ["Tokens left", "1", "0"]]);
+  assert.deepEqual(o.side!.map((s) => s.label), ["No token"]);
   assert.equal(sent.length, 0);
   o.onConfirm();
   assert.deepEqual(sent, [places(g)[0]]);
@@ -65,11 +65,11 @@ test("claims and panel: generic bar empty; rows per city; others only see who pl
   assert.equal(genericModel(g, claims).count, 0);
   const p = TokenPanel(g, "OE4-2-1", noop);
   assert.deepEqual(find(p, (n) => n.attrs.class === "token-city").map((n) => [n.attrs["data-city"], n.attrs["aria-pressed"]]), [["57-7-0", "false"], ["OE4-2-1", "true"]]);
-  assert.match(textOf(p), /Stationen übrig: 1, nächste für £20/);
+  assert.match(textOf(p), /Tokens left: 1, next for £20/);
   const other = structuredClone(g);
   other.state.prompt.viewer_to_act = false;
   other.state.prompt.actions = [];
-  assert.match(textOf(TokenPanel(other, null, noop)), /G setzt eine Station/);
+  assert.match(textOf(TokenPanel(other, null, noop)), /G places a token/);
   assert.equal(orderFor(other, null, () => {}), null);
 });
 
@@ -78,7 +78,7 @@ test("#414: city button reads name and zone when the map geometry is there, hex 
   const ts = tokenTargets(g);
   const t = ts[0]!;
   const map = { hexes: [{ id: t.hex, name: "Wien", zone: "B" }] } as unknown as MapGeometry;
-  assert.equal(cityRowText(t, map, 1), `Wien, Zone B · £${t.price}`);
-  assert.equal(cityRowText(t, { hexes: [{ id: t.hex, name: "Wien", zone: null }] } as unknown as MapGeometry, 2), `Wien (Stadt ${(t.city ?? 0) + 1}) · £${t.price}`);
-  assert.match(cityRowText(t, null, 1), new RegExp(`${t.hex} · Stadt ${(t.city ?? 0) + 1}`));
+  assert.equal(cityRowText(t, map, 1), `Wien, zone B · £${t.price}`);
+  assert.equal(cityRowText(t, { hexes: [{ id: t.hex, name: "Wien", zone: null }] } as unknown as MapGeometry, 2), `Wien (city ${(t.city ?? 0) + 1}) · £${t.price}`);
+  assert.match(cityRowText(t, null, 1), new RegExp(`${t.hex} · city ${(t.city ?? 0) + 1}`));
 });

@@ -80,7 +80,7 @@ const CHECKS_BID = String.raw`(async () => {
   if (q(".kit-dialog")) fail("dialog open without a choice");
   if (q(".frame-panel") && !q(".frame-panel").hidden) fail("action panel still covers the auction");
   if (!q(".frame-tabs .frame-log-link")) fail("no log link next to the tabs");
-  if (!/Wähle ein Los/.test(q(".auction-idle").textContent)) fail("idle line: " + q(".auction-idle").textContent);
+  if (!/Choose a lot/.test(q(".auction-idle").textContent)) fail("idle line: " + q(".auction-idle").textContent);
   if (!q('.auction-head [data-action="pass"]')) fail("no pass button in the sheet head");
   q('.auction-card[data-card="A"]').click();
   await sleep(50);
@@ -98,7 +98,7 @@ const CHECKS_BID = String.raw`(async () => {
   if ((await posted()).length !== 0) fail("closing sent something");
   q('.auction-card[data-card="A"]').click();
   await sleep(50);
-  if (!/Kaufen: Silver Banner Line für £120/.test(q(".kit-order-sentence").textContent)) fail("buy sentence: " + q(".kit-order-sentence").textContent);
+  if (!/Buy Silver Banner Line for £120/.test(q(".kit-order-sentence").textContent)) fail("buy sentence: " + q(".kit-order-sentence").textContent);
   if ((await posted()).length !== 0) fail("choosing sent something");
   const input = q(".auction-bidform input");
   if (!input || input.value !== "120") fail("amount field " + (input && input.value));
@@ -126,7 +126,7 @@ const CHECKS_PASS = String.raw`(async () => {
   if (!/Passen/.test(side.textContent)) fail("label " + side.textContent);
   q('.auction-card[data-card="WS"]').click();
   await sleep(50);
-  if (!/Gebot vormerken: Wien Südbahnhof mit £40/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/Place bid on Wien Südbahnhof: £40/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   q('.kit-dialog [data-action="pass"]').click();
   await sleep(600);
   const p = await (await fetch("/__posted")).json();
@@ -166,7 +166,7 @@ const CHECKS_RUNNING = String.raw`(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s);
   if (!q(".auction-running") || !/Silver Banner Line/.test(q(".auction-running").textContent)) fail("no running auction box");
-  if (!/Höchstgebot £130 von p3/.test(q(".auction-running").textContent)) fail("high bid: " + q(".auction-running").textContent);
+  if (!/High bid £130 by p3/.test(q(".auction-running").textContent)) fail("high bid: " + q(".auction-running").textContent);
   if (q(".auction-card[data-running=true]").getAttribute("aria-pressed") !== "true") fail("running lot not preselected");
   if (q(".auction-bidform input").value !== "135") fail("amount " + q(".auction-bidform input").value);
   if (!/Bieten: Silver Banner Line mit £135/.test(q(".kit-order-sentence").textContent)) fail("sentence " + q(".kit-order-sentence").textContent);

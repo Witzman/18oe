@@ -19,7 +19,7 @@ test("order: done ones checked, current one marked, rest follow; owner, own and 
   assert.equal(b.entries.find((e) => e.id === "F")!.mine, true);
   assert.equal(b.entries.find((e) => e.id === "H")!.mine, false);
   assert.equal(b.acting!.id, "B");
-  assert.match(b.sentence, /du bist am Zug/);
+  assert.match(b.sentence, /your turn/);
   assert.ok(b.acting!.color.length > 0);
 });
 
@@ -29,10 +29,10 @@ test("a bot's or another player's company acting says who operates", () => {
   g.state.meta.operating_order = g.state.meta.operating_order.map((o) => ({ ...o, done: ["A", "B"].includes(o.id) }));
   const b = orBand(g, theme)!;
   assert.equal(b.acting!.id, "D");
-  assert.match(b.sentence, /operiert: p3 \(Bot\)/);
+  assert.match(b.sentence, /operates: p3 \(Bot\)/);
   const view = OrBandView(b, theme);
   assert.equal(find(view, (n) => n.attrs["data-state"] === "current").length, 1);
-  assert.match(textOf(view), /hat operiert/);
+  assert.match(textOf(view), /has operated/);
 });
 
 test("stock round (#416): preview of the next operating order, nobody acting, nothing done", () => {
@@ -57,7 +57,7 @@ test("no band without an order or when the game is over", () => {
 
 test("head bar (#300): short round label and the compact order strip", () => {
   const g = load("operating-route");
-  assert.match(roundShort(g), /^BR \d+\.\d+$/);
+  assert.match(roundShort(g), /^OR \d+\.\d+$/);
   const strip = OrderBandView(orBand(g, theme)!, theme, { collapsed: false, onToggle: () => {} });
   const items = find(strip, (n) => n.attrs.class === "order-strip-item");
   assert.deepEqual(items.map((n) => n.attrs["data-state"]), ["done", "current", "next", "next", "next", "next"]);
@@ -70,5 +70,5 @@ test("head bar (#300): short round label and the compact order strip", () => {
   const btn = find(folded, (n) => n.tag === "button")[0]!;
   assert.equal(btn.attrs["aria-expanded"], "false");
   g.state.meta.round = { type: "stock", number: 3, turn: 1, description: null };
-  assert.equal(roundShort(g), "AR 3");
+  assert.equal(roundShort(g), "SR 3");
 });

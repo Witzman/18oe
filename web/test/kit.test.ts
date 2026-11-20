@@ -45,7 +45,7 @@ test("Wimpel: seat digit always present (never colour alone), 7 distinct slots, 
   for (let seat = 1; seat <= 7; seat++) {
     const w = Wimpel({ seat, name: "Anna" }, { theme: brett });
     assert.equal(find(w, (n) => classes(n).includes("kit-flag"))[0]!.children[0], String(seat));
-    assert.ok(w.attrs["aria-label"]!.includes(`Spieler ${seat}`));
+    assert.ok(w.attrs["aria-label"]!.includes(`Player ${seat}`));
     for (const theme of themes) assert.ok(inkReadable(theme.player[playerSlot(seat)], theme), `${theme.id} p${seat}`);
   }
   assert.ok(find(Wimpel({ seat: 1, name: "A" }, { theme: brett }), (n) => n.attrs.style?.includes("var(--player-p1)") ?? false).length === 1);
@@ -107,10 +107,10 @@ test("Tabelle: header cells carry aria-sort, sortable headers are buttons, row s
 });
 
 test("Tooltip: title, English term, breakdown rows, total and source; wrapper describes its trigger", () => {
-  const tip = Tooltip({ title: "Baukosten", term: "Terrain cost", rows: [{ label: "Gelände", amount: 20 }, { label: "Rabatt", amount: -5 }], total: { label: "Summe", amount: 15 }, source: "Regeln §11.3" }, "t1");
+  const tip = Tooltip({ title: "Track cost", term: "Terrain cost", rows: [{ label: "Terrain", amount: 20 }, { label: "Discount", amount: -5 }], total: { label: "Total", amount: 15 }, source: "Rulebook §11.3" }, "t1");
   assert.equal(tip.attrs.role, "tooltip");
   const text = textOf(tip);
-  for (const part of ["Baukosten", "Terrain cost", "Gelände", "£20", "−£5", "Summe", "£15", "Quelle: Regeln §11.3"]) assert.ok(text.includes(part), part);
+  for (const part of ["Track cost", "Terrain cost", "Terrain", "£20", "−£5", "Total", "£15", "Source: Rulebook §11.3"]) assert.ok(text.includes(part), part);
   assert.equal(find(tip, (n) => classes(n).includes("kit-tip-row")).length, 3);
   assert.ok(!textOf(Tooltip({ title: "x" }, "t2")).includes("Quelle"));
   const wrapped = mitTooltip(v("button", {}, "Legen"), { title: "x" }, "t3");
@@ -161,7 +161,7 @@ test("Auftrag: sentence plus before -> after, confirm and cancel call back", () 
   const o = order("preview", { onConfirm: () => { ok++; }, onCancel: () => { no++; } });
   assert.ok(textOf(o).includes("PLM kaufen"));
   assert.ok(textOf(find(o, (n) => n.tag === "dd")[0]!).includes("£260 → £95"));
-  assert.equal(textOf(confirmBtn(o)), "Bestätigen");
+  assert.equal(textOf(confirmBtn(o)), "Confirm");
   confirmBtn(o).on.click!(new Event("click"));
   find(o, (n) => classes(n).includes("kit-side-btn"))[0]!.on.click!(new Event("click"));
   assert.deepEqual([ok, no], [1, 1]);
@@ -186,10 +186,10 @@ test("Auftrag: waiting shows dots and locks everything; invalid locks confirm an
 test("sample page shows every block in all seven states", () => {
   for (const theme of themes) {
     const secs = kitSections(theme, { dialog: false }, { sort: () => {}, dialog: () => {} });
-    const rowsOf = (title: string) => find(secs.find((s) => textOf(find(s, (n) => n.tag === "h2")[0]!) === title)!, (n) => n.tag === "dt" && !["Kasse", "Zertifikate"].includes(textOf(n))).length;
-    assert.deepEqual(["Siegel", "Wimpel", "Auftrag"].map(rowsOf), [8, 8, 7]);
+    const rowsOf = (title: string) => find(secs.find((s) => textOf(find(s, (n) => n.tag === "h2")[0]!) === title)!, (n) => n.tag === "dt" && !["Cash", "Certificates"].includes(textOf(n))).length;
+    assert.deepEqual(["Seal", "Pennant", "Order"].map(rowsOf), [8, 8, 7]);
     const states = (title: string) => new Set(find(secs.find((s) => textOf(find(s, (n) => n.tag === "h2")[0]!) === title)!, (n) => "data-state" in n.attrs).map((n) => n.attrs["data-state"]));
-    for (const title of ["Siegel", "Wimpel", "Tabelle", "Auftrag"]) assert.deepEqual([...states(title)].sort(), [...STATES].sort(), title);
+    for (const title of ["Seal", "Pennant", "Table", "Order"]) assert.deepEqual([...states(title)].sort(), [...STATES].sort(), title);
     assert.deepEqual(secs.length, 8);
   }
 });

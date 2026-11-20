@@ -108,24 +108,24 @@ const CHECKS_FOUND = String.raw`(async () => {
 const CHECKS_STEPS = String.raw`(async () => {
   ${HEAD}
   const step = () => q(".concession-step").textContent;
-  if (!/Schritt 1 von 3: Gesellschaft wählen/.test(step())) fail("step 1: " + step());
-  if (q(".concession-back")) fail("Zurück on the first step");
+  if (!/Step 1 of 3: Choose a corporation/.test(step())) fail("step 1: " + step());
+  if (q(".concession-back")) fail("Back on the first step");
   if (q(".concession-price")) fail("par values before a corporation is chosen");
   if (q(".concession-fold[open]")) fail("a fold is open by default");
   q('.concession-card[data-corp="C"]').click();
   await sleep(50);
-  if (!/Schritt 2 von 3: Par-Kurs wählen/.test(step())) fail("step 2: " + step());
+  if (!/Step 2 of 3: Choose a par value/.test(step())) fail("step 2: " + step());
   if (document.querySelectorAll(".concession-card").length !== 1) fail("the other corporations stay after the choice");
   q('.concession-price[data-price="90"]').click();
   await sleep(50);
-  if (!/Schritt 3 von 3: Bestätigen/.test(step())) fail("step 3: " + step());
+  if (!/Step 3 of 3: Confirm/.test(step())) fail("step 3: " + step());
   small(".concession-back");
   q(".concession-back").click();
   await sleep(50);
-  if (!/Schritt 2 von 3/.test(step())) fail("Zurück from step 3: " + step());
+  if (!/Step 2 of 3/.test(step())) fail("Back from step 3: " + step());
   q(".concession-back").click();
   await sleep(50);
-  if (!/Schritt 1 von 3/.test(step()) || document.querySelectorAll(".concession-card").length < 2) fail("Zurück from step 2: " + step());
+  if (!/Step 1 of 3/.test(step()) || document.querySelectorAll(".concession-card").length < 2) fail("Back from step 2: " + step());
   // The panel does not need to scroll: its content fits the box it is in.
   const panel = q(".concession-panel");
   const box = panel.closest(".frame-panel-body, .frame-panel") || panel.parentElement;
@@ -144,7 +144,7 @@ const CHECKS_HOME = String.raw`(async () => {
   if (!q(".kit-main-btn").disabled) fail("main button open without a choice");
   t[1].click();
   await sleep(50);
-  if (!/Heimat in/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/Home in/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   q(".kit-main-btn").click();
   await sleep(600);
   if ((await (await fetch("/__posted")).json()).length !== 1) fail("not sent once");
@@ -261,7 +261,7 @@ test("stall line in the browser (#289): nobody to act is said, with a reload but
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-test("concession in the browser (#409): the steps follow one another, Zurück goes back, the panel does not scroll", { skip: browser ? false : "no headless browser installed" }, async () => {
+test("concession in the browser (#409): the steps follow one another, Back goes back, the panel does not scroll", { skip: browser ? false : "no headless browser installed" }, async () => {
   const { posted } = await scenario("concession", ".concession-card", CHECKS_STEPS);
   assert.equal(posted.length, 0);
 });

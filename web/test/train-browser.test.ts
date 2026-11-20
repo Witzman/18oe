@@ -77,7 +77,7 @@ const CHECKS = String.raw`(async () => {
   if (!rows[1].disabled || !/Erst der Pflichtkauf/.test(rows[1].textContent)) fail("foreign train not invalid with reason");
   if (!/Zugpflicht/.test(q(".train-duty").textContent)) fail("duty line");
   if (q(".frame-entry")) fail("generic bar still offers the claimed actions");
-  if (!/Pflicht-2\+2 für £100/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/mandatory 2\+2 for £100/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   if (q(".kit-main-btn").disabled) fail("main button locked although the only legal choice is previewed");
   if ((await (await fetch("/__posted")).json()).length !== 0) fail("previewing sent something");
   q(".kit-main-btn").click();

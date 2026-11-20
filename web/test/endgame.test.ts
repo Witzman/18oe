@@ -68,7 +68,7 @@ test("panel: one table row and one card per player, winner marked, corporations 
   assert.equal(find(tree, (n) => n.tag === "article").length, m.rows.length);
   const text = textOf(tree);
   for (const r of m.rows) assert.ok(text.includes(r.name), r.name);
-  assert.ok(text.includes(txt("end.winner_mark").de));
+  assert.ok(text.includes(txt("end.winner_mark").text));
   assert.ok(text.includes(m.rows[0]!.name));
   const link = find(tree, (n) => n.tag === "a" && n.attrs.href === "#/");
   assert.equal(link.length, 1, "link back to the lobby");
@@ -84,6 +84,6 @@ test("panel: collapsed form offers to show the standings again; no action button
 });
 
 test("round bar of a finished game says the game is over", () => {
-  assert.equal(roundBar(g, theme).round, txt("frame.over").de);
-  assert.match(roundBar(g, theme).who.text, /beendet/);
+  assert.equal(roundBar(g, theme).round, txt("frame.over").text);
+  assert.match(roundBar(g, theme).who.text, /Game over/);
 });

@@ -76,7 +76,7 @@ const CHECKS_SELL = (corp: string, percent: number, price: number) => String.raw
   const q = (s) => document.querySelector(s);
   const posted = async () => (await (await fetch("/__posted")).json());
   if (!q(".stock-sheet")) fail("the Markt view is not the one shown");
-  if (!/Markt/.test(q(".frame-tabs").textContent)) fail("no tab Markt");
+  if (!/Market/.test(q(".frame-tabs").textContent)) fail("no tab Market");
   if (document.querySelectorAll(".stock-row").length < 5) fail("rows " + document.querySelectorAll(".stock-row").length);
   if ([...document.querySelectorAll(".frame-entry")].some((e) => ["buy_shares", "sell_shares", "par", "pass"].includes(e.dataset.type))) fail("generic bar still offers claimed actions");
   if (q(".kit-dialog")) fail("a dialog is open before any choice");
@@ -96,10 +96,10 @@ const CHECKS_SELL = (corp: string, percent: number, price: number) => String.raw
   offers.find((b) => b.dataset.kind === "sell").click();
   await sleep(50);
   const sentence = q(".kit-dialog .kit-order-sentence") || fail("no order in the dialog");
-  if (!/${corp}: ${percent} % verkaufen, Erlös £${price}\./.test(sentence.textContent)) fail("sentence: " + sentence.textContent);
+  if (!/${corp}: sell ${percent} %, proceeds £${price}\./.test(sentence.textContent)) fail("sentence: " + sentence.textContent);
   if (q(".kit-dialog .kit-main-btn").disabled) fail("main button locked although valid");
   if (!q('.stock-cell[data-preview="true"]')) fail("no preview cell for the price after the sale");
-  if (!/Kasse/.test(q(".kit-dialog .kit-changes").textContent)) fail("no cash change line");
+  if (!/Cash/.test(q(".kit-dialog .kit-changes").textContent)) fail("no cash change line");
   if ((await posted()).length !== 0) fail("choosing sent something");
   q(".kit-dialog .kit-main-btn").click();
   await sleep(600);
@@ -115,9 +115,9 @@ const CHECKS_CLOSE = (corp: string) => String.raw`(async () => {
   if (!q(".kit-dialog")) fail("no dialog");
   q(".kit-dialog .stock-offer").click();
   await sleep(50);
-  ([...q(".kit-dialog").querySelectorAll("button")].find((b) => b.textContent === "Abbrechen") || fail("no Abbrechen once an offer is chosen")).click();
+  ([...q(".kit-dialog").querySelectorAll("button")].find((b) => b.textContent === "Cancel") || fail("no Cancel once an offer is chosen")).click();
   await sleep(50);
-  if (q(".kit-dialog")) fail("Abbrechen did not close the dialog");
+  if (q(".kit-dialog")) fail("Cancel did not close the dialog");
   q('.stock-hold[data-corp="${corp}"]').click();
   await sleep(50);
   q(".kit-backdrop").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
@@ -131,7 +131,7 @@ const CHECKS_BUY = String.raw`(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s);
   const tabs = [...document.querySelectorAll('.stock-tabs [role="tab"]')].map((t) => t.textContent);
-  if (tabs.join("|") !== "Aktienmarkt|Open Market") fail("tabs " + tabs);
+  if (tabs.join("|") !== "Stock market|Open Market") fail("tabs " + tabs);
   let offers = [];
   for (const row of [...document.querySelectorAll(".stock-row")].filter((r) => r.dataset.actionable === "true")) {
     row.querySelector(".stock-rowbtn").click();
@@ -144,14 +144,14 @@ const CHECKS_BUY = String.raw`(async () => {
   }
   if (!offers.length) fail("no corporation offers anything to buy");
   if (offers.some((b) => b.dataset.kind === "sell")) fail("the buy dialog offers a sale");
-  if (offers.some((b) => b.dataset.kind === "buy" && /Markt,/.test(b.textContent))) fail("market shares in the Aktienmarkt tab");
+  if (offers.some((b) => b.dataset.kind === "buy" && /Open Market,/.test(b.textContent))) fail("market shares in the Aktienmarkt tab");
   q(".kit-backdrop").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   await sleep(50);
   document.querySelector('.stock-tabs [data-tab="market"]').click();
   await sleep(50);
   const rows = [...document.querySelectorAll(".stock-row")];
   if (!rows.length) fail("Open Market lists no corporation");
-  if (rows.some((r) => !/Markt \d+/.test(r.textContent))) fail("a corporation without market shares in the Open Market tab");
+  if (rows.some((r) => !/Open Market \d+/.test(r.textContent))) fail("a corporation without market shares in the Open Market tab");
 })()`;
 
 // Pass is a kind of the action box without options (#497 S3): step 1 button, then the one entry, then the main button.
@@ -201,7 +201,7 @@ const CHECKS_BOX = String.raw`(async () => {
   q(".kit-dialog .kit-side-btn").click();
   await sleep(100);
   if (q(".kit-dialog")) fail("closing the dialog left it open");
-  if (!qa(".frame-option").length) fail("closing the dialog left the kind (Abbrechen is not Zurück)");
+  if (!qa(".frame-option").length) fail("closing the dialog left the kind (Cancel is not Back)");
   q(".frame-kind-back").click();
   await sleep(100);
   if (qa(".stock-row").length !== all) fail("back did not show all cards again");
@@ -212,12 +212,12 @@ const CHECKS_MAP = String.raw`(async () => {
   const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const tabs = () => [...document.querySelectorAll(".frame-tabs button")];
-  (tabs().find((b) => b.textContent === "Karte") || fail("no tab Karte")).click();
+  (tabs().find((b) => b.textContent === "Map") || fail("no tab Map")).click();
   await sleep(100);
-  if (document.querySelector(".stock-sheet")) fail("the tab Karte did not leave the sheet");
-  (tabs().find((b) => b.textContent === "Markt") || fail("tab Markt gone")).click();
+  if (document.querySelector(".stock-sheet")) fail("the tab Map did not leave the sheet");
+  (tabs().find((b) => b.textContent === "Market") || fail("tab Market gone")).click();
   await sleep(100);
-  if (!document.querySelector(".stock-sheet")) fail("tab Markt does not return to the sheet");
+  if (!document.querySelector(".stock-sheet")) fail("tab Market does not return to the sheet");
 })()`;
 
 async function scenario(name: string, checks: string) {

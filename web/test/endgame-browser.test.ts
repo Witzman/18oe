@@ -47,7 +47,7 @@ const CHECKS = String.raw`(async () => {
   await sleep(50);
   if (!q(".frame-log")) fail("log drawer did not open");
   // Map button collapses the board; the views are still there.
-  [...end.querySelectorAll("button")].find((b) => b.textContent === "Karte ansehen").click();
+  [...end.querySelectorAll("button")].find((b) => b.textContent === "View the map").click();
   await sleep(50);
   if (q(".frame-end").dataset.open !== "false") fail("board did not collapse");
   if (!q(".frame-view")) fail("view gone");

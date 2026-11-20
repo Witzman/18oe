@@ -44,7 +44,7 @@ export interface LadderRow { id: string; n: number; label: string; owner: string
 export function ladder(g: Game): LadderRow[] {
   return (g.state.concession ?? []).map((c, i) => ({
     id: c.id, n: i + 1, label: fillText("concession.n", { n: i + 1 }),
-    owner: c.owner ? playerName(g, c.owner) : txt("concession.owner_none").de,
+    owner: c.owner ? playerName(g, c.owner) : txt("concession.owner_none").text,
     mine: c.owner !== null && c.owner === g.viewer,
     state: c.status === "done" ? "done" : c.status === "current" ? "active" : "future",
   }));
@@ -153,8 +153,8 @@ export function sentenceFor(g: Game, sel: Selection, map: MapGeometry | null, ki
   const eff = effectiveSelection(g, sel, map, kind);
   if (isHomeToken(g)) {
     const t = homeTargets(g, map).find((x) => x.city === eff.city);
-    const confirm = txt("concession.confirm_home").de;
-    if (!t) return { text: txt("concession.home_pick").de, action: null, confirm };
+    const confirm = txt("concession.confirm_home").text;
+    if (!t) return { text: txt("concession.home_pick").text, action: null, confirm };
     const place = placeLabel(t);
     const text = t.zoneInfo
       ? fillText("concession.home_sentence", { place, zone: t.zoneInfo.id, price: formatGeld(t.zoneInfo.price) })
@@ -162,8 +162,8 @@ export function sentenceFor(g: Game, sel: Selection, map: MapGeometry | null, ki
     return { text, action: t.action, confirm };
   }
   const offer = offersIn(g, kind).find((o) => o.corp === eff.corp);
-  if (!offer) return { text: txt("concession.sentence_pick").de, action: null, confirm: txt("concession.confirm_float").de };
-  const confirm = txt(offer.kind === "par_only" ? "concession.confirm_par" : "concession.confirm_float").de;
+  if (!offer) return { text: txt("concession.sentence_pick").text, action: null, confirm: txt("concession.confirm_float").text };
+  const confirm = txt(offer.kind === "par_only" ? "concession.confirm_par" : "concession.confirm_float").text;
   const opt = offer.prices.find((x) => x.price === eff.price && x.action);
   if (!opt) return { text: fillText("concession.sentence_pick_price", { corp: offer.corp }), action: null, confirm };
   return { text: fillText(`concession.sentence_${offer.kind}`, { corp: offer.corp, price: formatGeld(opt.price) }), action: opt.action, confirm };
@@ -228,11 +228,11 @@ function fold(part: Fold, title: string, open: boolean, h: Handlers, ...content:
 }
 
 function zoneRows(g: Game, open: boolean, h: Handlers): VNode {
-  return fold("zones", txt("concession.zones").de, open, h,
+  return fold("zones", txt("concession.zones").text, open, h,
     v("ul", { class: "concession-zone-list" }, ...g.state.zones.map((z) => v("li", { "data-zone": z.id, "data-free": String(z.free) },
       fillText("concession.zone_row", { zone: z.id, price: formatGeld(z.price), left: z.chits_left }),
       z.discount > 0 ? ` · ${fillText("concession.zone_discount", { pct: z.discount })}` : "",
-      z.free ? "" : ` · ${txt("concession.zone_full").de}`))));
+      z.free ? "" : ` · ${txt("concession.zone_full").text}`))));
 }
 
 function offerCard(g: Game, o: Offer, selected: boolean, h: Handlers, theme: Theme): VNode {
@@ -251,8 +251,8 @@ function priceRow(o: Offer, sel: Selection, h: Handlers): VNode {
   return v("div", { class: "concession-prices", role: "group", "aria-label": fillText("concession.par_row", { corp: o.corp }) },
     ...o.prices.map((pr) => {
       const picked = sel.price === pr.price;
-      const cost = pr.cost !== null ? fillText("concession.cost_regional", { amount: formatGeld(pr.cost) }) : o.kind === "minor" ? fillText("concession.cost_minor", { price: formatGeld(pr.price) }) : txt("concession.cost_par_only").de;
-      const reason = pr.reason === null ? undefined : txt(pr.reason === "cash" ? "concession.invalid_cash" : "concession.invalid_now").de;
+      const cost = pr.cost !== null ? fillText("concession.cost_regional", { amount: formatGeld(pr.cost) }) : o.kind === "minor" ? fillText("concession.cost_minor", { price: formatGeld(pr.price) }) : txt("concession.cost_par_only").text;
+      const reason = pr.reason === null ? undefined : txt(pr.reason === "cash" ? "concession.invalid_cash" : "concession.invalid_now").text;
       return v("button", {
         type: "button", class: "concession-price", "data-price": String(pr.price), "aria-pressed": String(picked),
         "data-state": reason ? "invalid" : picked ? "selected" : "normal", disabled: reason !== undefined, title: reason ?? cost,
@@ -281,13 +281,13 @@ export function FoundingOptions(g: Game, sel: Selection, map: MapGeometry | null
   const chosen = os.find((o) => o.corp === eff.corp);
   return [
     step ? v("div", { class: "concession-stephead" },
-      v("p", { class: "concession-step", role: "status" }, fillText("concession.step", { n: step.n, total: step.total, title: txt(`concession.step_${step.kind}`).de })),
-      back ? v("button", { type: "button", class: "concession-back", onclick: () => h.onBack?.() }, txt("concession.back").de) : null) : null,
+      v("p", { class: "concession-step", role: "status" }, fillText("concession.step", { n: step.n, total: step.total, title: txt(`concession.step_${step.kind}`).text })),
+      back ? v("button", { type: "button", class: "concession-back", onclick: () => h.onBack?.() }, txt("concession.back").text) : null) : null,
     // Once a corporation is chosen only its card stays, pressed, above the par values.
     v("div", { class: "concession-cards" }, ...(chosen ? [chosen] : os).map((o) => offerCard(g, o, o.corp === eff.corp, h, theme))),
     chosen ? priceRow(chosen, eff, h) : null,
     // Assumption: the engine's help text for the step (D7) is not in the view yet; the two cases are told here.
-    v("p", { class: "muted concession-help" }, txt(step?.kind === "confirm" ? "concession.confirm_hint" : parOnly ? "concession.help_par_only" : "concession.help_float").de),
+    v("p", { class: "muted concession-help" }, txt(step?.kind === "confirm" ? "concession.confirm_hint" : parOnly ? "concession.help_par_only" : "concession.help_float").text),
   ].filter((n): n is VNode => n !== null);
 }
 
@@ -308,20 +308,20 @@ export function ConcessionPanel(g: Game, sel: Selection, map: MapGeometry | null
     const step = progress(g, sel, map);
     body.push(
       v("div", { class: "concession-stephead" },
-        v("p", { class: "concession-step", role: "status" }, fillText("concession.step", { n: step!.n, total: step!.total, title: txt(`concession.step_${step!.kind}`).de })),
-        backSelection(g, sel, map) !== null ? v("button", { type: "button", class: "concession-back", onclick: () => h.onBack?.() }, txt("concession.back").de) : null),
+        v("p", { class: "concession-step", role: "status" }, fillText("concession.step", { n: step!.n, total: step!.total, title: txt(`concession.step_${step!.kind}`).text })),
+        backSelection(g, sel, map) !== null ? v("button", { type: "button", class: "concession-back", onclick: () => h.onBack?.() }, txt("concession.back").text) : null),
       v("p", {}, fillText("concession.home_for", { corp: String(p.actions[0]?.entity ?? "") })),
       v("div", { class: "concession-targets" }, ...homeTargets(g, map).map((t) => targetButton(t, t.city === eff.city, h))),
-      v("p", { class: "muted concession-help" }, txt(step?.kind === "confirm" ? "concession.confirm_hint" : "concession.home_hint").de));
+      v("p", { class: "muted concession-help" }, txt(step?.kind === "confirm" ? "concession.confirm_hint" : "concession.home_hint").text));
   } else if (running) {
     body.push(v("p", { class: "concession-running" }, fillText("concession.running", { who: running.owner, n: running.n })));
   }
   const showZones = mine && (isFounding(g) || isHomeToken(g));
-  return v("section", { class: "concession-panel", "aria-label": txt("concession.title").de },
+  return v("section", { class: "concession-panel", "aria-label": txt("concession.title").text },
     // What the viewer must decide comes first; the folds below it never push it out of view.
     ...body,
     showZones ? zoneRows(g, open.zones, h) : null,
-    fold("ladder", txt("concession.ladder").de, open.ladder || !mine, h, Leiter(steps, txt("concession.ladder").de)));
+    fold("ladder", txt("concession.ladder").text, open.ladder || !mine, h, Leiter(steps, txt("concession.ladder").text)));
 }
 
 // ---- mount --------------------------------------------------------------------------------------

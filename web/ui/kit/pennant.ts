@@ -23,7 +23,7 @@ export function Wimpel(player: Player, o: PennantOptions): VNode {
   const attrs = {
     class: "kit-pennant",
     "data-state": state,
-    "aria-label": `Spieler ${player.seat}, ${player.name}`,
+    "aria-label": `Player ${player.seat}, ${player.name}`,
     "aria-disabled": state === "invalid" ? "true" : undefined,
     "aria-current": state === "selected" ? "true" : undefined,
   };

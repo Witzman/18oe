@@ -146,7 +146,7 @@ const DANGER_CHECKS = String.raw`(async () => {
   q(".kit-main-btn").click();
   await sleep(600);
   if ((await posted()) !== 1) fail("second click did not send");
-  if (!/Nicht erlaubt: nope/.test(q(".msg").textContent)) fail("engine message not shown: " + q(".msg").textContent);
+  if (!/Not allowed: nope/.test(q(".msg").textContent)) fail("engine message not shown: " + q(".msg").textContent);
   if (!q(".kit-order")) fail("selection lost after 422");
   q(".kit-order .kit-side-btn").click();
   await sleep(50);

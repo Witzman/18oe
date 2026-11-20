@@ -106,7 +106,7 @@ const DIVIDEND = String.raw`(async () => {
   q('.op-opt[data-kind="payout"]').click();
   await sleep(200);
   if (q(".kit-main-btn").disabled) fail("main button locked after the choice");
-  if (!/Alles ausschütten/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/Pay all/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   if ((await (await fetch("/__posted")).json()).length !== 0) fail("choosing sent something");
   q(".kit-main-btn").click();
   await sleep(600);
