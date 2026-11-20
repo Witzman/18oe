@@ -47,3 +47,12 @@
 .or-mark { width: 1.1em; text-align: center; }
 .or-owner { font-size: .85rem; color: var(--ui-faint); }
 .or-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Port authority signs as on the board (issue 478): blue North Sea, green Mediterranean; the name is the carrier, the colour only the match to the board. Buttons keep the 44 px target. */
+.op-signs { display: flex; gap: var(--shape-gap, 8px); flex-wrap: wrap; }
+.op-sign { align-items: center; justify-content: center; text-align: center; min-width: 8rem; border: 2px solid var(--stock-cell); box-shadow: 0 0 0 1px var(--ui-rule); }
+.op-sign[data-area="north_sea"], .op-sheet-fact[data-area="north_sea"] b { background: var(--stock-sign-north); color: var(--stock-sign-north-ink); }
+.op-sign[data-area="mediterranean"], .op-sheet-fact[data-area="mediterranean"] b { background: var(--stock-sign-med); color: var(--stock-sign-med-ink); }
+.op-sign .op-opt-name, .op-sign .op-sign-price { color: inherit; }
+.op-sign-price { font-variant-numeric: tabular-nums; font-size: var(--type-sm); }
+.op-sheet-fact[data-area] b { padding: 0 6px; border-radius: var(--shape-radius); }
