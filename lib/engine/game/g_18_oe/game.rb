@@ -84,6 +84,9 @@ module Engine
           %w[40 50 55 60 65 70],
           %w[30 40 50 55 60],
         ].freeze
+        # Certificate limits for 3 to 7 players: Info Board "Game Limits" (stock board).
+        # ASSUMPTION, no source (#521): 2 players => 99 (no limit). Neither the Info Board,
+        # Rulebook 4.1 nor Playbook 5.4 gives a 2-player figure; owner decided 2026-11-20 to keep it.
         CERT_LIMIT = { 2 => 99, 3 => 48, 4 => 36, 5 => 29, 6 => 24, 7 => 20 }.freeze
         # Standard game: £5,400 total / num_players, rounded up to nearest £5.
         # 2-player variant uses without-concessions formula (£5,200 / 2 = £2,600).
