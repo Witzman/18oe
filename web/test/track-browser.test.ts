@@ -90,9 +90,9 @@ const TRACK = String.raw`(async () => {
   // Another tile, then tap the same hex again: the rotation turns.
   q('.track-tile[data-tile="8-8"]').click();
   await sleep(100);
-  if (!/Drehung 1 von 2/.test(q(".track-rotation").textContent)) fail("rotation label " + q(".track-rotation").textContent);
+  if (!/Rotation 1 of 2/.test(q(".track-rotation").textContent)) fail("rotation label " + q(".track-rotation").textContent);
   await tap("I86", "touch");
-  if (!/Drehung 2 von 2/.test(q(".track-rotation").textContent)) fail("second tap did not turn: " + q(".track-rotation").textContent);
+  if (!/Rotation 2 of 2/.test(q(".track-rotation").textContent)) fail("second tap did not turn: " + q(".track-rotation").textContent);
   if (!/M lays tile 8 on I86, rotation 2 of 2/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   // The way back to the map from another view.
   const other = [...document.querySelectorAll(".frame-tabs [role=tab]")].find((b) => b.getAttribute("aria-selected") !== "true");

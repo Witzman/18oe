@@ -35,15 +35,15 @@ const CHECKS = String.raw`(async () => {
   if (!end || end.dataset.open !== "true") fail("no open final standings");
   if (end.querySelectorAll("tbody tr").length < 3) fail("ranking rows");
   if (end.querySelectorAll(".frame-end-card").length < 3) fail("player cards");
-  if (!q(".frame-roundbar").textContent.includes("beendet")) fail("round bar does not say the game is over");
+  if (!q(".frame-roundbar").textContent.includes("Game over")) fail("round bar does not say the game is over");
   if (q(".frame-entry") || q(".kit-main-btn")) fail("actions offered after the end");
-  if (q(".frame-panel .frame-toggle[aria-expanded]") && /Aktionen/.test(q(".frame-panel").textContent)) fail("action toggle present");
+  if (q(".frame-panel .frame-toggle[aria-expanded]") && /Actions/.test(q(".frame-panel").textContent)) fail("action toggle present");
   const lobby = end.querySelector("a[href='#/']");
   if (!lobby) fail("no lobby link");
   const box = end.getBoundingClientRect();
   if (box.right > innerWidth + 1) fail("board overflows horizontally");
   // Log button opens the log drawer.
-  [...end.querySelectorAll("button")].find((b) => b.textContent === "Protokoll").click();
+  [...end.querySelectorAll("button")].find((b) => b.textContent === "Game log").click();
   await sleep(50);
   if (!q(".frame-log")) fail("log drawer did not open");
   // Map button collapses the board; the views are still there.
