@@ -73,6 +73,8 @@ async function run(dir: string, port: number, waitFor: string, checks: string): 
 const HEAD = String.raw`const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s);
+  // #497 S4: with several kinds offered the box shows step 1 (the kinds) first; a single kind skips it.
+  const pickKind = async (k) => { const b = q('.frame-kind[data-kind="' + k + '"]'); if (b) { b.click(); await sleep(60); } };
   const small = (sel) => { for (const e of document.querySelectorAll(sel)) { const r = e.getBoundingClientRect(); if (r.height < 43.5) fail(sel + " too small: " + r.height); } };`;
 
 const CHECKS_FOUND = String.raw`(async () => {
@@ -80,6 +82,12 @@ const CHECKS_FOUND = String.raw`(async () => {
   if (document.querySelectorAll(".concession-panel .kit-ladder li").length !== 10) fail("ladder rows");
   if (q(".frame-entry")) fail("generic bar still offers the claimed actions");
   if (!q(".kit-main-btn").disabled) fail("main button open without a choice");
+  if (q(".concession-card")) fail("cards before the kind is chosen (step 1 shows only the kinds)");
+  if (document.querySelectorAll(".frame-kind").length !== 2) fail("kinds " + document.querySelectorAll(".frame-kind").length);
+  small(".frame-kind");
+  await pickKind("float_minor");
+  if (document.querySelectorAll(".frame-kind").length) fail("other kinds stay visible inside a kind");
+  small(".frame-kind-back");
   const cards = document.querySelectorAll(".concession-card");
   if (cards.length < 2) fail("cards " + cards.length);
   small(".concession-card");
@@ -160,7 +168,7 @@ async function scenario(name: string, waitFor: string, checks: string, nextNames
 }
 
 test("concession in the browser: card and par value choose, the main button sends exactly the offered par action", { skip: browser ? false : "no headless browser installed" }, async () => {
-  const { posted, game } = await scenario("concession-minor", ".concession-card", CHECKS_FOUND);
+  const { posted, game } = await scenario("concession-minor", ".frame-kind", CHECKS_FOUND);
   assert.equal(posted.length, 1);
   assert.deepEqual(posted[0]!.action, game.state.prompt.actions.find((a: Record<string, unknown>) => a.type === "par" && a.corporation === "C" && String(a.share_price).startsWith("90,")));
   assert.equal(posted[0]!.seq, game.seq);
@@ -187,6 +195,7 @@ const CHECKS_CHAIN = String.raw`(async () => {
   for (let n = 0; n < corps.length; n++) {
     let card = null;
     for (let i = 0; i < 100; i++) {
+      if (!q(".concession-card") && !q(".frame[aria-busy]")) await pickKind("float_regional");
       card = q('.concession-card[data-corp="' + corps[n] + '"]');
       if (card && !card.disabled && !q(".frame[aria-busy]")) break;
       await sleep(50);
@@ -206,14 +215,14 @@ const CHECKS_CHAIN = String.raw`(async () => {
     if ((await posted()) !== n + 1) fail("concession " + (n + 1) + " not sent");
   }
   // after the 3rd: Bot 4 ran the 4th, the 5th is Witzman's again
-  for (let i = 0; i < 100 && (!q(".concession-card") || q(".frame[aria-busy]")); i++) await sleep(50);
+  for (let i = 0; i < 100 && (!q(".concession-card") || q(".frame[aria-busy]")); i++) { if (!q(".concession-card") && !q(".frame[aria-busy]")) await pickKind("float_regional"); await sleep(50); }
   if ([...document.querySelectorAll(".concession-card")].some((c) => c.disabled)) fail("5th concession not clickable");
   if (errs.length) fail("page errors: " + errs.join(" | "));
 })()`;
 
 test("concession in the browser (#289): 1st, 2nd and 3rd concession of the same viewer in a row, slow answers", { skip: browser ? false : "no headless browser installed" }, async () => {
   const states = ["concession-chain-next", "concession-chain-3", "concession-chain-4"];
-  const { posted } = await scenario("concession-chain", ".concession-card", CHECKS_CHAIN, states, { postMs: 700, getMs: 900 });
+  const { posted } = await scenario("concession-chain", ".frame-kind", CHECKS_CHAIN, states, { postMs: 700, getMs: 900 });
   assert.equal(posted.length, 3);
   assert.deepEqual(posted.map((p) => p.action.corporation), ["DSJ", "LNWR", "GWR"]);
   assert.deepEqual(posted.map((p) => p.seq), ["concession-chain", ...states.slice(0, 2)].map((n) => fixture(n).seq));
