@@ -69,15 +69,21 @@ describe 'G18OE Barclay, Bevan, Barclay and Tritton (§14.4)' do
       expect(step.entity_choices(bbbt)).to eq({})
     end
 
-    it 'closes the private at the end of the stock round, the reservation stays' do
+    # #513: §6.1 (p. 17) removes the private at once; §14.4 (2) names no other condition (unlike (3)). Before
+    # #513 this spec checked the removal at the end of the stock round.
+    it 'removes the private at once, the reservation stays (also after the stock round)' do
       regional
       bbbt
       choose!('bbbt_custody:LNWR')
       reserved = regional_shares_for_sale.find { |s| game.bbbt_custody?(s) }
 
+      expect(bbbt).to be_closed
+      expect(player.companies).not_to include(bbbt)
+      expect(game.bbbt_custody?(reserved)).to be(true)
+      expect(game.bbbt_custody_blocks?(rival, reserved.to_bundle)).to be(true)
+
       game.bbbt_end_of_stock_round!
 
-      expect(bbbt).to be_closed
       expect(game.bbbt_custody?(reserved)).to be(true)
     end
 
@@ -152,7 +158,9 @@ describe 'G18OE Barclay, Bevan, Barclay and Tritton (§14.4)' do
     end
   end
 
-  # Owner's reading (#78): Re-Par only at the conversion of the owner's regional, free choice from the major par list.
+  # The special case kept from #78 (#513): while the owner's regional converts, a free choice from the major par
+  # list (the re-par of the new major right at its float). The general re-par: barclay_bevan_repar_spec.rb.
+  # #513 removed the spec 'is not offered as an ordinary private choice': §14.4 (1) offers it on any stock action.
   describe '(1) re-par at conversion' do
     let(:own) { start_regional!(game, 'LNWR', player) }
 
@@ -165,13 +173,6 @@ describe 'G18OE Barclay, Bevan, Barclay and Tritton (§14.4)' do
     def finish_conversion!
       act!(round, Engine::Action::Pass.new(player))
       act!(round, Engine::Action::BuyShares.new(player, shares: own.ipo_shares.first, percent: 10))
-    end
-
-    it 'is not offered as an ordinary private choice' do
-      own
-      bbbt
-
-      expect(step.entity_choices(bbbt).keys.grep(/repar/)).to be_empty
     end
 
     it 'offers the six major par values while the regional converts' do

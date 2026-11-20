@@ -54,6 +54,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.Track": e("Gleis legen", "Lay track", "§11.1"),
   "step.HochbergToken": e("Hochberg-Marker setzen", "Place Hochberg token", "§14.8"),
   "step.SmlTrain": e("Bewahrten 2+2 zuweisen", "Assign preserved 2+2", "§14.10"),
+  "step.BbbtRepar": e("Re-Par (Barclay, Bevan, Barclay and Tritton)", "Re-set the par value (Barclay, Bevan, Barclay and Tritton)", "§14.4"),
   "step.HomeHexConsent": e("Gleisbau im Heimathex erlauben", "Home hex permission", "§11.1.9"),
   "step.Route": e("Fahrt", "Run routes", "§11.3"),
   "step.OrientExpressBonus": e("Orient-Express-Bonus", "Orient Express bonus", "§12, §12.2"),

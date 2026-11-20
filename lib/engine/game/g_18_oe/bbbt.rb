@@ -3,13 +3,13 @@
 module Engine
   module Game
     module G18OE
-      # §14.4 Barclay, Bevan, Barclay and Tritton (workshop #78). The owner exercises one of three abilities;
-      # this part has (2) custodianship and (3) protection of a share value marker against DOWN, both used on the
-      # owner's own turn of a stock round (the private choices of Step::BuySellParShares). (1) re-setting a par
-      # value is, by the owner's decision (#78/#466), used only when a regional of the owner converts to a major:
-      # a free choice from the major par list instead of the letter mapping (deviates from the wording of §14.4,
-      # which also allows the OR). (3) is also offered at the moment another player sells (#476, Step::ProtectShare);
-      # the use at a foreign purchase for (2) is not built yet.
+      # §14.4 Barclay, Bevan, Barclay and Tritton (workshop #78). The owner exercises one of three abilities on the
+      # owner's own turn of a stock round (the private choices of Step::BuySellParShares): (1) re-setting the par
+      # value of an owned regional or major that still has its par value marker (#513; also in that RR's OR,
+      # Step::BbbtRepar), (2) custodianship and (3) protection of a share value marker against DOWN. While the
+      # owner's regional converts, (1) is the free choice of the new major's par value (#78, kept as a special case).
+      # (3) is also offered at the moment another player sells (#476, Step::ProtectShare); the use at a foreign
+      # purchase for (2) is not built yet. (1) and (2) remove the private at once (§6.1), (3) at the end of the SR.
       module Bbbt
         BBBT_CUSTODY = 'bbbt_custody'
         BBBT_PROTECT = 'bbbt_protect'
@@ -26,13 +26,17 @@ module Engine
 
           choices = {}
           @corporations.each do |corporation|
+            bbbt_repar_cells(company, corporation).each do |cell|
+              choices["#{BBBT_REPAR}:#{corporation.id}:#{cell.price}"] = "Re-Par #{corporation.name}: #{format_currency(cell.price)}"
+            end
             choices["#{BBBT_CUSTODY}:#{corporation.id}"] = "Custodianship: share of #{corporation.name}" if bbbt_custody_share(corporation)
             choices["#{BBBT_PROTECT}:#{corporation.id}"] = "Protect #{corporation.name} from falling" if bbbt_protectable?(corporation)
           end
           choices
         end
 
-        # §14.4 (1), owner's reading: while the owner's regional converts, any major par value; {choice => text}.
+        # §14.4 (1) at the conversion (#78, special case kept by #513): while the owner's regional converts, any
+        # major par value for the new major; {choice => text}.
         def bbbt_repar_choices(company, corporation)
           return {} unless company == bbbt_company && !@bbbt_used && !company.closed? && company.owner == corporation.owner
 
@@ -60,14 +64,49 @@ module Engine
           cell
         end
 
+        # §14.4 (1) (#513): "re-set the par value of one owned regional or major. This regional or major must have a
+        # marker on the Par Values section of the Info Board" (§10.7: a major's until the end of the SR in which it
+        # floats, a regional's until it expands). The par values of the RR's type, without its current one.
+        def bbbt_repar_cells(company, corporation)
+          return [] unless company == bbbt_company && !@bbbt_used && !company.closed? && !face_down_private?(company)
+          return [] if corporation.closed? || !company.owner&.player? || corporation.owner != company.owner
+
+          cells =
+            case corporation.type
+            when :regional then corporation.floated? ? @stock_market.par_prices : []
+            when :major then corporation.always_market_price ? [] : bbbt_major_par_cells
+            else []
+            end
+          cells.reject { |cell| cell == corporation.par_price }.sort_by(&:price)
+        end
+
+        # A regional takes the new value as its par value (its share value is its par value, and the expansion
+        # follows the new letter, §9.3); a major's par value marker moves, its share value marker stays (purchases
+        # from the treasury use the par value while the marker lies, §10.2; Developer's Note: a brief effect).
+        def bbbt_repar_now!(company, corporation, price)
+          cell = bbbt_repar_cells(company, corporation).find { |c| c.price == price }
+          raise GameError, "#{format_currency(price)} is not a par value #{corporation.name} can take" unless cell
+
+          if corporation.type == :regional
+            @stock_market.move(corporation, cell.coordinates)
+            corporation.original_par_price = cell
+          end
+          corporation.par_price = cell
+          @bbbt_used = true
+          @log << "#{company.owner.name} re-sets the par value of #{corporation.name} to #{format_currency(cell.price)} " \
+                  "(#{company.name}); #{company.name} leaves the game"
+          company.close!
+        end
+
         def bbbt_choice?(choice)
           choice.start_with?(BBBT_CUSTODY, BBBT_PROTECT, BBBT_REPAR)
         end
 
         def bbbt_exercise!(company, choice)
-          kind, id = choice.split(':', 2)
+          kind, id, price = choice.split(':', 3)
           corporation = corporation_by_id(id)
           raise GameError, "Unknown corporation #{id}" unless corporation
+          return bbbt_repar_now!(company, corporation, price.to_i) if kind == BBBT_REPAR
 
           if kind == BBBT_CUSTODY
             bbbt_custody!(company, corporation)
@@ -103,9 +142,13 @@ module Engine
           share = bbbt_custody_share(corporation)
           raise GameError, "No share of #{corporation.name} can be put into custodianship" unless share
 
-          (@bbbt_custody ||= {})[share] = company.owner
-          @log << "#{company.owner.name} puts a share of #{corporation.name} into custodianship (#{company.name}): " \
-                  "reserved for #{company.owner.name}"
+          owner = company.owner
+          (@bbbt_custody ||= {})[share] = owner
+          @log << "#{owner.name} puts a share of #{corporation.name} into custodianship (#{company.name}): " \
+                  "reserved for #{owner.name}; #{company.name} leaves the game"
+          # §6.1 (#513): the private leaves the game at once; its marker stays on the share until it is bought or
+          # exchanged at a minor's merge (§14.4 (2)), kept in @bbbt_custody.
+          company.close!
         end
 
         # §14.4 (3): the share value marker of any RR (also a foreign one) may not move DOWN for the rest of the SR.
@@ -158,7 +201,8 @@ module Engine
           super(bundle, allow_president_change: allow_president_change, swap: swap, movement: :none)
         end
 
-        # §14.4: "Exercising ability (2) or (3) closes this private at end of the SR."
+        # §14.4 (3): "When the SR ends, remove the marker and the private certificate from play." (1) and (2) have
+        # removed it already (§6.1).
         def bbbt_end_of_stock_round!
           @bbbt_protected = nil
           company = bbbt_company

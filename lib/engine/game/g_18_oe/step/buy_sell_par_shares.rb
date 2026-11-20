@@ -341,7 +341,7 @@ module Engine
             company = action.target
             raise GameError, "Cannot #{action.choice} #{company.name}" unless private_choices(company).key?(action.choice)
 
-            if action.choice.start_with?(Engine::Game::G18OE::Bbbt::BBBT_REPAR)
+            if @converting && action.choice.start_with?(Engine::Game::G18OE::Bbbt::BBBT_REPAR)
               @repar_cell = @game.bbbt_repar!(company, @converting, action.choice)
             elsif @game.bbbt_choice?(action.choice)
               @game.bbbt_exercise!(company, action.choice)
@@ -669,7 +669,8 @@ module Engine
             actions
           end
 
-          # §14.4 (1), owner's reading (#78): only while the owner's own regional converts.
+          # §14.4 (1) at the conversion of the owner's own regional (#78, kept as a special case by #513): the new
+          # major's par value, chosen before it floats. The general re-par is a private choice (Game#bbbt_choices).
           def repar_available?(player)
             !repar_choices_for(player).empty?
           end
