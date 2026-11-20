@@ -14,6 +14,15 @@ export const DIVIDEND_STEP = "Dividend";
 export const OPERATING_TYPES = [[ROUTE_STEP, "run_routes"], [ROUTE_STEP, "choose"], [DIVIDEND_STEP, "dividend"]] as const;
 
 export interface PullmanOption { choice: string; label: string; action: Action }
+/** The engine's start of the help line that names the Orient Express duty (§12.2, Game::ORIENT_EXPRESS_REQUIRED, #512). */
+const ORIENT_REQUIRED_PREFIX = "Orient Express is required";
+/** True while the Route step's help says the best routes include an Orient Express run (§12.2, #512). */
+export function orientRequired(g: Game): boolean {
+  if (g.state.prompt.step !== ROUTE_STEP) return false;
+  const help = g.state.prompt.help;
+  return (Array.isArray(help) ? help : [help]).some((line) => typeof line === "string" && line.startsWith(ORIENT_REQUIRED_PREFIX));
+}
+
 /** The `choose` actions of the Route step whose choice starts with `prefix`, with the label the view gives them. */
 function routeChoices(g: Game, prefix: string): PullmanOption[] {
   if (g.state.prompt.step !== ROUTE_STEP || !g.state.prompt.viewer_to_act) return [];
