@@ -222,7 +222,7 @@ describe 'G18OE trade offer between players (§10.4, #202)' do
     seller_view = Oe::View.render(game, viewer: seller.id, log: 0)[:prompt]
     buyer_view = Oe::View.render(game, viewer: buyer.id, log: 0)[:prompt]
 
-    trade = { buyer: buyer.id, seller: seller.id, kind: 'company', target: company.id, price: 35 }
+    trade = { buyer: buyer.id, seller: seller.id, kind: 'company', target: company.id, price: 35, give: [], also: [] }
     expect(seller_view[:step]).to eq('TradeOffer')
     expect(seller_view[:context][:trade]).to eq(trade)
     expect(seller_view[:choices].map { |c| c[:choice] }).to eq(['accept_trade'])
