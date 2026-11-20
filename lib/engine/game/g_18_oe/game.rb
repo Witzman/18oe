@@ -34,6 +34,7 @@ require_relative 'step/merge_offer'
 require_relative 'step/merge_token'
 require_relative 'step/concession'
 require_relative 'step/reserve_share'
+require_relative 'step/protect_share'
 require_relative 'step/trade_offer'
 require_relative 'step/orient_express_bonus'
 require_relative 'step/route'
@@ -1577,6 +1578,7 @@ module Engine
             G18OE::Step::MergeDiscardTrain,
             G18OE::Step::MergeMinor,
             G18OE::Step::ReserveShare,
+            G18OE::Step::ProtectShare,
             G18OE::Step::MergeOffer,
             G18OE::Step::TradeOffer,
             G18OE::Step::BuySellParShares,
