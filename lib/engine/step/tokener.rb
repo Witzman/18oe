@@ -109,6 +109,8 @@ module Engine
         prices = tokens.map(&:price)
 
         @game.abilities(token.corporation, :token) do |ability, _|
+          next if ability.special_only # a private's own token (SpecialToken step), not a price of the RR's token (#487)
+
           prices << ability.price(token)
           prices << ability.teleport_price
         end
