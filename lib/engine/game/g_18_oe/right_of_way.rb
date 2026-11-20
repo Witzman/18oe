@@ -72,8 +72,7 @@ module Engine
         end
 
         # Can the RR reach another town or city with yellow lays, `points` tile points and `cash`?
-        def right_of_way_yellow_connection?(entity, points, cash)
-          homes = right_of_way_home_nodes(entity)
+        def right_of_way_yellow_connection?(entity, points, cash, homes: right_of_way_home_nodes(entity))
           home_hexes = homes.map(&:hex)
           queue = []
           seen = {}
@@ -118,6 +117,22 @@ module Engine
             end
           end
           false
+        end
+
+        # Last paragraph of §11.1.9: "The president may not select a home token position that triggers the need
+        # to place a green tile as outlined above if a token position is available that would not do so."
+        # Would the home station in `city` leave the RR unable to connect to another stop (so Part 1 would apply)?
+        def right_of_way_home_position_needed?(corporation, city)
+          right_of_way_rules? && @phase.name == RIGHT_OF_WAY_PHASE &&
+            !right_of_way_yellow_connection?(corporation, tile_point_budget(corporation), corporation.cash, homes: [city])
+        end
+
+        # Positions of a metropolis the home station may take: those that do not trigger the green tile, or
+        # all of them when every one does.
+        def home_position_cities(corporation, hex)
+          open = hex.tile.cities.select { |city| city.tokenable?(corporation, free: true) }
+          fine = open.reject { |city| right_of_way_home_position_needed?(corporation, city) }
+          fine.empty? ? open : fine
         end
 
         private
