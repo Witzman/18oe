@@ -279,6 +279,37 @@ export function marketModel(g: Game, rows: CorpRow[], focus: string | null, sel:
   };
 }
 
+// ---- Par Prices (the board's table, #478) ----------------------------------------------------------------
+
+/** One field of the Par Prices table: the tier, its letter (A is the cheapest par of the tier), the price. */
+export interface ParFieldModel {
+  tier: "regional" | "major"; letter: string; price: number;
+  /** The corporation in focus can be founded at this price (a valid par cell on the Kurstafel). */
+  valid: boolean;
+  /** Corporations of the tier that were founded at this par price. */
+  corps: string[];
+}
+/** Four columns as on the board: Regional A to C, Regional D to F, Major A to C, Major D to F; each column from the dearest letter down. */
+export interface ParTableModel { columns: ParFieldModel[][] }
+export const PAR_COLUMN_SIZE = 3;
+
+export function parTableModel(g: Game, market: MarketModel): ParTableModel {
+  const grid = g.state.market.rows;
+  const cells = market.rows.flat().filter((c): c is MarketCellModel => c !== null);
+  const columns: ParFieldModel[][] = [];
+  for (const [tier, type] of [["regional", "par"], ["major", "convert_range"]] as const) {
+    const letters = [...letterOf(grid, type)].sort((a, b) => a[0] - b[0]);
+    for (let at = 0; at < letters.length; at += PAR_COLUMN_SIZE) {
+      columns.push(letters.slice(at, at + PAR_COLUMN_SIZE).reverse().map(([price, letter]) => ({
+        tier, letter, price,
+        valid: cells.some((c) => c.type === type && c.price === price && c.valid),
+        corps: g.state.corporations.filter((c) => !c.closed && c.type === tier && c.par_price === price).map((c) => c.id),
+      })));
+    }
+  }
+  return { columns };
+}
+
 // ---- Auftrag -------------------------------------------------------------------------------------------
 
 export interface OrderChange { label: string; before: number | string; after: number | string; money: boolean }

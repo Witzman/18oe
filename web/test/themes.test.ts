@@ -114,6 +114,8 @@ for (const t of themes) {
       // Rundenanzeiger, Betriebsreihenfolge, Hafenschilder (#478 slice 2).
       ["running round disc ink", t.stock.roundOnInk, t.stock.roundOn, 4.5],
       ["running round disc on board", t.stock.roundOn, t.stock.field, 1.5],
+      ["Par Prices tier label on panel", t.stock.par, t.stock.cell, 4.5],
+      ["Par Prices divider on panel", t.stock.parRule, t.stock.cell, 1.3],
       ["finished order cell ink", t.stock.orderDoneInk, t.stock.orderDone, 4.5],
       ["North Sea sign ink", t.stock.signNorthInk, t.stock.signNorth, 4.5],
       ["Mediterranean sign ink", t.stock.signMedInk, t.stock.signMed, 4.5],

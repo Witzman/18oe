@@ -9,7 +9,7 @@ import { Auftrag, Dialog, Geld, inkFor, playerSlot, Siegel, v, type VNode } from
 import { formatGeld } from "../kit/money.ts";
 import { fillText, txt } from "../text.ts";
 import type { Kind } from "../frame/kinds.ts";
-import { blockedReason, holdings, inTab, isMarketKind, offerOf, offersFor, offersOfKind, orderModel, rowsForKind, sealStack, type BuyOffer, type CorpRow, type MarketCellModel, type MarketModel, type Mode, type MustSell, type Offer, type ParOffer, type SellOffer, type Selection, type Tab } from "./stock-model.ts";
+import { blockedReason, holdings, inTab, isMarketKind, offerOf, offersFor, offersOfKind, orderModel, rowsForKind, sealStack, type BuyOffer, type CorpRow, type MarketCellModel, type MarketModel, type Mode, type ParFieldModel, parTableModel, type MustSell, type Offer, type ParOffer, type SellOffer, type Selection, type Tab } from "./stock-model.ts";
 
 export interface SheetHandlers {
   /** A corporation card: opens the dialog to buy or found (#408). */
@@ -209,6 +209,31 @@ function gridNode(i: SheetInput, h: SheetHandlers): VNode {
       v("li", { "data-mark": "preview" }, txt("stock.legend_after").de)));
 }
 
+/** Par Prices as on the board (#478): four columns of three fields, the price on both sides of the tier label. A field the corporation
+ *  in focus can be founded at is a button that picks that par (the same pick as the cell on the Kurstafel); the others only show. */
+function parTableNode(i: SheetInput, h: SheetHandlers): VNode {
+  const field = (f: ParFieldModel): VNode => {
+    const name = fillText(f.tier === "major" ? "stock.par_field_major" : "stock.par_field_regional", { letter: f.letter, price: formatGeld(f.price) });
+    const label = f.corps.length > 0 ? fillText("stock.par_field_corps", { field: name, corps: f.corps.join(", ") }) : name;
+    const attrs = { class: "stock-par-field", "data-par-field": `${f.tier}-${f.letter}`, "data-tier": f.tier, "data-valid": f.valid ? "true" : "false", "data-price": String(f.price), "aria-label": label };
+    const body = [
+      v("span", { class: "stock-par-price", "aria-hidden": "true" }, String(f.price)),
+      v("span", { class: "stock-par-name", "aria-hidden": "true" }, fillText(f.tier === "major" ? "stock.major_label" : "stock.par_regional", { letter: f.letter })),
+      v("span", { class: "stock-par-price", "aria-hidden": "true" }, String(f.price)),
+      f.corps.length > 0 ? v("span", { class: "stock-par-corps", "aria-hidden": "true" }, f.corps.join(" ")) : null,
+    ];
+    const row = i.rows.find((r) => r.id === i.focus);
+    const offer = f.valid ? row?.pars.find((p) => i.market.rows.flat().some((c) => c && c.row === p.cell?.row && c.col === p.cell?.col && c.price === f.price && c.type === (f.tier === "major" ? "convert_range" : "par"))) : undefined;
+    if (row && offer) return v("button", { ...attrs, type: "button", onclick: () => h.onPick(row.id, offer.key) }, ...body);
+    return v("div", attrs, ...body);
+  };
+  const t = parTableModel(i.g, i.market);
+  return v("section", { class: "stock-par", "aria-label": txt("stock.par_title").de },
+    v("h3", { class: "stock-par-title" }, txt("stock.par_title").de),
+    v("p", { class: "stock-par-sub" }, txt("stock.par_sub").de),
+    v("div", { class: "stock-par-table" }, ...t.columns.map((col) => v("div", { class: "stock-par-col" }, ...col.map(field)))));
+}
+
 /** Player order for the head: this round's in a stock round (seat order of the view), else the next stock round's (`meta.priority`, priority deal first; #406). */
 function orderLine(g: Game): VNode | null {
   if (g.state.meta.finished) return null;
@@ -258,7 +283,7 @@ export function sheetNode(i: SheetInput, h: SheetHandlers): VNode {
       orderLine(i.g),
       me ? v("span", { class: "stock-cash" }, `${txt("stock.cash").de} `, Geld(me.cash), ` · ${txt("stock.certs").de} ${fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit })}`) : null),
     i.must ? v("p", { class: "stock-warn", role: "alert" }, fillText("stock.must_sell", { limit: i.must.limit, certs: i.must.certs })) : null,
-    v("div", { class: "stock-body" }, listNode(i, h), holdingsNode(i, h), gridNode(i, h)));
+    v("div", { class: "stock-body" }, listNode(i, h), holdingsNode(i, h), gridNode(i, h), parTableNode(i, h)));
   return v("div", { class: "stock-stage" }, sheet, stockDialog(i, h) ?? cellListDialog(i, h));
 }
 
