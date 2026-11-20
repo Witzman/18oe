@@ -340,6 +340,7 @@
     "panelWidth": 312,
     "topbarHeight": 48,
     "panelRadius": 10,
+    "orderRing": 3,
     "sheetMaxHeight": 50,
     "zoneLine": 0.08,
     "focusLine": 0.09,
