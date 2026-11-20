@@ -18,7 +18,7 @@
 # players ends regularly (bank broken) in Train Phase 4, turn 12 to 14, so the Consolidation round (it follows the
 # first Level-5 train) is never played; the 3 player game reaches Phase 5 and plays it. Hence game 2 runs with
 # 3 players (`players: 3` in the slice file; full.yml runs one job per game). The targets under `combos` are reached;
-# the ones under `unreachable` are not.
+# the ones under `unreachable` are not. Game 3 (#492) and game 4 (#224) steer one target each and are not yet measured.
 # The director steers one thing for S2: it chooses a minor of its own for a merge (ScriptGame#start_merge, the
 # choice carries the minor's id and is no target); without it stock/MergeMinor/merge was never offered.
 # stock/BuySellParShares/choose:<minor id> (starting a merge) is keyed by the minor's id, so it cannot be a
@@ -30,8 +30,6 @@ slice: S2
 unreachable:
   consolidation/Consolidate/choose:offer_or_abandon: >-
     Offered only to the owner of a minor who has no major to merge it into and no regional. The rush games that reach the Consolidation round (game 2, 3 players, Phase 5) did not offer it (CI runs of #481); 4 to 6 player games end in Train Phase 4 before the round. A small scenario shows the enumerator offers it (spec/oe/s2_targets_spec.rb); steering a game to that state is the target-driven director of #118.
-  operating/DiscardTrain/discard_train: >-
-    A corporation is over its train limit only when the limit falls (Phase 4: major 4 to 3, minor and regional 2 to 1; Phase 6: major 3 to 2) while it holds more trains than the new limit. In the rush games no corporation was crowded when the Phase 4 or Phase 5 train was bought (CI runs of #481, 3 to 6 players; the Consolidation round's own discard is a different key, consolidation/DiscardTrain). A small scenario (a major with four 3-trains, spec/oe/s2_targets_spec.rb) shows the enumerator offers it; steering it is the target-driven director of #118.
 games:
   - name: rush game, conversions, merges and discards
     seed: 1
@@ -67,3 +65,13 @@ games:
     # `convert` when the round starts. A game of its own, so game 2 stays as measured; NOT yet run by CI.
     combos:
       - consolidation/Consolidate/convert
+  - name: rush game, trains crowded by the Phase 4 limit
+    seed: 1
+    finish: false
+    rush: true
+    # #224: while the discard is missing the director fills every corporation up to its train limit in Phases 2 and 3
+    # (ScriptGame#crowd_trains), so the first 4 train leaves the full ones over the lower limit (major 4 to 3, minor and
+    # regional 2 to 1). A game of its own, so game 1 stays as measured; NOT yet run by CI. 4 players: the game reaches
+    # Train Phase 4 (#481).
+    combos:
+      - operating/DiscardTrain/discard_train

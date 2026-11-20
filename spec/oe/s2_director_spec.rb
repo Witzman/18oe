@@ -62,8 +62,29 @@ RSpec.describe "S2 director steering (#481)" do
     end
   end
 
+  describe "filling a corporation with trains for the Phase 4 discard (#224)" do
+    let(:targets) { %w[operating/DiscardTrain/discard_train] }
+    let(:regional) { start_regional!(game, "LNWR", game.players.first) }
+    let(:offers) do
+      game.depot.upcoming.first(2).map { |t| { "type" => "buy_train", "entity" => regional.id, "train" => t.id, "price" => t.price, "variant" => nil } }
+    end
+
+    it "buys a depot train while the corporation is below its limit in Phase 3" do
+      at_phase!(game, "3")
+      expect(script.send(:director, "operating", "BuyTrain", prompt(*offers))).to eq(offers.min_by { |a| a["price"] })
+    end
+
+    it "leaves a corporation at its limit, a later phase and a reached target alone" do
+      at_phase!(game, "3")
+      with_trains!(game, regional, "3", "3")
+      expect(script.send(:director, "operating", "BuyTrain", prompt(*offers))).to be_nil
+      script.instance_variable_set(:@targets, [])
+      expect(script.send(:director, "operating", "BuyTrain", prompt(*offers))).to be_nil
+    end
+  end
+
   it "reads the seats of a game from the slice file, 4 without a `players:`" do
-    expect([0, 1, 2].map { |game| Oe::ScriptGame.players("s2", game) }).to eq([4, 3, 3])
+    expect([0, 1, 2, 3].map { |game| Oe::ScriptGame.players("s2", game) }).to eq([4, 3, 3, 4])
     expect(Oe::ScriptGame.players("s1", 0)).to eq(4)
   end
 end
