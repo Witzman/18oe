@@ -376,6 +376,8 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "frame.panel": e("Actions", "Action panel", "—"),
   "frame.panel_collapse": e("Collapse panel: the map is freed, the main action stays on one line", "Collapse panel", "—"),
   "frame.home_title": e("Centre the map on the active company's home station and zoom in", "Centre the map on the active company's home station and zoom in", "—"),
+  "frame.action_row": e("Actions", "Actions", "—"),
+  "frame.step_reopen": e("Open: {step}", "Open: {step}", "—"),
   "frame.panel_expand": e("Expand panel", "Expand panel", "—"),
   "frame.log_hint": e("Game log: what has happened so far", "Game log", "—"),
   "frame.players": e("Players", "Players", "—"),

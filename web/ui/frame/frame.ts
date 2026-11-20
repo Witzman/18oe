@@ -69,6 +69,9 @@ export interface GameFrame {
   subscribe: (fn: (g: Game) => void) => () => void;
 }
 
+/** Operating steps whose choice is a dialog over the map (#528); Track and Token are chosen on the map itself, their tiles sit in the row. */
+const OP_DIALOG_STEPS = ["Route", "Dividend", "BuyTrain"];
+
 const theme = (): Theme => choiceFromRoot(document.documentElement).theme;
 const put = (el: Element, ...nodes: (VNode | string | null)[]) =>
   el.replaceChildren(...nodes.filter((n): n is VNode | string => n !== null).map((n) => toDom(n)));
@@ -113,6 +116,11 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   let endOpen = true;
   let panelHides = 0;
   let rowOwners = 0; // panels that draw the kind row (#527)
+  // Operating round (#528): no box over the map. The head of the acting company, the order with the main button and the choice of
+  // the step sit in a row under the bands; the choice of Run, Dividend and Buy train is a dialog (closable, the row reopens it).
+  let opRow = false;
+  let opClosedKey: string | null = null;
+  let opDialogKey: string | null = null;
   const frame: GameFrame = {} as GameFrame;
   const listeners = new Set<(g: Game) => void>();
   const disposers: (() => void)[] = [];
@@ -179,10 +187,14 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   contextEl.append(loadingEl);
   const kindHost = h("div", { class: "frame-kind-host" });
   kindHost.hidden = true;
+  const rowHead = h("div", { class: "frame-actionrow-head" });
+  const rowStep = h("div", { class: "frame-actionrow-step" });
+  const rowEl = h("div", { class: "frame-actionrow", "aria-label": txt("frame.action_row").text }, rowHead, rowStep);
+  rowEl.hidden = true;
   const body = h("div", { class: "frame-body" }, mainEl, panelEl, logHost, kindHost);
   logHost.hidden = true;
   const headEl = h("header", { class: "frame-head" }, roundEl, playersEl);
-  const root = h("div", { class: "frame" }, headEl, orderEl, band.el, body, versionButton());
+  const root = h("div", { class: "frame" }, headEl, orderEl, band.el, rowEl, body, versionButton());
 
   const providers = new Map<Kind, Set<(g: Game) => VNode[]>>();
   const stageListeners = new Set<() => void>();
@@ -272,8 +284,58 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     panelHome.dataset.corp = acting?.id ?? "";
     // Operating round (#302): the compact head of the acting company (numbers, step strip), no rules text.
     const sheet = opSheet(game, t);
-    put(contextEl, sheet ? OpSheetView(sheet) : null);
-    contextEl.append(contextSlot);
+    opRow = sheet !== null;
+    if (opRow) {
+      put(opHeadEl, OpSheetView(sheet!));
+      contextEl.replaceChildren();
+    } else {
+      contextEl.replaceChildren();
+      contextEl.append(contextSlot);
+    }
+    placeOperating();
+  }
+  const opHeadEl = h("div", { class: "frame-actionrow-sheet" });
+  const opReopen = h("button", { type: "button", class: "frame-step-open" });
+  opReopen.addEventListener("click", () => { opClosedKey = null; if (game) drawBar(); });
+  const adopt = (parent: Element, ...nodes: Element[]) => { for (const n of nodes) if (n.parentNode !== parent) parent.append(n); };
+  const opKey = (g: Game): string => `${g.state.meta.current?.id ?? ""}:${g.state.prompt.step ?? ""}`;
+  // The choice of these steps is a dialog while it is the viewer's turn; the choice of the other steps (Track, Token) is a bar in the row.
+  const opDialogWanted = (): boolean => !!game && opRow && game.state.prompt.viewer_to_act && OP_DIALOG_STEPS.includes(game.state.prompt.step ?? "") && opClosedKey !== opKey(game);
+  // Moves the parts of the box between the box (not an operating round) and the row (operating round); a node is moved only
+  // when its parent changes, so the focus and the scroll of what stays survive a redraw.
+  function placeOperating() {
+    rowEl.hidden = !opRow;
+    if (!opRow) {
+      adopt(panelHead, panelHome);
+      adopt(panelBody, drawerEl);
+      adopt(panelEl, barEl);
+      adopt(contextEl, contextSlot);
+      return;
+    }
+    adopt(rowHead, opHeadEl, panelHome, opReopen, barEl);
+    adopt(rowEl, drawerEl);
+    const wanted = opDialogWanted();
+    if (!wanted && contextSlot.parentNode !== rowStep) rowStep.append(contextSlot);
+    const mineDialogStep = !!game && game.state.prompt.viewer_to_act && OP_DIALOG_STEPS.includes(game.state.prompt.step ?? "");
+    // Closed: the content stays out of the way (hidden in the bar), the button reopens it.
+    rowStep.hidden = mineDialogStep;
+    opReopen.hidden = !(mineDialogStep && !wanted);
+    if (game) opReopen.textContent = fillText("frame.step_reopen", { step: stepLabel(game.state.prompt.step) });
+  }
+  // Dialog of the operating step: built once per step and company, so a choice inside it keeps focus and scroll.
+  function drawStepDialog(g: Game) {
+    const key = opKey(g);
+    if (opDialogKey === key && kindHost.contains(contextSlot)) { kindHost.hidden = false; return; }
+    const close = () => { opClosedKey = key; drawBar(); };
+    const dialog = toDom(Dialog({
+      id: "frame-step", title: stepLabel(g.state.prompt.step), onClose: close, body: [],
+      actions: [v("button", { type: "button", class: "kit-side-btn", "data-action": "close-step", onclick: close }, txt("stock.close").text)],
+    }));
+    (dialog as HTMLElement).querySelector(".kit-dialog-body")!.append(contextSlot);
+    kindHost.hidden = false;
+    kindHost.replaceChildren(dialog);
+    opDialogKey = key;
+    (contextSlot.querySelector<HTMLElement>(".op-opt, .track-tile, .token-city, button") ?? kindHost.querySelector<HTMLElement>("button"))?.focus();
   }
 
   // ---- main area -------------------------------------------------------------------------------
@@ -372,6 +434,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   // the backdrop and "Close" go back to the choice of the kind (nothing is sent). The panels' own kinds stay in the sheet.
   function drawKindDialog() {
     const g = game;
+    if (g && opDialogWanted()) return drawStepDialog(g);
+    opDialogKey = null;
     const m = model();
     const block = g && m?.kinds && rowed() && g.state.prompt.viewer_to_act && stage !== null ? m.kinds.find((b) => b.kind === stage) : undefined;
     kindHost.hidden = !block || block.provided === true;
@@ -416,6 +480,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     }
     put(drawerEl, ...drawerNodes);
     drawerEl.hidden = drawerNodes.length === 0;
+    placeOperating();
     drawKindDialog();
     drawLog();
     drawLayout();
@@ -434,7 +499,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       context: contextEl.querySelector(".op-sheet") !== null || contextSlot.childElementCount > 0 || loadingEl.isConnected,
       message: (message.el.textContent ?? "") !== "", stall: !stallEl.hidden,
     });
-    panelEl.hidden = (panelHides > 0 || rowed()) && idle;
+    panelEl.hidden = opRow || ((panelHides > 0 || rowed()) && idle);
     panelEl.dataset.collapsed = collapsed ? "true" : "false";
     panelToggle.setAttribute("aria-expanded", String(!collapsed));
     const label = txt(collapsed ? "frame.panel_expand" : "frame.panel_collapse").text;
@@ -451,7 +516,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     const t = e.target as HTMLElement | null;
     if (t && t !== document.body && t.closest("input, textarea, select, button, a, summary, [contenteditable], dialog")) return;
     if (document.querySelector("dialog[open]")) return;
-    const main = root.querySelector<HTMLButtonElement>(".kit-dialog .kit-main-btn") ?? panelEl.querySelector<HTMLButtonElement>(".kit-main-btn");
+    const main = root.querySelector<HTMLButtonElement>(".kit-dialog .kit-main-btn") ?? rowEl.querySelector<HTMLButtonElement>(".kit-main-btn") ?? panelEl.querySelector<HTMLButtonElement>(".kit-main-btn");
     if (!main || main.disabled) return;
     e.preventDefault();
     main.click();

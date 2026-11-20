@@ -3,7 +3,7 @@
 .track-points, .token-left { margin: 0 0 var(--shape-gap); font-weight: bold; }
 .track-map { min-height: 2.75rem; margin-bottom: var(--shape-gap); }
 /* "Zur Karte" only while another view (market, opening) covers the map (issue 302). */
-.frame-body:has(.frame-view > .frame-map) .track-map { display: none; }
+.frame:has(.frame-view > .frame-map) .track-map { display: none; }
 .track-hexes, .token-cities { display: flex; flex-wrap: wrap; gap: 6px; }
 .track-hexes > *, .token-cities > * { flex: 1 1 8rem; }
 .track-hex, .token-city { min-height: 2.75rem; text-align: left; background: var(--ui-panel-alt); border: 1px solid var(--ui-rule); border-radius: var(--shape-radius); padding: 6px 10px; }
