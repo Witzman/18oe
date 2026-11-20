@@ -704,22 +704,18 @@ module Oe
     # multiset of names is offered once.
     def generate_double_head_trains(_step, entity)
       candidates = @game.double_head_candidates(entity)
-      combos = double_head_combinations(candidates)
+      combos = RouteSearch.new(@game).combinations(candidates)
       return [] if combos.empty?
+
+      # §12.2 (#512): when the best routes need a combination, only that one is offered
+      required = @game.orient_express_required(entity, [])
+      return [A::DoubleHeadTrains.new(entity, trains: required[:combine])] if required&.dig(:combine)
 
       need = OrientExpressReach.new(@game, entity).fewest_cities(candidates)
       return [] unless need
 
       fitting = combos.select { |trains| trains.sum { |t| @game.distance(t).first } >= need }
       sample(fitting).map { |trains| A::DoubleHeadTrains.new(entity, trains: trains) }
-    end
-
-    # Every set of two or more candidates, one per multiset of train names,
-    # smallest first.
-    def double_head_combinations(candidates)
-      sorted = candidates.sort_by { |t| [t.name, t.id] }
-      (2..sorted.size).flat_map { |n| sorted.combination(n).to_a }
-        .uniq { |trains| trains.map(&:name) }
     end
 
     # The fewest cities (city and offboard stops) on an Orient Express route
@@ -737,22 +733,8 @@ module Oe
       end
 
       def fewest_cities(trains)
-        trial = trial_train(trains)
-        routes, = RouteSearch.new(@game).path([trial], @entity, walk_limit: RoutePicker::WALK_LIMIT,
-                                                                sea_walk_limit: RoutePicker::SEA_WALK_LIMIT)
-        routes[trial].select { |route| @game.orient_express_run?(route) }
+        RouteSearch.new(@game).orient_express_routes(@entity, trains)
           .map { |route| route.visited_stops.count { |stop| !stop.town? } }.min
-      end
-
-      private
-
-      def trial_train(trains)
-        cities, towns = trains.map { |t| @game.distance(t) }.transpose.map(&:sum)
-        distance = [
-          { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
-          { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
-        ]
-        Engine::Train.new(name: "#{cities}+#{towns}", distance: distance, price: 0).tap { |t| t.owner = @entity }
       end
     end
 
@@ -833,28 +815,30 @@ module Oe
       # phases 7-8, 40 searches): 21 s instead of 169 s in all, at most 2.3 s
       # instead of 47 s; revenue equal in 35 of 40, the others -100, -20 (3x)
       # and +300 (the picker is greedy, more candidates are not always better).
-      WALK_LIMIT = 10_000
+      WALK_LIMIT = RouteSearch::WALK_LIMIT
       # Visits of the second pass, the one that also crosses the sea (#359): it
       # runs only for an RR whose network reaches a port it may use, after the
       # land pass, so land routes keep their WALK_LIMIT. Measured in the PR.
-      SEA_WALK_LIMIT = 5_000
+      SEA_WALK_LIMIT = RouteSearch::SEA_WALK_LIMIT
 
       def initialize(game, entity)
         @game = game
         @entity = entity
       end
 
+      # §12.2 (#512): when the routes picked leave out an Orient Express run the
+      # RR must make, the best routes found with it are offered instead (the
+      # engine rejects the others); the game reuses this search's candidates.
       def call
         router = RouteSearch.new(@game)
-        train_routes, = router.path(@game.route_trains(@entity).sort_by(&:price), @entity,
-                                    walk_limit: WALK_LIMIT, sea_walk_limit: SEA_WALK_LIMIT)
-        chosen = []
-        combined_first(train_routes).each do |train, candidates|
-          route = candidates.find { |candidate| compatible?(router, chosen, train, candidate) }
-          chosen << route if route
-        end
-        settle(chosen)
-        chosen
+        train_routes = router.train_routes(@entity)
+        chosen = router.pick(combined_first(train_routes))
+        required = @game.respond_to?(:orient_express_required) &&
+                   @game.orient_express_required(@entity, chosen, train_routes)
+        return chosen unless required
+
+        # a combination comes first (generate_double_head_trains offers it); no run before it
+        required[:routes]
       end
 
       private
@@ -867,25 +851,6 @@ module Oe
         train_routes.each_with_index
           .sort_by { |(train, _), i| [@game.combined_train?(train) ? 0 : 1, i] }
           .map(&:first)
-      end
-
-      # Each route validates itself against the other chosen routes, so the
-      # shared `routes` list must be the final one before the action is built.
-      def settle(chosen)
-        chosen.each do |route|
-          route.clear_cache!(only_routes: true)
-          route.routes = chosen
-        end
-      end
-
-      def compatible?(router, chosen, _train, candidate)
-        trial = chosen + [candidate]
-        trial.each { |r| r.routes = trial }
-        router.real_revenue(trial) >= 0 && candidate.revenue.positive?
-      rescue Engine::GameError
-        false
-      ensure
-        settle(chosen)
       end
     end
   end
