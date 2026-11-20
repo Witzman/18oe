@@ -62,6 +62,9 @@ test("head bar (#300): short round label and the compact order strip", () => {
   const items = find(strip, (n) => n.attrs.class === "order-strip-item");
   assert.deepEqual(items.map((n) => n.attrs["data-state"]), ["done", "current", "next", "next", "next", "next"]);
   assert.equal(items.filter((n) => n.attrs["aria-current"] === "step").length, 1);
+  // Board look (#478): numbered cells, finished and running ones marked by a sign, not by colour only.
+  assert.deepEqual(find(strip, (n) => n.attrs.class === "order-strip-no").map(textOf), ["1", "2", "3", "4", "5", "6"]);
+  assert.deepEqual(find(strip, (n) => n.attrs.class === "order-strip-mark").map(textOf), ["✓", "▶", "", "", "", ""]);
   const folded = OrderBandView(orBand(g, theme)!, theme, { collapsed: true, onToggle: () => {} });
   assert.equal(find(folded, (n) => n.attrs.class === "order-strip-item").length, 0);
   const btn = find(folded, (n) => n.tag === "button")[0]!;

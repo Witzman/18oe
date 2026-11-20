@@ -11,12 +11,13 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 
 const USAGE = `bin/shot <url|file> <out.png> [--width N] [--height N] [--theme brett|atlas]
          [--device ipad|ipad-10.2] [--orientation landscape|portrait] [--engine auto|chromium|webkit]
-         [--tile-style full|inner] [--wait-for <css selector>] [--delay ms] [--eval <js>]
+         [--scale 1..4] [--tile-style full|inner] [--wait-for <css selector>] [--delay ms] [--eval <js>]
   url    http(s) URL, including a #hash route (e.g. http://127.0.0.1:4567/#/kit)
   file   local HTML file; its directory is served as site root on 127.0.0.1 (module scripts
          and root-absolute paths like /main.js work, e.g. web/dist/index.html#/kit)
   --theme       sets localStorage oe.theme before the page runs
   --tile-style  sets localStorage oe.tileStyle
+  --scale       device scale factor 1 to 4 (default 1; output is width*scale pixels wide; not with --device)
   --wait-for    waits (max 15 s) until the selector matches
   --delay       extra wait in ms after load (default 300)
   --eval        JS run in the page after load/wait-for, before the shot (e.g. to set state)
@@ -56,7 +57,7 @@ export function resolveDevice(o) {
 }
 
 export function parseArgs(argv) {
-  const opts = { device: null, orientation: "landscape", engine: "auto", width: 1280, height: 800, delay: 300, theme: null, tileStyle: null, waitFor: null, evalJs: null, fullPage: false };
+  const opts = { device: null, orientation: "landscape", engine: "auto", width: 1280, height: 800, delay: 300, theme: null, tileStyle: null, waitFor: null, evalJs: null, fullPage: false, scale: 1 };
   const pos = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -71,12 +72,14 @@ export function parseArgs(argv) {
     else if (a === "--device") opts.device = val();
     else if (a === "--orientation") opts.orientation = val();
     else if (a === "--engine") opts.engine = val();
+    else if (a === "--scale") opts.scale = Number(val());
     else if (a === "--full-page") opts.fullPage = true;
     else if (a === "-h" || a === "--help") opts.help = true;
     else if (a.startsWith("--")) throw new Error(`unknown option ${a}`);
     else pos.push(a);
   }
   [opts.width, opts.height, opts.delay].forEach((n) => { if (!Number.isFinite(n) || n < 0) throw new Error("--width/--height/--delay need numbers"); });
+  if (!Number.isFinite(opts.scale) || opts.scale < 1 || opts.scale > 4) throw new Error("--scale needs a number from 1 to 4");
   if (!["auto", "chromium", "webkit"].includes(opts.engine)) throw new Error("--engine needs auto, chromium or webkit");
   [opts.input, opts.out] = pos;
   return opts;
@@ -227,7 +230,7 @@ async function main() {
 
     await send("Page.enable");
     await send("Runtime.enable");
-    await send("Emulation.setDeviceMetricsOverride", { width: o.width, height: o.height, deviceScaleFactor: dev?.dpr ?? 1, mobile: !!dev });
+    await send("Emulation.setDeviceMetricsOverride", { width: o.width, height: o.height, deviceScaleFactor: dev?.dpr ?? o.scale, mobile: !!dev });
     if (dev) {
       await send("Emulation.setUserAgentOverride", { userAgent: dev.ua, platform: "iPad" });
       await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });

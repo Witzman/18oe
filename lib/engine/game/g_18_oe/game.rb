@@ -2100,13 +2100,32 @@ module Engine
         end
 
         # §9.4 step 4: every other asset on the charter except trains goes. Merged-minor track
-        # rights left with the minor charters in step 3; port authorities (#56) and private markers
-        # (S8) do not exist yet and join here with their issues.
+        # rights left with the minor charters in step 3; port authorities go in port_authority_off!. Private
+        # markers: the pass-through tokens of Star Harbor and Central Circle (§14.5/§14.6, they stay in
+        # extra city positions after step 2) and the Swift Metropolitan Line marker on the 2+2 (§14.10:
+        # the train stays, as an ordinary one: it counts against the limit, DiscardTrain then applies).
+        # The private certificates stay with the players. Other privates leave nothing on the charter.
         def national_charter_assets_off!(corporation)
+          national_pass_tokens_off!(corporation)
+          national_sml_marker_off!(corporation)
           return unless orient_express_marker?(corporation)
 
           @orient_express_markers.delete(corporation)
           @log << "#{corporation.name} loses its Orient Express marker"
+        end
+
+        def national_pass_tokens_off!(corporation)
+          tokens = hexes.flat_map { |hex| hex.tile.cities }.flat_map(&:extra_tokens)
+                        .select { |token| pass_token?(token) && token.corporation == corporation }
+          tokens.each(&:remove!)
+          @log << "#{corporation.name} loses its #{tokens.size} private token(s) from the map" unless tokens.empty?
+        end
+
+        def national_sml_marker_off!(corporation)
+          return unless @sml_train && corporation.trains.include?(@sml_train)
+
+          @sml_train = nil
+          @log << "#{corporation.name} loses the Swift Metropolitan Line marker; its 2+2 stays as an ordinary train"
         end
 
         def location_hexes(names)

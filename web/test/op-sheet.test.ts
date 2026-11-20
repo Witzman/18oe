@@ -87,6 +87,7 @@ test("#56: the head names the water area of the company's port authority marker 
   assert.ok(!facts(g).some((f) => f.key === "op.port_authority"), "no marker, no fact");
   g.state.corporations.find((c) => c.id === "B")!.port_authority = "north_sea";
   assert.equal(facts(g).find((f) => f.key === "op.port_authority")!.value, "Nordsee");
+  assert.equal(facts(g).find((f) => f.key === "op.port_authority")!.area, "north_sea");
 });
 
 test("run bands (#155): the offered run of the active company, chains and stops as the prompt carries them", () => {

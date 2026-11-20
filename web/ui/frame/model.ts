@@ -20,6 +20,20 @@ export interface RoundBarModel {
   bank: number;
   finished: boolean;
 }
+// Round indicator as on the board (#478): Stock, OR 1 .. OR n, the running one active. Only the stock and the
+// operating round have markers; auction, concession, consolidation and the end keep the text chip (null).
+export interface RoundMarker { key: string; label: string; active: boolean }
+export interface RoundMarkers { markers: RoundMarker[]; set: number | null }
+export function roundMarkers(g: Game): RoundMarkers | null {
+  const m = g.state.meta;
+  const r = m.round;
+  if (m.finished || (r.type !== "stock" && r.type !== "operating")) return null;
+  const ors = Math.max(m.phase.operating_rounds, r.type === "operating" ? r.turn : 1);
+  const markers: RoundMarker[] = [{ key: "stock", label: txt("round.mark_stock").de, active: r.type === "stock" }];
+  for (let n = 1; n <= ors; n++) markers.push({ key: `or${n}`, label: fillText("round.mark_or", { n }), active: r.type === "operating" && r.turn === n });
+  return { markers, set: r.number };
+}
+
 export interface PlayerRow {
   id: string; seat: number; name: string; cash: number; value: number;
   certs: number; certLimit: number; priority: boolean; toAct: boolean; bot: boolean; me: boolean;
