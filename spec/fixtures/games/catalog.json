@@ -324,6 +324,11 @@
       "surface": "Zugphase 7",
       "slice": "S3",
       "reason": "Seit den Faehrkosten (#61, #73) zeigt keine Katalogpartie diesen Fall: strategy-4p-1 erreicht ihn in 6000 Aktionen nicht (28 min Lauf), strategy-3p-1 endet nach 5432 Aktionen ohne Phase 7. Eintrag, sobald eine Partie ihn zeigt (#442). Regel durch Engine-Specs gedeckt."
+    },
+    {
+      "surface": "§12.1 Kombination angeboten, angenommen, Orient Express gefahren (DoubleHeadTrains, danach OrientExpressBonus)",
+      "slice": "S3",
+      "reason": "Kein Katalogspieler fuehrt die Kombination aus: Bots und Strategie kombinieren nie (legal_actions_double_head_spec, 'is not chosen by the bot'), und die Skript-Partie erreicht sie nicht (s1.yml fuehrt operating/OrientExpressBonus/choose unter unreachable, kein Ziel double_head_trains). Entscheid Eigentuemer 2026-11-20 (#412): kein Katalogspieler 'script', fruehestens in v0.3 neu bewertet. In der CI gedeckt durch spec/oe/legal_actions_double_head_spec.rb ('is accepted; run_routes then runs the combined train on the Orient Express and the bonus follows', Angebot ueber LegalActions, Annahme, 4+4 auf dem Orient-Express-Lauf, Schritt OrientExpressBonus mit Wahl cash/right), spec/oe/legal_actions_double_head_real_map_spec.rb (dieselbe Kette auf der echten Karte, Paris - Konstantinopel) und spec/engine/g_18_oe/pullman_combined_spec.rb (Engine: Kombination, Pullman auf dem kombinierten Zug). Eintrag, sobald eine Partie die Kombination zeigt."
     }
   ]
 }
