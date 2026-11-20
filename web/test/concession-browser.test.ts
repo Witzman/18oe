@@ -81,13 +81,15 @@ const CHECKS_FOUND = String.raw`(async () => {
   ${HEAD}
   if (document.querySelectorAll(".concession-panel .kit-ladder li").length !== 10) fail("ladder rows");
   if (q(".frame-entry")) fail("generic bar still offers the claimed actions");
-  if (!q(".kit-main-btn").disabled) fail("main button open without a choice");
+  // Step 1 has no order: no main button yet (#497 S4); it appears, locked, once a kind is chosen.
+  if (q(".kit-main-btn") && !q(".kit-main-btn").disabled) fail("main button open in step 1");
   if (q(".concession-card")) fail("cards before the kind is chosen (step 1 shows only the kinds)");
   if (document.querySelectorAll(".frame-kind").length !== 2) fail("kinds " + document.querySelectorAll(".frame-kind").length);
   small(".frame-kind");
   await pickKind("float_minor");
   if (document.querySelectorAll(".frame-kind").length) fail("other kinds stay visible inside a kind");
   small(".frame-kind-back");
+  if (!q(".kit-main-btn") || !q(".kit-main-btn").disabled) fail("main button open without a choice");
   const cards = document.querySelectorAll(".concession-card");
   if (cards.length < 2) fail("cards " + cards.length);
   small(".concession-card");
