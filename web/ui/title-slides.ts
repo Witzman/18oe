@@ -1,5 +1,5 @@
 // Slides of the title screen (#460): screenshots of the running UI, the scenes of the feedback board (bin/boardshots.json
-// of the product). Files in web/title/, copied to dist by build.mjs. Order: the map first. The pictures show recorded example
+// of the workshop repo). Files in web/title/, copied to dist by build.mjs. Order: the map first. The pictures show recorded example
 // games, not a running game. Interval and fade are theme tokens (motion.titleSlideMs, motion.titleFadeMs).
 export interface Slide { scene: string; alt: string /* text.ts key */ }
 

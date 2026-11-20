@@ -63,13 +63,11 @@ In the WebKit engine only `oeTouch("tap", [{x,y}])` exists.
 `flock` on `tmp/heavy.lock` of the main `18oe` checkout before it starts a browser; other heavy jobs
 use `flock /home/witzman/18oe/tmp/heavy.lock <command>`. `OE_HEAVY_LOCK_HELD=1` skips it if you already hold it.
 
-## Screenshots for the UI feedback board (#374)
+## Screenshots for the UI feedback board
 
-`bin/boardshots [scene ...]` takes the scenes of `bin/boardshots.json` (a recorded game fixture each, served by a stub
-API, no engine) with the real built UI (`cd web && npm run build` first) at 1747x923 into `tmp/board/<scene>.png`
-(`OE_BOARD_OUT` changes the folder). Every scene is its own `bin/shot.mjs` run under a hard timeout and `heavy.lock`
-(one browser at a time, foreground only). A new scene is a line in `bin/boardshots.json`; `web/test/boardshots.test.ts`
-checks names and fixtures. The board page itself and how to publish it are in the workshop (`notes/ui-feedback/`).
+The feedback board and its screenshot tool live in the workshop repo (`bin/boardshots`, scenes in `bin/boardshots.json`,
+#374, moved there in #502). The tool reads this product (built `web/dist`, the recorded game fixtures in
+`web/test/fixtures/games/`, `bin/shot.mjs`); `bin/shot.mjs --scale N` (1 to 4) takes a sharper picture.
 
 ## Rules engine
 
