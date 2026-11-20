@@ -73,9 +73,9 @@ const CHECKS = String.raw`(async () => {
   if (rows.length !== 2) fail("rows " + rows.length);
   small(".train-row");
   if (rows[0].dataset.train !== "2+2-0" || rows[0].dataset.reserved !== "true") fail("reserved row not first");
-  if (!/Pflichtkauf/.test(rows[0].textContent)) fail("no mark");
-  if (!rows[1].disabled || !/Erst der Pflichtkauf/.test(rows[1].textContent)) fail("foreign train not invalid with reason");
-  if (!/Zugpflicht/.test(q(".train-duty").textContent)) fail("duty line");
+  if (!/Mandatory purchase/.test(rows[0].textContent)) fail("no mark");
+  if (!rows[1].disabled || !/The mandatory 2\+2 first/.test(rows[1].textContent)) fail("foreign train not invalid with reason");
+  if (!/Train obligation/.test(q(".train-duty").textContent)) fail("duty line");
   if (q(".frame-entry")) fail("generic bar still offers the claimed actions");
   if (!/mandatory 2\+2 for £100/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   if (q(".kit-main-btn").disabled) fail("main button locked although the only legal choice is previewed");

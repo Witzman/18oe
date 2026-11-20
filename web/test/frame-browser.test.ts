@@ -142,7 +142,7 @@ const DANGER_CHECKS = String.raw`(async () => {
   q(".kit-main-btn").click();
   await sleep(300);
   if ((await posted()) !== 0) fail("a dangerous action was sent on the first click");
-  if (!/Wirklich/.test(q(".kit-main-btn").textContent)) fail("no second-click label: " + q(".kit-main-btn").textContent);
+  if (!/Really/.test(q(".kit-main-btn").textContent)) fail("no second-click label: " + q(".kit-main-btn").textContent);
   q(".kit-main-btn").click();
   await sleep(600);
   if ((await posted()) !== 1) fail("second click did not send");

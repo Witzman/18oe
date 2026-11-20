@@ -109,8 +109,8 @@ const CHECKS_BID = String.raw`(async () => {
   if (q("#auction-amount-hint").dataset.bad !== "true") fail("hint not marked");
   if (document.activeElement !== input) fail("input lost the focus while typing");
   await type("130");
-  if (!/Bieten: Silver Banner Line mit £130/.test(q(".kit-order-sentence").textContent)) fail("bid sentence: " + q(".kit-order-sentence").textContent);
-  if (!/Bieten £130/.test(q(".kit-main-btn").textContent)) fail("button: " + q(".kit-main-btn").textContent);
+  if (!/Bid on Silver Banner Line: £130/.test(q(".kit-order-sentence").textContent)) fail("bid sentence: " + q(".kit-order-sentence").textContent);
+  if (!/Bid £130/.test(q(".kit-main-btn").textContent)) fail("button: " + q(".kit-main-btn").textContent);
   q(".kit-main-btn").click();
   await sleep(600);
   const p = await posted();
@@ -123,7 +123,7 @@ const CHECKS_PASS = String.raw`(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s);
   const side = q('.auction-head [data-action="pass"]') || fail("no pass button");
-  if (!/Passen/.test(side.textContent)) fail("label " + side.textContent);
+  if (!/Pass/.test(side.textContent)) fail("label " + side.textContent);
   q('.auction-card[data-card="WS"]').click();
   await sleep(50);
   if (!/Place bid on Wien Südbahnhof: £40/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
@@ -169,7 +169,7 @@ const CHECKS_RUNNING = String.raw`(async () => {
   if (!/High bid £130 by p3/.test(q(".auction-running").textContent)) fail("high bid: " + q(".auction-running").textContent);
   if (q(".auction-card[data-running=true]").getAttribute("aria-pressed") !== "true") fail("running lot not preselected");
   if (q(".auction-bidform input").value !== "135") fail("amount " + q(".auction-bidform input").value);
-  if (!/Bieten: Silver Banner Line mit £135/.test(q(".kit-order-sentence").textContent)) fail("sentence " + q(".kit-order-sentence").textContent);
+  if (!/Bid on Silver Banner Line: £135/.test(q(".kit-order-sentence").textContent)) fail("sentence " + q(".kit-order-sentence").textContent);
   if (q('.auction-card[data-card="B"]').dataset.state !== "blocked") fail("other lots must not be choosable during the auction");
   q(".kit-main-btn").click();
   await sleep(600);

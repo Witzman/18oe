@@ -98,7 +98,7 @@ const CHECKS_FOUND = String.raw`(async () => {
   small(".concession-price");
   q('.concession-price[data-price="90"]').click();
   await sleep(50);
-  if (!/Minor C zum Kurs/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/Float minor C at £90/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   if ((await (await fetch("/__posted")).json()).length !== 0) fail("choosing sent something");
   q(".kit-main-btn").click();
   await sleep(600);
@@ -243,7 +243,7 @@ test("stall line in the browser (#289): nobody to act is said, with a reload but
     const code = await run(dir, (server.address() as { port: number }).port, ".frame-stall:not([hidden])", String.raw`(async () => {
       ${HEAD}
       const el = q(".frame-stall");
-      if (el.dataset.kind !== "nobody" || !/Niemand kann ziehen/.test(el.textContent)) fail("stall: " + el.dataset.kind + " " + el.textContent);
+      if (el.dataset.kind !== "nobody" || !/Nobody can act/.test(el.textContent)) fail("stall: " + el.dataset.kind + " " + el.textContent);
       const b = q(".frame-stall-reload");
       if (!b || b.disabled) fail("no reload button");
       small(".frame-stall-reload");

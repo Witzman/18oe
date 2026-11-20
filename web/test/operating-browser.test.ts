@@ -71,8 +71,8 @@ const HEAD = String.raw`const fail = (m) => { throw new Error(m); };
 
 const ROUTE = String.raw`(async () => {
   ${HEAD}
-  if (!q(".frame-panel .op-sheet") || !/B · du/.test(q(".op-sheet").textContent)) fail("head");
-  if (document.querySelectorAll(".op-strip li").length !== 5 || !/Fahrt/.test(q('.op-strip [aria-current="step"]').textContent)) fail("step strip");
+  if (!q(".frame-panel .op-sheet") || !/B · you/.test(q(".op-sheet").textContent)) fail("head");
+  if (document.querySelectorAll(".op-strip li").length !== 5 || !/Run/.test(q('.op-strip [aria-current="step"]').textContent)) fail("step strip");
   if (q(".op-note") || q(".track-hint")) fail("rules text in the panel");
   const rows = document.querySelectorAll(".op-table tbody tr");
   if (rows.length !== 1 || !/2\+2-0/.test(rows[0].textContent) || !/£60/.test(rows[0].textContent)) fail("route row: " + (rows[0] && rows[0].textContent));
@@ -91,7 +91,7 @@ const ORDER = String.raw`(async () => {
   if (items.map((i) => i.dataset.id).join() !== "A,B,D,F,H,M") fail("order " + items.map((i) => i.dataset.id));
   if (items.map((i) => i.dataset.state).join() !== "done,current,next,next,next,next") fail("states");
   if (document.querySelectorAll('.order-strip-item[data-mine="true"]').length !== 2) fail("own marks");
-  if (!/B · du/.test(q(".op-sheet").textContent) || q(".op-sheet").dataset.mine !== "true") fail("acting head: " + q(".op-sheet").textContent);
+  if (!/B · you/.test(q(".op-sheet").textContent) || q(".op-sheet").dataset.mine !== "true") fail("acting head: " + q(".op-sheet").textContent);
   if (document.querySelector(".frame-panel .or-item")) fail("order list duplicated in the panel");
   const w = document.documentElement.scrollWidth; if (w > window.innerWidth + 1) fail("horizontal overflow " + w);
 })()`;

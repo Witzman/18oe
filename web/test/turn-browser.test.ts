@@ -66,7 +66,7 @@ const GAME_CHECKS = (on: boolean) => String.raw`(async () => {
   ${dotIcon(on)};
   const who = document.querySelector(".frame-who");
   if ((who.dataset.mine === "true") !== ${on}) throw new Error("round bar mine: " + who.dataset.mine);
-  if (${on} && !who.textContent.includes("Du bist dran")) throw new Error("who: " + who.textContent);
+  if (${on} && !who.textContent.includes("Your turn")) throw new Error("who: " + who.textContent);
 })()`;
 
 const LOBBY_CHECKS = String.raw`(async () => {
@@ -77,7 +77,7 @@ const LOBBY_CHECKS = String.raw`(async () => {
   const mark = (r) => r.querySelector(".game-turn")?.textContent;
   if (mark(rows.find((r) => r.querySelector(".game-link").textContent.includes("2"))) !== undefined) throw new Error("mark on game 2");
   const mine = rows.find((r) => r.querySelector(".game-link").textContent.includes("1"));
-  if (mark(mine) !== "Du bist dran") throw new Error("no mark on game 1");
+  if (mark(mine) !== "Your turn") throw new Error("no mark on game 1");
   for (const a of mine.querySelectorAll("a")) if (a.getBoundingClientRect().height < 44) throw new Error("touch target below 44 px");
 })()`;
 
