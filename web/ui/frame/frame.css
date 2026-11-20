@@ -19,7 +19,6 @@
 .frame-head .frame-tag-act { display: none; } /* "am Zug" is carried by the highlight */
 .frame-head .frame-certs { color: color-mix(in srgb, var(--ui-bar-ink) 65%, transparent); }
 .frame-head > .frame-players { flex-shrink: 0; padding-right: calc(var(--shape-gap) + 5.5rem); } /* the corner holds the dev menu and the version button */
-.order-strip-item[data-state="done"] .order-strip-owner { display: none; }
 .frame-head .frame-who { flex-shrink: 0; margin-left: 0; }
 @media (max-width: 1599px) and (min-width: 1280px) { .frame-head .frame-rr { display: none; } }
 /* Below 1700 px the who-text does not fit: the seal stays (accent background when it is you), the text is only for screen readers and the title. */
@@ -41,23 +40,21 @@
 /* Order band (issue 416, assumption: thin bar under the head bar in the bar colours, fold button 44 px wide, list scrolls sideways). */
 .frame-orderband[hidden] { display: none; }
 .order-band { display: flex; align-items: center; gap: var(--shape-gap); padding: 0 var(--shape-gap); background: color-mix(in srgb, var(--ui-bar) 88%, var(--ui-bg)); color: var(--ui-bar-ink); font-family: var(--font-head); border-top: 1px solid color-mix(in srgb, var(--ui-bar-ink) 20%, transparent); }
-.order-band-toggle { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; min-height: var(--shape-hit, 44px); min-width: var(--shape-hit, 44px); background: transparent; color: inherit; border-color: transparent; font-size: var(--type-sm); white-space: nowrap; }
 .order-band-title { color: color-mix(in srgb, var(--ui-bar-ink) 70%, transparent); }
-.order-band[data-collapsed="true"] .order-band-title { color: inherit; }
-.order-strip { flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: none; display: flex; gap: 4px; list-style: none; margin: 0; padding: 2px 0; white-space: nowrap; }
+.order-strip { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; list-style: none; margin: 0; padding: 2px 0; }
 /* Board look (issue 478): the dark order track, one numbered cream cell per company; finished cells grey like the board's "Finished Operating" row, the running one framed in the major red. */
 .order-band { background: var(--stock-field); color: var(--stock-cell); }
-.order-band-title { color: var(--stock-cell); text-transform: uppercase; letter-spacing: .08em; }
+.order-band-title { flex: 0 0 auto; margin: 0; font-size: var(--type-sm); font-weight: 400; color: var(--stock-cell); text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; }
 .order-strip { gap: 3px; padding: 4px 0; }
-.order-strip-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px 2px 4px; min-height: 2.2rem; border: 2px solid transparent; border-radius: var(--shape-radius); background: var(--stock-cell); color: var(--stock-cell-ink); }
+.order-strip-item { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 4px; min-height: var(--shape-hit, 44px); border: 2px solid transparent; border-radius: var(--shape-radius); background: var(--stock-cell); color: var(--stock-cell-ink); }
 .order-strip-no { min-width: 1.1em; font-size: var(--type-xs); font-weight: 700; color: var(--stock-cell-ink); }
 .order-strip-mark { min-width: 1em; font-size: var(--type-sm); }
 .order-strip-item[data-state="done"] { background: var(--stock-order-done); color: var(--stock-order-done-ink); }
 .order-strip-item[data-state="done"] :is(.order-strip-no) { color: var(--stock-order-done-ink); }
 .order-strip-item[data-state="current"] { border-color: var(--stock-major); box-shadow: 0 0 0 1px var(--stock-major); font-weight: 700; }
 .order-strip-item[data-state="current"] .order-strip-mark { color: var(--stock-major-ink); }
-.order-strip-item[data-mine="true"] .order-strip-owner { text-decoration: underline; }
-.order-strip-owner { font-size: var(--type-sm); }
+/* Owner (issue 526): a ring in the owner's player colour around the seal; width behind a token. */
+.order-strip-ring { display: inline-flex; border-radius: 50%; margin: var(--shape-order-ring); }
 .frame-who { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; padding: 4px 14px; border-radius: var(--shape-radius); }
 .frame-who[data-mine="true"] { background: var(--ui-accent); color: var(--ui-accent-ink); font-weight: 700; }
 .frame-roundbar .kit-tip { color: var(--ui-bar-ink); background: var(--ui-bg); color: var(--ui-ink); }

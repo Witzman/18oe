@@ -71,8 +71,8 @@ const HEAD = String.raw`const fail = (m) => { throw new Error(m); };
 
 const ROUTE = String.raw`(async () => {
   ${HEAD}
-  if (!q(".frame-panel .op-sheet") || !/B · du/.test(q(".op-sheet").textContent)) fail("head");
-  if (document.querySelectorAll(".op-strip li").length !== 5 || !/Fahrt/.test(q('.op-strip [aria-current="step"]').textContent)) fail("step strip");
+  if (!q(".frame-panel .op-sheet") || !/B · you/.test(q(".op-sheet").textContent)) fail("head");
+  if (document.querySelectorAll(".op-strip li").length !== 5 || !/Run/.test(q('.op-strip [aria-current="step"]').textContent)) fail("step strip");
   if (q(".op-note") || q(".track-hint")) fail("rules text in the panel");
   const rows = document.querySelectorAll(".op-table tbody tr");
   if (rows.length !== 1 || !/2\+2-0/.test(rows[0].textContent) || !/£60/.test(rows[0].textContent)) fail("route row: " + (rows[0] && rows[0].textContent));
@@ -91,7 +91,11 @@ const ORDER = String.raw`(async () => {
   if (items.map((i) => i.dataset.id).join() !== "A,B,D,F,H,M") fail("order " + items.map((i) => i.dataset.id));
   if (items.map((i) => i.dataset.state).join() !== "done,current,next,next,next,next") fail("states");
   if (document.querySelectorAll('.order-strip-item[data-mine="true"]').length !== 2) fail("own marks");
-  if (!/B · du/.test(q(".op-sheet").textContent) || q(".op-sheet").dataset.mine !== "true") fail("acting head: " + q(".op-sheet").textContent);
+  const strip = q(".order-strip"); if (strip.scrollWidth > strip.clientWidth + 1) fail("order strip scrolls sideways");
+  if (document.querySelector(".order-band-toggle")) fail("order band still foldable");
+  if (items.some((i) => i.getBoundingClientRect().height < 43)) fail("order chip under 44 px");
+  if (!items.every((i) => /player-p\d/.test(i.querySelector(".order-strip-ring").getAttribute("style") || ""))) fail("owner ring missing");
+  if (!/B · you/.test(q(".op-sheet").textContent) || q(".op-sheet").dataset.mine !== "true") fail("acting head: " + q(".op-sheet").textContent);
   if (document.querySelector(".frame-panel .or-item")) fail("order list duplicated in the panel");
   const w = document.documentElement.scrollWidth; if (w > window.innerWidth + 1) fail("horizontal overflow " + w);
 })()`;
@@ -106,7 +110,7 @@ const DIVIDEND = String.raw`(async () => {
   q('.op-opt[data-kind="payout"]').click();
   await sleep(200);
   if (q(".kit-main-btn").disabled) fail("main button locked after the choice");
-  if (!/Alles ausschütten/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/Pay all/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   if ((await (await fetch("/__posted")).json()).length !== 0) fail("choosing sent something");
   q(".kit-main-btn").click();
   await sleep(600);

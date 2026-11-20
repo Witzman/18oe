@@ -767,7 +767,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   function closePicker() { picker?.remove(); picker = null; }
   function openPicker(at: Vec, items: { label: string; run: () => void }[]) {
     closePicker();
-    const box = el_("div", { class: "map-picker", role: "menu", "aria-label": txt("map.pick.title").de },
+    const box = el_("div", { class: "map-picker", role: "menu", "aria-label": txt("map.pick.title").text },
       ...items.map((it) => el_("button", { type: "button", role: "menuitem", onclick: (e: Event) => { e.stopPropagation(); closePicker(); it.run(); } }, it.label)));
     const st = box.style;
     st.cssText = "position:absolute;z-index:5;display:flex;flex-direction:column;min-width:9rem;background:var(--ui-panel);color:var(--ui-ink);border:1px solid var(--ui-accent);border-radius:var(--shape-radius,4px);box-shadow:var(--shape-shadow,none);touch-action:manipulation";
@@ -797,7 +797,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
     const near = exact.length ? exact : slotsNear(slots, local, reach);
     if (near.length <= 1 || exact.length === 1) { fire(near[0] ?? null); return; }
     openPicker(p, near.map((s) => ({
-      label: txt("map.pick.slot").de.replace("{city}", String(s.city + 1)).replace("{slot}", String(s.slot + 1)),
+      label: txt("map.pick.slot").text.replace("{city}", String(s.city + 1)).replace("{slot}", String(s.slot + 1)),
       run: () => fire(s),
     })));
   }
@@ -810,7 +810,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
       const near = hexesNear(scene.grid, view, p, theme.hitTouchPx);
       if (!near.includes(id)) near.unshift(id);
       if (near.length > 1) {
-        openPicker(p, near.map((n) => ({ label: txt("map.pick.hex").de.replace("{hex}", n), run: () => activate(n, project(view, { x: scene.grid.byId.get(n)!.x, y: scene.grid.byId.get(n)!.y }, scene.grid.byId.get(n)!.z), true) })));
+        openPicker(p, near.map((n) => ({ label: txt("map.pick.hex").text.replace("{hex}", n), run: () => activate(n, project(view, { x: scene.grid.byId.get(n)!.x, y: scene.grid.byId.get(n)!.y }, scene.grid.byId.get(n)!.z), true) })));
         return;
       }
     }

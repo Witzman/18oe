@@ -24,15 +24,7 @@ const RULE_REFS = [
   "§11", "§11.4", "§12", "§13", "§14", "§15",
 ];
 
-// Dateien unter web/ui, die noch deutschen Text außerhalb von text.ts enthalten.
-// Die Liste schrumpft: sobald eine Datei keinen deutschen Text mehr hat, schlägt der
-// Test fehl, bis die Ausnahme gestrichen ist.
-const EXEMPT_FILES = [
-  "ui/theme-switch.ts", // Bestand: Beschriftung des Umschalters
-];
-const EXEMPT_DIRS = [
-  "ui/kit/", // Bausteine von einem anderen Agenten, hier nicht anfassen
-];
+// No file under web/ui is exempt any more (#504): the whole UI is English (CLAUDE.md rule 31).
 
 function stepClassNames(): string[] {
   const names: string[] = [];
@@ -62,7 +54,7 @@ function stringLiterals(src: string): string[] {
   return out;
 }
 
-const GERMAN = /[äöüÄÖÜß]|\b(und|oder|nicht|der|die|das|mit|für|ist|sind|keine|kein|bitte|Zug|Züge|Runde|Runden|Firma|Firmen|Spieler|Gleis|Gleise|Plätze|Verbindung)\b/;
+const GERMAN = /[äöüÄÖÜß]|\b(und|oder|nicht|der|die|das|mit|für|ist|sind|keine|kein|bitte|Zug|Züge|Runde|Runden|Firma|Firmen|Spieler|Gleis|Gleise|Plätze|Verbindung|Kasse|Kurs|Partie|Wähle|Aktie|Aktien|Konzession|Schließen|Abbrechen|Bestätigen|Gesellschaft|Gesellschaften)\b/;
 
 function hasGermanText(src: string): boolean {
   return stringLiterals(src).some((s) => GERMAN.test(s));
@@ -112,7 +104,7 @@ test("every reason for an invalid action (ui-spec §3.5) has an entry", () => {
 
 test("no entry has an empty German, English or rule text", () => {
   for (const [key, entry] of Object.entries(TEXT)) {
-    for (const field of ["de", "en", "regel"] as const) {
+    for (const field of ["text", "en", "regel"] as const) {
       assert.ok(entry[field].trim().length > 0, `${key}.${field} is empty`);
     }
   }
@@ -120,27 +112,12 @@ test("no entry has an empty German, English or rule text", () => {
 
 test("txt() returns the entry, and falls back to the key for an unknown key", () => {
   assert.equal(txt("round.stock").en, "Stock Round");
-  assert.deepEqual(txt("nicht.da"), { de: "nicht.da", en: "nicht.da", regel: "—" });
+  assert.deepEqual(txt("nicht.da"), { text: "nicht.da", en: "nicht.da", regel: "—" });
 });
 
-test("no German running text in web/ui outside text.ts (except the named exemptions)", () => {
-  const files = uiFiles().filter((f) => f !== "ui/text.ts");
-  const exempt = (f: string) =>
-    EXEMPT_FILES.includes(f) || EXEMPT_DIRS.some((d) => f.startsWith(d));
-
-  const offending = files.filter((f) => !exempt(f) && hasGermanText(readFileSync(join(WEB, f), "utf8")));
-  assert.deepEqual(offending, [], "German text outside text.ts: move it to web/ui/text.ts or name the file in EXEMPT_FILES");
-
-  // Die Ausnahmeliste schrumpft: eine Datei ohne deutschen Text fliegt aus der Liste.
-  const stale = EXEMPT_FILES.filter((f) => {
-    const path = join(WEB, f);
-    try {
-      return !hasGermanText(readFileSync(path, "utf8"));
-    } catch {
-      return true; // Datei gibt es nicht mehr
-    }
-  });
-  assert.deepEqual(stale, [], "these exemptions have no German text left (or no file): remove them from EXEMPT_FILES");
+test("no German text in web/ui (the UI is English only, #504)", () => {
+  const offending = uiFiles().filter((f) => hasGermanText(readFileSync(join(WEB, f), "utf8")));
+  assert.deepEqual(offending, [], "German text in the UI: the UI is English only (CLAUDE.md rule 31)");
 });
 
 test("the search detects German text in a UI file", () => {

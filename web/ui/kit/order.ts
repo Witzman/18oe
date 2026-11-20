@@ -25,10 +25,10 @@ export function Auftrag(o: OrderOptions): VNode {
   const confirm = v("button", {
     type: "button", class: "kit-main-btn", disabled: blocked, "aria-busy": waiting ? "true" : undefined,
     onclick: () => { if (!blocked) o.onConfirm?.(); },
-  }, waiting ? v("span", { class: "kit-dots", "aria-label": "Warte auf den Server" }, "•••") : (o.confirmLabel ?? "Bestätigen"));
-  const cancel = v("button", { type: "button", class: "kit-side-btn", disabled: waiting, onclick: () => o.onCancel?.() }, "Abbrechen");
+  }, waiting ? v("span", { class: "kit-dots", "aria-label": "Waiting for the server" }, "•••") : (o.confirmLabel ?? "Confirm"));
+  const cancel = v("button", { type: "button", class: "kit-side-btn", disabled: waiting, onclick: () => o.onCancel?.() }, "Cancel");
   const confirmCell = state === "invalid" && o.reason
-    ? mitTooltip(confirm, { title: "Jetzt nicht möglich", reason: o.reason })
+    ? mitTooltip(confirm, { title: "Not possible now", reason: o.reason })
     : confirm;
   return v("section", { class: "kit-order", "data-state": state, "aria-live": "polite", "aria-busy": waiting ? "true" : undefined },
     v("p", { class: "kit-order-sentence" }, o.sentence),

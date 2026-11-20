@@ -16,7 +16,7 @@ export const DEFAULT_SEATS = 4;
 export interface SeatDraft { kind: "bot" | "human"; account: string }
 
 const fill = (key: string, vars: Record<string, string | number>): string =>
-  Object.entries(vars).reduce((t, [k, v]) => t.replaceAll(`{${k}}`, String(v)), txt(key).de);
+  Object.entries(vars).reduce((t, [k, v]) => t.replaceAll(`{${k}}`, String(v)), txt(key).text);
 
 // Prüfung vor dem Senden. Liefert den fertigen Fehlertext oder null. Rein: kein DOM.
 // `seats` sind die Plätze 2 und folgende; `me` ist der Ersteller (Platz 1).
@@ -29,7 +29,7 @@ export function validateForm(me: Account, seats: SeatDraft[], seed: string): str
     if (seen.has(who)) return fill("lobby.err_seat_double", { n: i + 2 });
     seen.add(who);
   }
-  if (seed.trim() !== "" && !/^\d{1,10}$/.test(seed.trim())) return txt("lobby.err_seed").de;
+  if (seed.trim() !== "" && !/^\d{1,10}$/.test(seed.trim())) return txt("lobby.err_seed").text;
   return null;
 }
 
@@ -48,14 +48,14 @@ export function parseSeed(seed: string): number | undefined {
 // Server-Fehler -> verständlicher Text je Code. Rein: kein DOM.
 export function errorText(err: unknown): string {
   if (!(err instanceof ApiError)) return fill("lobby.err_other", { message: String(err) });
-  if (err.status === 0) return txt("lobby.err_network").de;
+  if (err.status === 0) return txt("lobby.err_network").text;
   switch (err.code) {
     case "unknown_player": {
       const n = /seat (\d+)/.exec(err.message)?.[1];
-      return n ? fill("lobby.err_unknown_player", { n }) : txt("lobby.err_unknown_player_any").de;
+      return n ? fill("lobby.err_unknown_player", { n }) : txt("lobby.err_unknown_player_any").text;
     }
     case "rate_limited": case "invalid_seats": case "game_limit": case "login_required":
-      return txt(`lobby.err_${err.code}`).de;
+      return txt(`lobby.err_${err.code}`).text;
     default:
       return fill("lobby.err_other", { message: err.message });
   }
@@ -63,7 +63,7 @@ export function errorText(err: unknown): string {
 
 function statusText(status: string): string {
   const known = txt(`lobby.status_${status}`);
-  return known.de === `lobby.status_${status}` ? status : known.de;
+  return known.text === `lobby.status_${status}` ? status : known.text;
 }
 
 // Eine Zeile der Liste; Marke "Du bist dran" nach viewer_to_act aus GET /games (#152, D11).
@@ -71,26 +71,26 @@ export function gameRow(g: GameSummary, me: Account | null): HTMLElement {
   const others = g.seats.filter((s) => s.account_id !== me?.id).map((s) => s.name).join(", ");
   return h("li", { class: "game-row", "data-to-act": g.viewer_to_act ? "true" : "false" },
     h("a", { class: "game-link", href: `#/game/${g.id}` }, fill("lobby.game_title", { id: g.id })),
-    g.viewer_to_act ? h("span", { class: "game-turn turn" }, txt("lobby.game_to_act").de) : null,
+    g.viewer_to_act ? h("span", { class: "game-turn turn" }, txt("lobby.game_to_act").text) : null,
     h("span", { class: "muted" }, [statusText(g.status), fill("lobby.game_seq", { seq: g.seq }),
       fill("lobby.game_players", { names: others })].join(" · ")),
-    h("a", { class: "game-open", href: `#/game/${g.id}` }, txt("lobby.game_open").de));
+    h("a", { class: "game-open", href: `#/game/${g.id}` }, txt("lobby.game_open").text));
 }
 
 export function gameList(games: GameSummary[], me: Account | null): HTMLElement {
-  if (games.length === 0) return h("p", { class: "muted", "data-empty": "" }, txt("lobby.games_empty").de);
+  if (games.length === 0) return h("p", { class: "muted", "data-empty": "" }, txt("lobby.games_empty").text);
   // Neueste zuerst.
   return h("ul", { class: "game-list" }, ...[...games].sort((a, b) => b.id - a.id).map((g) => gameRow(g, me)));
 }
 
 export function newGameForm(api: Api, me: Account, go: (hash: string) => void): HTMLElement {
   const error = h("p", { class: "error", role: "alert" });
-  const count = h("select", { name: "count", "aria-label": txt("lobby.seat_count").de },
+  const count = h("select", { name: "count", "aria-label": txt("lobby.seat_count").text },
     ...Array.from({ length: MAX_SEATS - MIN_SEATS + 1 }, (_, i) =>
       h("option", { value: String(MIN_SEATS + i) }, fill("lobby.seat_count_option", { n: MIN_SEATS + i }))));
   count.value = String(DEFAULT_SEATS);
   const seed = h("input", { name: "seed", type: "text", inputmode: "numeric", autocomplete: "off" });
-  const submit = h("button", { type: "submit" }, txt("lobby.submit").de);
+  const submit = h("button", { type: "submit" }, txt("lobby.submit").text);
   const seatsBox = h("div", { class: "seats" });
   // Eingaben überleben ein Ändern der Platzzahl.
   const drafts: SeatDraft[] = Array.from({ length: MAX_SEATS - 1 }, () => ({ kind: "bot", account: "" }));
@@ -103,12 +103,12 @@ export function newGameForm(api: Api, me: Account, go: (hash: string) => void): 
       const draft = drafts[i]!;
       const name = h("input", {
         name: `account${n}`, type: "text", autocomplete: "off", value: draft.account,
-        placeholder: txt("lobby.seat_account_placeholder").de, "aria-label": fill("lobby.seat_account", { n }),
+        placeholder: txt("lobby.seat_account_placeholder").text, "aria-label": fill("lobby.seat_account", { n }),
       });
       name.hidden = draft.kind === "bot";
       name.addEventListener("input", () => { draft.account = name.value; });
       const kind = h("select", { name: `kind${n}`, "aria-label": fill("lobby.seat_kind", { n }) },
-        h("option", { value: "bot" }, txt("lobby.seat_bot").de), h("option", { value: "human" }, txt("lobby.seat_human").de));
+        h("option", { value: "bot" }, txt("lobby.seat_bot").text), h("option", { value: "human" }, txt("lobby.seat_human").text));
       kind.value = draft.kind;
       kind.addEventListener("change", () => {
         draft.kind = kind.value === "human" ? "human" : "bot";
@@ -129,22 +129,22 @@ export function newGameForm(api: Api, me: Account, go: (hash: string) => void): 
     const bad = validateForm(me, seats, seed.value);
     if (bad) { error.textContent = bad; return; }
     submit.disabled = true;
-    submit.textContent = txt("lobby.submitting").de;
+    submit.textContent = txt("lobby.submitting").text;
     try {
       const game = await api.createGame(buildSeats(me, seats), parseSeed(seed.value));
       go(`#/game/${game.id}`);
     } catch (e) {
       error.textContent = errorText(e);
       submit.disabled = false;
-      submit.textContent = txt("lobby.submit").de;
+      submit.textContent = txt("lobby.submit").text;
     }
   };
 
   return h("form", { class: "new-game", onsubmit, novalidate: true },
-    h("p", { class: "muted" }, txt("lobby.new_intro").de),
-    h("label", { class: "row" }, h("span", {}, txt("lobby.seat_count").de), count),
+    h("p", { class: "muted" }, txt("lobby.new_intro").text),
+    h("label", { class: "row" }, h("span", {}, txt("lobby.seat_count").text), count),
     seatsBox,
-    h("label", { class: "field" }, h("span", {}, txt("lobby.seed_label").de), seed, h("small", { class: "muted" }, txt("lobby.seed_hint").de)),
+    h("label", { class: "field" }, h("span", {}, txt("lobby.seed_label").text), seed, h("small", { class: "muted" }, txt("lobby.seed_hint").text)),
     h("div", { class: "row" }, submit), error);
 }
 
@@ -164,9 +164,9 @@ export async function lobbyPage(ctx: LobbyCtx): Promise<HTMLElement> {
   return h("div", { class: "lobby" },
     h("h1", {}, "18OE"),
     h("div", { class: "row" }, h("span", { class: "muted" }, fill("lobby.signed_in", { name: me?.name ?? "?" })),
-      h("button", { type: "button", onclick: async () => { await ctx.api.logout(); ctx.go("#/login"); } }, txt("lobby.logout").de)),
-    h("h2", {}, txt("lobby.games_title").de),
+      h("button", { type: "button", onclick: async () => { await ctx.api.logout(); ctx.go("#/login"); } }, txt("lobby.logout").text)),
+    h("h2", {}, txt("lobby.games_title").text),
     list,
-    h("h2", {}, txt("lobby.new_title").de),
+    h("h2", {}, txt("lobby.new_title").text),
     me ? newGameForm(ctx.api, me, ctx.go) : null);
 }

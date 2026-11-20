@@ -661,7 +661,8 @@ module Oe
     end
 
     # The open trade offer (§10.4, #202) the seller answers: `choose` accept_trade or `pass` (decline).
-    #   trade: { buyer:, seller:, kind: "company" | "corporation", target: id, price: }
+    #   trade: { buyer:, seller:, kind: "company" | "corporation", target: id, price:, give: [obj], also: [obj] }
+    #   (obj = { kind:, id: }, the swap objects of §10.4, #517)
     def trade_context(step)
       offer = step.pending_offer
       return nil unless offer
@@ -669,7 +670,13 @@ module Oe
       minor = offer.is_a?(Engine::Action::BuyCorporation)
       target = minor ? offer.corporation : offer.company
       { buyer: offer.entity.id, seller: target.owner.id, kind: minor ? "corporation" : "company",
-        target: target.id, price: offer.price }
+        target: target.id, price: offer.price,
+        give: trade_objects(offer.give), also: trade_objects(offer.also) }
+    end
+
+    # The objects of a swap (§10.4, #517): { kind: "company" | "corporation", id: }.
+    def trade_objects(objects)
+      objects.map { |object| { kind: object.corporation? ? "corporation" : "company", id: object.id } }
     end
 
     # Every private, minor charter and concession and where it is now (#124,

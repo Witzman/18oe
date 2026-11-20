@@ -25,19 +25,19 @@ const CHECKS = String.raw`(async () => {
   await sleep(300);
   // wrong login: own error text, button usable again
   fill("login", "anna"); fill("password", "falsch-falsch"); submit();
-  await waitText(".access .status", /Anmeldung läuft/, "busy login");
-  await waitText(".access .error", /stimmt nicht/, "wrong login");
+  await waitText(".access .status", /Logging in/, "busy login");
+  await waitText(".access .error", /is wrong/, "wrong login");
   if (q(".access .status").textContent) throw new Error("status not cleared on error");
   if (q("button[type=submit]").disabled) throw new Error("button stays disabled after an error");
   // rate limit, server error, unparsable answer
-  fill("login", "limit"); submit(); await waitText(".access .error", /Zu viele Versuche/, "rate limit");
+  fill("login", "limit"); submit(); await waitText(".access .error", /Too many attempts/, "rate limit");
   fill("login", "boom"); submit(); await waitText(".access .error", /boom/, "server error");
-  fill("login", "garbled"); submit(); await waitText(".access .error", /unerwartet/, "unparsable 200");
+  fill("login", "garbled"); submit(); await waitText(".access .error", /unexpectedly/, "unparsable 200");
   fill("login", "html502"); submit(); await waitText(".access .error", /502/, "html 502");
   // successful login: success message first, then the lobby
   fill("login", "anna"); fill("password", "richtig-richtig"); submit();
-  await waitText(".access .status", /Angemeldet als "Anna Lee"/, "login ok");
-  await waitText("body", /Partien|Neue Partie|Anna Lee/, "lobby after login");
+  await waitText(".access .status", /Logged in as "Anna Lee"/, "login ok");
+  await waitText("body", /games|New game|Anna Lee/, "lobby after login");
   // second account in the same browser: registration page, errors, success
   location.hash = "#/register";
 })()`;
@@ -54,12 +54,12 @@ const CHECKS2 = String.raw`(async () => {
   await sleep(300);
   q(".access form input[name=code]");
   fill("name", "Bob"); fill("email", "bob@example.de"); fill("password", "geheim-geheim"); fill("code", "falsch"); submit();
-  await waitText(".access .status", /Konto wird angelegt/, "busy register");
-  await waitText(".access .error", /Einladungscode ist falsch/, "invalid invite");
-  fill("name", "Taken"); fill("code", "richtig"); submit(); await waitText(".access .error", /schon vergeben/, "name taken");
-  fill("name", "Bob"); fill("email", "dup@example.de"); submit(); await waitText(".access .error", /keine Registrierung möglich/, "email taken");
+  await waitText(".access .status", /Creating account/, "busy register");
+  await waitText(".access .error", /invite code is wrong/, "invalid invite");
+  fill("name", "Taken"); fill("code", "richtig"); submit(); await waitText(".access .error", /already taken/, "name taken");
+  fill("name", "Bob"); fill("email", "dup@example.de"); submit(); await waitText(".access .error", /Registration is not possible/, "email taken");
   fill("email", "bob@example.de"); submit();
-  await waitText(".access .status", /Konto "Bob" angelegt\. Du bist angemeldet/, "register ok");
+  await waitText(".access .status", /Account "Bob" created\. You are logged in/, "register ok");
 })()`;
 
 function stub(dir: string) {

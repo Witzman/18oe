@@ -37,13 +37,13 @@ export function connectionBand(o: BandOptions) {
   const setI = o.setInterval ?? ((fn, ms) => setInterval(fn, ms));
   const clearI = o.clearInterval ?? ((hd) => clearInterval(hd as ReturnType<typeof setInterval>));
   const label = h("span", {});
-  const el = h("div", { class: "band", role: "alert", hidden: true }, label, h("button", { type: "button", onclick: () => o.retryNow() }, txt("msg.network_retry").de));
+  const el = h("div", { class: "band", role: "alert", hidden: true }, label, h("button", { type: "button", onclick: () => o.retryNow() }, txt("msg.network_retry").text));
   let left = 0;
   let timer: unknown = null;
   let reason: string | null = null;
   const draw = () => {
     const n = String(Math.max(0, left));
-    label.textContent = reason === null ? txt("msg.network_band").de.replace("{n}", n) : `${reason}, ${fillText("msg.band_retry", { n })}`;
+    label.textContent = reason === null ? txt("msg.network_band").text.replace("{n}", n) : `${reason}, ${fillText("msg.band_retry", { n })}`;
   };
   const stopTimer = () => { if (timer !== null) clearI(timer); timer = null; };
   return {

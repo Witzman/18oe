@@ -92,12 +92,12 @@ test("a single offer is chosen already; with several the player must choose", ()
 
 test("the sentence names minor or regional, the par value and the confirm word", () => {
   const minor = sentenceFor(load("concession"), { corp: "B", price: 80, city: null }, null);
-  assert.match(minor.text, /Minor B/);
+  assert.match(minor.text, /minor B/);
   assert.match(minor.text, /£80/);
   const regional = sentenceFor(load("concession-regional"), { corp: "LNWR", price: 70, city: null }, null);
-  assert.match(regional.text, /Regional LNWR/);
+  assert.match(regional.text, /regional LNWR/);
   const only = sentenceFor(load("concession-paronly"), { corp: "GWR", price: 60, city: null }, null);
-  assert.match(only.text, /Regional GWR/);
+  assert.match(only.text, /regional GWR/);
   assert.notEqual(only.confirm, minor.confirm);
 });
 
@@ -121,7 +121,7 @@ test("home token: every target has hex, name and zone with price; single target 
   const s = sentenceFor(g, { corp: null, price: null, city: first.city }, map);
   assert.equal(s.action, first.action);
   assert.match(s.text, new RegExp(first.name!));
-  assert.match(s.text, new RegExp(`Zone ${first.zone}`));
+  assert.match(s.text, new RegExp(`zone ${first.zone}`));
   g.state.prompt.actions = [first.action];
   assert.equal(effectiveSelection(g, emptySelection(), map).city, first.city);
   assert.equal(orderFor(g, emptySelection(), map, () => {})!.state, "preview");
@@ -133,7 +133,7 @@ test("home token: only the viewer sees targets; the others see who executes the 
   assert.equal(homeTargets(g, map).length, 0);
   assert.equal(orderFor(g, emptySelection(), map, () => {}), null);
   const text = textOf(ConcessionPanel(g, emptySelection(), map, noop, themes[0]!));
-  assert.match(text, /führt die 1\. Konzession aus/);
+  assert.match(text, /executes concession 1\./);
 });
 
 test("panel DOM: ladder with ten rows, aria-current on the running one; the zones are listed too (both fold away)", () => {
@@ -160,9 +160,9 @@ test("steps (#409): one step at a time, the corporation, then the par value, the
   assert.deepEqual(progress(g, { corp: "B", price: null, city: null }, null), { n: 2, total: 3, kind: "price" });
   assert.deepEqual(progress(g, { corp: "B", price: 70, city: null }, null), { n: 3, total: 3, kind: "confirm" });
   const text = (sel: { corp: string | null; price: number | null }) => textOf(ConcessionPanel(g, { ...sel, city: null }, null, noop, themes[0]!));
-  assert.match(text({ corp: null, price: null }), /Schritt 1 von 3: Gesellschaft wählen/);
-  assert.match(text({ corp: "B", price: null }), /Schritt 2 von 3: Par-Kurs wählen/);
-  assert.match(text({ corp: "B", price: 70 }), /Schritt 3 von 3: Bestätigen/);
+  assert.match(text({ corp: null, price: null }), /Step 1 of 3: Choose a corporation/);
+  assert.match(text({ corp: "B", price: null }), /Step 2 of 3: Choose a par value/);
+  assert.match(text({ corp: "B", price: 70 }), /Step 3 of 3: Confirm/);
   // One offer only: it is chosen already, the flow has two steps.
   const single = load("concession");
   const only = String(single.state.prompt.actions.find((a) => a.type === "par")!.corporation);
@@ -174,7 +174,7 @@ test("steps (#409): one step at a time, the corporation, then the par value, the
   assert.deepEqual(backSelection(single, { corp: only, price: 70, city: null }, null), { corp: only, price: null, city: null });
 });
 
-test("steps (#409): Zurück goes one step back, and is not offered where nothing can be undone", () => {
+test("steps (#409): Back goes one step back, and is not offered where nothing can be undone", () => {
   const g = load("concession");
   assert.equal(backSelection(g, emptySelection(), null), null);
   assert.deepEqual(backSelection(g, { corp: "B", price: null, city: null }, null), emptySelection());
@@ -203,7 +203,7 @@ test("panel DOM: dimmed price buttons are disabled with the reason", () => {
   const tree = ConcessionPanel(g, { corp: "GWR", price: null, city: null }, null, noop, themes[0]!);
   const b90 = find(tree, (n) => n.attrs.class === "concession-price" && n.attrs["data-price"] === "90")[0]!;
   assert.equal(b90.attrs.disabled, "");
-  assert.match(textOf(b90), /Kasse reicht nicht/);
+  assert.match(textOf(b90), /Not enough cash/);
 });
 
 test("panel DOM: the home token step lists one button per target with zone and price", () => {
@@ -211,7 +211,7 @@ test("panel DOM: the home token step lists one button per target with zone and p
   const tree = ConcessionPanel(g, emptySelection(), map, noop, themes[0]!);
   const targets = find(tree, (n) => n.attrs.class === "concession-target");
   assert.equal(targets.length, 62);
-  assert.ok(targets.every((b) => /Zone [A-Z]+, £\d+/.test(textOf(b))));
+  assert.ok(targets.every((b) => /zone [A-Z]+, £\d+/.test(textOf(b))));
 });
 
 test("home token on the map (#261): targets carry the city index, a tap picks it, the preview shows the corp", () => {
@@ -248,7 +248,7 @@ test("steps (#409): the home token takes the city, then confirm", () => {
   assert.deepEqual(progress(g, emptySelection(), map), { n: 1, total: 2, kind: "city" });
   const t = homeTargets(g, map)[0]!;
   assert.deepEqual(progress(g, { corp: null, price: null, city: t.city }, map), { n: 2, total: 2, kind: "confirm" });
-  assert.match(textOf(ConcessionPanel(g, emptySelection(), map, noop, themes[0]!)), /Schritt 1 von 2: Ort wählen/);
+  assert.match(textOf(ConcessionPanel(g, emptySelection(), map, noop, themes[0]!)), /Step 1 of 2: Choose a city/);
   assert.deepEqual(backSelection(g, { corp: null, price: null, city: t.city }, map), emptySelection());
   g.state.prompt.viewer_to_act = false;
   assert.equal(progress(g, emptySelection(), map), null);
@@ -285,10 +285,10 @@ test("box (#497 S4): the steps count inside the kind; one offer of the kind is c
   one.state.prompt.actions = one.state.prompt.actions.filter((a) => a.type !== "par" || a.corporation === "LNWR" || offers(g).find((o) => o.corp === a.corporation)?.kind === "minor");
   assert.equal(offersIn(one, "float_regional").length, 1);
   assert.deepEqual(progress(one, emptySelection(), null, "float_regional"), { n: 1, total: 2, kind: "price" });
-  assert.equal(backSelection(one, emptySelection(), null, "float_regional"), null, "the box's Zurück leaves the kind, the panel has nothing to take back");
+  assert.equal(backSelection(one, emptySelection(), null, "float_regional"), null, "the box's Back leaves the kind, the panel has nothing to take back");
 });
 
-test("box (#497 S4): the panel's Zurück and the box's Zurück never contradict: inside a kind the panel steps back, at its first step only the box offers back", () => {
+test("box (#497 S4): the panel's Back and the box's Back never contradict: inside a kind the panel steps back, at its first step only the box offers back", () => {
   const g = load("concession-minor");
   assert.equal(backSelection(g, emptySelection(), null, "float_regional"), null);
   assert.deepEqual(backSelection(g, { corp: "LNWR", price: null, city: null }, null, "float_regional"), emptySelection());
@@ -313,7 +313,7 @@ test("box (#497 S4): FoundingOptions draws only the cards of the kind, the par v
   assert.ok(cards("float_regional").length > 0 && cards("float_regional").every((n) => n.attrs["data-kind"] === "regional"));
   const prices = find(v("div", {}, ...FoundingOptions(g, { corp: "LNWR", price: null, city: null }, null, noop, themes[0]!, "float_regional")), (n) => n.attrs.class === "concession-price");
   assert.equal(prices.length, 6);
-  // The step head with its Zurück is part of the options (the box draws them; the context slot keeps only the folds).
+  // The step head with its Back is part of the options (the box draws them; the context slot keeps only the folds).
   const back = find(v("div", {}, ...FoundingOptions(g, { corp: "LNWR", price: 70, city: null }, null, { ...noop, onBack: () => {} }, themes[0]!, "float_regional")), (n) => n.attrs.class === "concession-back");
   assert.equal(back.length, 1);
 });
@@ -342,9 +342,9 @@ test("box (#497 S4): the claimed par actions are the box's provided kinds: two k
   assert.ok(two.m.kinds!.every((b) => b.provided && b.entries.length === 0), "the options are the panel's");
   assert.equal(two.head, 0);
   const inKind = bar("concession-minor", "float_minor");
-  assert.deepEqual([inKind.kinds.length, inKind.head, inKind.back], [0, 1, 1], "in a kind: head with Zurück, no other kind");
+  assert.deepEqual([inKind.kinds.length, inKind.head, inKind.back], [0, 1, 1], "in a kind: head with Back, no other kind");
   const one = bar("concession", null);
-  assert.deepEqual([one.kinds.length, one.head, one.back], [0, 1, 0], "a single kind skips step 1 and has no box Zurück");
+  assert.deepEqual([one.kinds.length, one.head, one.back], [0, 1, 0], "a single kind skips step 1 and has no box Back");
   const par = bar("concession-paronly", null);
   assert.deepEqual([par.m.kinds!.map((b) => b.kind), par.back], [["par_regional"], 0]);
 });

@@ -23,7 +23,7 @@ import { OrderBandView, orBand } from "./or-band.ts";
 import { opSheet, OpSheetView } from "../panels/op-sheet.ts";
 import { roundChip } from "./round-marks.ts";
 import { corpColor, playerRows, roundBar, roundMarkers, stallNotice, stepLabel, type PlayerRow } from "./model.ts";
-import { panelIdle, readCollapsed, readOrderCollapsed, writeCollapsed, writeOrderCollapsed } from "./panel.ts";
+import { panelIdle, readCollapsed, writeCollapsed } from "./panel.ts";
 import { createViews } from "./views.ts";
 import { fetchLogFrom, isAtBottom, mergeLog, nextScrollTop, resumeFrom, type LogLine } from "./log.ts";
 import { versionButton } from "../version.ts";
@@ -75,7 +75,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const orderSlot: OrderSlot = createOrderSlot(() => { if (game) drawBar(); });
   const views = createViews([{
     id: "map", labelKey: "frame.view_map",
-    render: ({ container }) => { if (container.childElementCount === 0) container.append(h("p", { class: "muted frame-placeholder" }, txt("frame.view_placeholder").de)); },
+    render: ({ container }) => { if (container.childElementCount === 0) container.append(h("p", { class: "muted frame-placeholder" }, txt("frame.view_placeholder").text)); },
   }]);
   const band = connectionBand({ retryNow });
   const message = messageArea();
@@ -87,7 +87,6 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   let busy = false;
   let rangeError: { key: string; text: string } | null = null;
   let collapsed = readCollapsed();
-  let orderCollapsed = readOrderCollapsed();
   let genericOpen: boolean | null = null; // null = automatic (open while there is something to choose)
   let logOpen = false;
   // The full log (#292): fetched from /games/:id/log while the sheet is open; the sheet element lives on
@@ -117,10 +116,10 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const roundEl = h("div", { class: "frame-roundbar" });
   const orderEl = h("div", { class: "frame-orderband" });
   orderEl.hidden = true;
-  const playersEl = h("nav", { class: "frame-players", "aria-label": txt("frame.player_bar").de });
+  const playersEl = h("nav", { class: "frame-players", "aria-label": txt("frame.player_bar").text });
   const contextEl = h("div", { class: "frame-context" });
   const contextSlot = h("div", { class: "frame-context-slot" });
-  const mainEl = h("main", { class: "frame-main", "aria-label": txt("frame.main").de });
+  const mainEl = h("main", { class: "frame-main", "aria-label": txt("frame.main").text });
   const tabsEl = h("div", { class: "frame-tabs", role: "tablist" });
   const viewEl = h("div", { class: "frame-view" });
   const endEl = h("div", { class: "frame-end-slot" });
@@ -129,7 +128,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   // (order with the main button, stall line, messages, tools).
   const panelTitle = h("div", { class: "frame-panel-title" });
   const panelToggle = h("button", { type: "button", class: "frame-panel-toggle" });
-  const panelHome = h("button", { type: "button", class: "frame-panel-home", title: txt("frame.home_title").de, "aria-label": txt("frame.home_title").de }, "⌂");
+  const panelHome = h("button", { type: "button", class: "frame-panel-home", title: txt("frame.home_title").text, "aria-label": txt("frame.home_title").text }, "⌂");
   panelHome.hidden = true;
   const panelHead = h("div", { class: "frame-panel-head" }, panelToggle, panelTitle, panelHome);
   const drawerEl = h("div", { class: "frame-drawer" });
@@ -137,7 +136,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const barEl = h("div", { class: "frame-panel-foot" });
   const barMain = h("div", { class: "frame-bar-order" });
   const barTools = h("div", { class: "frame-bar-tools" });
-  const panelEl = h("aside", { class: "frame-panel", "aria-label": txt("frame.panel").de }, panelHead, panelBody, barEl);
+  const panelEl = h("aside", { class: "frame-panel", "aria-label": txt("frame.panel").text }, panelHead, panelBody, barEl);
   // #289: "nobody can act" / "the bot does not move" / "no action offered", never a silent hang.
   const stallEl = h("p", { class: "frame-stall", role: "status", "aria-live": "polite" });
   stallEl.hidden = true;
@@ -160,7 +159,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (!show) return;
     stallEl.append(n!.text);
     if (frame.reload && n!.kind !== "slow_answer") {
-      const b = h("button", { type: "button", class: "frame-stall-reload" }, txt("frame.stall_reload").de);
+      const b = h("button", { type: "button", class: "frame-stall-reload" }, txt("frame.stall_reload").text);
       b.addEventListener("click", () => frame.reload?.());
       stallEl.append(" ", b);
     }
@@ -172,7 +171,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   disposers.push(() => clearInterval(stallTimer));
   // Until the first state is drawn the context sheet says so (#294): never a bare map without a word. A
   // failed load shows in the band above (reason and "Jetzt"), this line stays until a state arrives.
-  const loadingEl = h("p", { class: "muted frame-loading", role: "status" }, txt("frame.loading").de);
+  const loadingEl = h("p", { class: "muted frame-loading", role: "status" }, txt("frame.loading").text);
   contextEl.append(loadingEl);
   const body = h("div", { class: "frame-body" }, mainEl, panelEl, logHost);
   logHost.hidden = true;
@@ -208,10 +207,10 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     const t = theme();
     const m = roundBar(game, t);
     const phase = mitTooltip(v("span", { class: "frame-phase" }, m.phase.label),
-      { title: m.phase.label, term: "Train phase", rows: [{ label: txt("frame.phase_tiles").de, value: m.phase.tiles }, { label: txt("frame.phase_ors").de, value: String(m.phase.operatingRounds) }], source: txt("frame.phase_tiles").regel });
+      { title: m.phase.label, term: "Train phase", rows: [{ label: txt("frame.phase_tiles").text, value: m.phase.tiles }, { label: txt("frame.phase_ors").text, value: String(m.phase.operatingRounds) }], source: txt("frame.phase_tiles").regel });
     put(roundEl,
-      v("a", { class: "frame-signet", href: "#/", title: txt("frame.signet_title").de }, "18OE"),
-      v("span", { class: "frame-rr", title: txt(`rrphase.${m.rrPhase}`).en }, txt(`rrphase.${m.rrPhase}`).de),
+      v("a", { class: "frame-signet", href: "#/", title: txt("frame.signet_title").text }, "18OE"),
+      v("span", { class: "frame-rr", title: txt(`rrphase.${m.rrPhase}`).en }, txt(`rrphase.${m.rrPhase}`).text),
       phase,
       roundChip(m.round, m.roundShort, roundMarkers(game)),
       v("div", { class: "frame-who", "data-mine": m.who.mine ? "true" : "false", role: "status", title: m.who.text },
@@ -227,7 +226,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     const b = game ? orBand(game, theme()) : null;
     orderEl.hidden = b === null;
     if (b === null) return orderEl.replaceChildren();
-    put(orderEl, OrderBandView(b, theme(), { collapsed: orderCollapsed, onToggle: () => { orderCollapsed = !orderCollapsed; writeOrderCollapsed(orderCollapsed); drawOrderBand(); } }));
+    put(orderEl, OrderBandView(b, theme()));
   }
 
   // ---- player bar ------------------------------------------------------------------------------
@@ -237,17 +236,17 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     },
     Wimpel({ seat: p.seat, name: p.name }, { theme: t }),
     v("span", { class: "frame-cash" }, Geld(p.cash)),
-    v("span", { class: "frame-certs", title: txt("frame.certs_title").de }, fillText("frame.certs", { n: p.certs, limit: p.certLimit })),
-    p.priority ? v("span", { class: "frame-star", title: txt("frame.priority").de, "aria-label": txt("frame.priority").de }, "★") : null,
-    p.bot ? v("span", { class: "frame-tag" }, txt("frame.bot").de) : null,
-    p.toAct ? v("span", { class: "frame-tag frame-tag-act" }, txt("frame.to_act").de) : null);
-    return mitTooltip(btn, { title: p.name, term: txt("frame.worth").en, total: { label: txt("frame.worth").de, amount: p.value }, rows: [{ label: txt("frame.cash").de, amount: p.cash }] });
+    v("span", { class: "frame-certs", title: txt("frame.certs_title").text }, fillText("frame.certs", { n: p.certs, limit: p.certLimit })),
+    p.priority ? v("span", { class: "frame-star", title: txt("frame.priority").text, "aria-label": txt("frame.priority").text }, "★") : null,
+    p.bot ? v("span", { class: "frame-tag" }, txt("frame.bot").text) : null,
+    p.toAct ? v("span", { class: "frame-tag frame-tag-act" }, txt("frame.to_act").text) : null);
+    return mitTooltip(btn, { title: p.name, term: txt("frame.worth").en, total: { label: txt("frame.worth").text, amount: p.value }, rows: [{ label: txt("frame.cash").text, amount: p.cash }] });
   }
   function drawPlayers() {
     if (!game) return put(playersEl);
     const t = theme();
     put(playersEl, ...playerRows(game).map((p) => playerEntry(p, t)),
-      v("span", { class: "frame-bank" }, `${txt("frame.bank").de} `, Geld(game.state.bank.cash)));
+      v("span", { class: "frame-bank" }, `${txt("frame.bank").text} `, Geld(game.state.bank.cash)));
   }
 
   // ---- action panel: context (only the current step, no rules text) -------------------------------------
@@ -276,8 +275,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     put(tabsEl, ...(list.length > 1 ? list.map((d) => v("button", {
       type: "button", role: "tab", "aria-selected": String(d.id === views.activeId),
       onclick: () => views.activate(d.id),
-    }, txt(d.labelKey).de)) : []),
-      v("button", { type: "button", class: "frame-log-link", title: txt("frame.log_hint").de, "aria-haspopup": "dialog", onclick: () => { logOpen = true; drawLog(); } }, txt("frame.log").de));
+    }, txt(d.labelKey).text)) : []),
+      v("button", { type: "button", class: "frame-log-link", title: txt("frame.log_hint").text, "aria-haspopup": "dialog", onclick: () => { logOpen = true; drawLog(); } }, txt("frame.log").text));
     views.active?.render({ container: viewEl });
   }
   views.onChange(() => { viewEl.replaceChildren(); drawMain(); });
@@ -308,9 +307,9 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     logList.replaceChildren(...(lines.length === 0 ? [] : [toDom(v("ol", {}, ...lines.map((l) => v("li", {}, l.text))))]));
     if (!wasOpen) {
       logHost.replaceChildren(toDom(Dialog({
-        id: "frame-log", title: txt("frame.log").de, onClose: closeLog,
-        body: [v("div", { class: "frame-log" }, lines.length === 0 ? v("p", { class: "muted" }, txt("frame.log_empty").de) : null)],
-        actions: [v("button", { type: "button", class: "kit-side-btn", "data-action": "close-log", onclick: closeLog }, txt("frame.log_close").de)],
+        id: "frame-log", title: txt("frame.log").text, onClose: closeLog,
+        body: [v("div", { class: "frame-log" }, lines.length === 0 ? v("p", { class: "muted" }, txt("frame.log_empty").text) : null)],
+        actions: [v("button", { type: "button", class: "kit-side-btn", "data-action": "close-log", onclick: closeLog }, txt("frame.log_close").text)],
       })));
       logHost.querySelector(".frame-log")!.append(logList);
       logHost.querySelector<HTMLElement>("[data-action='close-log']")!.focus();
@@ -344,7 +343,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   function orderSentence(g: Game, m: NonNullable<ReturnType<typeof model>>): string {
     const who = roundBar(g, theme()).who;
     if (g.state.meta.finished || !g.state.prompt.viewer_to_act) return who.text;
-    return m.count > 0 ? txt("frame.order_idle").de : txt("frame.order_nothing").de;
+    return m.count > 0 ? txt("frame.order_idle").text : txt("frame.order_nothing").text;
   }
   function drawBar() {
     const g = game;
@@ -357,9 +356,9 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     } else if (selected) {
       const type = String(selected.type);
       const order = Auftrag({
-        sentence: txt(`action.${type}`).de + (danger ? ` ${txt("frame.danger_note").de}` : ""),
+        sentence: txt(`action.${type}`).text + (danger ? ` ${txt("frame.danger_note").text}` : ""),
         changes: [], state: busy ? "waiting" : "preview",
-        confirmLabel: danger && armed ? txt("frame.confirm_danger").de : txt("frame.confirm").de,
+        confirmLabel: danger && armed ? txt("frame.confirm_danger").text : txt("frame.confirm").text,
         onConfirm: () => { if (danger && !armed) { armed = true; drawBar(); } else send(selected!); },
         onCancel: () => frame.discardSelection(),
       });
@@ -375,8 +374,8 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
       null);
     const drawerNodes: VNode[] = [];
     if (showGeneric && open) {
-      drawerNodes.push(v("section", { class: "frame-drawer-sheet", "aria-label": txt("frame.generic_title").de },
-        v("h3", {}, txt("frame.generic_title").de),
+      drawerNodes.push(v("section", { class: "frame-drawer-sheet", "aria-label": txt("frame.generic_title").text },
+        v("h3", {}, txt("frame.generic_title").text),
         GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError, stage, onStage, provided: (k: Kind) => [...(providers.get(k) ?? [])].flatMap((fn) => fn(g)) })));
     }
     put(drawerEl, ...drawerNodes);
@@ -401,7 +400,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     panelEl.hidden = panelHides > 0 && idle;
     panelEl.dataset.collapsed = collapsed ? "true" : "false";
     panelToggle.setAttribute("aria-expanded", String(!collapsed));
-    const label = txt(collapsed ? "frame.panel_expand" : "frame.panel_collapse").de;
+    const label = txt(collapsed ? "frame.panel_expand" : "frame.panel_collapse").text;
     panelToggle.title = label;
     panelToggle.setAttribute("aria-label", label);
     panelToggle.textContent = collapsed ? "▴" : "▾";

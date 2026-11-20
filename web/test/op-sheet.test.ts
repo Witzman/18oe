@@ -18,13 +18,13 @@ test("head: acting company, du, its numbers in one line and the strip with the c
   const g = load("operating-route");
   const s = opSheet(g, theme)!;
   assert.equal(s.id, "B");
-  assert.equal(s.who, "du");
+  assert.equal(s.who, "you");
   assert.deepEqual(s.facts.map((f) => f.key), ["op.cash", "op.price", "op.trains", "op.tokens"].filter((k) => k !== "op.price" || g.state.corporations.find((c) => c.id === "B")!.share_price !== null));
-  assert.equal(s.facts.find((f) => f.key === "op.tokens")!.value, "1/2 frei");
+  assert.equal(s.facts.find((f) => f.key === "op.tokens")!.value, "1/2 free");
   assert.deepEqual(s.steps.map((x) => x.state), ["done", "done", "current", "next", "next"]);
   const text = textOf(OpSheetView(s));
-  assert.match(text, /B · du/);
-  assert.match(text, /3 Fahrt/);
+  assert.match(text, /B · you/);
+  assert.match(text, /3 Run/);
   assert.equal(find(OpSheetView(s), (n) => n.attrs["aria-current"] === "step").length, 1);
 });
 
@@ -54,7 +54,7 @@ test("dividend: one line per option with share, treasury and price; payout list 
   const g = load("operating-dividend");
   const now = g.state.corporations.find((c) => c.id === "KSS")!.share_price;
   const lines = dividendOptions(g).map((o) => optionLine(o, now));
-  assert.deepEqual(lines, ["£60 in die Kasse · Kurs £65 → £60", "£3 je Anteil · £36 in die Kasse · Kurs bleibt", "£6 je Anteil · £12 in die Kasse · Kurs £65 → £70"]);
+  assert.deepEqual(lines, ["£60 to treasury · Price £65 → £60", "£3 per share · £36 to treasury · Price unchanged", "£6 per share · £12 to treasury · Price £65 → £70"]);
   const f = load("operating-dividend-fraction");
   assert.equal(payoutRows(f, null)!.kind, "payout");
   assert.equal(payoutRows(f, "half")!.kind, "half");
@@ -76,9 +76,9 @@ test("#55: the head shows the company's Pullman once Pullman cars are on sale (�
   g.state.depot.pullmans = { available: true, supply: 9, market: 0 };
   const b = g.state.corporations.find((c) => c.id === "B")!;
   b.pullman = false;
-  assert.equal(facts(g).find((f) => f.key === "op.pullman")!.value, "keine");
+  assert.equal(facts(g).find((f) => f.key === "op.pullman")!.value, "none");
   b.pullman = true;
-  assert.equal(facts(g).find((f) => f.key === "op.pullman")!.value, "ja");
+  assert.equal(facts(g).find((f) => f.key === "op.pullman")!.value, "yes");
 });
 
 test("#56: the head names the water area of the company's port authority marker (§11.3.5)", () => {
@@ -86,7 +86,7 @@ test("#56: the head names the water area of the company's port authority marker 
   const facts = (gg: Game) => opSheet(gg, theme)!.facts;
   assert.ok(!facts(g).some((f) => f.key === "op.port_authority"), "no marker, no fact");
   g.state.corporations.find((c) => c.id === "B")!.port_authority = "north_sea";
-  assert.equal(facts(g).find((f) => f.key === "op.port_authority")!.value, "Nordsee");
+  assert.equal(facts(g).find((f) => f.key === "op.port_authority")!.value, "North Sea");
   assert.equal(facts(g).find((f) => f.key === "op.port_authority")!.area, "north_sea");
 });
 

@@ -24,16 +24,16 @@ const pennant = (g: Game, id: string, theme: Theme) => Wimpel({ seat: seatOf(g, 
 
 /** Minor lots: no fixed home hex; says so and lists the free zones with the home-token price (#256, ui-spec 4.2). */
 export function homeLine(zones: { zone: string; price: number }[]): VNode {
-  const list = zones.length === 0 ? txt("auction.home_none").de
+  const list = zones.length === 0 ? txt("auction.home_none").text
     : fillText("auction.home_zones", { zones: zones.map((z) => fillText("auction.home_zone", { zone: z.zone, price: z.price })).join(", ") });
-  return v("small", { class: "auction-home" }, v("strong", {}, txt("auction.home_free").de), " · ", list);
+  return v("small", { class: "auction-home" }, v("strong", {}, txt("auction.home_free").text), " · ", list);
 }
 
 function cardNode(c: CardModel, g: Game, theme: Theme, h: SheetHandlers): VNode {
   const { card } = c;
   const price = card.min_bid;
   const body = [
-    v("span", { class: "auction-kind", "data-kind": card.kind }, txt(`auction.kind_${card.kind}`).de),
+    v("span", { class: "auction-kind", "data-kind": card.kind }, txt(`auction.kind_${card.kind}`).text),
     v("strong", { class: "auction-name" }, card.name),
     v("span", { class: "auction-price" },
       card.bid ? fillText("auction.high_bid", { amount: formatGeld(card.bid.price) }) : fillText(c.buyNow ? "auction.price_top" : "auction.min_bid", { amount: formatGeld(price) }),
@@ -47,7 +47,7 @@ function cardNode(c: CardModel, g: Game, theme: Theme, h: SheetHandlers): VNode 
     class: "auction-card", "data-card": card.id, "data-kind": card.kind, "data-state": c.state,
     "data-running": c.running ? "true" : "false",
   };
-  const tip = { title: card.name, text: c.text ?? undefined, term: txt(`auction.kind_${card.kind}`).en, reason: c.why ?? undefined, rows: [{ label: txt("auction.face_label").de, amount: card.value }], source: txt(`auction.kind_${card.kind}`).regel };
+  const tip = { title: card.name, text: c.text ?? undefined, term: txt(`auction.kind_${card.kind}`).en, reason: c.why ?? undefined, rows: [{ label: txt("auction.face_label").text, amount: card.value }], source: txt(`auction.kind_${card.kind}`).regel };
   if (c.state === "pick" || c.state === "selected") {
     const btn = v("button", { ...attrs, type: "button", "aria-pressed": String(c.state === "selected"), onclick: () => h.onSelect(card.id) }, ...body, v("span", { class: "auction-mark", "aria-hidden": "true" }, "◂"));
     return v("li", {}, mitTooltip(btn, tip));
@@ -59,7 +59,7 @@ function cardNode(c: CardModel, g: Game, theme: Theme, h: SheetHandlers): VNode 
 function rowNode(r: RowModel, g: Game, theme: Theme, h: SheetHandlers): VNode {
   const head = v("div", { class: "auction-rowhead" },
     v("strong", {}, fillText("auction.row", { roman: r.roman })),
-    v("small", { class: "muted" }, r.sold ? txt("auction.row_sold").de : r.top ? txt("auction.row_top").de : txt("auction.row_below").de));
+    v("small", { class: "muted" }, r.sold ? txt("auction.row_sold").text : r.top ? txt("auction.row_top").text : txt("auction.row_below").text));
   return v("section", { class: "auction-row", "data-row": String(r.row), "data-top": r.top ? "true" : "false", "data-sold": r.sold ? "true" : "false" },
     head, v("ul", { class: "auction-cards" }, ...r.cards.map((c) => cardNode(c, g, theme, h))));
 }
@@ -68,18 +68,18 @@ function rowNode(r: RowModel, g: Game, theme: Theme, h: SheetHandlers): VNode {
 export function bidForm(g: Game, sel: Selection | null, h: SheetHandlers, named = true): VNode | null {
   const range = sel ? g.state.prompt.ranges.find((r) => r.type === "bid" && r.company === sel.id) : undefined;
   const card = sel ? g.state.auction?.cards.find((c) => c.id === sel.id) : undefined;
-  if (!sel || !range || !card) return g.state.prompt.viewer_to_act ? v("p", { class: "auction-bidform auction-idle muted" }, txt("auction.form_idle").de) : null;
+  if (!sel || !range || !card) return g.state.prompt.viewer_to_act ? v("p", { class: "auction-bidform auction-idle muted" }, txt("auction.form_idle").text) : null;
   if (range.min === range.max) return v("p", { class: "auction-bidform auction-fixed" }, named ? v("strong", {}, card.name) : null, named ? " " : null, fillText("auction.fixed", { amount: formatGeld(range.min) }));
   const bad = rangeValue(range, sel.amount) === null;
   return v("form", { class: "auction-bidform", onsubmit: (e) => e.preventDefault() },
     named ? v("strong", {}, card.name) : null,
-    v("label", {}, txt("auction.amount").de, v("input", {
+    v("label", {}, txt("auction.amount").text, v("input", {
       type: "number", name: "amount", min: String(range.min), max: String(range.max), step: String(range.step), value: sel.amount,
       inputmode: "numeric", "aria-invalid": bad ? "true" : "false", "aria-describedby": "auction-amount-hint",
       oninput: (e) => h.onAmount((e.currentTarget as HTMLInputElement).value),
     })),
     v("span", { id: "auction-amount-hint", class: bad ? "msg-error" : "muted", "data-bad": bad ? "true" : "false" }, amountHint(range)),
-    card.kind === "minor" ? v("small", { class: "muted" }, txt("auction.minor_hint").de) : null);
+    card.kind === "minor" ? v("small", { class: "muted" }, txt("auction.minor_hint").text) : null);
 }
 
 /** Rows without lots left shrink to one line (consecutive ones merged), so the open rows stay in view. */
@@ -91,7 +91,7 @@ function rowNodes(rows: RowModel[], g: Game, theme: Theme, h: SheetHandlers): VN
     let j = i;
     while (rows[j + 1]?.sold) j++;
     const label = j === i ? fillText("auction.row", { roman: r.roman }) : fillText("auction.rows", { from: r.roman, to: rows[j]!.roman });
-    out.push(v("p", { class: "auction-sold", "data-rows": `${r.row}-${rows[j]!.row}` }, v("strong", {}, label), ` ${txt("auction.row_sold").de}`));
+    out.push(v("p", { class: "auction-sold", "data-rows": `${r.row}-${rows[j]!.row}` }, v("strong", {}, label), ` ${txt("auction.row_sold").text}`));
     i = j;
   }
   return out;
@@ -102,7 +102,7 @@ function passButton(g: Game, h: SheetHandlers): VNode | null {
   const pass = passAction(g);
   if (!pass || !g.state.prompt.viewer_to_act) return null;
   const running = g.state.auction?.current != null;
-  return v("button", { type: "button", class: "kit-side-btn", "data-action": "pass", title: running ? txt("auction.pass_running_tip").de : txt("auction.pass_tip").de, onclick: () => h.onPass?.() }, txt("auction.pass").de);
+  return v("button", { type: "button", class: "kit-side-btn", "data-action": "pass", title: running ? txt("auction.pass_running_tip").text : txt("auction.pass_tip").text, onclick: () => h.onPass?.() }, txt("auction.pass").text);
 }
 
 /** The centred dialog over the sheet once a lot is chosen (#368): amount, order sentence, confirm, cancel, pass.
@@ -136,8 +136,8 @@ export function sheetNode(m: SheetModel, g: Game, sel: Selection | null, theme: 
   const dialog = lotDialog(g, sel, h);
   const sheet = v("div", { class: "auction-sheet" },
     v("header", { class: "auction-head" },
-      v("h2", {}, txt("auction.board").de),
-      v("span", { class: "auction-head-side" }, passButton(g, h), m.cash !== null ? v("span", { class: "auction-cash" }, `${txt("auction.cash").de} `, Geld(m.cash)) : null)),
+      v("h2", {}, txt("auction.board").text),
+      v("span", { class: "auction-head-side" }, passButton(g, h), m.cash !== null ? v("span", { class: "auction-cash" }, `${txt("auction.cash").text} `, Geld(m.cash)) : null)),
     v("p", { class: "auction-status muted", role: "status" }, status.join(" · ")),
     run ? v("section", { class: "auction-running", "aria-label": fillText("auction.running", { name: run.card.name }) },
       v("strong", {}, fillText("auction.running", { name: run.card.name })),
@@ -152,11 +152,11 @@ export function sheetNode(m: SheetModel, g: Game, sel: Selection | null, theme: 
 
 export function openingNode(rows: OpeningRow[], theme: Theme): VNode {
   return v("div", { class: "auction-sheet auction-opening" },
-    v("header", { class: "auction-head" }, v("h2", {}, txt("auction.opening_title").de)),
+    v("header", { class: "auction-head" }, v("h2", {}, txt("auction.opening_title").text)),
     v("ul", { class: "auction-players" }, ...rows.map((r) => v("li", { class: "auction-player", "data-player": r.player },
       Wimpel({ seat: r.seat, name: r.name }, { theme }),
-      r.items.length === 0 ? v("span", { class: "muted" }, txt("auction.opening_none").de)
+      r.items.length === 0 ? v("span", { class: "muted" }, txt("auction.opening_none").text)
         : v("ul", { class: "auction-owned" }, ...r.items.map((i) => v("li", { "data-kind": i.kind },
-          v("span", { class: "auction-kind", "data-kind": i.kind }, txt(`auction.kind_${i.kind}`).de), " ", i.name,
+          v("span", { class: "auction-kind", "data-kind": i.kind }, txt(`auction.kind_${i.kind}`).text), " ", i.name,
           i.value !== null ? v("small", { class: "muted" }, ` ${fillText("auction.opening_value", { amount: formatGeld(i.value) })}`) : null)))))));
 }

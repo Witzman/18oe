@@ -17,7 +17,7 @@ test("rows: the reserved 2+2 comes first with the mark; the foreign train is inv
   assert.deepEqual(rows.map((r) => r.id), ["2+2-0", "2+2-3"]);
   assert.ok(rows[0]!.reserved && rows[0]!.options.length === 1 && rows[0]!.reason === null);
   assert.ok(!rows[1]!.reserved && rows[1]!.options.length === 0);
-  assert.match(rows[1]!.reason!, /Pflichtkauf/);
+  assert.match(rows[1]!.reason!, /The mandatory 2\+2 first/);
   // #418: the depot's count of a type is the train on offer plus the not yet offered ones (1 + 6); a corporation's row has none.
   assert.equal(rows[0]!.left, 7);
   assert.equal(rows[1]!.left, null);
@@ -26,22 +26,22 @@ test("rows: the reserved 2+2 comes first with the mark; the foreign train is inv
 test("#418: the depot row says how many trains of its type are left, also when no further ones are scheduled", () => {
   const g = load("buy-train");
   assert.equal(trainRows(g)[0]!.left, 1, "no schedule in this recording: the one on offer");
-  assert.match(textOf(TrainPanel(g, emptySelection(), noop)), /1 übrig/);
+  assert.match(textOf(TrainPanel(g, emptySelection(), noop)), /1 left/);
 });
 
 test("rows: without the obligation the reasons are cash, limit or generic", () => {
   const g = load("buy-train-reserved");
   g.state.prompt.context.train!.obligation.active = false;
   const foreign = trainRows(g)[1]!;
-  assert.equal(foreign.reason, "Jetzt nicht möglich", "affordable with the president, nothing else known");
+  assert.equal(foreign.reason, "Not possible now", "affordable with the president, nothing else known");
   g.state.prompt.context.train!.president_may_contribute = false;
   g.state.corporations.find((c) => c.id === "B")!.cash = 10;
-  assert.match(trainRows(g)[1]!.reason!, /£50 fehlen/);
+  assert.match(trainRows(g)[1]!.reason!, /£50 missing/);
   g.state.prompt.context.train!.count = 2;
-  assert.match(trainRows(g)[1]!.reason!, /Zuglimit 2 in Phase 2/);
+  assert.match(trainRows(g)[1]!.reason!, /Train limit 2 in phase 2/);
   g.state.corporations.find((c) => c.id === "B")!.cash = 500;
   g.state.prompt.context.train!.count = 0;
-  assert.equal(trainRows(g)[1]!.reason, "Jetzt nicht möglich");
+  assert.equal(trainRows(g)[1]!.reason, "Not possible now");
 });
 
 test("without the view's context (older state) the list still works, nothing is marked reserved", () => {
@@ -54,10 +54,10 @@ test("the reserved 2+2 is chosen already; the sentence previews, the action is t
   const g = load("buy-train-reserved");
   assert.equal(effectiveSelection(g, emptySelection()).train, "2+2-0");
   const s = sentenceFor(g, emptySelection());
-  assert.match(s.text, /B kauft den Pflicht-2\+2 für £100/);
+  assert.match(s.text, /B buys the mandatory 2\+2 for £100/);
   assert.equal(s.action, g.state.prompt.actions[0]);
   // B has £80: the president (p0, £55) chips in £20 and the changes say so.
-  assert.deepEqual(s.changes.map((c) => [c.label, c.before, c.after]), [["Kasse B", "£80", "£0"], ["Kasse p0", "£55", "£35"]]);
+  assert.deepEqual(s.changes.map((c) => [c.label, c.before, c.after]), [["Cash B", "£80", "£0"], ["Cash p0", "£55", "£35"]]);
 });
 
 test("the order only exists for the viewer; main button is a preview, nothing is sent while choosing", () => {
@@ -65,7 +65,7 @@ test("the order only exists for the viewer; main button is a preview, nothing is
   const sent: unknown[] = [];
   const spec = orderFor(g, emptySelection(), (a) => sent.push(a))!;
   assert.equal(spec.state, "preview");
-  assert.equal(spec.confirmLabel, "Kaufen");
+  assert.equal(spec.confirmLabel, "Buy");
   assert.equal(sent.length, 0);
   spec.onConfirm();
   assert.deepEqual(sent, [g.state.prompt.actions[0]]);
@@ -74,14 +74,14 @@ test("the order only exists for the viewer; main button is a preview, nothing is
   assert.ok(trainRows(g).every((r) => r.options.length === 0 && r.reason === null), "read-only for the others");
 });
 
-test("pass becomes the side button 'Kein Zug'; without a pass action there is none", () => {
+test("pass becomes the side button 'No train'; without a pass action there is none", () => {
   const g = load("buy-train-reserved");
   assert.deepEqual(orderFor(g, emptySelection(), () => {})!.side, []);
   const pass = { type: "pass", entity: "B", entity_type: "corporation" };
   g.state.prompt.actions.push(pass);
   const sent: unknown[] = [];
   const side = orderFor(g, emptySelection(), (a) => sent.push(a))!.side!;
-  assert.equal(side[0]!.label, "Kein Zug");
+  assert.equal(side[0]!.label, "No train");
   side[0]!.onClick();
   assert.deepEqual(sent, [pass]);
 });
@@ -95,7 +95,7 @@ test("several prices of a foreign train: choose train, then price; invalid until
   assert.equal(effectiveSelection(g, emptySelection()).price, null);
   assert.equal(orderFor(g, emptySelection(), () => {})!.state, "invalid");
   const s = sentenceFor(g, { train: "2+2-3", price: 50 });
-  assert.match(s.text, /für £50 \(von A\)/);
+  assert.match(s.text, /for £50 \(from A\)/);
   assert.equal(s.action!.price, 50);
   const panel = TrainPanel(g, { train: "2+2-3", price: 50 }, noop);
   assert.equal(find(panel, (n) => n.attrs.class === "train-prices").length, 1);
@@ -104,9 +104,9 @@ test("several prices of a foreign train: choose train, then price; invalid until
 
 test("duty line: cash and missing money while the buyer has to buy", () => {
   const g = load("buy-train-reserved");
-  assert.match(dutyLine(g)!, /Zugpflicht: Kasse £80, es fehlen £20/);
+  assert.match(dutyLine(g)!, /Train obligation: cash £80, £20 missing/);
   g.state.prompt.context.train!.shortfall = 0;
-  assert.match(dutyLine(g)!, /B muss einen Zug kaufen/);
+  assert.match(dutyLine(g)!, /B must buy a train/);
   g.state.prompt.context.train!.must_buy = false;
   assert.equal(dutyLine(g), null);
 });
@@ -118,9 +118,9 @@ test("consequence hint: first train of a kind names the new phase and the trains
   g.state.depot.schedule!.push({ name: "x", count: 1, price: 1, phase_on: null, rusts_on: "3+3", obsolete_on: null, available_on: null });
   g.state.prompt.actions = [{ type: "buy_train", entity: "B", entity_type: "corporation", train: "3+3-0", price: 180 }];
   const row = trainRows(g)[0]!;
-  assert.match(row.hint!, /beginnt Phase 3/);
-  assert.match(row.hint!, /x rosten/);
-  assert.match(sentenceFor(g, emptySelection()).warn!, /^Folge:/);
+  assert.match(row.hint!, /starts phase 3/);
+  assert.match(row.hint!, /x rust/);
+  assert.match(sentenceFor(g, emptySelection()).warn!, /^Consequence:/);
 });
 
 test("insolvency (11.6.5): lines of the latest resolution from the log tail", () => {
@@ -128,7 +128,7 @@ test("insolvency (11.6.5): lines of the latest resolution from the log tail", ()
   assert.deepEqual(insolvencyLines(g), []);
   g.state.log.push({ action: 1400, text: "H cannot pay for its 2+2 and p1 cannot make up the difference: first-round insolvency" }, { action: 1400, text: "p1 puts all personal cash into H's treasury" }, { action: 1401, text: "other" });
   assert.equal(insolvencyLines(g).length, 2);
-  assert.match(textOf(TrainPanel(g, emptySelection(), noop)), /Erstrunden-Insolvenz/);
+  assert.match(textOf(TrainPanel(g, emptySelection(), noop)), /First-round insolvency/);
 });
 
 test("claims: buy_train and pass leave the generic bar; sell_shares and bankrupt stay there", () => {
@@ -143,11 +143,11 @@ test("claims: buy_train and pass leave the generic bar; sell_shares and bankrupt
 
 test("panel: every row is a button of at least touch size class, the mark and the reason are in the text", () => {
   const text = textOf(TrainPanel(load("buy-train-reserved"), emptySelection(), noop));
-  assert.match(text, /Pflichtkauf/);
-  assert.match(text, /Erst der Pflichtkauf/);
-  assert.match(text, /Aus dem Depot/);
-  assert.match(text, /Von anderen Gesellschaften/);
-  assert.match(text, /von A/);
+  assert.match(text, /Mandatory purchase/);
+  assert.match(text, /The mandatory 2\+2 first/);
+  assert.match(text, /From the depot/);
+  assert.match(text, /From other corporations/);
+  assert.match(text, /from A/);
 });
 
 test("#55: the Pullman purchases and the discard are rows of their own; the sentence carries the view's label", () => {

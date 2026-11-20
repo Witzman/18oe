@@ -22,7 +22,7 @@ export function gamesPage(ctx: Ctx): Promise<HTMLElement> {
 export type { GameFrame } from "./frame/frame.ts";
 
 export function notFoundPage(): HTMLElement {
-  return h("div", {}, h("h1", {}, txt("msg.not_found_title").de), h("p", {}, h("a", { href: "#/" }, txt("msg.not_found_link").de)));
+  return h("div", {}, h("h1", {}, txt("msg.not_found_title").text), h("p", {}, h("a", { href: "#/" }, txt("msg.not_found_link").text)));
 }
 
 export function gameFrame(retryNow: () => void = () => {}, api?: Api): GameFrame {

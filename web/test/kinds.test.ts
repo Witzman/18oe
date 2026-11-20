@@ -123,7 +123,7 @@ test("every kind has a label and a tooltip, English only (rule 31); back and pic
   for (const key of ["kind.back", "kind.back_tip", "kind.pick", "kind.step_head"]) assert.ok(TEXT[key], key);
   for (const [key, entry] of Object.entries(TEXT)) {
     if (!key.startsWith("kind.")) continue;
-    assert.ok(entry.de.length > 0, key);
-    assert.doesNotMatch(entry.de, /[äöüÄÖÜß]/, `${key} shows German: ${entry.de}`);
+    assert.ok(entry.text.length > 0, key);
+    assert.doesNotMatch(entry.text, /[äöüÄÖÜß]/, `${key} shows German: ${entry.text}`);
   }
 });

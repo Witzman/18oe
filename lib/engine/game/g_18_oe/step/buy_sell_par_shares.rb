@@ -56,8 +56,10 @@ module Engine
           # §10.4 is a stock action of every stock round (owner decision F1, 2026-11-18, workshop #67: the
           # earlier limit to the opening stock round, "errata 10", has no source). Only a round that can ask
           # the seller (Step::TradeOffer) trades: the stock round, not the consolidation (§10.6) or concession round.
-          def can_trade?(player)
-            @round.current_actions.empty? && @game.num_certs(player) < @game.cert_limit(player) &&
+          # A player at the certificate limit may trade too (owner decision 2026-11-20, #524): what counts is the
+          # limit after the trade, checked for every offer in validate_trade_certs! (§4.1).
+          def can_trade?(_player)
+            @round.current_actions.empty? &&
               @round.steps.any? { |step| step.is_a?(G18OE::Step::TradeOffer) }
           end
 
@@ -107,9 +109,75 @@ module Engine
 
           # §10.4 (#202): a purchase from another player is an offer; Step::TradeOffer asks the seller.
           def offer_trade!(action, target, seller)
-            @log << "#{action.entity.name} offers #{@game.format_currency(action.price)} to #{seller.name} " \
-                    "for #{target.name}"
+            validate_trade_objects!(action, target, seller)
+            @log << "#{action.entity.name} offers #{trade_terms(action)} to #{seller.name} for #{trade_wanted(action, target)}"
             @round.trade_offer = action
+          end
+
+          # §10.4 (#517): "The players may only exchange personal cash, minors and face up privates." The
+          # buyer's `give` and the seller's `also` must be such objects of their owners, and neither side
+          # may end above its certificate limit (§4.1).
+          def validate_trade_objects!(action, target, seller)
+            buyer = action.entity
+            merged = @game.merged_minors.values.flatten
+            wanted = [target, *action.also]
+            offered = action.give
+            raise GameError, 'Cannot trade an object twice' if (wanted + offered).uniq.size != wanted.size + offered.size
+
+            offered.each do |object|
+              raise GameError, "Cannot trade #{object.name}: it is not yours (§10.4)" unless tradable_object?(buyer, object, merged)
+            end
+            action.also.each do |object|
+              raise GameError, "Cannot trade #{object.name}: it is not the seller's (§10.4)" unless tradable_object?(seller, object, merged)
+            end
+            validate_trade_certs!(buyer, wanted, offered)
+            validate_trade_certs!(seller, offered, wanted)
+          end
+
+          def validate_trade_certs!(player, received, given)
+            delta = received.sum { |object| trade_certs(object) } - given.sum { |object| trade_certs(object) }
+            return if delta <= 0 || @game.num_certs(player) + delta <= @game.cert_limit(player)
+
+            raise GameError, "#{player.name} would exceed the certificate limit by this trade (§4.1)"
+          end
+
+          # What `player` could give in a trade: own floated minors with their presidency, own face up privates.
+          def tradable_objects(player)
+            merged = @game.merged_minors.values.flatten
+            @game.corporations.select { |corporation| tradable_minor?(player, corporation, merged, other: false) } +
+              player.companies.select { |company| tradable_object?(player, company, merged) }
+          end
+
+          # An offer that would pass process_buy_company / process_buy_corporation's checks on the objects.
+          def valid_trade_objects?(action, target)
+            validate_trade_objects!(action, target, target.owner)
+            true
+          rescue GameError
+            false
+          end
+
+          def trade_certs(object)
+            return 1 if object.company?
+
+            object.presidents_share.counts_for_limit ? object.presidents_share.cert_size : 0
+          end
+
+          # A minor the owner holds with its presidency, or a face up private the owner holds.
+          def tradable_object?(owner, object, merged)
+            return tradable_minor?(owner, object, merged, other: false) if object.corporation?
+
+            object.company? && @game.private_company?(object) && object.owner == owner &&
+              !@game.face_down_private?(object) && !@game.abilities(object, :no_buy)
+          end
+
+          def trade_terms(action)
+            parts = action.give.map(&:name)
+            parts << @game.format_currency(action.price) if action.price.positive? || parts.empty?
+            parts.join(' and ')
+          end
+
+          def trade_wanted(action, target)
+            [target, *action.also].map(&:name).join(' and ')
           end
 
           # The seller accepted (Step::TradeOffer): the offer becomes the buyer's stock action.
@@ -125,12 +193,11 @@ module Engine
             player = action.entity
             price = action.price
 
-            company.owner = player
-            seller.companies.delete(company)
-            player.companies << company
+            exchange_objects!(action, player, seller)
+            move_company(company, player)
             player.spend(price, seller) if price.positive?
             track_action(action, company)
-            @log << "#{player.name} buys #{company.name} from #{seller.name} for #{@game.format_currency(price)}"
+            @log << "#{player.name} buys #{trade_wanted(action, company)} from #{seller.name} for #{trade_terms(action)}"
             @game.after_buy_company(player, company, price)
             pass!
           end
@@ -151,7 +218,8 @@ module Engine
             corporation = action.corporation
             price = action.price
             seller = corporation.owner
-            @log << "#{player.name} buys #{corporation.name} from #{seller.name} for #{@game.format_currency(price)}"
+            @log << "#{player.name} buys #{trade_wanted(action, corporation)} from #{seller.name} for #{trade_terms(action)}"
+            exchange_objects!(action, player, seller)
             @game.share_pool.transfer_shares(
               corporation.presidents_share.to_bundle, player,
               spender: player, receiver: seller, price: price
@@ -160,7 +228,30 @@ module Engine
             pass!
           end
 
-          def tradable_minor?(player, corporation, merged)
+          # §10.4 (#517): the objects besides the target change hands: `give` to the seller, `also` to the buyer.
+          def exchange_objects!(action, buyer, seller)
+            action.give.each { |object| move_trade_object(object, seller) }
+            action.also.each { |object| move_trade_object(object, buyer) }
+          end
+
+          def move_trade_object(object, to)
+            if object.company?
+              move_company(object, to)
+              @game.after_buy_company(to, object, 0)
+            else
+              @game.share_pool.transfer_shares(object.presidents_share.to_bundle, to, price: 0)
+            end
+          end
+
+          def move_company(company, to)
+            company.owner.companies.delete(company)
+            company.owner = to
+            to.companies << company
+          end
+
+          # `other: true` asks whether `player` may buy it (held by another player); `other: false`, whether
+          # `player` holds it (#517).
+          def tradable_minor?(player, corporation, merged, other: true)
             return false unless corporation&.corporation?
             return false if corporation.type != :minor || corporation.closed? || !corporation.floated?
             return false if merged.include?(corporation)
@@ -168,7 +259,7 @@ module Engine
             seller = corporation.owner
             return false unless seller&.player?
 
-            seller != player && corporation.presidents_share&.owner == seller
+            (other ? seller != player : seller == player) && corporation.presidents_share&.owner == seller
           end
 
           def must_sell_actions(entity)
