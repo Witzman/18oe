@@ -36,7 +36,7 @@ module Engine
                   'controlled RR on the map for free. The token must be reachable by that RR as if it were '\
                   'paid for; the cost of crossing ferries and sea zones (§11.2.1) still applies. '\
                   'If also owning the White Cliffs Ferry, this private may pay for that token\'s placement cost.',
-            # §14.3 (#77): see Step::SpecialToken#process_free_token; used once (ASSUMPTION: the rules give no count).
+            # §14.3 (#77): see Step::SpecialToken#process_free_token; used once: exercising the ability removes the private, §6.1 (p. 17).
             abilities: [
               {
                 type: 'token',

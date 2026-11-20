@@ -1132,8 +1132,11 @@ module Engine
           minor.placed_tokens.any? { |token| nodes.key?(token.city) }
         end
 
+        # §10.5: a treasury share, else one from the Open Market; §14.4 (2), S. 43: a share in custodianship is the
+        # one "exchanged when merging in a minor" (#510).
         def merge_share(major)
-          major.treasury_shares.find { |share| !share.president } ||
+          treasury = major.treasury_shares.reject(&:president)
+          treasury.find { |share| bbbt_custody?(share) } || treasury.first ||
             @share_pool.shares_by_corporation[major].first
         end
 
