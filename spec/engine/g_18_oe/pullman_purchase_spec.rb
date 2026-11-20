@@ -95,6 +95,59 @@ describe 'G18OE buying a Pullman (§11.6.2)' do
     it 'rejects a choice that is not on offer' do
       expect { choose!('pullman_market') }.to raise_error(Engine::GameError, /Pullman/)
     end
+
+    # #508 5a (owner, 2026-11-20): §11.6.2 pays the £15 royalty to "Minor M (or its owning major)"; an
+    # abandoned M has no owning major, so nobody is paid (§9.5: the charter's cash is the bank's).
+    describe 'the royalty when Minor M is gone (#508)' do
+      let(:minor_m) { start_minor!(game, 'M', game.players.first, 'IT') }
+
+      # The state Step::MergeMinor and Step::MergeToken leave for a major (§10.5).
+      def merge_m!(major)
+        game.transfer(:trains, minor_m, major)
+        minor_m.presidents_share.counts_for_limit = false
+        game.add_minor_charter!(minor_m, major)
+        game.minor_regional_order.delete(minor_m)
+        game.close_corporation(minor_m, quiet: true)
+      end
+
+      def expect_no_royalty!
+        expect(game.pullman_royalty_receiver).to be_nil
+        lnwr_cash = lnwr.cash
+        bank_cash = game.bank.cash
+        expect { choose!('pullman_m') }.to change(buyer, :cash).by(-150)
+        expect(lnwr.cash).to eq(lnwr_cash)
+        expect(game.bank.cash).to eq(bank_cash + 150)
+        expect(game.pullman?(buyer)).to be(true)
+      end
+
+      it 'pays the major M merged into' do
+        minor_m
+        merge_m!(lnwr)
+        expect(game.pullman_royalty_receiver).to eq(lnwr)
+      end
+
+      it 'pays no royalty for an abandoned M that never merged' do
+        game.abandon_minor!(minor_m)
+        expect_no_royalty!
+      end
+
+      it 'pays no royalty when M merged into a national (abandoned since #506)' do
+        national = start_major!(game, 'GWR', game.players.first)
+        game.form_national!(national)
+        game.add_minor_charter!(minor_m, national)
+        game.close_corporation(minor_m, quiet: true)
+        game.abandon_merged_minor!(minor_m, national)
+        expect(game.abandoned_minor?(minor_m)).to be(true)
+        expect_no_royalty!
+      end
+
+      it 'pays no royalty when the major M merged into becomes a national' do
+        merge_m!(lnwr)
+        game.form_national!(lnwr)
+        expect(game.abandoned_minor?(minor_m)).to be(true)
+        expect_no_royalty!
+      end
+    end
   end
 end
 

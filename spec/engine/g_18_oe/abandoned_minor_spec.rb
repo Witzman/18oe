@@ -172,6 +172,56 @@ describe 'G18OE abandoning a minor (§9.5)' do
     end
   end
 
+  # #508 5d (owner, 2026-11-20): "one-time cash payment" (§10.5, §15.1). The used ability goes back to the
+  # charter with the national formation, so a later purchase (§11.7, "as if merged") pays nothing again.
+  describe 'minor A after the formation of a national (#508)' do
+    let(:minor) { start_minor!(game, 'A', player, 'SP') }
+    let(:first_major) { start_major!(game, 'PLM', player) }
+    let(:buyer) { start_major!(game, 'LNWR', game.players[1]) }
+    let(:round) { enter_round!(game, game.operating_round(1)) }
+    let(:step) { round_step(round, Engine::Game::G18OE::Step::IssueShares) }
+
+    def merge_a!(major)
+      game.transfer(:trains, minor, major)
+      minor.presidents_share.counts_for_limit = false
+      game.add_minor_charter!(minor, major)
+      game.minor_regional_order.delete(minor)
+      game.close_corporation(minor, quiet: true)
+    end
+
+    def prepare_buyer!
+      buyer.spend(buyer.cash, game.bank) if buyer.cash.positive?
+      game.bank.spend(300, buyer)
+      round.instance_variable_set(:@current_operator, buyer)
+      step.setup
+    end
+
+    def buy_charter!
+      step.process_choose(Engine::Action::Choose.new(buyer, choice: minor.id))
+    end
+
+    it 'pays nothing again when another major buys the charter A paid out for' do
+      merge_a!(first_major)
+      expect(minor.abilities).to be_empty
+      game.form_national!(first_major)
+      expect(game.abandoned_minor?(minor)).to be(true)
+      expect(minor.abilities.first).to be_used
+
+      prepare_buyer!
+      expect { buy_charter! }.to change(game.bank, :cash).by(60)
+      expect(buyer.cash).to eq(300 - 60)
+    end
+
+    it 'pays at the first purchase when A never merged (first payment)' do
+      game.abandon_minor!(minor)
+      expect(minor.abilities.first).not_to be_used
+
+      prepare_buyer!
+      expect { buy_charter! }.to change(game.bank, :cash).by(60 - buyer.share_price.price)
+      expect(buyer.cash).to eq(300 - 60 + buyer.share_price.price)
+    end
+  end
+
   describe 'buying an abandoned minor (§11.7)' do
     let(:former_owner) { game.players[1] }
     let(:minor_id) { 'D' }

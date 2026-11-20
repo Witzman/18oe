@@ -16,10 +16,11 @@ module Engine
           super
         end
 
-        # The abbreviated OR (§13) has no Golden Bell step, so it keeps the normal order.
+        # The abbreviated OR (§13) has no Golden Bell step, so it keeps the normal order, and no mail contract
+        # (Minor K): it only repeats the previous payout (#508 5c).
         def setup
           @game.golden_bell_ask! unless abbreviated?
-          @game.pay_mail_contract!
+          @game.pay_mail_contract! unless abbreviated?
           super
         end
 
