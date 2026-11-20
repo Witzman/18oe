@@ -45,7 +45,7 @@ module Engine
           end
 
           def choice_name
-            "#{buyer.name} offers #{@game.format_currency(offer.price)} for #{target.name}"
+            "#{buyer.name} offers #{terms} for #{wanted}"
           end
 
           def pass_description
@@ -83,6 +83,16 @@ module Engine
 
           def offer
             @round.trade_offer
+          end
+
+          def terms
+            parts = offer.give.map(&:name)
+            parts << @game.format_currency(offer.price) if offer.price.positive? || parts.empty?
+            parts.join(' and ')
+          end
+
+          def wanted
+            [target, *offer.also].map(&:name).join(' and ')
           end
 
           def buyer
