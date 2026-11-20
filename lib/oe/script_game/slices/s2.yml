@@ -28,8 +28,6 @@
 # a target or has no scenario). A target the run never reaches turns the CI run red.
 slice: S2
 unreachable:
-  consolidation/Consolidate/convert: >-
-    A regional's president converts it in the Consolidation round only if he still presides a regional then. The rush games that reach the round (game 2, 3 players, Phase 5) offered the round's other actions but not this one (CI runs of #481); 4 to 6 player games end in Train Phase 4 before the round. A small scenario shows the enumerator offers it (spec/oe/s2_targets_spec.rb); steering a game to keep a regional for that round is the target-driven director of #118.
   consolidation/Consolidate/choose:offer_or_abandon: >-
     Offered only to the owner of a minor who has no major to merge it into and no regional. The rush games that reach the Consolidation round (game 2, 3 players, Phase 5) did not offer it (CI runs of #481); 4 to 6 player games end in Train Phase 4 before the round. A small scenario shows the enumerator offers it (spec/oe/s2_targets_spec.rb); steering a game to that state is the target-driven director of #118.
   operating/DiscardTrain/discard_train: >-
@@ -60,3 +58,12 @@ games:
       - consolidation/Consolidate/choose:offer_or_merge
       - consolidation/MergeOffer/choose:merge_offer
       - consolidation/MergeOffer/pass
+  - name: rush game with 3 players, a regional kept for the consolidation round
+    seed: 1
+    finish: false
+    rush: true
+    players: 3
+    # #492: the director keeps one regional unconverted (ScriptGame#hold_regional) so its president is offered
+    # `convert` when the round starts. A game of its own, so game 2 stays as measured; NOT yet run by CI.
+    combos:
+      - consolidation/Consolidate/convert

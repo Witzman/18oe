@@ -254,6 +254,9 @@ module Oe
       starve = starve_presidents(round, step, prompt, missing)
       return starve if starve
 
+      held = hold_regional(round, step, prompt, missing)
+      return held if held
+
       range = prompt["ranges"].find { |r| missing.include?(key(round, step, r)) }
       return nil unless range
 
@@ -327,6 +330,23 @@ module Oe
       return nil unless round == "stock" && step == "BuySellParShares" && missing.include?(MERGE_TARGET)
 
       prompt["actions"].find { |a| a["type"] == "choose" && !a["target"] && corporation_type(a["choice"]) == :minor }
+    end
+
+    # The Consolidation round offers `convert` only to the president of a regional that is still there (#492). The
+    # strategy converts every regional at the first chance, so none is left and the target stays missing. While it
+    # is missing the director keeps ONE regional (the first one a convert is offered for) unconverted in the Stock
+    # Rounds: it converts the others and passes when only the held one is left. Everything else is the bot's play.
+    CONSOLIDATION_CONVERT = "consolidation/Consolidate/convert"
+
+    def hold_regional(round, step, prompt, missing)
+      return nil unless round == "stock" && missing.include?(CONSOLIDATION_CONVERT)
+
+      converts = prompt["actions"].select { |a| a["type"] == "convert" && corporation_type(a["entity"]) == :regional }
+      return nil if converts.empty?
+
+      @held_regional ||= converts.first["entity"]
+      other = converts.find { |a| a["entity"] != @held_regional }
+      other || prompt["actions"].find { |a| a["type"] == "pass" }
     end
 
     def reserve_question?(action)
