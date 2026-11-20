@@ -38,8 +38,32 @@ RSpec.describe "S2 director steering (#481)" do
     end
   end
 
+  describe "keeping a regional for the consolidation round (#492)" do
+    let(:targets) { %w[consolidation/Consolidate/convert] }
+    let(:first) { start_regional!(game, "LNWR", game.players.first) }
+    let(:second) { start_regional!(game, "GWR", game.players.first) }
+    let(:pass) { { "type" => "pass", "entity" => game.players.first.id } }
+
+    def convert(regional)
+      { "type" => "convert", "entity" => regional.id }
+    end
+
+    it "converts the others and passes when only the held regional is left" do
+      held = convert(first)
+      other = convert(second)
+      expect(script.send(:director, "stock", "BuySellParShares", prompt(pass, held, other))).to eq(other)
+      expect(script.send(:director, "stock", "BuySellParShares", prompt(pass, held))).to eq(pass)
+    end
+
+    it "takes the convert itself in the consolidation round and holds nothing once the target is reached" do
+      expect(script.send(:director, "consolidation", "Consolidate", prompt(pass, convert(first)))).to eq(convert(first))
+      script.instance_variable_set(:@targets, [])
+      expect(script.send(:director, "stock", "BuySellParShares", prompt(pass, convert(first)))).to be_nil
+    end
+  end
+
   it "reads the seats of a game from the slice file, 4 without a `players:`" do
-    expect([0, 1].map { |game| Oe::ScriptGame.players("s2", game) }).to eq([4, 3])
+    expect([0, 1, 2].map { |game| Oe::ScriptGame.players("s2", game) }).to eq([4, 3, 3])
     expect(Oe::ScriptGame.players("s1", 0)).to eq(4)
   end
 end
