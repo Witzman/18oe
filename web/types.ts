@@ -188,7 +188,13 @@ export interface StockPar { corporation: string; share_price: string; price: num
 export interface StockContext { bundles: StockBundle[]; pars: StockPar[] }
 // The open trade offer (§10.4, #202) the seller answers with `choose` accept_trade or `pass` (decline);
 // `target` is a private's company id (kind "company") or a minor's corporation id (kind "corporation").
-export interface TradeContext { buyer: string; seller: string; kind: "company" | "corporation"; target: string; price: number }
+// `give` are the buyer's own minors / face up privates, `also` further ones of the seller (§10.4, #517);
+// missing in states recorded before #517.
+export interface TradeObject { kind: "company" | "corporation"; id: string }
+export interface TradeContext {
+  buyer: string; seller: string; kind: "company" | "corporation"; target: string; price: number;
+  give?: TradeObject[]; also?: TradeObject[];
+}
 export interface PromptContext {
   track: TrackContext | null; token: TokenContext | null;
   dividend: DividendContext | null; train: TrainContext | null; stock: StockContext | null;

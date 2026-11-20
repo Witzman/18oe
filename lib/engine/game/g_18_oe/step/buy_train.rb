@@ -187,10 +187,28 @@ module Engine
             end
           end
 
+          # §11.6: a train bought from another RR stays the type its first buyer chose; only a depot or Open
+          # Market train is bought as either side (upstream offers every variant of a corporation's train).
+          def train_variant_helper(train, entity)
+            variants = super
+            return variants unless train.owned_by_corporation?
+
+            variants.select { |variant| variant[:name] == train.name }
+          end
+
+          def check_same_type!(action)
+            train = action.train
+            return unless train.owned_by_corporation? && action.variant && action.variant != train.name
+
+            raise GameError, "A train bought from another RR stays a #{train.name} train, not a " \
+                             "#{action.variant} train (§11.6)"
+          end
+
           def process_buy_train(action)
             return process_national_train(action) if national?(action.entity)
 
             check_depot_price!(action)
+            check_same_type!(action)
             reserved = action.train.name == '2+2' && action.train.from_depot?
             super
             @train_bought = true
