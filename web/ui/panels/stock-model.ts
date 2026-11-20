@@ -4,13 +4,18 @@
 // the president's share at a par price) comes from `prompt.context.stock`; the market grid from `state.market`.
 import type { Corporation, Game, MarketCell } from "../../types.ts";
 import { actionKey, type Action } from "../frame/generic.ts";
+import type { Kind } from "../frame/kinds.ts";
 import { playerName } from "../frame/model.ts";
 import { fillText, txt } from "../text.ts";
 import { formatGeld } from "../kit/money.ts";
 
 export const STOCK_STEP = "BuySellParShares";
-/** Action types of the stock step this panel offers itself (the rest stays in the generic bar). */
-export const STOCK_TYPES = ["buy_shares", "sell_shares", "par", "pass"] as const;
+/** Action types of the stock step this panel offers itself (the rest stays in the generic bar; `pass` is a kind of
+ *  the action box without options, #497 S3). */
+export const STOCK_TYPES = ["buy_shares", "sell_shares", "par"] as const;
+/** The kinds of the action box whose options are corporations of this sheet (#497 S3). */
+export const MARKET_KINDS: readonly Kind[] = ["float_regional", "float_minor", "buy", "sell"];
+export const isMarketKind = (k: Kind | null): k is Kind => k !== null && MARKET_KINDS.includes(k);
 
 export interface BuyOffer {
   kind: "buy"; key: string; action: Action; source: string; percent: number; certs: number; price: number | null;
@@ -114,8 +119,28 @@ export const inTab = (r: CorpRow, tab: Tab): boolean => (tab === "market" ? r.ma
 /** The corporations the viewer holds shares of (the list left of the cards, #407). */
 export const holdings = (rows: CorpRow[]): CorpRow[] => rows.filter((r) => r.mine > 0);
 
-/** The offers of a row for the dialog: the sales (mode sell), or what the tab buys: treasury shares and par prices, or market shares. */
-export function offersFor(r: CorpRow, tab: Tab, mode: Mode): { buys: BuyOffer[]; sells: SellOffer[]; pars: ParOffer[] } {
+/** The kind of the action box an offer belongs to: the same reading as `kindOfAction` for a stock round (a par of a
+ *  minor founds a minor, any other par founds a regional, the engine floats it at once). */
+export const offerKind = (o: Offer, r: Pick<CorpRow, "tier">): Kind => (o.kind === "buy" ? "buy" : o.kind === "sell" ? "sell" : r.tier === "minor" ? "float_minor" : "float_regional");
+
+/** The offers of a row that belong to one kind (all of them when no kind is chosen). */
+export function offersOfKind(r: CorpRow, kind: Kind | null): { buys: BuyOffer[]; sells: SellOffer[]; pars: ParOffer[] } {
+  if (kind === null) return { buys: r.buys, sells: r.sells, pars: r.pars };
+  // A kind of another panel (pass, privates, ...) has no offer here.
+  const own = (o: Offer) => offerKind(o, r) === kind;
+  return { buys: r.buys.filter(own), sells: r.sells.filter(own), pars: r.pars.filter(own) };
+}
+
+/** The cards the sheet shows for the kind the player is in: only corporations with an offer of it (all without a market kind). */
+export function rowsForKind(rows: CorpRow[], kind: Kind | null): CorpRow[] {
+  if (!isMarketKind(kind)) return rows;
+  return rows.filter((r) => { const o = offersOfKind(r, kind); return o.buys.length + o.sells.length + o.pars.length > 0; });
+}
+
+/** The offers of a row for the dialog: the sales (mode sell), or what the tab buys: treasury shares and par prices, or market shares.
+ *  With a kind chosen in the box (#497 S3) the kind decides instead of mode and tab: only its offers show. */
+export function offersFor(r: CorpRow, tab: Tab, mode: Mode, kind: Kind | null = null): { buys: BuyOffer[]; sells: SellOffer[]; pars: ParOffer[] } {
+  if (kind !== null) return offersOfKind(r, kind);
   if (mode === "sell") return { buys: [], sells: r.sells, pars: [] };
   return { buys: r.buys.filter((b) => (b.source === "market") === (tab === "market")), sells: [], pars: tab === "stock" ? r.pars : [] };
 }

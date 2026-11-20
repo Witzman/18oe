@@ -31,6 +31,8 @@ RSpec.describe "S1 target list, player trade (§10.4, #223)" do
     range = { "type" => "buy_company", "entity" => "alice", "company" => "P1", "min" => 0, "max" => 90, "step" => 1 }
     action = script.send(:director, "stock", "BuySellParShares", { "actions" => [], "ranges" => [range] })
     expect(action).to include("type" => "buy_company", "entity" => "alice", "company" => "P1", "price" => 5)
+    # #487: the engine finds the actor by entity_type; without it the action is a dummy player's and is rejected
+    expect(action).to include("entity_type" => "player")
     expect(script.send(:offered_in?, action, { "actions" => [], "ranges" => [range] })).to be true
   end
 end

@@ -45,6 +45,15 @@ describe 'G18OE Hochberg Mining and Lumber Co. (§14.8)' do
     expect(placements).to be_empty
   end
 
+  it 'accepts every placement the enumerator offers (#510)' do
+    round
+    offered = placements
+
+    expect(offered).not_to be_empty
+    expect { act!(round, offered.last) }.not_to raise_error
+    expect(game.hochberg_hex).to eq(offered.last.target)
+  end
+
   it 'offers nothing to a player who does not control the operating RR' do
     start_major!(game, 'CHN', other)
     other_op = game.corporation_by_id('CHN')

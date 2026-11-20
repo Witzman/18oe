@@ -80,4 +80,26 @@ describe 'G18OE minor K, Vermilion Seal mail contract (§15.10)' do
       expect(minor.cash).to eq(minor_before)
     end
   end
+
+  # #507: §9.5 (S. 23): an abandoned minor has no operation any more and its cash goes to the bank.
+  describe 'when K is abandoned (§9.5)' do
+    it 'pays nothing to the abandoned charter' do
+      at_phase!(game, '3')
+      game.abandon_minor!(k)
+      bank_before = game.bank.cash
+      cash_before = k.cash
+      game.pay_mail_contract!
+
+      expect(k.cash).to eq(cash_before)
+      expect(game.bank.cash).to eq(bank_before)
+    end
+
+    it 'still pays a floated K that is not abandoned' do
+      at_phase!(game, '3')
+      before = k.cash
+      game.pay_mail_contract!
+
+      expect(k.cash - before).to eq(40)
+    end
+  end
 end

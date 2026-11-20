@@ -176,4 +176,30 @@ describe 'G18OE Central Circle Transport (§14.6)' do
     expect(places.map(&:city).map { |city| game.port_accesses(city).any? }.uniq).to eq([false])
     expect { act!(round, places.sample) }.not_to raise_error
   end
+
+  # #487: the owner's free token (price 0, special_only) is the private's own token, not a discount on the RR's
+  # own token: the Place Token step prices and offers the RR's tokens as before.
+  describe 'the RR\'s own Place Token step while the owner holds the private (#487)' do
+    let(:token_step) { Engine::Game::G18OE::Step::Token }
+
+    it 'prices the RR\'s token at its own price, not at the private\'s free token' do
+      cctc
+      round = token_step_round!(game, operator)
+      step = round_step(round, token_step)
+
+      expect(step.min_token_price(step.available_tokens(operator))).to eq(operator.next_token.price)
+    end
+
+    it 'refuses a token whose price plus the sea fee the treasury cannot pay (Step#check_connected)' do
+      cctc
+      round = token_step_round!(game, operator)
+      step = round_step(round, token_step)
+      city = all_cities.find { |c| game.cross_water_token_fee(operator, c).to_i.positive? }
+      skip 'no city with a sea fee reachable in this state' unless city
+
+      operator.spend(operator.cash - (operator.next_token.price + game.cross_water_token_fee(operator, city)) + 1, game.bank)
+
+      expect { step.check_connected(operator, city, city.hex) }.to raise_error(Engine::GameError, /cannot pay/)
+    end
+  end
 end

@@ -7,8 +7,8 @@ import { test } from "node:test";
 import { themes } from "../themes/index.ts";
 import type { MapGeometry } from "../render/mapdata.ts";
 import type { Game } from "../types.ts";
-import { find, textOf } from "../ui/kit/vnode.ts";
-import { backSelection, ConcessionPanel, effectiveSelection, emptySelection, homeMapTargets, homePreview, homeTapMap, homeTargets, hexOfCity, indexOfCity, ladder, offers, orderFor, parPrice, progress, sentenceFor } from "../ui/panels/concession.ts";
+import { find, textOf, v } from "../ui/kit/vnode.ts";
+import { backSelection, ConcessionPanel, FoundingOptions, offerKind, offersIn, effectiveSelection, emptySelection, homeMapTargets, homePreview, homeTapMap, homeTargets, hexOfCity, indexOfCity, ladder, offers, orderFor, parPrice, progress, sentenceFor } from "../ui/panels/concession.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { genericModel } from "../ui/frame/generic.ts";
 
@@ -252,4 +252,99 @@ test("steps (#409): the home token takes the city, then confirm", () => {
   assert.deepEqual(backSelection(g, { corp: null, price: null, city: t.city }, map), emptySelection());
   g.state.prompt.viewer_to_act = false;
   assert.equal(progress(g, emptySelection(), map), null);
+});
+
+// ---- S4 (#497): the concession step in the two-step action box --------------------------------------
+test("box (#497 S4): an offer's kind is the kind of its par action; offersIn keeps only that kind", () => {
+  const g = load("concession-minor");
+  const kinds = [...new Set(offers(g).map(offerKind))].sort();
+  assert.deepEqual(kinds, ["float_minor", "float_regional"]);
+  assert.ok(offersIn(g, "float_minor").every((o) => o.kind === "minor"));
+  assert.ok(offersIn(g, "float_regional").every((o) => o.kind === "regional"));
+  assert.equal(offersIn(g, "par_regional").length, 0, "a kind that is not offered has no offers");
+  assert.equal(offersIn(g, null).length, offers(g).length);
+  assert.ok(offers(load("concession-paronly")).every((o) => offerKind(o) === "par_regional"));
+});
+
+test("box (#497 S4): offerKind agrees with kindOfAction for every par action (one reading)", async () => {
+  const { kindOfAction } = await import("../ui/frame/kinds.ts");
+  for (const n of ["concession", "concession-minor", "concession-regional", "concession-paronly", "concession-chain"]) {
+    const g = load(n);
+    for (const o of offers(g)) for (const pr of o.prices) if (pr.action) assert.equal(kindOfAction(g, pr.action), offerKind(o), `${n} ${o.corp}`);
+  }
+});
+
+test("box (#497 S4): the steps count inside the kind; one offer of the kind is chosen already", () => {
+  const g = load("concession-minor");
+  // Kind "regional": many corporations, the panel still asks for one.
+  assert.deepEqual(progress(g, emptySelection(), null, "float_regional"), { n: 1, total: 3, kind: "corp" });
+  assert.equal(effectiveSelection(g, { corp: "C", price: null, city: null }, null, "float_regional").corp, null, "a corporation of another kind is not chosen");
+  assert.equal(effectiveSelection(g, { corp: "LNWR", price: null, city: null }, null, "float_regional").corp, "LNWR");
+  // One regional left: skipped like a single offer.
+  const one = load("concession-minor");
+  one.state.prompt.actions = one.state.prompt.actions.filter((a) => a.type !== "par" || a.corporation === "LNWR" || offers(g).find((o) => o.corp === a.corporation)?.kind === "minor");
+  assert.equal(offersIn(one, "float_regional").length, 1);
+  assert.deepEqual(progress(one, emptySelection(), null, "float_regional"), { n: 1, total: 2, kind: "price" });
+  assert.equal(backSelection(one, emptySelection(), null, "float_regional"), null, "the box's Zurück leaves the kind, the panel has nothing to take back");
+});
+
+test("box (#497 S4): the panel's Zurück and the box's Zurück never contradict: inside a kind the panel steps back, at its first step only the box offers back", () => {
+  const g = load("concession-minor");
+  assert.equal(backSelection(g, emptySelection(), null, "float_regional"), null);
+  assert.deepEqual(backSelection(g, { corp: "LNWR", price: null, city: null }, null, "float_regional"), emptySelection());
+  assert.deepEqual(backSelection(g, { corp: "LNWR", price: 70, city: null }, null, "float_regional"), { corp: "LNWR", price: null, city: null });
+});
+
+test("box (#497 S4): the order sentence follows the kind: nothing from another kind can be sent", () => {
+  const g = load("concession-minor");
+  const sent: unknown[] = [];
+  const o = orderFor(g, { corp: "C", price: 70, city: null }, null, (a) => sent.push(a), "float_regional");
+  assert.equal(o?.state, "invalid", "C is a minor, the kind is regional");
+  const ok = orderFor(g, { corp: "C", price: 70, city: null }, null, (a) => sent.push(a), "float_minor");
+  assert.equal(ok?.state, "preview");
+  ok!.onConfirm();
+  assert.equal(sent.length, 1);
+});
+
+test("box (#497 S4): FoundingOptions draws only the cards of the kind, the par values once one is chosen", () => {
+  const g = load("concession-minor");
+  const cards = (kind: "float_minor" | "float_regional", sel = emptySelection()) => find(v("div", {}, ...FoundingOptions(g, sel, null, noop, themes[0]!, kind)), (n) => n.attrs.class === "concession-card");
+  assert.ok(cards("float_minor").length > 0 && cards("float_minor").every((n) => n.attrs["data-kind"] === "minor"));
+  assert.ok(cards("float_regional").length > 0 && cards("float_regional").every((n) => n.attrs["data-kind"] === "regional"));
+  const prices = find(v("div", {}, ...FoundingOptions(g, { corp: "LNWR", price: null, city: null }, null, noop, themes[0]!, "float_regional")), (n) => n.attrs.class === "concession-price");
+  assert.equal(prices.length, 6);
+  // The step head with its Zurück is part of the options (the box draws them; the context slot keeps only the folds).
+  const back = find(v("div", {}, ...FoundingOptions(g, { corp: "LNWR", price: 70, city: null }, null, { ...noop, onBack: () => {} }, themes[0]!, "float_regional")), (n) => n.attrs.class === "concession-back");
+  assert.equal(back.length, 1);
+});
+
+test("box (#497 S4): in the box the panel keeps no founding body of its own (no second copy of the choice)", () => {
+  const g = load("concession");
+  const own = ConcessionPanel(g, emptySelection(), null, noop, themes[0]!, { zones: false, ladder: false }, { boxed: true, kind: "float_minor" });
+  assert.equal(find(own, (n) => n.attrs.class === "concession-card").length, 0);
+  assert.equal(find(own, (n) => n.attrs.class === "concession-stephead").length, 0);
+  assert.equal(find(own, (n) => n.tag === "details").length, 2, "zones and ladder stay in the panel");
+});
+
+test("box (#497 S4): the claimed par actions are the box's provided kinds: two kinds = step 1 with both, one kind = no step 1, never pass or remove", async () => {
+  const { GenericBar } = await import("../ui/frame/generic.ts");
+  const { FOUNDING_KINDS } = await import("../ui/panels/concession.ts");
+  const claims = createClaims();
+  claims.claim("Concession", "par");
+  const bar = (n: string, stage: "float_minor" | null, provided = (): never[] => []) => {
+    const g = load(n);
+    const m = genericModel(g, claims, new Set(FOUNDING_KINDS));
+    const tree = GenericBar(m, { selectedKey: null, onSelect: () => {}, onRange: () => {}, rangeError: null, stage, onStage: () => {}, provided });
+    return { m, kinds: find(tree, (x) => x.attrs.class === "frame-kind").map((x) => x.attrs["data-kind"]), head: find(tree, (x) => x.attrs.class === "frame-kind-head").length, back: find(tree, (x) => x.attrs.class === "frame-kind-back").length };
+  };
+  const two = bar("concession-minor", null);
+  assert.deepEqual(two.kinds, ["float_regional", "float_minor"], "step 1 offers only what the engine offers");
+  assert.ok(two.m.kinds!.every((b) => b.provided && b.entries.length === 0), "the options are the panel's");
+  assert.equal(two.head, 0);
+  const inKind = bar("concession-minor", "float_minor");
+  assert.deepEqual([inKind.kinds.length, inKind.head, inKind.back], [0, 1, 1], "in a kind: head with Zurück, no other kind");
+  const one = bar("concession", null);
+  assert.deepEqual([one.kinds.length, one.head, one.back], [0, 1, 0], "a single kind skips step 1 and has no box Zurück");
+  const par = bar("concession-paronly", null);
+  assert.deepEqual([par.m.kinds!.map((b) => b.kind), par.back], [["par_regional"], 0]);
 });

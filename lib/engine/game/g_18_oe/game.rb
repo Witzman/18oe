@@ -34,6 +34,7 @@ require_relative 'step/merge_offer'
 require_relative 'step/merge_token'
 require_relative 'step/concession'
 require_relative 'step/reserve_share'
+require_relative 'step/protect_share'
 require_relative 'step/trade_offer'
 require_relative 'step/orient_express_bonus'
 require_relative 'step/route'
@@ -771,6 +772,8 @@ module Engine
 
           @corporations.each do |corp|
             next if corp.closed? || !corp.floated? || !corp.abilities.include?(@mail_contract_ability)
+            # §9.5: an abandoned charter does not operate; its treasury belongs to the bank.
+            next if abandoned_minor?(corp)
 
             @bank.spend(amount, corp)
             @log << "#{corp.name} receives mail contract of #{format_currency(amount)}"
@@ -1130,8 +1133,11 @@ module Engine
           minor.placed_tokens.any? { |token| nodes.key?(token.city) }
         end
 
+        # §10.5: a treasury share, else one from the Open Market; §14.4 (2), S. 43: a share in custodianship is the
+        # one "exchanged when merging in a minor" (#510).
         def merge_share(major)
-          major.treasury_shares.find { |share| !share.president } ||
+          treasury = major.treasury_shares.reject(&:president)
+          treasury.find { |share| bbbt_custody?(share) } || treasury.first ||
             @share_pool.shares_by_corporation[major].first
         end
 
@@ -1180,6 +1186,8 @@ module Engine
           @log << "#{minor.name} is abandoned"
           minor.trains.dup.each { |train| @depot.reclaim_train(train) }
           minor.placed_tokens.each(&:remove!)
+          # §9.5 step 3: all tokens; the pass-through tokens of Star Harbor/Central Circle are not in minor.tokens
+          national_pass_tokens_off!(minor)
           # §9.5 step 4: the D minor's tokens go back to its charter
           green_junction_remove!(back_to_charter: true) if green_junction_holder?(minor)
           minor.spend(minor.cash, @bank) if minor.cash.positive?
@@ -1203,10 +1211,42 @@ module Engine
           end
         end
 
+        # The merge closed the minor (Step::MergeToken); it reopens in the state abandon_minor! leaves.
+        def abandon_merged_minor!(minor, corporation)
+          green_junction_remove!(back_to_charter: true) if minor.id == GREEN_JUNCTION_ID && green_junction_holder?(corporation)
+          (@merged_minor_abilities.delete(minor) || []).each do |ability|
+            next unless corporation.abilities.include?(ability)
+
+            corporation.remove_ability(ability)
+            minor.add_ability(ability)
+          end
+          share = minor.presidents_share
+          holdings = share.owner.shares_by_corporation
+          holdings.delete(minor) if holdings.key?(minor) && holdings[minor] == [share]
+          share.owner = minor
+          minor.shares_by_corporation[minor] = [share]
+          share.buyable = false
+          minor.reopen!
+          minor.ipoed = true
+          minor.floated = true
+          minor.owner = nil
+          @corporations << minor unless @corporations.include?(minor)
+          @log << "#{minor.name} is abandoned (§9.5)"
+        end
+
         def add_minor_charter!(minor, major)
+          # §10.5 (Nationals only): the minor is abandoned (§9.5); Step::MergeToken does that once the merge
+          # has closed it (abandon_merged_minor!). It is no merged minor of the national: its ability (C),
+          # Pullman (M) and zone stay with the charter; its pass-through tokens leave the map (§9.5 step 3).
+          if major.type == :national
+            national_pass_tokens_off!(minor)
+            clear_graph
+            return
+          end
+
+          pass_tokens_to_major!(minor, major)
           @merged_minors[major] << minor
           pullman_on_merge!(minor, major)
-          return unless major.type == :major
 
           pay_minor_a_bonus!(minor, major) if minor.id == 'A'
           # Remembered per minor: the abilities go back to its charter when it is abandoned (§9.5).
@@ -1541,6 +1581,7 @@ module Engine
             G18OE::Step::MergeDiscardTrain,
             G18OE::Step::MergeMinor,
             G18OE::Step::ReserveShare,
+            G18OE::Step::ProtectShare,
             G18OE::Step::MergeOffer,
             G18OE::Step::TradeOffer,
             G18OE::Step::BuySellParShares,
@@ -2067,29 +2108,6 @@ module Engine
           clear_graph
         end
 
-        # The merge closed the minor (Step::MergeToken); it reopens in the state abandon_minor! leaves.
-        def abandon_merged_minor!(minor, corporation)
-          green_junction_remove!(back_to_charter: true) if minor.id == GREEN_JUNCTION_ID && green_junction_holder?(corporation)
-          (@merged_minor_abilities.delete(minor) || []).each do |ability|
-            next unless corporation.abilities.include?(ability)
-
-            corporation.remove_ability(ability)
-            minor.add_ability(ability)
-          end
-          share = minor.presidents_share
-          holdings = share.owner.shares_by_corporation
-          holdings.delete(minor) if holdings.key?(minor) && holdings[minor] == [share]
-          share.owner = minor
-          minor.shares_by_corporation[minor] = [share]
-          share.buyable = false
-          minor.reopen!
-          minor.ipoed = true
-          minor.floated = true
-          minor.owner = nil
-          @corporations << minor unless @corporations.include?(minor)
-          @log << "#{minor.name} is abandoned (§9.5)"
-        end
-
         # §11.2.2: "If the token on the White Cliffs Ferry token position is removed due to the
         # formation of a national, Lille becomes permanently open for all RRs to pass through."
         # ASSUMPTION (workshop #53): open as before the ferry was used, so the placeholder that
@@ -2112,6 +2130,18 @@ module Engine
 
           @orient_express_markers.delete(corporation)
           @log << "#{corporation.name} loses its Orient Express marker"
+        end
+
+        # Owner decision 2026-11-20 (#509): a major takes over all abilities and tokens of a merged minor, with no
+        # choice, so the pass-through tokens (§14.5/§14.6) stay in their extra city positions and belong to the major.
+        def pass_tokens_to_major!(minor, major)
+          tokens = hexes.flat_map { |hex| hex.tile.cities }.flat_map(&:extra_tokens)
+                        .select { |token| pass_token?(token) && token.corporation == minor }
+          return if tokens.empty?
+
+          tokens.each { |token| token.corporation = major }
+          clear_graph
+          @log << "#{major.name} takes over #{tokens.size} private token(s) of #{minor.name}"
         end
 
         def national_pass_tokens_off!(corporation)
