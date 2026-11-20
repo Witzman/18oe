@@ -140,6 +140,11 @@
 .frame-entries { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0; }
 .frame-entry { text-align: left; max-width: 100%; overflow-wrap: anywhere; }
 .frame-entry[aria-pressed="true"] { background: var(--ui-ink); color: var(--ui-panel); border-color: var(--ui-ink); box-shadow: inset 4px 0 0 var(--ui-accent); }
+/* Two-step box (issue 497, S2): kind buttons and the back button are full width, 44 px high through .frame-panel button. */
+.frame-kinds { display: flex; flex-direction: column; gap: 6px; }
+.frame-kind, .frame-kind-back { width: 100%; text-align: left; overflow-wrap: anywhere; }
+.frame-kind-pick { margin: 0 0 6px; }
+.frame-kind-head { display: flex; flex-direction: column; gap: 6px; }
 .frame-range { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .frame-range input { width: 7rem; }
 .frame .msg-error { color: var(--ui-error); } .frame .msg-warn { color: var(--ui-warn); }
