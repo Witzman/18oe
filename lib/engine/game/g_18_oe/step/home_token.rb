@@ -1,13 +1,17 @@
 # frozen_string_literal: true
 
 require_relative '../../../step/home_token'
+require_relative 'home_position'
 
 module Engine
   module Game
     module G18OE
       module Step
         class HomeToken < Engine::Step::HomeToken
+          include HomePosition
+
           def process_place_token(action)
+            check_home_position!(action)
             minor = action.entity.type == :minor
             hex = action.city.hex
             if minor
