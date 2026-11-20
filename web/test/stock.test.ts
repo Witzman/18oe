@@ -10,7 +10,7 @@ import { genericModel } from "../ui/frame/generic.ts";
 import { kindOfAction, type Kind } from "../ui/frame/kinds.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
 import { corpRows, holdings, inTab, marketModel, offerKind, offersOfKind, rowsForKind, sealStack, mustSell, offersFor, offerOf, orderModel, parCell, passAction, STOCK_STEP, STOCK_TYPES } from "../ui/panels/stock-model.ts";
-import { kindOptionsNode, offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
+import { offerLabel, offersNode, sheetNode, type SheetHandlers, type SheetInput } from "../ui/panels/stock-sheet.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
 const pool = load("stock-pool"), par = load("stock-par");
@@ -440,13 +440,19 @@ test("sheet: with a kind chosen the cards are those of the kind and the dialog s
   }
 });
 
-test("box options (variant A): one button per corporation of the kind, each opens that corporation", () => {
-  const rows = corpRows(pool);
-  const opened: string[] = [];
-  const nodes = kindOptionsNode(pool, theme, rows, "buy", (c) => opened.push(c));
-  assert.deepEqual(nodes.map((n) => n.attrs["data-corp"]), rowsForKind(rows, "buy").map((r) => r.id));
-  nodes[0]!.on.click!(new Event("click"));
-  assert.deepEqual(opened, [nodes[0]!.attrs["data-corp"]]);
+test("action row (#527): one button per kind offered, the chosen kind pressed, a tap hands the kind to the frame; no row without kinds", () => {
+  const kinds = [{ kind: "buy" as Kind, count: 2 }, { kind: "sell" as Kind, count: 1 }, { kind: "pass" as Kind, count: 1 }];
+  const picked: Kind[] = [];
+  const h: SheetHandlers = { ...noop, onKind: (k) => picked.push(k) };
+  const row = (o: Partial<SheetInput>) => find(sheetNode(input(pool, o), h), (n) => n.attrs.class === "stock-kind");
+  const btns = row({ kinds, kind: "sell" });
+  assert.deepEqual(btns.map((n) => n.attrs["data-kind"]), ["buy", "sell", "pass"]);
+  assert.deepEqual(btns.map((n) => n.attrs["aria-pressed"]), ["false", "true", "false"]);
+  assert.ok(btns.every((n) => n.attrs.title), "each kind has its tip");
+  btns[2]!.on.click!(new Event("click"));
+  assert.deepEqual(picked, ["pass"]);
+  assert.equal(row({ kinds: [] }).length, 0);
+  assert.equal(row({}).length, 0);
 });
 
 test("box: a provided kind is a step-1 button with its offer count, its options are the panel's, pass is a plain kind", () => {
