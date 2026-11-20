@@ -24,7 +24,7 @@ export function pickScenes(scenes, names) {
 }
 
 // One scene: serve dist + fixtures, run bin/shot.mjs, stop the server.
-async function one(web, out, fixture, catalog, evalJs) {
+async function one(web, out, fixture, catalog, evalJs, scale = 1) {
   const dist = join(web, "dist");
   const read = (f) => JSON.parse(readFileSync(join(web, "test", "fixtures", f), "utf8"));
   const game = read(`games/${fixture}.json`);
@@ -55,6 +55,7 @@ async function one(web, out, fixture, catalog, evalJs) {
   const port = server.address().port;
   const args = [join(here, "shot.mjs"), `http://127.0.0.1:${port}/#/game/1`, out, "--width", "1747", "--height", "923", "--wait-for", ".frame-tabs", "--delay", "2500"];
   if (evalJs) args.push("--eval", evalJs);
+  if (scale !== 1) args.push("--scale", String(scale));
   const child = spawn(process.execPath, args, { stdio: "inherit" });
   const code = await new Promise((r) => child.on("close", (c) => r(c ?? 1)));
   server.closeAllConnections?.();
@@ -64,8 +65,8 @@ async function one(web, out, fixture, catalog, evalJs) {
 
 async function main(argv) {
   if (argv[0] === "--one") {
-    const [, web, out, fixture, catalog, evalJs] = argv;
-    process.exit(await one(web, out, fixture, catalog, evalJs || undefined));
+    const [, web, out, fixture, catalog, evalJs, scale] = argv;
+    process.exit(await one(web, out, fixture, catalog, evalJs || undefined, Number(scale) || 1));
   }
   const [web, outDir, catalog, ...names] = argv;
   if (!web || !outDir || !catalog) {
@@ -76,7 +77,7 @@ async function main(argv) {
   let failed = 0;
   for (const scene of pickScenes(loadScenes(), names)) {
     const out = resolve(outDir, `${scene.name}.png`);
-    const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "--one", resolve(web), out, scene.fixture, resolve(catalog), scene.eval ?? ""],
+    const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), "--one", resolve(web), out, scene.fixture, resolve(catalog), scene.eval ?? "", String(scene.scale ?? 1)],
       { stdio: "inherit", timeout: 120_000, killSignal: "SIGKILL" });
     const ok = r.status === 0 && existsSync(out);
     if (!ok) failed += 1;
