@@ -90,13 +90,13 @@ const TRACK = String.raw`(async () => {
   // Another tile, then tap the same hex again: the rotation turns.
   q('.track-tile[data-tile="8-8"]').click();
   await sleep(100);
-  if (!/Drehung 1 von 2/.test(q(".track-rotation").textContent)) fail("rotation label " + q(".track-rotation").textContent);
+  if (!/Rotation 1 of 2/.test(q(".track-rotation").textContent)) fail("rotation label " + q(".track-rotation").textContent);
   await tap("I86", "touch");
-  if (!/Drehung 2 von 2/.test(q(".track-rotation").textContent)) fail("second tap did not turn: " + q(".track-rotation").textContent);
-  if (!/M legt Kachel 8 auf I86, Drehung 2 von 2/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/Rotation 2 of 2/.test(q(".track-rotation").textContent)) fail("second tap did not turn: " + q(".track-rotation").textContent);
+  if (!/M lays tile 8 on I86, rotation 2 of 2/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   // The way back to the map from another view.
   const other = [...document.querySelectorAll(".frame-tabs [role=tab]")].find((b) => b.getAttribute("aria-selected") !== "true");
-  if (other) { other.click(); await sleep(100); small(".track-map"); q(".track-map").click(); await sleep(100); if (tab() !== "Karte") fail("no way back to the map: " + tab()); }
+  if (other) { other.click(); await sleep(100); small(".track-map"); q(".track-map").click(); await sleep(100); if (tab() !== "Map") fail("no way back to the map: " + tab()); }
   if ((await posted()).length !== 0) fail("previewing sent something");
   q(".kit-main-btn").click();
   await sleep(600);
@@ -111,7 +111,7 @@ const TOKEN = String.raw`(async () => {
   await tap("Y14", "touch");
   if (q('.token-city[data-city="OE4-2-1"]')?.getAttribute("aria-pressed") !== "true") fail("map tap did not pick Y14");
   if (!findLabel(m.layer("overlay"), "preview Y14")) fail("no token preview on the map");
-  if (!/G setzt eine Station in Y14/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
+  if (!/G places a token in Y14/.test(q(".kit-order-sentence").textContent)) fail("sentence: " + q(".kit-order-sentence").textContent);
   q('.token-city[data-city="57-7-0"]').click();
   await sleep(150);
   if (!findLabel(m.layer("overlay"), "preview AC16")) fail("row pick did not move the preview");

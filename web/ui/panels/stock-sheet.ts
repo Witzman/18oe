@@ -41,14 +41,14 @@ export interface SheetInput {
   kind?: Kind | null;
 }
 
-const money = (n: number | null): string => (n === null ? txt("stock.unknown_value").de : formatGeld(n));
-const percent = (n: number): string => (n > 0 ? fillText("stock.pct", { n }) : txt("stock.none").de);
+const money = (n: number | null): string => (n === null ? txt("stock.unknown_value").text : formatGeld(n));
+const percent = (n: number): string => (n > 0 ? fillText("stock.pct", { n }) : txt("stock.none").text);
 
 const sealOf = (g: Game, theme: Theme, id: string, name?: string, size: "s" | "m" = "s") =>
   Siegel({ sym: id, name, color: corpColor(theme, g, id) }, { theme, size });
 
 export function offerLabel(o: Offer, row: CorpRow): string {
-  if (o.kind === "buy") return fillText("stock.offer_buy", { pct: o.percent, source: txt(`stock.source_${o.source === "market" ? "market" : "ipo"}`).de, price: money(o.price) });
+  if (o.kind === "buy") return fillText("stock.offer_buy", { pct: o.percent, source: txt(`stock.source_${o.source === "market" ? "market" : "ipo"}`).text, price: money(o.price) });
   if (o.kind === "sell") return fillText("stock.offer_sell", { pct: o.percent, price: money(o.price) });
   return fillText(row.tier === "minor" ? "stock.offer_par_minor" : "stock.offer_par", { par: formatGeld(o.price), cost: money(o.cost) });
 }
@@ -64,39 +64,39 @@ function offerButton(o: Offer, row: CorpRow, sel: Selection | null, h: SheetHand
 function group(headKey: string, kind: Offer["kind"], list: (BuyOffer | SellOffer | ParOffer)[], row: CorpRow, sel: Selection | null, h: SheetHandlers): VNode | null {
   if (list.length === 0) return null;
   return v("div", { class: "stock-group", "data-kind": kind },
-    v("strong", {}, txt(headKey).de),
+    v("strong", {}, txt(headKey).text),
     v("div", { class: "stock-offers" }, ...list.map((o) => offerButton(o, row, sel, h))));
 }
 
 /** The share bar: one slice per holder, width = percent, in the colour of the player (pool and treasury have their own). */
 function barNode(r: CorpRow, i: SheetInput): VNode {
-  const label = r.holders.map((h) => `${h.name} ${h.percent} %${h.president ? ` (${txt("stock.president_mark").de})` : ""}`).join(", ");
+  const label = r.holders.map((h) => `${h.name} ${h.percent} %${h.president ? ` (${txt("stock.president_mark").text})` : ""}`).join(", ");
   return v("div", { class: "stock-bar", role: "img", "aria-label": label },
     ...r.holders.map((h) => {
       const slot = h.kind === "player" ? playerSlot(h.seat) : null;
       const style = slot ? `width:${h.percent}%;--seg:var(--player-${slot});--seg-ink:${inkFor(i.theme.player[slot], i.theme)}` : `width:${h.percent}%`;
       return v("span", { class: "stock-seg", "data-kind": h.kind, "data-president": h.president ? "true" : "false", style },
-        h.president ? txt("stock.president_mark").de : null, h.percent >= 20 ? String(h.percent) : null);
+        h.president ? txt("stock.president_mark").text : null, h.percent >= 20 ? String(h.percent) : null);
     }));
 }
 
 function holdersNode(r: CorpRow): VNode {
   return v("ul", { class: "stock-holders" }, ...r.holders.map((h) => v("li", { "data-kind": h.kind, "data-president": h.president ? "true" : "false" },
     v("i", { class: "stock-swatch", style: h.kind === "player" ? `--seg:var(--player-${playerSlot(h.seat)})` : "", "data-kind": h.kind, "aria-hidden": "true" }),
-    `${h.name} ${h.percent}`, h.president ? v("b", {}, ` ${txt("stock.president_mark").de}`) : null)));
+    `${h.name} ${h.percent}`, h.president ? v("b", {}, ` ${txt("stock.president_mark").text}`) : null)));
 }
 
 /** One card per corporation (#303): seal, id, price, trains, share bar, holders. The card selects the corporation. */
 function rowNode(r: CorpRow, i: SheetInput, h: SheetHandlers): VNode {
   const open = i.focus === r.id;
   const head = v("button", {
-    type: "button", class: "stock-rowbtn", "aria-pressed": String(open), title: `${r.name} · ${txt(`tier.${r.tier}`).de} · ${txt(`stock.state_${r.state === "other" ? "open" : r.state}`).de}`, onclick: () => h.onFocus(r.id),
+    type: "button", class: "stock-rowbtn", "aria-pressed": String(open), title: `${r.name} · ${txt(`tier.${r.tier}`).text} · ${txt(`stock.state_${r.state === "other" ? "open" : r.state}`).text}`, onclick: () => h.onFocus(r.id),
   },
   v("span", { class: "stock-card-top" },
     sealOf(i.g, i.theme, r.id, r.name, "s"),
     v("strong", { class: "stock-id" }, r.id),
-    v("span", { class: "stock-price", "data-label": txt("stock.col_price").de }, r.price !== null ? Geld(r.price) : txt("stock.none").de),
-    r.state === "open" ? v("small", { class: "muted stock-state" }, txt("stock.state_open").de) : v("small", { class: "muted stock-trains", title: txt("stock.col_trains").de }, fillText("stock.trains", { n: r.trains })),
+    v("span", { class: "stock-price", "data-label": txt("stock.col_price").text }, r.price !== null ? Geld(r.price) : txt("stock.none").text),
+    r.state === "open" ? v("small", { class: "muted stock-state" }, txt("stock.state_open").text) : v("small", { class: "muted stock-trains", title: txt("stock.col_trains").text }, fillText("stock.trains", { n: r.trains })),
     r.actionable ? v("span", { class: "stock-mark", "aria-hidden": "true" }, "◂") : null),
   barNode(r, i), holdersNode(r));
   return v("li", { class: "stock-row", "data-corp": r.id, "data-state": r.state, "data-focus": open ? "true" : "false", "data-actionable": r.actionable ? "true" : "false" }, head);
@@ -109,7 +109,7 @@ export function offersNode(i: SheetInput, h: SheetHandlers): VNode | null {
   const o = offersFor(r, i.tab, i.mode, i.kind ?? null);
   const any = o.buys.length + o.sells.length + o.pars.length > 0;
   return v("div", { class: "stock-detail", "data-corp": r.id },
-    any ? null : v("p", { class: "muted stock-idle" }, blockedReason(i.g, r) ?? txt(i.mode === "sell" ? "stock.row_idle" : "stock.nothing_to_buy").de),
+    any ? null : v("p", { class: "muted stock-idle" }, blockedReason(i.g, r) ?? txt(i.mode === "sell" ? "stock.row_idle" : "stock.nothing_to_buy").text),
     group("stock.buy_head", "buy", o.buys, r, i.sel, h),
     group("stock.sell_head", "sell", o.sells, r, i.sel, h),
     group("stock.par_head", "par", o.pars, r, i.sel, h));
@@ -118,8 +118,8 @@ export function offersNode(i: SheetInput, h: SheetHandlers): VNode | null {
 function listNode(i: SheetInput, h: SheetHandlers): VNode {
   // With a market kind chosen, the kind replaces the tab: the cards with an offer of it, wherever the shares are.
   const rows = isMarketKind(i.kind ?? null) ? rowsForKind(i.rows, i.kind ?? null) : i.rows.filter((r) => inTab(r, i.tab));
-  return v("section", { class: "stock-list", "aria-label": txt("stock.tab_list").de },
-    rows.length === 0 ? v("p", { class: "muted stock-empty" }, txt(`stock.empty_${i.tab}`).de) : v("ul", { class: "stock-rows" }, ...rows.map((r) => rowNode(r, i, h))));
+  return v("section", { class: "stock-list", "aria-label": txt("stock.tab_list").text },
+    rows.length === 0 ? v("p", { class: "muted stock-empty" }, txt(`stock.empty_${i.tab}`).text) : v("ul", { class: "stock-rows" }, ...rows.map((r) => rowNode(r, i, h))));
 }
 
 /** The shares of the viewer, one button per corporation: it opens the sale (#407). */
@@ -127,16 +127,16 @@ function holdingsNode(i: SheetInput, h: SheetHandlers): VNode {
   const kind = i.kind ?? null;
   // Selling needs the shares of the viewer: in another market kind the list has nothing to offer and stays out of the way.
   const mine = holdings(isMarketKind(kind) && kind !== "sell" ? [] : rowsForKind(i.rows, kind));
-  return v("section", { class: "stock-hold-box", "aria-label": txt("stock.hold_head").de },
-    v("h3", {}, txt("stock.hold_head").de),
-    mine.length === 0 ? v("p", { class: "muted" }, txt("stock.hold_none").de)
+  return v("section", { class: "stock-hold-box", "aria-label": txt("stock.hold_head").text },
+    v("h3", {}, txt("stock.hold_head").text),
+    mine.length === 0 ? v("p", { class: "muted" }, txt("stock.hold_none").text)
       : v("ul", { class: "stock-hold-list" }, ...mine.map((r) => v("li", {},
         v("button", {
           type: "button", class: "stock-hold", "data-corp": r.id, title: fillText("stock.hold_item", { corp: r.id, pct: r.mine }), "aria-label": fillText("stock.hold_item", { corp: r.id, pct: r.mine }),
           onclick: () => h.onSell(r.id),
         }, sealOf(i.g, i.theme, r.id, r.name), v("strong", { class: "stock-id" }, r.id),
         v("span", { class: "stock-hold-pct" }, fillText("stock.pct", { n: r.mine })),
-        v("span", { class: "stock-price" }, r.price !== null ? Geld(r.price) : txt("stock.none").de))))));
+        v("span", { class: "stock-price" }, r.price !== null ? Geld(r.price) : txt("stock.none").text))))));
 }
 
 const ARROW_GLYPH = { right: "→", down: "↓", up: "↑" } as const;
@@ -148,7 +148,7 @@ function cellNode(c: MarketCellModel, i: SheetInput, h: SheetHandlers): VNode {
   const marks = [
     c.major ? fillText("stock.cell_major", { letter: c.major }) : null,
     c.regional ? fillText("stock.cell_regional", { letter: c.regional }) : null,
-    ...c.arrows.map((a) => txt(`stock.arrow_${a}`).de),
+    ...c.arrows.map((a) => txt(`stock.arrow_${a}`).text),
   ].filter(Boolean);
   const label = marks.length > 0 ? `${base}; ${marks.join(", ")}` : base;
   const attrs = {
@@ -187,7 +187,7 @@ function cellListDialog(i: SheetInput, h: SheetHandlers): VNode | null {
       sealOf(i.g, i.theme, id, i.g.state.corporations.find((x) => x.id === id)?.name),
       v("strong", {}, id), v("span", { class: "muted" }, i.g.state.corporations.find((x) => x.id === id)?.name ?? ""),
       v("span", { class: "stock-price" }, formatGeld(c.price)))))],
-    actions: [v("button", { type: "button", class: "kit-side-btn", onclick: () => h.onClose?.() }, txt("stock.close").de)],
+    actions: [v("button", { type: "button", class: "kit-side-btn", onclick: () => h.onClose?.() }, txt("stock.close").text)],
   });
 }
 
@@ -196,17 +196,17 @@ const emptyCell = () => v("div", { class: "stock-cell stock-cell-empty", "aria-h
 /** The rows are `display: contents` in one grid, so a short row is padded to the full width: otherwise the next row's cells fill the gap (#405). */
 function gridNode(i: SheetInput, h: SheetHandlers): VNode {
   const cols = Math.max(0, ...i.market.rows.map((l) => l.length));
-  return v("section", { class: "stock-grid", "aria-label": txt("stock.tab_grid").de },
+  return v("section", { class: "stock-grid", "aria-label": txt("stock.tab_grid").text },
     v("div", { class: "stock-grid-scroll", style: `--cols:${cols}` }, ...i.market.rows.map((line, r) =>
       v("div", { class: "stock-grid-row", "data-row": String(r) },
         ...line.map((c) => c ? cellNode(c, i, h) : emptyCell()),
         ...Array.from({ length: cols - line.length }, emptyCell)))),
     v("ul", { class: "stock-legend muted" },
-      v("li", { "data-type": "par" }, txt("stock.legend_par").de),
-      v("li", { "data-type": "convert_range" }, txt("stock.legend_convert").de),
-      v("li", { "data-mark": "arrow" }, txt("stock.legend_arrow").de),
-      v("li", { "data-mark": "valid" }, txt("stock.legend_target").de),
-      v("li", { "data-mark": "preview" }, txt("stock.legend_after").de)));
+      v("li", { "data-type": "par" }, txt("stock.legend_par").text),
+      v("li", { "data-type": "convert_range" }, txt("stock.legend_convert").text),
+      v("li", { "data-mark": "arrow" }, txt("stock.legend_arrow").text),
+      v("li", { "data-mark": "valid" }, txt("stock.legend_target").text),
+      v("li", { "data-mark": "preview" }, txt("stock.legend_after").text)));
 }
 
 /** Player order for the head: this round's in a stock round (seat order of the view), else the next stock round's (`meta.priority`, priority deal first; #406). */
@@ -215,7 +215,7 @@ function orderLine(g: Game): VNode | null {
   const inStock = g.state.meta.round.type === "stock";
   const ids = inStock ? [...g.state.players].sort((a, b) => a.order - b.order).map((p) => p.id) : g.state.meta.priority;
   if (ids.length === 0) return null;
-  return v("p", { class: "stock-order muted" }, `${txt(inStock ? "stock.order_now" : "stock.order_next").de}: `, ids.map((id) => playerName(g, id)).join(" → "));
+  return v("p", { class: "stock-order muted" }, `${txt(inStock ? "stock.order_now" : "stock.order_next").text}: `, ids.map((id) => playerName(g, id)).join(" → "));
 }
 
 const changesOf = (o: ReturnType<typeof orderModel>) => o.changes.map((c) => ({
@@ -238,9 +238,9 @@ export function stockDialog(i: SheetInput, h: SheetHandlers): VNode | null {
       picked ? Auftrag({
         sentence: o.sentence, changes: changesOf(o), state: o.state, reason: o.reason, confirmLabel: o.confirmLabel, showCancel: true,
         onConfirm: () => h.onConfirm?.(), onCancel: () => h.onClose?.(),
-      }) : v("p", { class: "muted stock-pick" }, txt("stock.pick_offer").de),
+      }) : v("p", { class: "muted stock-pick" }, txt("stock.pick_offer").text),
     ],
-    actions: picked ? [] : [v("button", { type: "button", class: "kit-side-btn", onclick: () => h.onClose?.() }, txt("stock.close").de)],
+    actions: picked ? [] : [v("button", { type: "button", class: "kit-side-btn", onclick: () => h.onClose?.() }, txt("stock.close").text)],
   });
 }
 
@@ -248,15 +248,15 @@ export function sheetNode(i: SheetInput, h: SheetHandlers): VNode {
   const me = i.g.state.players.find((p) => p.id === i.g.viewer);
   const p = i.g.state.prompt;
   const status = i.g.state.meta.finished ? null
-    : p.viewer_to_act && p.step === "BuySellParShares" ? txt("stock.status_mine").de
+    : p.viewer_to_act && p.step === "BuySellParShares" ? txt("stock.status_mine").text
       : fillText("stock.status_other", { names: i.g.state.meta.active_players.map((id) => playerName(i.g, id)).join(", ") });
   const sheet = v("div", { class: "stock-sheet", "data-tab": i.tab },
     v("header", { class: "stock-head" },
-      status ? v("p", { class: "stock-status", role: "status" }, status) : v("h2", {}, txt("stock.title").de),
+      status ? v("p", { class: "stock-status", role: "status" }, status) : v("h2", {}, txt("stock.title").text),
       v("div", { class: "stock-tabs", role: "tablist" },
-        ...(["stock", "market"] as const).map((t) => v("button", { type: "button", role: "tab", "data-tab": t, "aria-selected": String(i.tab === t), onclick: () => h.onTab(t) }, txt(`stock.tab_${t}`).de))),
+        ...(["stock", "market"] as const).map((t) => v("button", { type: "button", role: "tab", "data-tab": t, "aria-selected": String(i.tab === t), onclick: () => h.onTab(t) }, txt(`stock.tab_${t}`).text))),
       orderLine(i.g),
-      me ? v("span", { class: "stock-cash" }, `${txt("stock.cash").de} `, Geld(me.cash), ` · ${txt("stock.certs").de} ${fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit })}`) : null),
+      me ? v("span", { class: "stock-cash" }, `${txt("stock.cash").text} `, Geld(me.cash), ` · ${txt("stock.certs").text} ${fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit })}`) : null),
     i.must ? v("p", { class: "stock-warn", role: "alert" }, fillText("stock.must_sell", { limit: i.must.limit, certs: i.must.certs })) : null,
     v("div", { class: "stock-body" }, listNode(i, h), holdingsNode(i, h), gridNode(i, h)));
   return v("div", { class: "stock-stage" }, sheet, stockDialog(i, h) ?? cellListDialog(i, h));
@@ -269,7 +269,7 @@ export function kindOptionsNode(g: Game, theme: Theme, rows: CorpRow[], kind: Ki
     const o = offersOfKind(r, kind);
     const n = o.buys.length + o.sells.length + o.pars.length;
     return v("button", {
-      type: "button", class: "frame-option", "data-corp": r.id, "data-kind": kind, title: `${r.name} · ${txt(`tier.${r.tier}`).de}`,
+      type: "button", class: "frame-option", "data-corp": r.id, "data-kind": kind, title: `${r.name} · ${txt(`tier.${r.tier}`).text}`,
       "aria-label": fillText("stock.option_label", { corp: r.id, name: r.name, n }),
       onclick: () => onOpen(r.id),
     }, sealOf(g, theme, r.id, r.name), v("strong", { class: "stock-id" }, r.id),

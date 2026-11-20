@@ -29,17 +29,17 @@ test("run: one row per train from the offered run_routes action, total and sente
   assert.equal(m.action, g.state.prompt.actions[0]);
   assert.deepEqual(m.rows, [{ train: "2+2-0", stops: "H21 – G24 – G26", revenue: 60 }]);
   assert.equal(m.total, 60);
-  assert.match(runSentence(g), /B fährt 1 Zug\/Züge und erzielt £60/);
+  assert.match(runSentence(g), /B runs 1 train\(s\) for £60/);
   const panel = textOf(RoutePanel(g));
   assert.match(panel, /2\+2-0/);
-  assert.match(panel, /Summe/);
+  assert.match(panel, /Total/);
 });
 
 test("run: Orient Express bonus and subsidy count into the total and get a row", () => {
   const g = load("operating-route");
   (g.state.prompt.actions[0] as Record<string, unknown>).extra_revenue = 30;
   assert.equal(runModel(g).total, 90);
-  assert.match(textOf(RoutePanel(g)), /Orient-Express-Zuschlag/);
+  assert.match(textOf(RoutePanel(g)), /Orient Express bonus/);
 });
 
 test("run: the Orient Express duty (§12.2, #512) shows from the Route step's help lines, and replaces 'no train can run' before a combination", () => {
@@ -54,14 +54,14 @@ test("run: the Orient Express duty (§12.2, #512) shows from the Route step's he
   assert.equal(orientRequired(g), true);
   const panel = textOf(RoutePanel(g));
   assert.match(panel, /Orient Express is required/);
-  assert.doesNotMatch(panel, /Kein Zug kann fahren/);
+  assert.doesNotMatch(panel, /No train can run/);
 });
 
 test("run: without an offered route the panel says so and sends nothing", () => {
   const g = load("operating-route");
   g.state.prompt.actions = [];
   assert.equal(runModel(g).action, null);
-  assert.match(runSentence(g), /Kein Zug kann fahren/);
+  assert.match(runSentence(g), /No train can run/);
 });
 
 test("dividend: every offered kind with amount per share, treasury and the price movement", () => {
@@ -70,7 +70,7 @@ test("dividend: every offered kind with amount per share, treasury and the price
   assert.deepEqual(o.map((x) => [x.kind, x.perShare, x.treasury, x.price, x.move]), [
     ["withhold", 0, 60, 60, "down"], ["half", 3, 36, 65, "same"], ["payout", 6, 12, 70, "up"],
   ]);
-  assert.deepEqual(o.map((x) => x.label), ["Einbehalten", "Hälfte ausschütten", "Alles ausschütten"]);
+  assert.deepEqual(o.map((x) => x.label), ["Hold", "Pay half", "Pay all"]);
 });
 
 test("dividend: nothing is chosen until the player picks; the order sends exactly the offered action", () => {
@@ -79,8 +79,8 @@ test("dividend: nothing is chosen until the player picks; the order sends exactl
   assert.equal(dividendOrder(g, null).action, null);
   const o = dividendOrder(g, "payout");
   assert.equal(o.action, g.state.prompt.actions[2]);
-  assert.match(o.sentence, /KSS: Alles ausschütten\. Je Anteil £6, Kasse £12, Kurs £65 nach £70/);
-  assert.deepEqual(o.changes.map((c) => [c.label, c.before, c.after]), [["Kasse KSS", "£0", "£12"], ["Kurs KSS", "£65", "£70"]]);
+  assert.match(o.sentence, /KSS: Pay all\. Per share £6, treasury £12, price £65 to £70/);
+  assert.deepEqual(o.changes.map((c) => [c.label, c.before, c.after]), [["Treasury KSS", "£0", "£12"], ["Share price KSS", "£65", "£70"]]);
   assert.equal(dividendOrder(g, "nonsense").action, null, "a pick that is not offered is nothing");
 });
 
@@ -91,9 +91,9 @@ test("dividend with a fractional rate per share: shown as £8,75 with the rounde
   const o = dividendOptions(g);
   assert.deepEqual(o.map((x) => [x.kind, x.perShare, x.treasury]), [["withhold", 0, 70], ["half", 8.75, 44], ["payout", 17.5, 18]]);
   const half = dividendOrder(g, "half");
-  assert.match(half.sentence, /Je Anteil £8,75, Kasse £44/);
-  assert.match(half.sentence, /Auszahlung \(je Empfänger aufgerundet\): p0 £18, p1 £9\./);
-  assert.match(dividendOrder(g, "payout").sentence, /Je Anteil £17,50.*p0 £35, p1 £18/);
+  assert.match(half.sentence, /Per share £8,75, treasury £44/);
+  assert.match(half.sentence, /Paid out \(rounded up per recipient\): p0 £18, p1 £9\./);
+  assert.match(dividendOrder(g, "payout").sentence, /Per share £17,50.*p0 £35, p1 £18/);
   const text = textOf(DividendPanel(g, "half", noop));
   assert.match(text, /£8,75/);
   assert.match(text, /£17,50/);
@@ -116,7 +116,7 @@ test("dividend panel: selection marks the row, rows are buttons; buttons are dis
   assert.deepEqual(rows.map((r) => r.attrs["aria-pressed"]), ["false", "true", "false"]);
   g.state.prompt.viewer_to_act = false;
   assert.ok(find(DividendPanel(g, null, noop), (n) => n.attrs["data-kind"] !== undefined).every((r) => r.attrs.disabled === ""));
-  assert.match(textOf(OperatingPanel(g, null, noop)), /entscheidet/);
+  assert.match(textOf(OperatingPanel(g, null, noop)), /decides/);
 });
 
 test("claims: the panel takes run_routes and dividend of its steps; the generic bar keeps the rest", () => {
@@ -140,19 +140,19 @@ test("generic bar: a choose action shows the engine's label and the question, no
     { choice: "convert", target: "KSS", entity: "p0", label: "Convert to Major" },
     { choice: "skip", target: null, entity: "p0", label: "Do not convert" },
   ];
-  assert.equal(choiceLabel(g, g.state.prompt.actions[0]!), "Convert to Major · für KSS");
+  assert.equal(choiceLabel(g, g.state.prompt.actions[0]!), "Convert to Major · for KSS");
   const m = genericModel(g, createClaims());
-  assert.equal(m.groups[0]!.label, "Auswahl treffen: Convert");
-  assert.deepEqual(m.groups[0]!.entries.map((e) => e.detail), ["Convert to Major · für KSS", "Do not convert", "choice unlabelled"]);
+  assert.equal(m.groups[0]!.label, "Choose: Convert");
+  assert.deepEqual(m.groups[0]!.entries.map((e) => e.detail), ["Convert to Major · for KSS", "Do not convert", "choice unlabelled"]);
 });
 
-test("private choices: German label and tooltip from text.ts (#290)", () => {
+test("private choices: English label and tooltip from text.ts (#290)", () => {
   const g = load("operating-dividend");
   const flip = { type: "choose", entity: "p0", entity_type: "player", choice: "flip_private", target: "PeC" };
   g.state.prompt.actions = [flip];
   g.state.prompt.choices = [{ choice: "flip_private", target: "PeC", entity: "p0", label: "Flip face down" }];
-  assert.match(choiceLabel(g, flip)!, /^Schließen \(umdrehen\).*· für PeC$/);
-  assert.match(choiceTip(flip)!, /zählt nicht mehr zum Zertifikatslimit/);
+  assert.match(choiceLabel(g, flip)!, /^Close \(flip\).*· for PeC$/);
+  assert.match(choiceTip(flip)!, /no longer counts against the certificate limit/);
 });
 
 test("#55: the Route step offers the trains the Pullman may be attached to; a click sends the choose action", () => {
@@ -178,8 +178,8 @@ test("run: sea crossings and ferries of the stored run get a line with what coun
     ferries: [{ ferry: "AA20-AB27", distance: 1, counted: 1 }],
   }];
   const lines = runLines(g);
-  assert.deepEqual(lines[0]!.sea, ["Seefahrt I52 – I50: 2 Seezonen, 1 zählen, Hafenmarke −1", "Fähre AA20-AB27: Distanz 1, 1 zählt"]);
-  assert.match(textOf(DividendPanel(g, "half", noop)), /3-0: Seefahrt I52 – I50/);
+  assert.deepEqual(lines[0]!.sea, ["Sea crossing I52 – I50: 2 sea zones, 1 count, Port token −1", "Ferry AA20-AB27: distance 1, 1 counts"]);
+  assert.match(textOf(DividendPanel(g, "half", noop)), /3-0: Sea crossing I52 – I50/);
 });
 
 test("#56: the Route step offers the port authority markers a major may buy; a click sends the choose action", () => {
@@ -195,7 +195,7 @@ test("#56: the Route step offers the port authority markers a major may buy; a c
   // The look changed (#478): the button is the board's sign, area name from text.ts and the price from the engine's label.
   const sign = find(panel, (n) => n.attrs["data-port-authority"] === "port_authority:north_sea")[0]!;
   assert.equal(sign.attrs["data-area"], "north_sea");
-  assert.match(textOf(sign), /Nordsee/);
+  assert.match(textOf(sign), /North Sea/);
   assert.match(textOf(sign), /£125/);
   assert.match(String(sign.attrs.title), /Buy the North Sea port authority marker/);
   assert.deepEqual(portSign({ choice: "port_authority:mediterranean", label: "Buy it", action: choose }), { area: "mediterranean", price: null });

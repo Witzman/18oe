@@ -80,7 +80,7 @@ const CHECKS = String.raw`(async () => {
   const fail = (m) => { throw new Error(m); };
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const q = (s) => document.querySelector(s);
-  if ([...document.querySelectorAll(".frame-panel .frame-toggle")].some((b) => /Protokoll/.test(b.textContent))) fail("log toggle still in the panel");
+  if ([...document.querySelectorAll(".frame-panel .frame-toggle")].some((b) => /Game log/.test(b.textContent))) fail("log toggle still in the panel");
   const link = q(".frame-tabs .frame-log-link") || fail("no log link next to the tabs");
   link.click();
   await sleep(800);

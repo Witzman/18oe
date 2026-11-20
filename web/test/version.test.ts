@@ -7,7 +7,7 @@ const server = { version: "0.1.0-dev", build: "abcdef123456", engine: "06b3f0b37
 
 test("versionLine names version, build and engine; missing server values read as unknown", () => {
   assert.equal(versionLine(server, "0.1.0-dev"), "Version 0.1.0-dev · Build abcdef123456 · Engine 06b3f0b37+abcdef123456");
-  assert.equal(versionLine(null, "0.1.0-dev"), "Version 0.1.0-dev · Build unbekannt · Engine unbekannt");
+  assert.equal(versionLine(null, "0.1.0-dev"), "Version 0.1.0-dev · Build unknown · Engine unknown");
 });
 
 test("isStale only when both versions are known and differ", () => {

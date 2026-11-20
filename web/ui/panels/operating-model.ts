@@ -57,7 +57,7 @@ export function operator(g: Game): Corporation | null {
 export interface Head { id: string; name: string; tier: string; cash: number; price: number | null; trains: string[]; tokensFree: number; tokensAll: number }
 export function headOf(c: Corporation): Head {
   return {
-    id: c.id, name: c.name, tier: txt(`tier.${c.type}`).de, cash: c.cash, price: c.share_price,
+    id: c.id, name: c.name, tier: txt(`tier.${c.type}`).text, cash: c.cash, price: c.share_price,
     trains: c.trains.map((t) => t.name), tokensFree: c.tokens.filter((t) => !t.used).length, tokensAll: c.tokens.length,
   };
 }
@@ -80,7 +80,7 @@ export function runModel(g: Game): RunModel {
 export function runSentence(g: Game): string {
   const m = runModel(g);
   const corp = operator(g);
-  if (!m.action || !corp) return txt("route.none").de;
+  if (!m.action || !corp) return txt("route.none").text;
   return fillText("route.sentence", { corp: corp.id, n: m.rows.length, revenue: formatGeld(m.total) });
 }
 
@@ -102,7 +102,7 @@ export function dividendOptions(g: Game): DivOption[] {
     const price = o?.price ?? null;
     const now = corp?.share_price ?? null;
     return {
-      kind, label: txt(`dividend.${kind}`).de, action, perShare: o?.per_share ?? null, treasury: o?.treasury ?? null, price,
+      kind, label: txt(`dividend.${kind}`).text, action, perShare: o?.per_share ?? null, treasury: o?.treasury ?? null, price,
       payouts: o?.payouts ?? [],
       move: price === null || now === null ? null : price > now ? "up" : price < now ? "down" : "same",
     };
@@ -118,8 +118,8 @@ export function chosenOption(g: Game, pick: string | null): DivOption | null {
 export function dividendOrder(g: Game, pick: string | null): { sentence: string; changes: Change[]; action: Action | null } {
   const o = chosenOption(g, pick);
   const corp = operator(g);
-  if (!o || !corp) return { sentence: txt("div.pick").de, changes: [], action: null };
-  const money = (n: number | null) => (n === null ? txt("stock.unknown_value").de : formatGeld(n));
+  if (!o || !corp) return { sentence: txt("div.pick").text, changes: [], action: null };
+  const money = (n: number | null) => (n === null ? txt("stock.unknown_value").text : formatGeld(n));
   const now = corp.share_price;
   const price = o.price !== null && now !== null && o.price !== now ? fillText("div.sentence_price", { from: formatGeld(now), to: formatGeld(o.price) }) : "";
   const paid = o.payouts.map((p) => `${playerName(g, p.holder)} ${formatGeld(p.amount)}`).join(", ");
@@ -137,7 +137,7 @@ export interface RunLine { train: string; stops: string; revenue: number; sea: s
 /** The sea stretches of one run as text lines (#362): each crossing and ferry with what counts against the city limit. */
 export function seaLines(r: RunSea): string[] {
   const reduction = (x: { kind: string; units: number }) =>
-    fillText("route.reduction", { kind: txt(`route.reduction_${x.kind}`).de, units: x.units });
+    fillText("route.reduction", { kind: txt(`route.reduction_${x.kind}`).text, units: x.units });
   return [
     ...(r.sea ?? []).map((s) => [fillText("route.sea", { from: s.from, to: s.to, zones: s.zones, counted: s.counted }),
       ...s.reductions.map(reduction)].join(", ")),
@@ -189,7 +189,7 @@ export function optionLine(o: DivOption, now: number | null): string {
   if (o.perShare !== null && o.perShare > 0) parts.push(fillText("div.share_line", { share: formatGeld(o.perShare) }));
   if (o.treasury !== null && o.treasury > 0) parts.push(fillText("div.treasury_line", { amount: formatGeld(o.treasury) }));
   if (o.price !== null && now !== null) {
-    parts.push(o.move === "same" ? txt("div.price_same").de : fillText("div.price_line", { from: formatGeld(now), to: formatGeld(o.price) }));
+    parts.push(o.move === "same" ? txt("div.price_same").text : fillText("div.price_line", { from: formatGeld(now), to: formatGeld(o.price) }));
   }
   return parts.join(" · ");
 }

@@ -47,14 +47,14 @@ export function choiceLabel(g: Game, a: Action): string | null {
 /** German label of an engine choice when text.ts has one (#290); null otherwise (engine label stays). */
 function choiceText(a: Action): string | null {
   const t = txt(`choice.${String(a.choice)}`);
-  return t.de === `choice.${String(a.choice)}` ? null : t.de;
+  return t.text === `choice.${String(a.choice)}` ? null : t.text;
 }
 
 /** Tooltip help for a choice (#290, help level 1); undefined when text.ts has none. */
 export function choiceTip(a: Action): string | undefined {
   if (a.type !== "choose") return undefined;
   const t = txt(`choice.${String(a.choice)}_tip`);
-  return t.de === `choice.${String(a.choice)}_tip` ? undefined : t.de;
+  return t.text === `choice.${String(a.choice)}_tip` ? undefined : t.text;
 }
 
 export function actionDetail(g: Game, a: Action): string {
@@ -63,7 +63,7 @@ export function actionDetail(g: Game, a: Action): string {
   const parts = Object.entries(a).filter(([k]) => !META_KEYS.has(k)).map(([k, val]) => {
     // Dividend kinds (Rulebook 11.4) have German names; every other parameter is shown as sent.
     const kind = k === "kind" && typeof val === "string" ? txt(`dividend.${val}`) : null;
-    return kind && kind.de !== `dividend.${val}` ? kind.de : `${k} ${show(val)}`;
+    return kind && kind.text !== `dividend.${val}` ? kind.text : `${k} ${show(val)}`;
   });
   const who = typeof a.entity === "string" && a.entity !== g.viewer ? fillText("frame.param_entity", { entity: playerName(g, a.entity) }) : "";
   return [...parts, who].filter(Boolean).join(" · ");
@@ -77,14 +77,14 @@ export function genericModel(g: Game, claims: Claims, provided: ReadonlySet<Kind
     const type = String(a.type ?? "");
     if (!open(type)) continue;
     const list = byType.get(type) ?? [];
-    list.push({ key: actionKey(a), action: a, label: txt(`action.${type}`).de, detail: actionDetail(g, a), danger: DANGEROUS.has(type), tip: choiceTip(a) });
+    list.push({ key: actionKey(a), action: a, label: txt(`action.${type}`).text, detail: actionDetail(g, a), danger: DANGEROUS.has(type), tip: choiceTip(a) });
     byType.set(type, list);
   }
   // A `choose` group carries the step's question (`choice_name`, #124) next to its name.
-  const groupLabel = (type: string) => type === "choose" && p.choice_name ? `${txt("action.choose").de}: ${p.choice_name}` : txt(`action.${type}`).de;
+  const groupLabel = (type: string) => type === "choose" && p.choice_name ? `${txt("action.choose").text}: ${p.choice_name}` : txt(`action.${type}`).text;
   const groups: Group[] = [...byType].map(([type, entries]) => ({ type, label: groupLabel(type), entries }));
   const ranges: RangeEntry[] = p.ranges.filter((r) => open(r.type)).map((r) => ({
-    key: `range:${r.type}:${r.entity}:${r.company}`, range: r, label: txt(`action.${r.type}`).de,
+    key: `range:${r.type}:${r.entity}:${r.company}`, range: r, label: txt(`action.${r.type}`).text,
     detail: `${r.company} · ${fillText("frame.range_bounds", { min: r.min, max: r.max, step: r.step })}`,
   }));
   const unsupported = p.unsupported.filter((u) => !claims.isClaimed(p.step, u.split(/:\s*/).pop() ?? u));
@@ -154,13 +154,13 @@ export function GenericBar(m: GenericModel, h: GenericHandlers): VNode {
     },
   },
   v("strong", {}, r.label), v("span", { class: "muted" }, r.detail),
-  v("label", {}, txt("frame.range_label").de, v("input", { type: "number", name: "price", min: String(r.range.min), max: String(r.range.max), step: String(r.range.step), value: String(r.range.min), required: true })),
-  v("button", { type: "submit" }, txt("frame.range_pick").de),
+  v("label", {}, txt("frame.range_label").text, v("input", { type: "number", name: "price", min: String(r.range.min), max: String(r.range.max), step: String(r.range.step), value: String(r.range.min), required: true })),
+  v("button", { type: "submit" }, txt("frame.range_pick").text),
   h.rangeError?.key === r.key ? v("span", { class: "msg-error", role: "alert" }, h.rangeError.text) : null);
   const unsupported = m.unsupported.length > 0 ? v("p", { class: "msg-warn" }, fillText("frame.unsupported", { list: m.unsupported.join("; ") })) : null;
   if (m.kinds !== null && m.kinds.length > 0) return v("div", { class: "frame-generic frame-staged" }, ...stagedBar(m.kinds, h, range), unsupported);
   return v("div", { class: "frame-generic" },
-    m.count === 0 && m.unsupported.length === 0 ? v("p", { class: "muted" }, txt("frame.generic_none").de) : null,
+    m.count === 0 && m.unsupported.length === 0 ? v("p", { class: "muted" }, txt("frame.generic_none").text) : null,
     ...m.groups.map(group), ...m.ranges.map(range),
     unsupported);
 }
@@ -168,17 +168,17 @@ export function GenericBar(m: GenericModel, h: GenericHandlers): VNode {
 /** Step 1: one full-width button per kind. Step 2: the head with the back button, then only that kind's options. */
 function stagedBar(blocks: KindBlock[], h: GenericHandlers, range: (r: RangeEntry) => VNode): VNode[] {
   const view = stageView(blocks.map((b) => b.kind), h.stage ?? null);
-  const label = (kind: Kind) => txt(`kind.${kind}`).de;
+  const label = (kind: Kind) => txt(`kind.${kind}`).text;
   if (view.step === 1) {
-    return [v("p", { class: "frame-kind-pick" }, txt("kind.pick").de),
+    return [v("p", { class: "frame-kind-pick" }, txt("kind.pick").text),
       v("div", { class: "frame-kinds" }, ...blocks.map((b) => v("button", {
-        type: "button", class: "frame-kind", "data-kind": b.kind, title: txt(`kind.${b.kind}_tip`).de, onclick: () => h.onStage?.(b.kind),
+        type: "button", class: "frame-kind", "data-kind": b.kind, title: txt(`kind.${b.kind}_tip`).text, onclick: () => h.onStage?.(b.kind),
       }, `${label(b.kind)} (${b.count})`)))];
   }
   const block = blocks.find((b) => b.kind === view.kind);
   if (!block) return [];
   return [v("div", { class: "frame-kind-head", "data-kind": block.kind },
-    view.back ? v("button", { type: "button", class: "frame-kind-back", title: txt("kind.back_tip").de, onclick: () => h.onStage?.(null) }, txt("kind.back").de) : null,
+    view.back ? v("button", { type: "button", class: "frame-kind-back", title: txt("kind.back_tip").text, onclick: () => h.onStage?.(null) }, txt("kind.back").text) : null,
     v("strong", {}, fillText("kind.step_head", { kind: label(block.kind) }))),
   block.provided ? v("div", { class: "frame-options", "data-kind": block.kind }, ...(h.provided?.(block.kind) ?? []))
     : v("div", { class: "frame-entries" }, ...block.entries.map((e) => entryButton(e, h))),
