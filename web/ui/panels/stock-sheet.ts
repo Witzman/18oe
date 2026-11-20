@@ -8,7 +8,8 @@ import { corpColor, playerName } from "../frame/model.ts";
 import { Auftrag, Dialog, Geld, inkFor, playerSlot, Siegel, v, type VNode } from "../kit/index.ts";
 import { formatGeld } from "../kit/money.ts";
 import { fillText, txt } from "../text.ts";
-import { blockedReason, holdings, inTab, offerOf, offersFor, orderModel, passAction, sealStack, type BuyOffer, type CorpRow, type MarketCellModel, type MarketModel, type Mode, type MustSell, type Offer, type ParOffer, type SellOffer, type Selection, type Tab } from "./stock-model.ts";
+import type { Kind } from "../frame/kinds.ts";
+import { blockedReason, holdings, inTab, isMarketKind, offerOf, offersFor, offersOfKind, orderModel, rowsForKind, sealStack, type BuyOffer, type CorpRow, type MarketCellModel, type MarketModel, type Mode, type MustSell, type Offer, type ParOffer, type SellOffer, type Selection, type Tab } from "./stock-model.ts";
 
 export interface SheetHandlers {
   /** A corporation card: opens the dialog to buy or found (#408). */
@@ -22,7 +23,6 @@ export interface SheetHandlers {
   /** Dialog: cancel, Escape and the backdrop only drop the choice; the main button sends. */
   onClose?: () => void;
   onConfirm?: () => void;
-  onPass?: () => void;
 }
 
 export interface SheetInput {
@@ -37,6 +37,8 @@ export interface SheetInput {
   must: MustSell | null;
   /** "row,col" of the Kurstafel cell whose corporation list is open. */
   cellList?: string | null;
+  /** The kind the player is in in the action box (#497 S3), read from the frame; null in step 1: all cards and offers show. */
+  kind?: Kind | null;
 }
 
 const money = (n: number | null): string => (n === null ? txt("stock.unknown_value").de : formatGeld(n));
@@ -104,7 +106,7 @@ function rowNode(r: CorpRow, i: SheetInput, h: SheetHandlers): VNode {
 export function offersNode(i: SheetInput, h: SheetHandlers): VNode | null {
   const r = i.rows.find((x) => x.id === i.focus);
   if (!r) return null;
-  const o = offersFor(r, i.tab, i.mode);
+  const o = offersFor(r, i.tab, i.mode, i.kind ?? null);
   const any = o.buys.length + o.sells.length + o.pars.length > 0;
   return v("div", { class: "stock-detail", "data-corp": r.id },
     any ? null : v("p", { class: "muted stock-idle" }, blockedReason(i.g, r) ?? txt(i.mode === "sell" ? "stock.row_idle" : "stock.nothing_to_buy").de),
@@ -114,14 +116,17 @@ export function offersNode(i: SheetInput, h: SheetHandlers): VNode | null {
 }
 
 function listNode(i: SheetInput, h: SheetHandlers): VNode {
-  const rows = i.rows.filter((r) => inTab(r, i.tab));
+  // With a market kind chosen, the kind replaces the tab: the cards with an offer of it, wherever the shares are.
+  const rows = isMarketKind(i.kind ?? null) ? rowsForKind(i.rows, i.kind ?? null) : i.rows.filter((r) => inTab(r, i.tab));
   return v("section", { class: "stock-list", "aria-label": txt("stock.tab_list").de },
     rows.length === 0 ? v("p", { class: "muted stock-empty" }, txt(`stock.empty_${i.tab}`).de) : v("ul", { class: "stock-rows" }, ...rows.map((r) => rowNode(r, i, h))));
 }
 
 /** The shares of the viewer, one button per corporation: it opens the sale (#407). */
 function holdingsNode(i: SheetInput, h: SheetHandlers): VNode {
-  const mine = holdings(i.rows);
+  const kind = i.kind ?? null;
+  // Selling needs the shares of the viewer: in another market kind the list has nothing to offer and stays out of the way.
+  const mine = holdings(isMarketKind(kind) && kind !== "sell" ? [] : rowsForKind(i.rows, kind));
   return v("section", { class: "stock-hold-box", "aria-label": txt("stock.hold_head").de },
     v("h3", {}, txt("stock.hold_head").de),
     mine.length === 0 ? v("p", { class: "muted" }, txt("stock.hold_none").de)
@@ -219,12 +224,6 @@ const changesOf = (o: ReturnType<typeof orderModel>) => o.changes.map((c) => ({
   after: c.money && typeof c.after === "number" ? Geld(c.after) : String(c.after),
 }));
 
-/** The pass button in the head: the stock step offers it only when passing is allowed (#407). */
-function passButton(g: Game, h: SheetHandlers): VNode | null {
-  if (!passAction(g) || !g.state.prompt.viewer_to_act) return null;
-  return v("button", { type: "button", class: "kit-side-btn", "data-action": "pass", title: txt("stock.pass_tip").de, onclick: () => h.onPass?.() }, txt("stock.pass").de);
-}
-
 /** The centred dialog of a focused corporation (#407, #408): the offers of the mode and tab, the order once one is chosen.
  *  Closing it (Abbrechen, Escape, backdrop) only drops the choice; nothing is sent before the main button. */
 export function stockDialog(i: SheetInput, h: SheetHandlers): VNode | null {
@@ -257,9 +256,23 @@ export function sheetNode(i: SheetInput, h: SheetHandlers): VNode {
       v("div", { class: "stock-tabs", role: "tablist" },
         ...(["stock", "market"] as const).map((t) => v("button", { type: "button", role: "tab", "data-tab": t, "aria-selected": String(i.tab === t), onclick: () => h.onTab(t) }, txt(`stock.tab_${t}`).de))),
       orderLine(i.g),
-      passButton(i.g, h),
       me ? v("span", { class: "stock-cash" }, `${txt("stock.cash").de} `, Geld(me.cash), ` · ${txt("stock.certs").de} ${fillText("stock.certs_of", { n: me.certs, limit: me.cert_limit })}`) : null),
     i.must ? v("p", { class: "stock-warn", role: "alert" }, fillText("stock.must_sell", { limit: i.must.limit, certs: i.must.certs })) : null,
     v("div", { class: "stock-body" }, listNode(i, h), holdingsNode(i, h), gridNode(i, h)));
   return v("div", { class: "stock-stage" }, sheet, stockDialog(i, h) ?? cellListDialog(i, h));
+}
+
+/** The options of a market kind in the action box (#497 S3, variant A): one button per corporation with an offer of the
+ *  kind. A tap opens the dialog of that corporation in the sheet; the choice itself stays the same place as before. */
+export function kindOptionsNode(g: Game, theme: Theme, rows: CorpRow[], kind: Kind, onOpen: (corp: string) => void): VNode[] {
+  return rowsForKind(rows, kind).map((r) => {
+    const o = offersOfKind(r, kind);
+    const n = o.buys.length + o.sells.length + o.pars.length;
+    return v("button", {
+      type: "button", class: "frame-option", "data-corp": r.id, "data-kind": kind, title: `${r.name} · ${txt(`tier.${r.tier}`).de}`,
+      "aria-label": fillText("stock.option_label", { corp: r.id, name: r.name, n }),
+      onclick: () => onOpen(r.id),
+    }, sealOf(g, theme, r.id, r.name), v("strong", { class: "stock-id" }, r.id),
+    v("span", { class: "muted" }, r.name), v("small", { class: "muted" }, fillText("stock.option_count", { n })));
+  });
 }
