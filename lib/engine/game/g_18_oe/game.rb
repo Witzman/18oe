@@ -1608,7 +1608,7 @@ module Engine
             G18OE::Step::ConvertToNational,
             G18OE::Step::Bankrupt,
             G18OE::Step::DiscardTrain,
-            Engine::Step::HomeToken,
+            G18OE::Step::Operating::HomeToken,
             G18OE::Step::HochbergToken,
             G18OE::Step::SmlTrain,
             G18OE::Step::BbbtRepar,
