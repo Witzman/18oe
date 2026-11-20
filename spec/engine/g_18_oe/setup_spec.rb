@@ -60,10 +60,16 @@ describe 'G18OE setup' do
     expect(game.bank.cash + game.players.sum(&:cash)).to eq(54_000)
   end
 
-  it 'uses the Info Board certificate limits (§4.1)' do
-    limits = (2..7).to_h { |n| [n, new_game(Array.new(n) { |i| "p#{i}" }).cert_limit] }
+  def cert_limits(counts)
+    counts.to_h { |n| [n, new_game(Array.new(n) { |i| "p#{i}" }).cert_limit] }
+  end
 
-    expect(limits).to eq(2 => 99, 3 => 48, 4 => 36, 5 => 29, 6 => 24, 7 => 20)
+  it 'uses the Info Board certificate limits for 3 to 7 players (§4.1, Game Limits)' do
+    expect(cert_limits(3..7)).to eq(3 => 48, 4 => 36, 5 => 29, 6 => 24, 7 => 20)
+  end
+
+  it 'assumes no certificate limit (99) for 2 players: ASSUMPTION, no source (#521)' do
+    expect(cert_limits([2])).to eq(2 => 99)
   end
 
   it "reserves each regional's home city at setup (§3.1, PB 1.1)" do
