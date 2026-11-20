@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Engine
-  module Action
+  module Helper
     # §10.4 (#517): the objects of a player trade besides the target and the cash price. `give` are the
     # buyer's own minors / face up privates, `also` further ones of the seller. Written to the action
     # hash only when there are some, so every action recorded before stays as it was.

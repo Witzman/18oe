@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
 require_relative 'base'
-require_relative 'trade_objects'
+require_relative '../helper/trade_objects'
 
 module Engine
   module Action
     class BuyCorporation < Base
-      include TradeObjects
+      include Helper::TradeObjects
 
       attr_reader :entity, :corporation, :minor, :price
 
