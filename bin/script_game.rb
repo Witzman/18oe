@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # Scripted game over the real HTTP API (#132).
-#   bin/script-game --spawn [--slice s1] [--players 4] [--seed 1]
+#   bin/script-game --spawn [--slice s1] [--players N] [--seed 1]   (players: the slice file's `players:`, else 4)
 #       starts a local server (in-memory database, bots off), registers the
 #       players with an invite code, plays one game from the auction to the end
 #       and prints which round/step/action combinations were executed.
@@ -18,7 +18,7 @@ require "securerandom"
 require "socket"
 require "oe/script_game"
 
-opts = { slice: "s1", players: 4, seed: 1, seed_given: false, base: nil, spawn: false, invite: ENV["OE_INVITE_CODE"], max_actions: 20_000 }
+opts = { slice: "s1", players: nil, seed: 1, seed_given: false, base: nil, spawn: false, invite: ENV["OE_INVITE_CODE"], max_actions: 20_000 }
 OptionParser.new do |o|
   o.on("--slice NAME") { |v| opts[:slice] = v }
   o.on("--players N", Integer) { |v| opts[:players] = v }
@@ -51,7 +51,9 @@ end
 abort "no invite code (OE_INVITE_CODE or --invite)" unless opts[:invite]
 password = SecureRandom.hex(12)
 clients = {}
-opts[:players].times do |i|
+indexes = opts[:only] ? [opts[:only]] : (0...Oe::ScriptGame.games(opts[:slice])).to_a
+seats = ->(index) { opts[:players] || Oe::ScriptGame.players(opts[:slice], index) }
+indexes.map(&seats).max.times do |i|
   name = "script-#{opts[:seed]}-#{i + 1}"
   client = Oe::ScriptGame::Clients::Net.new(opts[:base])
   status, body = client.call(:post, "/register", { name: name, email: "#{name}@example.test", password: password, code: opts[:invite] })
@@ -60,8 +62,8 @@ opts[:players].times do |i|
 end
 
 ok = true
-(opts[:only] ? [opts[:only]] : (0...Oe::ScriptGame.games(opts[:slice])).to_a).each do |index|
-  result = Oe::ScriptGame.new(clients: clients, slice: opts[:slice], game: index, seed: opts[:seed_given] && opts[:seed],
+indexes.each do |index|
+  result = Oe::ScriptGame.new(clients: clients.first(seats.call(index)).to_h, slice: opts[:slice], game: index, seed: opts[:seed_given] && opts[:seed],
                               max_actions: opts[:max_actions],
                               log: ->(seq, round, step, _a) { warn "  seq #{seq} #{round}/#{step}" if (seq % 500).zero? }).run
   puts Oe::ScriptGame::Report.lines(result), "", "=" * 78, ""

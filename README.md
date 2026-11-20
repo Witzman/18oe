@@ -63,13 +63,11 @@ In the WebKit engine only `oeTouch("tap", [{x,y}])` exists.
 `flock` on `tmp/heavy.lock` of the main `18oe` checkout before it starts a browser; other heavy jobs
 use `flock /home/witzman/18oe/tmp/heavy.lock <command>`. `OE_HEAVY_LOCK_HELD=1` skips it if you already hold it.
 
-## Screenshots for the UI feedback board (#374)
+## Screenshots for the UI feedback board
 
-`bin/boardshots [scene ...]` takes the scenes of `bin/boardshots.json` (a recorded game fixture each, served by a stub
-API, no engine) with the real built UI (`cd web && npm run build` first) at 1747x923 into `tmp/board/<scene>.png`
-(`OE_BOARD_OUT` changes the folder). Every scene is its own `bin/shot.mjs` run under a hard timeout and `heavy.lock`
-(one browser at a time, foreground only). A new scene is a line in `bin/boardshots.json`; `web/test/boardshots.test.ts`
-checks names and fixtures. The board page itself and how to publish it are in the workshop (`notes/ui-feedback/`).
+The feedback board and its screenshot tool live in the workshop repo (`bin/boardshots`, scenes in `bin/boardshots.json`,
+#374, moved there in #502). The tool reads this product (built `web/dist`, the recorded game fixtures in
+`web/test/fixtures/games/`, `bin/shot.mjs`); `bin/shot.mjs --scale N` (1 to 4) takes a sharper picture.
 
 ## Rules engine
 
@@ -125,7 +123,7 @@ Two stages, one definition of "fast": the RSpec tag `:game_flow` (spec/support/t
 | Stage | Workflow | When | What |
 |---|---|---|---|
 | fast | `ci.yml` | every pull request | rspec `--tag ~game_flow` (engine specs, contracts; = `bin/test fast`), typecheck, web unit tests, browser tests only if `web/**` changed (`touch-browser` excluded). Target: under 3 min |
-| milestone | `full.yml` | nightly (cron 02:17 UTC; GitHub starts scheduled runs late, measured 09:37 and 10:41 UTC), tag `v0.*`, manually for any commit | the complete rspec suite (`:game_flow` included), long whole games uncapped, all browser tests incl. `touch-browser`, scripted game, `catalog live` |
+| milestone | `full.yml` | nightly (cron 02:17 UTC; GitHub starts scheduled runs late, measured 09:37 and 10:41 UTC), tag `v0.*`, manually for any commit | the complete rspec suite (`:game_flow` included), long whole games uncapped, all browser tests incl. `touch-browser`, scripted games (slice s1; slice s2 as its own job, one runner per game; #481), `catalog live` |
 
 `full.yml` does NOT run on every push to `main`, and nobody dispatches or waits for it after a merge (#439): a pull
 request is merged on a green fast stage. `full` runs nightly and before a deploy (`bin/deploy-check` in the workshop
