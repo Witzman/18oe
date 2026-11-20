@@ -125,8 +125,9 @@ export interface Prompt {
   unsupported: string[];
   ranges: { type: string; entity: string; company: string; min: number; max: number; step: number }[];
   actions: Record<string, unknown>[];
-  // The active step's own texts (#124), English as in the engine; help is null when empty.
-  description: string | null; help: string | null; pass_description: string | null;
+  // The active step's own texts (#124), English as in the engine; help is null when empty, and a list of
+  // lines when the step has several (the Route step adds the Orient Express duty, #512).
+  description: string | null; help: string | readonly string[] | null; pass_description: string | null;
   // Offered double-head combinations for the Orient Express (#136) and the note on what they mean.
   double_head: { entity: string; trains: string[]; names: string[]; train: string; label: string }[];
   double_head_note: string | null;

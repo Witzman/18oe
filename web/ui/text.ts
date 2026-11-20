@@ -744,6 +744,7 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "route.col_train": e("Zug", "Train", "§11.3"),
   "route.col_stops": e("Halte", "Stops", "§11.3"),
   "route.col_revenue": e("Einnahme", "Revenue", "§11.3"),
+  "route.orient_required": e("Orient Express is required: the best routes for all trains include an Orient Express run. Combine trains if that is how it is reached.", "Orient Express required (best possible routes, ties do not count)", "§12.2"),
   "route.extra": e("Orient-Express-Zuschlag", "Orient Express bonus", "§12"),
   "route.subsidy": e("Zuschuss", "Subsidy", "§11.3"),
   "route.total": e("Summe", "Total", "§11.3"),

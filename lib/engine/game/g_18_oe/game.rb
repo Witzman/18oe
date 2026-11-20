@@ -461,6 +461,9 @@ module Engine
         ORIENT_EXPRESS_ORIGINS = %w[Paris London Berlin Madrid Sankt-Peterburg].freeze
         ORIENT_EXPRESS_DESTINATIONS = %w[Constantinople].freeze
         ORIENT_EXPRESS_BONUS = { '2' => 30, '3' => 30, '4' => 30, '5' => 60, '6' => 60, '7' => 100, '8' => 100 }.freeze
+        # §12.2 (#512): the step help and the error when submitted routes leave out an obligatory run.
+        ORIENT_EXPRESS_REQUIRED = 'Orient Express is required: the best routes for all trains include an '\
+                                  'Orient Express run (§12.2).'
         CONVERSION_NEW_SHARES = 6
         MAJOR_MAX_OWNERSHIP_PERCENT = 60
         TWO_PLAYER_MAJOR_MAX_OWNERSHIP_PERCENT = 70
@@ -1703,6 +1706,102 @@ module Engine
             bonus = orient_express_bonus_route?(route) ? 0 : self.class::ORIENT_EXPRESS_BONUS[route.phase.name]
             route.revenue + bonus
           end.max
+        end
+
+        # §12.2 (#512): "A RR is not obligated to run the Orient Express on the first occasion it is able to do
+        # so, unless such a route is part of the "best possible routes" for all trains on the RR. (Ties do not
+        # count as best possible.)" Owner's reading (2026-11-20): the routes with the highest total revenue over
+        # all trains of the RR, including trains the RR may still combine (§12.1). Returns the best Orient
+        # Express solution found, {revenue:, routes:, combine:}, when `routes` (the submitted ones) leave out an
+        # Orient Express run and earn less, and the solution earns strictly more than the best found without
+        # one; nil otherwise. `combine` is the set of trains to combine first (then `routes` is nil: the routes
+        # of a combined train exist only after the combination), else `routes` are routes of the trains as they
+        # stand. Only a major without the marker whose network reaches both ends is checked; the search is the
+        # RoutePicker's (Oe::RouteSearch, the MRI copy of AutoRouter#path), whose candidates `train_routes` the
+        # picker passes in. The routes compared are found greedily, as the picker finds them, so a submission is
+        # only rejected when a solution found with the Orient Express beats it.
+        def orient_express_required(corporation, routes, train_routes = nil)
+          return unless orient_express_duty?(corporation)
+
+          # with the picker's candidates at hand the comparison is cheap (no search) and is kept for the help
+          best = orient_express_best(corporation, train_routes) if train_routes
+          return if orient_express_route(routes)
+
+          best ||= orient_express_best(corporation)
+          return if !best || routes_revenue(routes) >= best[:revenue]
+
+          orient_express_router.settle(best[:routes]) if best[:routes]
+          best
+        end
+
+        def orient_express_duty?(corporation)
+          corporation&.corporation? && corporation.type == :major && !orient_express_marker?(corporation) &&
+            orient_express_reachable?(corporation)
+        end
+
+        # The step help (#512) names the duty only once the routes have been searched in this state (by the
+        # RoutePicker or a submission), so showing the prompt never starts a search of its own.
+        def orient_express_required_known?(corporation)
+          @orient_express_best&.first == orient_express_best_key(corporation) && !@orient_express_best[1].nil?
+        end
+
+        # Best solution found with an Orient Express run, {revenue:, routes:, combine:}, when it earns strictly
+        # more than the best found without one; nil otherwise. Kept for the current state (corporation, round,
+        # last action), so the engine reuses what the RoutePicker found for the same prompt.
+        def orient_express_best(corporation, train_routes = nil)
+          key = orient_express_best_key(corporation)
+          return @orient_express_best[1] if !train_routes && @orient_express_best&.first == key
+
+          router = orient_express_router
+          result = orient_express_compare(router, corporation, train_routes || router.train_routes(corporation))
+          @orient_express_best = [key, result]
+          result
+        end
+
+        def orient_express_best_key(corporation)
+          [corporation, @round, @last_processed_action]
+        end
+
+        def orient_express_compare(router, corporation, train_routes)
+          without = router.pick(train_routes.map { |train, routes| [train, routes.reject { |r| orient_express_run?(r) }] })
+          without_revenue = router.real_revenue(without)
+          with = train_routes.filter_map { |_train, routes| routes.find { |r| orient_express_run?(r) } }
+            .map { |route| router.pick(train_routes, [route]) }
+            .map { |picked| { revenue: router.real_revenue(picked), routes: picked } }
+          with.concat(orient_express_combinations(router, corporation, train_routes))
+          best = with.max_by { |solution| solution[:revenue] }
+          best if best && best[:revenue] > without_revenue
+        end
+
+        # §12.1: the solutions with two or more of the corporation's non-permanent trains combined into one that
+        # runs an Orient Express route (Game#double_head_candidates leaves out permanent trains and the Swift
+        # Metropolitan; a Pullman car runs on the combined train, the Krasnaya Strela marker is in its rows).
+        # Trains of one name are interchangeable, so each multiset of names is tried once. The other trains
+        # keep the candidates already searched; only the combined train is searched (one walk each), and not at
+        # all when the combination of every candidate finds no Orient Express route.
+        def orient_express_combinations(router, corporation, train_routes)
+          candidates = double_head_candidates(corporation)
+          return [] if candidates.size < 2
+          widest = router.orient_express_routes(corporation, candidates)
+          return [] if widest.empty?
+
+          # a combination needs at least as many cities as the fewest cities of an Orient Express route of the
+          # combination of every candidate (the same pruning as Oe::LegalActions#generate_double_head_trains)
+          need = widest.map { |route| route.visited_stops.count { |stop| !stop.town? } }.min
+          router.combinations(candidates).filter_map do |trains|
+            next if trains.sum { |train| distance(train).first } < need
+
+            routes = router.orient_express_routes(corporation, trains)
+            next if routes.empty?
+
+            others = train_routes.reject { |train, _| trains.include?(train) }
+            router.pick_combined(routes, others.to_a, trains)
+          end
+        end
+
+        def orient_express_router
+          require_relative '../../../oe/route_search'
+          ::Oe::RouteSearch.new(self)
         end
 
         # Base#compute_stops scores every combination of the visited stops; with

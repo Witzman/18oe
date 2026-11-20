@@ -10,7 +10,7 @@ import { Geld, formatGeld, toDom, v, type VNode } from "../kit/index.ts";
 import { fillText, txt } from "../text.ts";
 import {
   DIVIDEND_STEP, OPERATING_TYPES, ROUTE_STEP, chosenOption, dividendOptions, dividendOrder, isOperatingStep,
-  operator, optionLine, payoutRows, portAuthorityOptions, portSign, pullmanOptions, runBands, runHexes, runLines, runModel, runSentence, type DivOption,
+  operator, optionLine, orientRequired, payoutRows, portAuthorityOptions, portSign, pullmanOptions, runBands, runHexes, runLines, runModel, runSentence, type DivOption,
 } from "./operating-model.ts";
 import { mapPick } from "./map-pick.ts";
 
@@ -23,8 +23,10 @@ export function RoutePanel(g: Game, onPullman?: (action: Record<string, unknown>
   const marker = portAuthorityOptions(g);
   const cell = (cls: string, ...c: (string | VNode)[]) => v("td", { class: cls }, ...c);
   const extra = (key: string, n: number) => n > 0 ? v("tr", { class: "op-extra", title: tip(key) }, cell("", txt(key).de), cell("", ""), cell("op-num", Geld(n))) : null;
+  const duty = orientRequired(g);
   return v("div", { class: "op-run" },
-    m.rows.length === 0 ? v("p", { class: "muted" }, txt("route.none").de)
+    duty ? v("p", { class: "op-required", role: "status", title: tip("route.orient_required") }, txt("route.orient_required").de) : null,
+    m.rows.length === 0 ? (duty ? null : v("p", { class: "muted" }, txt("route.none").de))
       : v("table", { class: "op-table" },
         v("thead", {}, v("tr", {},
           v("th", { title: tip("route.col_train") }, txt("route.col_train").de), v("th", { title: tip("route.col_stops") }, txt("route.col_stops").de),
