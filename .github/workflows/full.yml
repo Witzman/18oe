@@ -212,7 +212,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        game: [1, 2, 3]
+        game: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
         with:
