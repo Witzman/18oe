@@ -77,6 +77,10 @@ module Engine
 
           def help
             base_help = super
+            # §12.2 (#512): known only once the routes have been searched for this prompt (no search here)
+            if current_entity.type == :major && @game.orient_express_required_known?(current_entity)
+              base_help = Array(base_help).reject(&:empty?) + [@game.class::ORIENT_EXPRESS_REQUIRED]
+            end
             return base_help if current_entity.type != :major || !@game.non_permanent_trains?
 
             Array(base_help).reject(&:empty?) + [
@@ -96,6 +100,7 @@ module Engine
           end
 
           def process_run_routes(action)
+            check_orient_express_duty!(action)
             super
             @round.orient_express_revenue = @game.orient_express_train_revenue(@round.routes)
             remove_combined_trains!
@@ -134,6 +139,17 @@ module Engine
           end
 
           private
+
+          # §12.2 (#512): routes that leave out an Orient Express run the best routes include are rejected.
+          # Not while loading: the action was checked when it was first processed, and a replay would run the
+          # route search again for every such run.
+          def check_orient_express_duty!(action)
+            return if @game.loading
+            return unless (required = @game.orient_express_required(action.entity, action.routes))
+
+            raise GameError, "#{@game.class::ORIENT_EXPRESS_REQUIRED} Routes with it earn "\
+                             "#{@game.format_currency(@game.routes_revenue(required))}."
+          end
 
           def remove_combined_trains!
             @round.combined_trains.each_key do |train|

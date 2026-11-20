@@ -459,6 +459,9 @@ module Engine
         ORIENT_EXPRESS_ORIGINS = %w[Paris London Berlin Madrid Sankt-Peterburg].freeze
         ORIENT_EXPRESS_DESTINATIONS = %w[Constantinople].freeze
         ORIENT_EXPRESS_BONUS = { '2' => 30, '3' => 30, '4' => 30, '5' => 60, '6' => 60, '7' => 100, '8' => 100 }.freeze
+        # §12.2 (#512): the step help and the error when submitted routes leave out an obligatory run.
+        ORIENT_EXPRESS_REQUIRED = 'Orient Express is required: the best routes for all trains include an '\
+                                  'Orient Express run (§12.2).'
         CONVERSION_NEW_SHARES = 6
         MAJOR_MAX_OWNERSHIP_PERCENT = 60
         TWO_PLAYER_MAJOR_MAX_OWNERSHIP_PERCENT = 70
@@ -1699,6 +1702,74 @@ module Engine
             bonus = orient_express_bonus_route?(route) ? 0 : self.class::ORIENT_EXPRESS_BONUS[route.phase.name]
             route.revenue + bonus
           end.max
+        end
+
+        # §12.2 (#512): "A RR is not obligated to run the Orient Express on the first occasion it is able to do
+        # so, unless such a route is part of the "best possible routes" for all trains on the RR. (Ties do not
+        # count as best possible.)" Owner's reading (2026-11-20): the routes with the highest total revenue over
+        # all trains of the RR. Returns the best routes found with an Orient Express run when `routes` (the
+        # submitted ones) leave it out and earn less, and the routes found with it earn strictly more than the
+        # best found without it; nil otherwise. Only a major without the marker whose network reaches both ends
+        # is checked; the search is the RoutePicker's (Oe::RouteSearch, the MRI copy of AutoRouter#path), whose
+        # candidates `train_routes` the picker passes in. The routes compared are found greedily, as the picker
+        # finds them, so a submission is only rejected when routes found with the Orient Express beat it.
+        def orient_express_required(corporation, routes, train_routes = nil)
+          return unless orient_express_duty?(corporation)
+
+          # with the picker's candidates at hand the comparison is cheap (no search) and is kept for the help
+          best = orient_express_best(corporation, train_routes) if train_routes
+          return if orient_express_route(routes)
+
+          best ||= orient_express_best(corporation)
+          return if !best || routes_revenue(routes) >= best[:revenue]
+
+          orient_express_router.settle(best[:routes])
+          best[:routes]
+        end
+
+        def orient_express_duty?(corporation)
+          corporation&.corporation? && corporation.type == :major && !orient_express_marker?(corporation) &&
+            orient_express_reachable?(corporation)
+        end
+
+        # The step help (#512) names the duty only once the routes have been searched in this state (by the
+        # RoutePicker or a submission), so showing the prompt never starts a search of its own.
+        def orient_express_required_known?(corporation)
+          @orient_express_best&.first == orient_express_best_key(corporation) && !@orient_express_best[1].nil?
+        end
+
+        # Best routes found with an Orient Express run and their revenue, when they earn strictly more than the
+        # best found without one; nil otherwise. Kept for the current state (corporation, round, last action),
+        # so the engine reuses what the RoutePicker found for the same prompt.
+        def orient_express_best(corporation, train_routes = nil)
+          key = orient_express_best_key(corporation)
+          return @orient_express_best[1] if !train_routes && @orient_express_best&.first == key
+
+          router = orient_express_router
+          result = orient_express_compare(router, train_routes || router.train_routes(corporation))
+          @orient_express_best = [key, result]
+          result
+        end
+
+        def orient_express_best_key(corporation)
+          [corporation, @round, @last_processed_action]
+        end
+
+        def orient_express_compare(router, train_routes)
+          without = router.pick(train_routes.map { |train, routes| [train, routes.reject { |r| orient_express_run?(r) }] })
+          without_revenue = router.real_revenue(without)
+          with = train_routes.filter_map { |_train, routes| routes.find { |r| orient_express_run?(r) } }
+            .map { |route| router.pick(train_routes, [route]) }
+            .map { |picked| [router.real_revenue(picked), picked] }
+            .max_by(&:first)
+          return if !with || with.first <= without_revenue
+
+          { revenue: with.first, routes: with.last }
+        end
+
+        def orient_express_router
+          require_relative '../../../oe/route_search'
+          ::Oe::RouteSearch.new(self)
         end
 
         # Base#compute_stops scores every combination of the visited stops; with

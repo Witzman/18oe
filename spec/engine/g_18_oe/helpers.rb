@@ -162,4 +162,101 @@ module G18OESpecHelpers
   def round_step(round, klass)
     round.steps.find { |s| s.is_a?(klass) }
   end
+
+  # --- Real-map land chain (#411, shared with #512): yellow tiles over the shortest land path. ---
+
+  # Shortest land path (white hexes) from hex `from` to hex `to`.
+  def land_path(from, to)
+    prev = { from => nil }
+    queue = [from]
+    until queue.empty?
+      hex = queue.shift
+      break if hex == to
+
+      hex.neighbors.each_value do |other|
+        next if prev.key?(other) || other.tile.color != :white
+
+        prev[other] = hex
+        queue << other
+      end
+    end
+    path = []
+    hex = to
+    while hex
+      path.unshift(hex)
+      hex = prev[hex]
+    end
+    path
+  end
+
+  def edge_between(hex, other)
+    hex.neighbors.find { |_edge, n| n == other }.first
+  end
+
+  # Lays on `hex` the plainest supply tile with the printed stops of the hex whose exits include
+  # `edges` (rotated to fit); a stop's two exits must meet in one stop.
+  def lay_through!(game, hex, edges)
+    stops = [hex.tile.cities.size, hex.tile.towns.size]
+    candidates = game.tiles.select do |t|
+      t.hex.nil? && t.color == :yellow && [t.cities.size, t.towns.size] == stops
+    end
+    candidates.sort_by { |t| t.exits.size }.each do |tile|
+      6.times do |rotation|
+        tile.rotate!(rotation)
+        next unless (edges - tile.exits).empty?
+        next unless tile_connects?(tile, edges)
+
+        game.update_tile_lists(tile, hex.tile)
+        hex.lay(tile)
+        return tile
+      end
+    end
+    raise "no tile for #{hex.id} #{edges.inspect}"
+  end
+
+  def tile_connects?(tile, edges)
+    return true if tile.cities.empty? && tile.towns.empty? && tile.paths.any? { |p| (edges - p.exits).empty? }
+
+    nodes = edges.map { |e| tile.paths.select { |p| p.exits.include?(e) }.flat_map(&:nodes) }
+    nodes.reduce(:&).any? || (tile.cities.empty? && tile.towns.empty?)
+  end
+
+  def lay_chain!(game, path)
+    path.each_with_index do |hex, i|
+      edges = []
+      edges << edge_between(hex, path[i - 1]) if i.positive?
+      edges << edge_between(hex, path[i + 1]) if i < path.size - 1
+      lay_through!(game, hex, edges)
+    end
+    game.graph.clear
+  end
+
+  # Lays the chain Paris (Q30) - Constantinople (AA82) and stations `corporation` in the Paris city the
+  # chain leaves from. Returns the path.
+  def paris_constantinople_chain!(game, corporation)
+    paris = game.hex_by_id('Q30')
+    path = land_path(paris, game.hex_by_id('AA82'))
+    lay_chain!(game, path)
+    out = edge_between(paris, path[1])
+    city = paris.tile.cities.find { |c| c.paths.any? { |pa| pa.exits.include?(out) } }
+    city.place_token(corporation, corporation.next_token, free: true, check_tokenable: false)
+    game.graph.clear
+    path
+  end
+
+  # Puts `entity` first in the operating order and enters OR 1 up to its Route step.
+  def route_round!(game, entity)
+    game.minor_regional_order.delete(entity)
+    game.minor_regional_order.unshift(entity)
+    round = enter_round!(game, game.operating_round(1))
+    round.setup
+    5.times do
+      break if round.active_step.is_a?(Engine::Game::G18OE::Step::Route)
+
+      act!(game, Engine::Action::Pass.new(round.current_entity))
+    end
+    raise 'not in the Route step' unless round.active_step.is_a?(Engine::Game::G18OE::Step::Route)
+
+    round
+  end
 end

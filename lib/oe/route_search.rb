@@ -22,6 +22,52 @@ module Oe
       @flash = flash
     end
 
+    # Walk limits of the search as the RoutePicker runs it (see Oe::LegalActions::RoutePicker). Here so the
+    # game's Orient Express duty (§12.2, #512) searches exactly as the picker does.
+    WALK_LIMIT = 10_000
+    SEA_WALK_LIMIT = 5_000
+
+    # Oe extension: the candidate routes per train of `corporation`, searched as the RoutePicker does.
+    def train_routes(corporation)
+      path(@game.route_trains(corporation).sort_by(&:price), corporation,
+           walk_limit: WALK_LIMIT, sea_walk_limit: SEA_WALK_LIMIT).first
+    end
+
+    # Oe extension (the RoutePicker's combination, moved here for #512): per train in the order of
+    # `train_routes` (a hash or [train, candidates] pairs), the best candidate that fits the routes chosen so
+    # far (greedy; AutoRouter's combiner is Opal-only). `chosen` holds routes already fixed; their trains pick
+    # nothing more. The routes come back settled.
+    def pick(train_routes, chosen = [])
+      chosen = chosen.dup
+      train_routes.each do |train, candidates|
+        next if chosen.any? { |route| route.train == train }
+
+        route = candidates.find { |candidate| compatible?(chosen, candidate) }
+        chosen << route if route
+      end
+      settle(chosen)
+      chosen
+    end
+
+    # Each route validates itself against the other chosen routes, so the
+    # shared `routes` list must be the final one before the action is built.
+    def settle(chosen)
+      chosen.each do |route|
+        route.clear_cache!(only_routes: true)
+        route.routes = chosen
+      end
+    end
+
+    def compatible?(chosen, candidate)
+      trial = chosen + [candidate]
+      trial.each { |r| r.routes = trial }
+      real_revenue(trial) >= 0 && candidate.revenue.positive?
+    rescue Engine::GameError
+      false
+    ensure
+      settle(chosen)
+    end
+
     def real_revenue(routes)
       routes.each do |route|
         route.clear_cache!(only_routes: true)
