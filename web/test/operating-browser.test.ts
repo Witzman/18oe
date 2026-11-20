@@ -91,6 +91,10 @@ const ORDER = String.raw`(async () => {
   if (items.map((i) => i.dataset.id).join() !== "A,B,D,F,H,M") fail("order " + items.map((i) => i.dataset.id));
   if (items.map((i) => i.dataset.state).join() !== "done,current,next,next,next,next") fail("states");
   if (document.querySelectorAll('.order-strip-item[data-mine="true"]').length !== 2) fail("own marks");
+  const strip = q(".order-strip"); if (strip.scrollWidth > strip.clientWidth + 1) fail("order strip scrolls sideways");
+  if (document.querySelector(".order-band-toggle")) fail("order band still foldable");
+  if (items.some((i) => i.getBoundingClientRect().height < 43)) fail("order chip under 44 px");
+  if (!items.every((i) => /player-p\d/.test(i.querySelector(".order-strip-ring").getAttribute("style") || ""))) fail("owner ring missing");
   if (!/B · you/.test(q(".op-sheet").textContent) || q(".op-sheet").dataset.mine !== "true") fail("acting head: " + q(".op-sheet").textContent);
   if (document.querySelector(".frame-panel .or-item")) fail("order list duplicated in the panel");
   const w = document.documentElement.scrollWidth; if (w > window.innerWidth + 1) fail("horizontal overflow " + w);

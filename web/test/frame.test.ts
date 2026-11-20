@@ -170,13 +170,15 @@ test("frame.css uses only theme variables and no fixed colours (rule 10)", async
   assert.deepEqual(css.match(/#[0-9a-f]{3,8}\b|rgba?\(/gi) ?? [], []);
 });
 
-test("portrait: the sheet is in the flow below the map, not over it; order strip scrolls on its own (#333, #416)", () => {
+test("portrait: the sheet is in the flow below the map, not over it; order strip wraps instead of scrolling (#333, #416, #526)", () => {
   const css = readFileSync(new URL("../ui/frame/frame.css", import.meta.url), "utf8");
   const portrait = css.slice(css.indexOf("@media (orientation: portrait)"));
   assert.match(portrait, /\.frame-body \{ flex-direction: column; \}/);
   assert.match(portrait, /\.frame-panel \{ position: relative;/);
   assert.match(portrait, /max-height: calc\(var\(--shape-sheet-max-height\) \* 1%\)/);
-  assert.match(css, /\.order-strip \{[^}]*overflow-x: auto/);
+  assert.match(css, /\.order-strip \{[^}]*flex-wrap: wrap/);
+  assert.doesNotMatch(css, /\.order-strip \{[^}]*overflow-x/);
+  assert.doesNotMatch(css, /order-band-toggle/);
 });
 
 test("view tabs sit in the head bar with 44 px targets, no longer floating over the map (#417)", () => {
