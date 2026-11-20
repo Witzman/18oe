@@ -128,6 +128,34 @@ describe 'G18OE abbreviated last OR (§13)' do
     end
   end
 
+  # §11 step 1 "All privates pay their revenues to the owning players" holds at the start of every OR;
+  # §13 "only each RR paying again" does not stop it (owner decision on #519, 2026-11-20: option A).
+  describe 'private revenue' do
+    let(:owner) { game.players.last }
+    let(:private_company) { game.company_by_id('WS') }
+
+    before do
+      regional
+      final_turn!(2)
+      give_company!(owner, private_company)
+      remember_payout!(regional, 80, :payout)
+    end
+
+    it 'is still paid to the owning player at the start of the abbreviated OR' do
+      cash = owner.cash
+      start_round!(2)
+
+      expect(owner.cash - cash).to eq(private_company.revenue)
+    end
+
+    it 'is paid in the first final OR as well' do
+      cash = owner.cash
+      start_round!(1)
+
+      expect(owner.cash - cash).to eq(private_company.revenue)
+    end
+  end
+
   it 'enters the abbreviated OR from the first final OR and ends the game after it' do
     regional
     final_turn!(2)
