@@ -16,7 +16,7 @@ import { THEME_CHANGED } from "../theme-switch.ts";
 import { fillText, txt } from "../text.ts";
 import { createClaims } from "./claims.ts";
 import type { Kind } from "./kinds.ts";
-import { backStage, chooseKind, stageAfterRender } from "./stage.ts";
+import { backStage, chooseKind, stageAfterRender, stageView } from "./stage.ts";
 import { createOrderSlot, orderView, type OrderSlot, type OrderSpec } from "./order.ts";
 import { actionKey, genericModel, GenericBar, rangeAction, rangeValue, type Action, type Entry, type RangeEntry } from "./generic.ts";
 import { OrderBandView, orBand } from "./or-band.ts";
@@ -56,6 +56,10 @@ export interface GameFrame {
   // Runs the cleanups of mounted views and panels when the page leaves the game (the map frees its WebGL context).
   onDispose: (fn: () => void) => void;
   dispose: () => void;
+  // The two-step box (#497 S3): a panel draws the options of a kind itself (`provide`, returns the release), reads
+  // the kind the player is in (`current`: step 2's kind, null in step 1) and is told when the player changes it.
+  // The state stays here, at the frame; a panel never keeps its own copy of the kind.
+  kinds: { provide: (kind: Kind, options: (g: Game) => VNode[]) => () => void; current: () => Kind | null; subscribe: (fn: () => void) => () => void };
   // Special panels follow the game state: called with every new state before the frame draws it (#46).
   subscribe: (fn: (g: Game) => void) => () => void;
 }
@@ -173,7 +177,13 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
   const headEl = h("header", { class: "frame-head" }, roundEl, playersEl);
   const root = h("div", { class: "frame" }, headEl, orderEl, band.el, body, versionButton());
 
-  const model = () => (game ? genericModel(game, claims) : null);
+  const providers = new Map<Kind, (g: Game) => VNode[]>();
+  const stageListeners = new Set<() => void>();
+  const model = () => (game ? genericModel(game, claims, new Set(providers.keys())) : null);
+  const currentKind = (): Kind | null => {
+    const kinds = model()?.kinds?.map((b) => b.kind);
+    return kinds ? stageView(kinds, stage).kind : null;
+  };
 
   // While an action is in flight every button is locked. Only the buttons this lock disabled are marked and
   // opened again afterwards (#289): the panels redraw when the answer arrives, still inside the lock, and
@@ -317,6 +327,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     stage = kind === null ? backStage() : chooseKind(model()?.kinds?.map((b) => b.kind) ?? [], stage, kind);
     selected = null; armed = false; rangeError = null;
     drawBar();
+    for (const fn of [...stageListeners]) fn();
   }
   function select(a: Action) { selected = a; armed = false; rangeError = null; drawBar(); }
   function onRange(r: RangeEntry, input: string) {
@@ -364,7 +375,7 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
     if (showGeneric && open) {
       drawerNodes.push(v("section", { class: "frame-drawer-sheet", "aria-label": txt("frame.generic_title").de },
         v("h3", {}, txt("frame.generic_title").de),
-        GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError, stage, onStage })));
+        GenericBar(m, { selectedKey: selected ? actionKey(selected) : null, onSelect: (e: Entry) => select(e.action), onRange, rangeError, stage, onStage, provided: (k: Kind) => providers.get(k)?.(g) ?? [] })));
     }
     put(drawerEl, ...drawerNodes);
     drawerEl.hidden = drawerNodes.length === 0;
@@ -418,6 +429,14 @@ export function createGameFrame(retryNow: () => void = () => {}, api?: Api): Gam
 
   Object.assign(frame, {
     root, band, message, claims, views, setOrder: (spec: OrderSpec) => orderSlot.set(spec), hidePanel: () => { panelHides++; drawLayout(); let done = false; return () => { if (done) return; done = true; panelHides--; drawLayout(); }; }, send: (a: Action) => send(a), slots: { context: contextSlot, main: viewEl }, hooks: {},
+    kinds: {
+      provide(kind: Kind, options: (g: Game) => VNode[]) {
+        providers.set(kind, options);
+        return () => { if (providers.get(kind) === options) providers.delete(kind); };
+      },
+      current: currentKind,
+      subscribe(fn: () => void) { stageListeners.add(fn); return () => { stageListeners.delete(fn); }; },
+    },
     onDispose: (fn: () => void) => { disposers.push(fn); },
     dispose: () => { disposers.splice(0).forEach((f) => f()); },
     subscribe: (fn: (g: Game) => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; },

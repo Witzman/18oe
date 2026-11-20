@@ -579,8 +579,23 @@ module Engine
           end
 
           def process_sell_shares(action)
+            return if hold_sale_for_bbbt?(action)
+
             super
             @sold = true
+          end
+
+          # §14.4 (3) (#476): the sale waits for the owner of the private (Step::ProtectShare) before the marker moves.
+          def hold_sale_for_bbbt?(action)
+            # only in a stock round (the consolidation round has no Step::ProtectShare)
+            return false if !@round.respond_to?(:pending_share_sale) || @round.pending_share_sale
+            return false unless @game.bbbt_sale_window_owner(action.bundle)
+
+            raise GameError, "Cannot sell shares of #{action.bundle.corporation.name}" if
+              !can_sell?(action.entity, action.bundle) && !action.swap
+
+            @round.pending_share_sale = action
+            true
           end
 
           def process_convert(action)
