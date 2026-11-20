@@ -112,6 +112,7 @@ module Engine
 
           def close_minor!
             @game.close_corporation(pending_minor)
+            @game.abandon_merged_minor!(pending_minor, pending_corporation) if pending_corporation.type == :national
             @round.pending_acquisition = nil
           end
         end

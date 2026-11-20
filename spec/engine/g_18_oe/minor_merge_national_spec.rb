@@ -53,6 +53,56 @@ describe 'G18OE merging a minor into a national in a Stock Round (§10.5)' do
     merge!
     expect(national.abilities).to be_empty
     expect(abilities).not_to be_empty
-    expect(game.merged_minors[national]).to include(minor)
+    expect(game.merged_minors[national]).not_to include(minor)
+  end
+
+  # #506: §10.5 (Nationals only): "the minor is abandoned (see 9.5)", so it is no merged minor of the
+  # national; the charter stays in the Open Market and a major may buy it for £60 (§11.7).
+  describe 'abandoning the merged minor (#506)' do
+    it 'leaves the minor as an abandoned minor, not closed' do
+      merge!
+      expect(minor).not_to be_closed
+      expect(minor.owner).to be_nil
+      expect(game.abandoned_minor?(minor)).to be true
+      expect(game.abandoned_minors).to include(minor)
+      expect(game.merged_minors[national]).to be_empty
+    end
+
+    it 'keeps the national zones free of the minor zone' do
+      merge!
+      expect(game.track_rights_zones(national)).not_to include('SP')
+    end
+
+    it 'lets a major buy the charter for the abandoned minor price (§11.7)' do
+      merge!
+      buyer = game.players.find { |p| p != player }
+      major = start_major!(game, 'PLM', buyer)
+      expect(game.abandoned_minors).to include(minor)
+      game.add_minor_charter!(minor, major)
+      expect(game.merged_minors[major]).to include(minor)
+      expect(game.abandoned_minor_price).to eq(60)
+    end
+
+    context 'with Minor C (Golden Bell)' do
+      let(:minor) { start_minor!(game, 'C', player, 'RU') }
+
+      it 'gives the national no Golden Bell choice (§10.5: majors only)' do
+        merge!
+        expect(game.golden_bell_holder).to be_nil
+      end
+    end
+
+    context 'with Minor M (Pullman)' do
+      let(:minor) { start_minor!(game, 'M', player, 'IT') }
+
+      it 'keeps the Pullman with the charter, not in the Open Market (§9.5)' do
+        merge!
+        game.event_pullmans_available!
+        expect(game.pullman_market).to eq(0)
+        expect(game.pullman?(national)).to be false
+        expect(game.pullman_m_holder).to eq(minor)
+        expect(game.pullman?(minor)).to be true
+      end
+    end
   end
 end
