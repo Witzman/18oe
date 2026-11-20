@@ -13,6 +13,7 @@ import type { Box } from "../projection.ts";
 import { coastRuns, foamLayers, seaBands, simplify, type Band, type Run } from "../sea-bands.ts";
 import { dashes, markGlyph, seaOfHex, zoneBorders, zoneMarks } from "../sea-zones.ts";
 import { worldText } from "../world-text.ts";
+import { REGION_LABELS, seaLabel, type BoardLabel } from "../names.ts";
 
 export interface Block {
   /** Index into Scene.levels. */
@@ -209,6 +210,14 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
   }
   const marks = new Graphics();
   drawSeaZones(marks, scene, theme);
+  // The sea names go on top of the land (a coast may cover the water beside a circle); the text keeps inside the map.
+  const seaNames = new Container();
+  const size = theme.seaNameSize;
+  const xs = scene.geometry.hexes.map((h) => h.x);
+  const reach = { min: Math.min(...xs), max: Math.max(...xs) };
+  if (theme.seaNameAlpha > 0) {
+    for (const m of zoneMarks(scene.geometry.hexes)) addNames(seaNames, seaLabel(m.zone, m, theme.seaMarkRadius + size * 0.9), size, map.seaName, theme.seaNameAlpha, true, theme, reach);
+  }
 
   // Foam fringe along the coast (under the land, so only the sea side shows), then the land, then a thin shore line.
   const foam = new Graphics();
@@ -232,8 +241,17 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
   const seaNode = new Container();
   seaNode.addChild(sea, gradient, gradientMed, marks);
   const landNode = new Container();
-  landNode.addChild(foam, land);
+  landNode.addChild(foam, land, seaNames);
+  if (theme.zoneNameAlpha > 0) for (const l of REGION_LABELS) addNames(landNode, l, theme.zoneNameSize, map.zoneName, theme.zoneNameAlpha, false, theme);
   return { sea: seaNode, land: landNode };
+}
+
+/** The lines of a board name, centred on its position, one under the other (#461). */
+function addNames(into: Container, label: BoardLabel, size: number, color: number, alpha: number, italic: boolean, theme: RenderTheme, reach?: { min: number; max: number }): void {
+  // about half the width of the longest line, in world units (bold sans: 0.3 side lengths per character)
+  const half = Math.max(...label.lines.map((l) => l.length)) * size * 0.3;
+  const x = reach ? Math.min(Math.max(label.x, reach.min + half), reach.max - half) : label.x;
+  label.lines.forEach((line, i) => into.addChild(worldText(line, size, color, theme, { x, y: label.y + (i - (italic ? 0 : (label.lines.length - 1) / 2)) * size * 1.15 }, undefined, { italic, alpha })));
 }
 
 /** One stroke per band along every coast run (own colour and alpha); butt ends so nothing reaches past the map border. */

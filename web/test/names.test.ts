@@ -27,3 +27,12 @@ test("shown from the name zoom on, or always for the hovered hex", () => {
   assert.equal(nameVisible({ zoom: 10, nameZoom: 24, hovered: true }), true);
   assert.equal(nameVisible({ zoom: 24, nameZoom: 24, hovered: false }), true);
 });
+
+import { REGION_LABELS, seaLabel } from "../render/names.ts";
+
+test("board names (#461): the eleven regions of the board; a sea name with a bracket becomes two lines under the circle", () => {
+  assert.equal(REGION_LABELS.length, 11);
+  assert.ok(REGION_LABELS.some((l) => l.lines.join(" ") === "France and Belgium"));
+  assert.deepEqual(seaLabel("North Sea", { x: 10, y: 5 }, 1), { lines: ["North Sea"], x: 10, y: 6 });
+  assert.deepEqual(seaLabel("North Atlantic (Silver Coast)", { x: 1, y: 2 }, 1).lines, ["North Atlantic", "(Silver Coast)"]);
+});
