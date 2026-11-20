@@ -115,6 +115,34 @@ describe 'G18OE trade offer with objects on both sides (§10.4, #517)' do
     expect { offer!(their_private, give: [my_private, my_minor]) }.to raise_error(RuntimeError, /certificate limit/)
   end
 
+  it 'lets a player at the certificate limit swap one for one and offers only that (#524, §4.1)' do
+    their_private
+    my_private
+    allow(game).to receive(:cert_limit).and_return(game.num_certs(buyer))
+
+    offers = Oe::LegalActions.new(game, limit: 200, rng: Random.new(1)).call.grep(Engine::Action::BuyCompany)
+    expect(offers).not_to be_empty
+    expect(offers.map(&:give)).to all(eq([my_private]))
+    expect { offer!(their_private, price: 5) }.to raise_error(RuntimeError, /certificate limit/)
+    expect { offer!(their_private, give: [my_private], also: [game.company_by_id('HMLC')]) }.to raise_error(RuntimeError)
+
+    offer!(their_private, price: 5, give: [my_private])
+    accept!
+    expect([their_private.owner, my_private.owner]).to eq([buyer, seller])
+    expect(game.num_certs(buyer)).to eq(game.cert_limit(buyer))
+  end
+
+  it 'refuses a swap that takes the buyer over the limit and does not offer it (#524, §4.1)' do
+    their_private
+    their_minor
+    my_private
+    allow(game).to receive(:cert_limit).and_return(game.num_certs(buyer))
+
+    expect { offer!(their_private, give: [my_private], also: [their_minor]) }
+      .to raise_error(RuntimeError, /certificate limit/)
+    expect(round.trade_offer).to be_nil
+  end
+
   it 'keeps the plain cash offer unchanged: no give, no also' do
     their_private
     offer!(their_private, price: 35)
