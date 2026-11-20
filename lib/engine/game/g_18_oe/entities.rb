@@ -60,12 +60,12 @@ module Engine
             revenue: 10,
             desc: 'One marker. Exercise one of three abilities: '\
                   '(1) During any SR or a controlled RR\'s OR, re-set the par value of one owned regional or major '\
-                  'to any valid par value for that type. '\
+                  'that still has its par value marker to any valid par value for that type. '\
                   '(2) Place one share of any RR into custodianship — reserved for the owner; '\
                   'place this private\'s marker on the share. '\
                   '(3) At any time during a SR, prevent one RR\'s share marker from moving DOWN for the rest of that SR; '\
                   'place this private\'s marker on that share marker. '\
-                  'Exercising ability (2) or (3) closes this private at end of the SR.',
+                  'Exercising ability (1) or (2) removes this private at once; (3) removes it at the end of the SR.',
             auction_row: 2,
           },
           # -----------------------------------------------------------------------
