@@ -96,7 +96,9 @@ module OeViewChecks
     end
     return if step.is_a?(Engine::Step::HomeToken) # also the engine's own home-token step (majors, regionals)
 
-    expect(token[:price]).to eq(tokens.first.price)
+    # #487: an RR without a token left keeps the Place Token step open for a controlling player's private (its
+    # free token, §14.3 to §14.6; Step::Token#actions), so there is no price to show
+    expect(token[:price]).to eq(tokens.first&.price)
     expect(token[:kind]).to eq("operating")
   end
 

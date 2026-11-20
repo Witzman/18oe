@@ -266,7 +266,7 @@ module Oe
     # The offer of a trade range (§10.4, #223): a small price inside the range, so the buyer can pay.
     def trade_offer_from(range)
       price = [[5, range["min"]].max, range["max"]].min
-      action = { "type" => range["type"], "entity" => range["entity"], "price" => price }
+      action = { "type" => range["type"], "entity" => range["entity"], "entity_type" => "player", "price" => price }
       action.merge(range["type"] == "buy_company" ? { "company" => range["company"] } : { "corporation" => range["company"] })
     end
 

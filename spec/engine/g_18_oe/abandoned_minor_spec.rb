@@ -135,7 +135,7 @@ describe 'G18OE abandoning a minor (§9.5)' do
       national = start_major!(game, 'LNWR', player)
       national.type = :national
       game.add_minor_charter!(minor, national)
-      expect(game.merged_minors[national]).to include(minor)
+      expect(game.merged_minors[national]).not_to include(minor) # #506: abandoned, not merged (§10.5)
       expect(minor.abilities).not_to be_empty
     end
   end
