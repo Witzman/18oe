@@ -704,22 +704,18 @@ module Oe
     # multiset of names is offered once.
     def generate_double_head_trains(_step, entity)
       candidates = @game.double_head_candidates(entity)
-      combos = double_head_combinations(candidates)
+      combos = RouteSearch.new(@game).combinations(candidates)
       return [] if combos.empty?
+
+      # §12.2 (#512): when the best routes need a combination, only that one is offered
+      required = @game.orient_express_required(entity, [])
+      return [A::DoubleHeadTrains.new(entity, trains: required[:combine])] if required&.dig(:combine)
 
       need = OrientExpressReach.new(@game, entity).fewest_cities(candidates)
       return [] unless need
 
       fitting = combos.select { |trains| trains.sum { |t| @game.distance(t).first } >= need }
       sample(fitting).map { |trains| A::DoubleHeadTrains.new(entity, trains: trains) }
-    end
-
-    # Every set of two or more candidates, one per multiset of train names,
-    # smallest first.
-    def double_head_combinations(candidates)
-      sorted = candidates.sort_by { |t| [t.name, t.id] }
-      (2..sorted.size).flat_map { |n| sorted.combination(n).to_a }
-        .uniq { |trains| trains.map(&:name) }
     end
 
     # The fewest cities (city and offboard stops) on an Orient Express route
@@ -737,22 +733,8 @@ module Oe
       end
 
       def fewest_cities(trains)
-        trial = trial_train(trains)
-        routes, = RouteSearch.new(@game).path([trial], @entity, walk_limit: RoutePicker::WALK_LIMIT,
-                                                                sea_walk_limit: RoutePicker::SEA_WALK_LIMIT)
-        routes[trial].select { |route| @game.orient_express_run?(route) }
+        RouteSearch.new(@game).orient_express_routes(@entity, trains)
           .map { |route| route.visited_stops.count { |stop| !stop.town? } }.min
-      end
-
-      private
-
-      def trial_train(trains)
-        cities, towns = trains.map { |t| @game.distance(t) }.transpose.map(&:sum)
-        distance = [
-          { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
-          { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
-        ]
-        Engine::Train.new(name: "#{cities}+#{towns}", distance: distance, price: 0).tap { |t| t.owner = @entity }
       end
     end
 
@@ -853,7 +835,10 @@ module Oe
         chosen = router.pick(combined_first(train_routes))
         required = @game.respond_to?(:orient_express_required) &&
                    @game.orient_express_required(@entity, chosen, train_routes)
-        required || chosen
+        return chosen unless required
+
+        # a combination comes first (generate_double_head_trains offers it); no run before it
+        required[:routes]
       end
 
       private

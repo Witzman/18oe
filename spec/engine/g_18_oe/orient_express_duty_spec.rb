@@ -49,7 +49,7 @@ describe 'G18OE Orient Express duty (§12.2, #512)' do
 
       required = game.orient_express_required(major, [plain], { train => [oe, plain] })
 
-      expect(required).to eq([oe])
+      expect(required[:routes]).to eq([oe])
     end
 
     it 'does not require it on a tie (§12.2: ties do not count as best possible)' do
@@ -207,10 +207,84 @@ describe 'G18OE Orient Express duty (§12.2, #512)' do
         expect { act!(game, run) }.not_to raise_error
       end
 
-      it 'does not require combining trains that cannot reach Constantinople on their own' do
+      it 'still requires the Orient Express run of a combined train once the combination was made' do
+        combine!
+
+        expect(game.double_head_candidates(major)).to eq([])
+        expect(game.orient_express_required(major, [])).to include(:revenue)
+      end
+    end
+
+    # §12.2 (owner, 2026-11-20): "best possible routes" include the combination of the non-permanent trains
+    # that §12.1 allows, not only the trains as they stand. Two 2+2 trains reach Constantinople only combined
+    # (4+4); their routes without it earn 100, the combined train's Orient Express run more.
+    context 'with trains that make the best routes only combined (§12.1)' do
+      let(:trains) { with_trains!(game, major, '2+2', '2+2') }
+
+      before { trains }
+
+      def plain_routes
+        router = Oe::RouteSearch.new(game)
+        router.pick(router.train_routes(major).to_a)
+      end
+
+      it 'requires the combination when the combined train earns strictly more than the routes without it' do
+        route_round!(game, major)
+        plain = plain_routes
+
+        required = game.orient_express_required(major, plain)
+
+        expect(required[:combine]).to match_array(trains)
+        expect(required[:revenue]).to be > game.routes_revenue(plain)
+      end
+
+      it 'rejects the single trains\' routes and names the trains to combine' do
+        round = route_round!(game, major)
+
+        expect { act!(game, Engine::Action::RunRoutes.new(major, routes: plain_routes)) }
+          .to raise_error(/Orient Express is required.* Combining 2\+2, 2\+2/)
+        expect(round.active_step.actions(major)).to include('double_head_trains')
+      end
+
+      it 'offers the combination and no run before it, then the combined train\'s Orient Express run' do
+        route_round!(game, major)
+        actions = Oe::LegalActions.new(game).call
+
+        expect(actions.grep(Engine::Action::RunRoutes)).to be_empty
+        expect(actions.grep(Engine::Action::DoubleHeadTrains).map(&:trains)).to all(match_array(trains))
+
+        act!(game, actions.grep(Engine::Action::DoubleHeadTrains).first)
+        run = offered_run
+        expect(run.routes.map { |r| game.orient_express_run?(r) }).to eq([true])
+        expect { act!(game, run) }.not_to raise_error
+      end
+
+      it 'tells the president in the step help' do
+        route_round!(game, major)
+        Oe::LegalActions.new(game).call
+
+        expect(Array(game.round.active_step.help)).to include(Engine::Game::G18OE::Game::ORIENT_EXPRESS_REQUIRED)
+      end
+
+      it 'does not require it when the combined train earns less than the routes without it' do
+        route_round!(game, major)
+        allow_any_instance_of(Engine::Route).to receive(:revenue) { |r| game.orient_express_run?(r) ? 90 : 50 }
+
+        expect(game.orient_express_required(major, plain_routes)).to be_nil
+      end
+
+      it 'does not require it on a tie (§12.2)' do
+        route_round!(game, major)
+        allow_any_instance_of(Engine::Route).to receive(:revenue) { |r| game.orient_express_run?(r) ? 100 : 50 }
+
+        expect(game.orient_express_required(major, plain_routes)).to be_nil
+      end
+
+      it 'does not require it of a major that holds the marker' do
+        game.place_orient_express_marker!(major)
         route_round!(game, major)
 
-        expect(game.orient_express_required(major, [])).to be_nil
+        expect(game.orient_express_required(major, plain_routes)).to be_nil
       end
     end
   end

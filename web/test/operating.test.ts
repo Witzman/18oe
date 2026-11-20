@@ -8,7 +8,7 @@ import type { Game } from "../types.ts";
 import { createClaims } from "../ui/frame/claims.ts";
 import { choiceLabel, choiceTip, genericModel } from "../ui/frame/generic.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
-import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, portAuthorityOptions, portSign, pullmanOptions, runLines, runModel, runSentence } from "../ui/panels/operating-model.ts";
+import { chosenOption, dividendOptions, dividendOrder, headOf, ladderIndex, operator, orientRequired, portAuthorityOptions, portSign, pullmanOptions, runLines, runModel, runSentence } from "../ui/panels/operating-model.ts";
 import { DividendPanel, OperatingPanel, RoutePanel } from "../ui/panels/operating.ts";
 
 const load = (n: string) => JSON.parse(readFileSync(new URL(`./fixtures/games/${n}.json`, import.meta.url), "utf8")) as Game;
@@ -40,6 +40,21 @@ test("run: Orient Express bonus and subsidy count into the total and get a row",
   (g.state.prompt.actions[0] as Record<string, unknown>).extra_revenue = 30;
   assert.equal(runModel(g).total, 90);
   assert.match(textOf(RoutePanel(g)), /Orient-Express-Zuschlag/);
+});
+
+test("run: the Orient Express duty (§12.2, #512) shows from the Route step's help lines, and replaces 'no train can run' before a combination", () => {
+  const g = load("operating-route");
+  assert.equal(orientRequired(g), false);
+  assert.doesNotMatch(textOf(RoutePanel(g)), /Orient Express is required/);
+  g.state.prompt.help = ["Run routes.", "Orient Express is required: the best routes for all trains include an Orient Express run (§12.2)."];
+  assert.equal(orientRequired(g), true);
+  assert.match(textOf(RoutePanel(g)), /Orient Express is required/);
+  g.state.prompt.help = "Orient Express is required: the best routes for all trains include an Orient Express run (§12.2).";
+  g.state.prompt.actions = [];
+  assert.equal(orientRequired(g), true);
+  const panel = textOf(RoutePanel(g));
+  assert.match(panel, /Orient Express is required/);
+  assert.doesNotMatch(panel, /Kein Zug kann fahren/);
 });
 
 test("run: without an offered route the panel says so and sends nothing", () => {
