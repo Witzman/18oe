@@ -160,7 +160,7 @@ const CHECKS_PASS = String.raw`(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   if (document.querySelector('.stock-head [data-action="pass"]')) fail("the head still has a pass button");
   const kind = document.querySelector('.frame-kind[data-kind="pass"]') || fail("no kind Passen in step 1");
-  if (!/Passen/.test(kind.textContent)) fail("label " + kind.textContent);
+  if (!/Pass \(1\)/.test(kind.textContent)) fail("label " + kind.textContent);
   if (kind.getBoundingClientRect().height < 43.5) fail("kind button under 44px");
   kind.click();
   await sleep(50);

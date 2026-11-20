@@ -116,12 +116,14 @@ test("constructed: choices no fixture holds (reserve, offer_or_merge, bbbt, conv
   assert.deepEqual(kindsOf(all), KINDS.filter((k) => cases.some(([, c]) => c === k)));
 });
 
-test("every kind has German and English texts and a tooltip; back and pick exist", () => {
+test("every kind has a label and a tooltip, English only (rule 31); back and pick exist", () => {
   for (const k of KINDS) {
-    for (const key of [`kind.${k}`, `kind.${k}_tip`]) {
-      assert.ok(TEXT[key], key);
-      assert.notEqual(txt(key).de, txt(key).en, key);
-    }
+    for (const key of [`kind.${k}`, `kind.${k}_tip`]) assert.ok(TEXT[key], key);
   }
-  for (const key of ["kind.back", "kind.pick", "kind.step_head"]) assert.ok(TEXT[key], key);
+  for (const key of ["kind.back", "kind.back_tip", "kind.pick", "kind.step_head"]) assert.ok(TEXT[key], key);
+  for (const [key, entry] of Object.entries(TEXT)) {
+    if (!key.startsWith("kind.")) continue;
+    assert.ok(entry.de.length > 0, key);
+    assert.doesNotMatch(entry.de, /[äöüÄÖÜß]/, `${key} shows German: ${entry.de}`);
+  }
 });

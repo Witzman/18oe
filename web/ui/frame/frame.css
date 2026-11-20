@@ -112,7 +112,7 @@
 .frame-panel[data-collapsed="true"] .frame-panel-head { border-bottom: 0; flex: 1 1 auto; }
 .frame-panel[data-collapsed="true"] .frame-panel-foot { flex: 1 1 100%; padding-top: 0; background: transparent; }
 .frame-panel[data-collapsed="true"] .kit-changes, .frame-panel[data-collapsed="true"] .frame-bar-tools, .frame-panel[data-collapsed="true"] .frame-detailline { display: none; }
-.frame-panel button { min-height: var(--shape-hit); min-width: var(--shape-hit); }
+.frame-panel button { min-height: var(--shape-hit); min-width: var(--shape-hit); touch-action: manipulation; }
 .frame-panel .kit-main-btn { min-width: 8rem; }
 
 .frame-bar-order { min-width: 0; }
