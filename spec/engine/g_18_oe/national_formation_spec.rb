@@ -209,6 +209,35 @@ describe 'G18OE forming a national (§9.4)' do
       expect(game.orient_express_marker?(lnwr)).to be(false)
     end
 
+    it 'loses the pass-through token of a private from the map (step 4, §14.5/§14.6)' do
+      port = game.hexes.flat_map { |hex| hex.tile.cities }.find { |c| game.port_accesses(c).any? && c.tokens.compact.empty? }
+      game.place_pass_token!(game.company_by_id('SHTC'), port, lnwr)
+      expect(game.pass_token_city?(port, lnwr)).to be(true)
+      convert!(lnwr)
+
+      expect(game.pass_token_city?(port, lnwr)).to be(false)
+      expect(port.extra_tokens).to be_empty
+    end
+
+    describe 'the Swift Metropolitan Line marker (step 4, §14.10)' do
+      let(:sml) { give_company!(alice, game.company_by_id('SML')) }
+      let!(:sml_train) { game.sml_pool.first }
+
+      # the rusted 2+2 cards left unclaimed at Train Phase 4 are the pool of the private (§11.6.6)
+      before { game.sml_assign!(sml, lnwr) }
+
+      it 'is removed, the 2+2 stays and now counts against the train limit; the certificate stays' do
+        expect(game.num_corp_trains(lnwr)).to eq(lnwr.trains.size - 1)
+        convert!(lnwr)
+
+        expect(game.sml_train).to be_nil
+        expect(lnwr.trains).to include(sml_train)
+        expect(game.num_corp_trains(lnwr)).to eq(lnwr.trains.size)
+        expect(sml.owner).to eq(alice)
+        expect(game.face_down_private?(sml)).to be(true)
+      end
+    end
+
     it 'keeps its trains, including the 2+2 that rusted at this phase change' do
       convert!(lnwr)
 
