@@ -178,7 +178,7 @@ test("portrait: the sheet is in the flow below the map, not over it; order strip
   assert.match(portrait, /max-height: calc\(var\(--shape-sheet-max-height\) \* 1%\)/);
   assert.match(css, /\.order-strip \{[^}]*flex-wrap: wrap/);
   assert.doesNotMatch(css, /\.order-strip \{[^}]*overflow-x/);
-  assert.doesNotMatch(css, /order-band-toggle/);
+  assert.match(css, /\.order-band-toggle \{[^}]*min-height: var\(--shape-hit, 44px\)/); // foldable again (#532)
 });
 
 test("view tabs sit in the head bar with 44 px targets, no longer floating over the map (#417)", () => {

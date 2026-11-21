@@ -82,13 +82,14 @@ export function OrBandView(b: OrBand, theme: Theme, opts: { order?: boolean } = 
   return v("section", { class: "or-band", "aria-label": txt("op.order").text }, card, list ? v("h3", { class: "or-title" }, txt("op.order").text) : null, list);
 }
 
-// Band under the head bar (#416, #526): one chip per company in operating order, no fold button. The seal
+// Band under the head bar (#416, #526, #532): one chip per company in operating order, foldable (the folded band is one thin line, the map gets the room). The seal
 // carries a ring in the owner's player colour (token `--order-ring`), the acting one is marked, done ones
 // are muted. In a stock round the title is "Turn order" (preview of the next OR), else "Operating order".
 // The chips wrap to a second row instead of scrolling sideways. The title of a chip carries the details.
-export function OrderBandView(b: OrBand, theme: Theme): VNode {
+export function OrderBandView(b: OrBand, theme: Theme, opts: { collapsed: boolean; onToggle: () => void }): VNode {
   const ownerText = (e: OrEntry) => e.mine ? txt("op.you").text : `${e.owner ?? "?"}${e.bot ? ` · ${txt("frame.bot").text}` : ""}`;
   const label = txt(b.preview ? "frame.order_band_next" : "frame.head_order").text;
+  const toggleLabel = txt(opts.collapsed ? "frame.order_band_expand" : "frame.order_band_collapse").text;
   const list = v("ol", { class: "order-strip", "aria-label": label },
     ...b.entries.map((e, i) => v("li", {
       class: "order-strip-item", "data-id": e.id, "data-state": e.state, "data-mine": e.mine ? "true" : "false",
@@ -101,6 +102,9 @@ export function OrderBandView(b: OrBand, theme: Theme): VNode {
     v("span", { class: "order-strip-ring", "data-owner": e.seat === null ? "none" : String(e.seat), style: e.seat === null ? undefined : `box-shadow:0 0 0 var(--shape-order-ring) var(--player-${playerSlot(e.seat)})` },
       Siegel({ sym: e.id, color: e.color, name: e.name }, { theme, size: "s" })),
     v("span", { class: "or-sr" }, ` ${ownerText(e)}, ${txt(`op.state_${e.state}`).text}`))));
-  return v("section", { class: "order-band", "data-preview": b.preview ? "true" : "false", "aria-label": label },
-    v("h3", { class: "order-band-title" }, label), list);
+  return v("section", { class: "order-band", "data-collapsed": opts.collapsed ? "true" : "false", "data-preview": b.preview ? "true" : "false", "aria-label": label },
+    v("button", { type: "button", class: "order-band-toggle", "aria-expanded": String(!opts.collapsed), title: toggleLabel, "aria-label": toggleLabel, onclick: opts.onToggle },
+      v("span", { "aria-hidden": "true" }, opts.collapsed ? "▸" : "▾"),
+      v("h3", { class: "order-band-title" }, label)),
+    opts.collapsed ? null : list);
 }

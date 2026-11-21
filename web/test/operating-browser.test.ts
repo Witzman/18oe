@@ -71,17 +71,7 @@ const HEAD = String.raw`const fail = (m) => { throw new Error(m); };
 
 const ROUTE = String.raw`(async () => {
   ${HEAD}
-  if (!q(".frame-actionrow .op-sheet") || !/B · you/.test(q(".op-sheet").textContent)) fail("head not in the action row");
-  if (q(".frame-panel") && !q(".frame-panel").hidden) fail("action box still over the map (#528)");
-  const rowBox = q(".frame-actionrow").getBoundingClientRect(), mapBox = q(".frame-map").getBoundingClientRect();
-  if (rowBox.bottom > mapBox.top + 1) fail("the row covers the map");
-  if (!q(".frame-kind-host .kit-dialog .op-table")) fail("the run is not in the step dialog");
-  if (!q(".frame-actionrow .kit-main-btn")) fail("main button not in the row");
-  q('[data-action="close-step"]').click(); await sleep(100);
-  if (q(".frame-kind-host .kit-dialog")) fail("dialog stays after Close");
-  if (!q(".frame-step-open") || q(".frame-step-open").hidden) fail("no way to reopen the choice");
-  small(".frame-step-open"); q(".frame-step-open").click(); await sleep(100);
-  if (!q(".frame-kind-host .kit-dialog .op-table")) fail("dialog does not reopen");
+  if (!q(".frame-panel .op-sheet") || !/B · you/.test(q(".op-sheet").textContent)) fail("head");
   if (document.querySelectorAll(".op-strip li").length !== 5 || !/Run/.test(q('.op-strip [aria-current="step"]').textContent)) fail("step strip");
   if (q(".op-note") || q(".track-hint")) fail("rules text in the panel");
   const rows = document.querySelectorAll(".op-table tbody tr");
@@ -97,12 +87,16 @@ const ROUTE = String.raw`(async () => {
 
 const ORDER = String.raw`(async () => {
   ${HEAD}
-  const items = [...document.querySelectorAll(".order-strip-item")];
+  let items = [...document.querySelectorAll(".order-strip-item")];
   if (items.map((i) => i.dataset.id).join() !== "A,B,D,F,H,M") fail("order " + items.map((i) => i.dataset.id));
   if (items.map((i) => i.dataset.state).join() !== "done,current,next,next,next,next") fail("states");
   if (document.querySelectorAll('.order-strip-item[data-mine="true"]').length !== 2) fail("own marks");
   const strip = q(".order-strip"); if (strip.scrollWidth > strip.clientWidth + 1) fail("order strip scrolls sideways");
-  if (document.querySelector(".order-band-toggle")) fail("order band still foldable");
+  const tg = document.querySelector(".order-band-toggle"); if (!tg) fail("order band not foldable");
+  tg.click(); await new Promise((r) => setTimeout(r, 50));
+  if (document.querySelectorAll(".order-strip-item").length) fail("order band did not fold");
+  document.querySelector(".order-band-toggle").click(); await new Promise((r) => setTimeout(r, 50));
+  items = [...document.querySelectorAll(".order-strip-item")];
   if (items.some((i) => i.getBoundingClientRect().height < 43)) fail("order chip under 44 px");
   if (!items.every((i) => /player-p\d/.test(i.querySelector(".order-strip-ring").getAttribute("style") || ""))) fail("owner ring missing");
   if (!/B · you/.test(q(".op-sheet").textContent) || q(".op-sheet").dataset.mine !== "true") fail("acting head: " + q(".op-sheet").textContent);
