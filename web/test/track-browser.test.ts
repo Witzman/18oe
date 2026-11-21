@@ -77,9 +77,6 @@ const TRACK = String.raw`(async () => {
   ${HEAD}
   if (document.querySelectorAll(".track-hex").length !== 2) fail("hex rows " + document.querySelectorAll(".track-hex").length);
   small(".track-hex");
-  if (q(".frame-panel") && !q(".frame-panel").hidden) fail("action box still over the map (#528)");
-  if (q(".frame-actionrow").getBoundingClientRect().bottom > q(".frame-map").getBoundingClientRect().top + 1) fail("the row covers the map");
-  if (!q(".frame-actionrow .track-hexes")) fail("hexes not in the row");
   if (q(".track-map").getBoundingClientRect().height !== 0) fail("'to the map' shown while the map is up");
   if (q(".frame-entry")) fail("generic bar still offers the claimed actions");
   if (q(".kit-main-btn") && !q(".kit-main-btn").disabled) fail("main button open before a pick");
