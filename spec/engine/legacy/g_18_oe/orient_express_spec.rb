@@ -136,22 +136,23 @@ describe 'G18OE Orient Express (§12)' do
     it 'is no Orient Express run from London straight over the sea to Constantinople' do
       route = sea_route('M28', 'AA82')
 
-      expect(route.chains.map { |chain| chain[:sea].nil? }).to eq([false])
-      expect(game.orient_express_run?(route)).to be(false)
-      expect(game.orient_express_route([route])).to be_nil
+      expect(route.chains.map { |chain| chain[:crossing].nil? }).to eq([false])
+      # Chris: not a quiet non-run but an illegal route (check_other raises, sea_routes row 15), the legacy wrapper
+      # let it run as an ordinary route without the bonus.
+      expect { game.check_other(route) }.to raise_error(Engine::GameError, /sea crossings/)
     end
 
     it 'does not let a combined train run London over the sea to Constantinople' do
       route = sea_route('M28', 'AA82')
       allow(game).to receive(:combined_train?).with(route.train).and_return(true)
 
-      expect { game.check_other(route) }.to raise_error(Engine::GameError, 'Combined trains may only run an Orient Express route')
+      expect { game.check_other(route) }.to raise_error(Engine::GameError, 'An Orient Express run may not consist entirely of sea crossings')
     end
 
     it 'is an Orient Express run once land track between Marseille and Toulon lies on the way' do
       route = sea_route('M28', 'X33', 'X35', 'AA82')
 
-      expect(route.chains.map { |chain| chain[:sea].nil? }).to eq([false, true, false])
+      expect(route.chains.map { |chain| chain[:crossing].nil? }).to eq([false, true, false])
       expect(game.orient_express_run?(route)).to be(true)
       allow(game).to receive(:combined_train?).with(route.train).and_return(true)
       expect { game.check_other(route) }.not_to raise_error
@@ -328,7 +329,7 @@ describe 'G18OE Orient Express (§12)' do
     it 'combines a 2+2, 3 and 2+2 into one 7+4 train' do
       combined = combine!(first_two, three, second_two)
 
-      expect(combined.name).to eq('7+4')
+      expect(combined.name).to eq('7+4C')
       expect(combined.distance).to eq([{ 'nodes' => ['town'], 'pay' => 4, 'visit' => 99 },
                                        { 'nodes' => %w[city offboard town], 'pay' => 7, 'visit' => 7 }])
       expect(combined.owner).to eq(major)
@@ -345,7 +346,7 @@ describe 'G18OE Orient Express (§12)' do
     it 'logs the combination' do
       combine!(first_two, three, second_two)
 
-      expect(game.log.last.message).to eq("#{major.name} combines 2+2, 2+2, 3 into a 7+4 train for the Orient Express")
+      expect(game.log.last.message).to eq("#{major.name} combines 2+2, 2+2, 3 into a 7+4C train for the Orient Express")
     end
 
     it 'rejects combining a non-permanent train with a permanent one' do
@@ -461,13 +462,14 @@ describe 'G18OE Orient Express (§12)' do
       three
       second_two
 
-      expect(step.help).to eq([help_text])
+      expect(step.help).to include(help_text) # Chris: the route step adds its sea help beside it
     end
 
     it 'puts the receivership help before the combining help' do
       allow(major).to receive(:receivership?).and_return(true)
 
-      expect(step.help).to eq([step_receivership_help, help_text])
+      expect(step.help.first).to eq(step_receivership_help)
+      expect(step.help).to include(help_text)
     end
 
     it 'adds no combining help for a regional' do
@@ -479,7 +481,7 @@ describe 'G18OE Orient Express (§12)' do
     it 'adds no combining help once every non-permanent train has rusted' do
       game.depot.trains.each { |train| train.rusted = true if train.rusts_on }
 
-      expect(step.help).to eq('')
+      expect(step.help).not_to include(help_text)
     end
   end
 

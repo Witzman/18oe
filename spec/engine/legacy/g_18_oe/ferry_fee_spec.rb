@@ -58,7 +58,7 @@ describe 'G18OE ferry fees for track and tokens (§11.1.6, §11.2.1)' do
     end
 
     it 'charges £5 for a tile on the far shore (§11.1.6)' do
-      expect(game.cross_water_track_fee(lnwr, hex('H55'), rotated('57', 4))).to eq(5)
+      expect(game.cross_water_tile_fee(lnwr, hex('H55'), rotated('57', 4))).to eq(5)
     end
 
     it 'charges £20 for a token on the far shore (§11.2.1)' do
@@ -68,16 +68,16 @@ describe 'G18OE ferry fees for track and tokens (§11.1.6, §11.2.1)' do
     end
 
     it 'charges nothing for a tile on the near shore' do
-      expect(game.cross_water_track_fee(lnwr, hex('K60'), rotated('57', 2))).to eq(0)
+      expect(game.cross_water_tile_fee(lnwr, hex('K60'), rotated('57', 2))).to eq(0)
     end
 
     it 'charges nothing to a national (§11.1.5)' do
       lnwr.type = :national
 
-      expect(game.cross_water_track_fee(lnwr, hex('H55'), rotated('57', 4))).to eq(0)
+      expect(game.cross_water_tile_fee(lnwr, hex('H55'), rotated('57', 4))).to eq(0)
     end
 
-    it 'pays the ferry with the tile and says so in the log (§11.1.6)' do
+    it 'pays the ferry with the tile and records the fee on the action (§11.1.6)' do
       cash!(lnwr, 500)
       step = track_step
       game.round.instance_variable_set(:@entities, [lnwr])
@@ -89,23 +89,26 @@ describe 'G18OE ferry fees for track and tokens (§11.1.6, §11.2.1)' do
       expect(rotation).not_to be_nil
       before = lnwr.cash
 
-      step.lay_tile_action(Engine::Action::LayTile.new(lnwr, tile: tile, hex: hex('H55'), rotation: rotation))
+      action = Engine::Action::LayTile.new(lnwr, tile: tile, hex: hex('H55'), rotation: rotation)
+      step.process_lay_tile(action)
 
-      messages = game.log.map(&:message)
-      expect(messages).to include("LNWR pays £5 for 1 ferry crossed to the new track (§11.1.6)")
+      # Chris: the fee travels on the action (extra_cost, checked on replay); the log line is the core's
+      # "spends £X and lays tile" line, the old fee sentence is player text of the wrapper (text.ts).
+      expect(action.extra_cost).to eq(5)
       expect(before - lnwr.cash).to be >= 5
     end
 
-    it 'pays the ferry with the token and says so in the log (§11.2.1)' do
+    it 'pays the ferry with the token and records the cost on the action (§11.2.1)' do
       lay!('H55', '57', 4)
       cash!(lnwr, 1000)
       token = lnwr.next_token
       price = token.price
 
-      token_step.place_token(lnwr, hex('H55').tile.cities.first, token)
+      action = Engine::Action::PlaceToken.new(lnwr, city: hex('H55').tile.cities.first, slot: 0)
+      token_step.process_place_token(action)
 
+      expect(action.cost).to eq(price + 20)
       expect(lnwr.cash).to eq(1000 - price - 20)
-      expect(game.log.map(&:message)).to include('LNWR pays £20 for 1 ferry crossed to the token (§11.2.1)')
     end
   end
 
@@ -118,7 +121,7 @@ describe 'G18OE ferry fees for track and tokens (§11.1.6, §11.2.1)' do
     end
 
     it 'charges nothing for a tile or a token on the far shore' do
-      expect(game.cross_water_track_fee(lnwr, hex('Z41'), rotated('57', 2))).to eq(0)
+      expect(game.cross_water_tile_fee(lnwr, hex('Z41'), rotated('57', 2))).to eq(0)
       lay!('Z41', '57', 2)
 
       expect(game.cross_water_token_fee(lnwr, hex('Z41').tile.cities.first)).to eq(0)
@@ -134,15 +137,14 @@ describe 'G18OE ferry fees for track and tokens (§11.1.6, §11.2.1)' do
     end
 
     it 'counts the ferry after the landing together with the sea zones (§11.2.1)' do
-      cost = game.cross_water_token_cost(lnwr, hex('AE72').tile.city_towns.first)
+      # Chris prices by weight (zone 2, ferry 1; token £20 a unit): 3 zones (£120) + 1 ferry (£20)
 
-      expect([cost.ferries, cost.zones]).to eq([1, 3])
+      expect(game.cross_water_token_fee(lnwr, hex('AE72').tile.city_towns.first)).to eq(140)
     end
 
     it 'does not count it for the landing itself' do
-      cost = game.cross_water_token_cost(lnwr, hex('AD79').tile.city_towns.first)
 
-      expect([cost.ferries, cost.zones]).to eq([0, 3])
+      expect(game.cross_water_token_fee(lnwr, hex('AD79').tile.city_towns.first)).to eq(120)
     end
   end
 
@@ -161,9 +163,8 @@ describe 'G18OE ferry fees for track and tokens (§11.1.6, §11.2.1)' do
       hex('AB27').lay(bend)
       game.graph.clear
 
-      cost = game.cross_water_track_cost(lnwr, hex('AF25'), rotated('57', 3))
 
-      expect([cost.ferries, cost.zones]).to eq([2, 0])
+      expect(game.cross_water_tile_fee(lnwr, hex('AF25'), rotated('57', 3))).to eq(10) # two ferries, 5 each
     end
   end
 end

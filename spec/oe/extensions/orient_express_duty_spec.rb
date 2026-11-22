@@ -1,7 +1,12 @@
 # frozen_string_literal: true
 
-require_relative '../engine_helper'
-require_relative 'helpers'
+# EXTENSION SPEC (#563 Task 8 triage, spec-first for Task 9, red on purpose): Chris' engine has no Orient Express duty
+# (§12.2 "not obligated unless part of the best possible routes"): no orient_express_required, no step hook. The patch is
+# sketched in notes/rueckport-differenz/spec-triage-A.md (patch 1). The second half (running the routes on the real map)
+# also needs the wrapper (Oe::LegalActions, Task 4c) and the new route API (touch_node -> connection_data).
+
+require_relative '../../engine/engine_helper'
+require_relative '../../engine/g_18_oe/helpers'
 require 'oe/legal_actions'
 
 # #512, §12.2 (rulebook p. 41/42): "A RR is not obligated to run the Orient Express on the first occasion it is

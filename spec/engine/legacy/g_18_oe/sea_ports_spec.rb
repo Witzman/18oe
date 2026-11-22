@@ -3,7 +3,11 @@
 require_relative '../engine_helper'
 require_relative 'helpers'
 
-describe 'G18OE port accesses and ferry components (§11.3.4, §11.3.6, §11.3.7)' do
+# Rewritten on Chris' sea API in the triage (#563 Task 8). The legacy wrapper kept its own port_accesses /
+# usable_port_access? / ferry_components structures; Chris reads the PORTS data directly: sea_exit?, port_usable?
+# (token of the RR for a private port), usable_ports (adds the track to the arrow, §11.3.6), ferry_links (both ends of
+# a ferry, distance) and ferry_track? for the blue paths.
+describe 'G18OE port data, usable ports and ferry links (§11.3.4, §11.3.6, §11.3.7)' do
   include G18OESpecHelpers
 
   let(:game) { new_game }
@@ -15,80 +19,82 @@ describe 'G18OE port accesses and ferry components (§11.3.4, §11.3.6, §11.3.7
     tile.cities.first || tile.towns.first || tile.offboards.first
   end
 
-  def access(hex_id, exit)
-    game.port_accesses(node(hex_id)).find { |a| a.exit == exit }
-  end
-
   def lay_tile!(hex_id, name, rotation)
     tile = game.tiles.find { |t| t.name == name && !t.hex }
     tile.rotate!(rotation)
     game.hex_by_id(hex_id).lay(tile)
+    game.graph.clear
   end
 
   def token!(hex_id, corporation)
     game.hex_by_id(hex_id).tile.cities.first.place_token(corporation, corporation.next_token, free: true,
                                                                                                check_tokenable: false)
+    game.graph.clear
   end
 
-  describe 'port_accesses' do
-    it 'gives every port entry in PORTS an access with a sea zone (§11.3.4)' do
-      expected = ports.flat_map do |hex_id, exits|
-        exits.select { |_, data| data[:port] }.keys.map { |exit| [hex_id, exit] }
-      end
-      found = ports.keys.select { |hex_id| node(hex_id) }.flat_map do |hex_id|
-        game.port_accesses(node(hex_id)).map { |a| [a.hex_id, a.exit] }
-      end
+  def usable?(hex_id, exit, corporation)
+    game.usable_ports(node(hex_id), corporation).include?([hex_id, exit])
+  end
 
-      expect(found).to match_array(expected)
-      ports.keys.select { |hex_id| node(hex_id) }.each do |hex_id|
-        game.port_accesses(node(hex_id)).each { |a| expect(a.zone).not_to be_nil, "#{hex_id} #{a.exit}" }
-      end
+  describe 'port entries' do
+    it 'gives every port entry of PORTS a sea zone (§11.3.4)' do
+      unresolved = ports.flat_map do |hex_id, exits|
+        exits.select { |_, data| data[:port] }.keys.map { |exit| [hex_id, exit] }
+      end.select { |hex_id, exit| game.port_sea_zone(hex_id, exit).nil? }
+
+      expect(unresolved).to eq([])
     end
 
     it 'never offers a dead end (§11.3.4)' do
-      expect(game.port_accesses(node('P19')).map(&:exit)).to contain_exactly(1, 3)
-      expect(game.port_accesses(node('E44'))).to eq([])
+      expect(game.sea_exit?('P19', 2)).to be(false)
+      expect(game.sea_exit?('E44', 0)).to be(false)
+      expect(game.sea_exit?('P19', 1)).to be(true)
+      expect(game.usable_ports(node('E44'), corp)).to eq([])
     end
 
-    it 'offers no access at a ferry end without a port symbol' do
-      expect(game.port_accesses(node('N31'))).to eq([])
+    it 'offers no port at a ferry end without a port symbol' do
+      expect(game.port_usable?('N31', 1, corp)).to be(false)
     end
 
-    it 'gives Kobenhavn an offshore access into Skagerrak and an onshore one into the Baltic Sea' do
-      expect(game.port_accesses(node('I50')).map { |a| [a.exit, a.zone, a.kind] })
-        .to contain_exactly([:offshore, 'Skagerrak', :public], [5, 'Baltic Sea', :public])
+    it 'gives Kobenhavn an offshore port into Skagerrak and an onshore one into the Baltic Sea' do
+      expect(game.port_sea_zone('I50', :offshore)).to eq('Skagerrak')
+      expect(game.port_sea_zone('I50', 5)).to eq('Baltic Sea')
+      expect(ports['I50'].values.map { |data| data[:port] }).to eq(%i[public public])
     end
 
-    it 'marks a ferry end with a port symbol as a ferry port (§11.3.7)' do
-      expect(access('AA20', 5)).to have_attributes(kind: :private, ferry_port: true, zone: 'Balearic Sea')
-      expect(access('F49', 0)).to have_attributes(kind: :private, ferry_port: false)
+    it 'marks a ferry end with a port symbol as both private port and ferry end (§11.3.7)' do
+      expect(ports['AA20'][5]).to include(port: :private)
+      expect(game.ferry_links('AA20', 5)).to eq([[['AB27', 1], 1]])
+      expect(ports['F49'][0]).to eq(port: :private)
     end
 
-    it 'has no access for a node without a port' do
-      expect(game.port_accesses(node('B43'))).to eq([])
+    it 'has no port for a hex without one' do
+      expect(ports['B43']).to be_nil
+      expect(game.usable_ports(node('B43'), corp)).to eq([])
     end
   end
 
-  describe 'usable_port_access? (PB 4.4)' do
+  describe 'usable ports (PB 4.4)' do
     it 'refuses Goteborg private port without track to the port arrow, even with a token' do
       bjv = game.corporation_by_id('BJV')
       token!('F49', bjv)
 
-      expect(game.usable_port_access?(node('F49'), access('F49', 0), bjv)).to be(false)
+      expect(game.port_usable?('F49', 0, bjv)).to be(true)
+      expect(usable?('F49', 0, bjv)).to be(false) # the track to the arrow is missing
     end
 
     it 'allows the Christiania offshore port without any track or token (§11.3.6)' do
-      expect(game.usable_port_access?(node('C48'), access('C48', :offshore), corp)).to be(true)
+      expect(usable?('C48', :offshore, corp)).to be(true)
     end
 
     it 'allows a public onshore port reached by a preprinted track section' do
-      expect(game.usable_port_access?(node('Z27'), access('Z27', 0), corp)).to be(true)
+      expect(usable?('Z27', 0, corp)).to be(true)
     end
 
     it 'refuses Valencia private port without track, even with a token' do
       token!('AA20', corp)
 
-      expect(game.usable_port_access?(node('AA20'), access('AA20', 5), corp)).to be(false)
+      expect(usable?('AA20', 5, corp)).to be(false)
     end
 
     it 'allows Valencia private port with track only to a RR with a token there (§11.3.6)' do
@@ -96,82 +102,54 @@ describe 'G18OE port accesses and ferry components (§11.3.4, §11.3.6, §11.3.7
       other = game.corporation_by_id('GWR')
       token!('AA20', corp)
 
-      expect(game.usable_port_access?(node('AA20'), access('AA20', 5), corp)).to be(true)
-      expect(game.usable_port_access?(node('AA20'), access('AA20', 5), other)).to be(false)
+      expect(usable?('AA20', 5, corp)).to be(true)
+      expect(usable?('AA20', 5, other)).to be(false)
     end
 
     it 'refuses the private Edinburgh offshore port to a RR without a token there (§11.3.6)' do
-      expect(game.usable_port_access?(node('G26'), access('G26', :offshore), corp)).to be(false)
+      expect(usable?('G26', :offshore, corp)).to be(false)
       token!('G26', corp)
-      expect(game.usable_port_access?(node('G26'), access('G26', :offshore), corp)).to be(true)
+
+      expect(usable?('G26', :offshore, corp)).to be(true)
     end
 
-    it 'refuses an onshore access when the laid track points elsewhere' do
+    it 'refuses an onshore port when the laid track points elsewhere' do
       lay_tile!('AA20', '57', 0)
       token!('AA20', corp)
 
-      expect(game.usable_port_access?(node('AA20'), access('AA20', 5), corp)).to be(false)
+      expect(usable?('AA20', 5, corp)).to be(false)
     end
   end
 
-  describe 'ferry_components (§11.3.7)' do
-    let(:components) { game.ferry_components }
-    let(:ferry_ends) do
-      ports.flat_map { |hex_id, exits| exits.select { |_, data| data[:ferries] }.keys.map { |exit| [hex_id, exit] } }
-    end
-
-    it 'gives every component exactly one distance' do
-      components.each { |c| expect(c.distances.size).to eq(1), c.ends.inspect }
-    end
-
-    it 'puts every ferry end of PORTS in exactly one component' do
-      ferry_ends.each do |ferry_end|
-        expect(components.count { |c| c.ends.include?(ferry_end) }).to eq(1), ferry_end.inspect
-      end
-      expect(components.flat_map(&:ends)).to match_array(ferry_ends)
-    end
-
-    it 'puts both ends of every PORTS ferry in the same component' do
-      ports.each do |hex_id, exits|
-        exits.each do |exit, data|
-          (data[:ferries] || []).each do |ferry|
-            component = components.find { |c| c.ends.include?([hex_id, exit]) }
-            expect(component.ends).to include([ferry[:hex], ferry[:exit]]), "#{hex_id} #{exit}"
-            expect(component.distance).to eq(ferry[:distance])
-          end
+  describe 'ferry links (§11.3.7)' do
+    it 'lists both ends of every PORTS ferry with the same distance' do
+      asymmetric = ports.flat_map do |hex_id, exits|
+        exits.flat_map do |exit, data|
+          (data[:ferries] || []).reject do |ferry|
+            game.ferry_links(ferry[:hex], ferry[:exit]).include?([[hex_id, exit], ferry[:distance]])
+          end.map { |ferry| [hex_id, exit, ferry] }
         end
       end
-    end
 
-    it 'leaves no blue ferry line without ferry ends' do
-      components.each { |c| expect(c.ends.size).to be >= 2, c.hex_ids.inspect }
+      expect(asymmetric).to eq([])
     end
 
     it 'joins the White Cliffs ferry Lille-London with distance 0' do
-      component = components.find { |c| c.ends.include?(['N31', 1]) }
-
-      expect(component.ends).to contain_exactly(['N31', 1], ['M28', 5])
-      expect(component.distance).to eq(0)
+      expect(game.ferry_links('N31', 1)).to eq([[['M28', 5], 0]])
+      expect(game.ferry_links('M28', 5)).to eq([[['N31', 1], 0]])
     end
 
-    it 'joins the Irish Sea ferries of Dublin into one component with distance 1' do
-      component = components.find { |c| c.ends.include?(['I20', 4]) }
-
-      expect(component.ends).to contain_exactly(['I20', 4], ['J23', 2], ['J25', 2], ['I26', 1])
-      expect(component.distance).to eq(1)
+    it 'joins the Irish Sea ferries of Dublin to its three ports with distance 1 each' do
+      expect(game.ferry_links('I20', 4)).to contain_exactly([['J23', 2], 1], [['J25', 2], 1], [['I26', 1], 1])
     end
 
-    it 'reaches the Edinburgh offshore port through its terminal in G30' do
-      component = components.find { |c| c.ends.include?(['G26', :offshore]) }
-
-      expect(component.ends).to contain_exactly(['G26', :offshore], ['B41', 1])
-      expect(component.distance).to eq(1)
+    it 'reaches the Edinburgh offshore port through its ferry from B41 with distance 1' do
+      expect(game.ferry_links('G26', :offshore)).to eq([[['B41', 1], 1]])
     end
 
-    it 'finds the component of a blue ferry path' do
-      path = game.hex_by_id('N29').tile.paths.first
-
-      expect(game.ferry_component(path).ends).to contain_exactly(['N31', 1], ['M28', 5])
+    it 'knows the blue ferry path' do
+      expect(game.ferry_track?(game.hex_by_id('N29').tile.paths.first)).to be(true)
+      expect(game.sea_traffic?(game.hex_by_id('N29').tile.paths.first)).to be(true)
     end
   end
 end

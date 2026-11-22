@@ -26,13 +26,13 @@ describe 'G18OE nationals lay track from their virtual tokens (§11.1, §11.3.10
   end
 
   it 'counts every city of the home zone as connected, none outside it' do
-    expect(game.for_graph_city_tokened_by?(city('F25'), lnwr, game.graph)).to be(true) # Glasgow, UK
-    expect(game.for_graph_city_tokened_by?(city('Q30'), lnwr, game.graph)).to be(false) # Paris, FR
+    expect(game.city_tokened_by?(city('F25'), lnwr)).to be(true) # Glasgow, UK
+    expect(game.city_tokened_by?(city('Q30'), lnwr)).to be(false) # Paris, FR
   end
 
   it 'is no virtual token for a major' do
     major = start_major!(game, 'GWR', alice)
-    expect(game.for_graph_city_tokened_by?(city('F25'), major, game.graph)).to be(false)
+    expect(game.city_tokened_by?(city('F25'), major)).to be(false)
   end
 
   it 'lets the national lay track next to a city of its zone' do

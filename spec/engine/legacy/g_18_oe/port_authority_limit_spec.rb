@@ -3,9 +3,13 @@
 require_relative '../engine_helper'
 require_relative 'helpers'
 
-# #56 part 3: a port authority marker takes two sea zones in its water area off the city limits of its RR's trains
-# (§11.3.5, §11.3.4). The reduction belongs to the RR (the trains share it, split between two trains is allowed);
-# it applies to sea zones of its area only, not to ferries and not to the other water area.
+# #56 part 3, rewritten on Chris' port authority model in the triage (#563 Task 8): a port authority marker takes two
+# sea zones in its water area off the city limits of its RR's trains (§11.3.5, §11.3.4). The reduction belongs to the
+# RR (the trains share it, a split between two trains is allowed); it applies to sea zones of its area only, not to
+# ferries and not to the other water area.
+# Old API -> Chris: @port_authority_owners[corp] = area -> @port_authorities[corp] = [sea] (a list, limit 1 per major in
+# PORT_AUTHORITY_LIMIT), port_authority_allowance -> sea_pool, route.revenue RouteTooLong / sea_pool_allocation.
+# Chris' own twins: sea_routes_spec 'port authorities and Minor H' and 'sharing the pool across the railroad's trains'.
 describe 'G18OE port authority and the city limit (§11.3.5)' do
   include G18OESpecHelpers
 
@@ -34,14 +38,18 @@ describe 'G18OE port authority and the city limit (§11.3.5)' do
   end
 
   def route_over(corporation, name, *hex_ids, routes: [])
-    Engine::Route.new(game, game.phase, train!(corporation, name), routes: routes).tap do |route|
-      routes << route
-      hex_ids.each { |hex_id| route.touch_node(node(hex_id)) }
+    route = Engine::Route.new(game, game.phase, train!(corporation, name), routes: routes)
+    routes << route
+    hex_ids.each_cons(2) do |from, to|
+      chain = route.select(node(from), node(to)).first
+      route.connection_data << route.segment(chain, left: node(from))
     end
+    route
   end
 
-  def own!(area)
-    game.instance_variable_get(:@port_authority_owners)[dsj] = area
+  def own!(sea)
+    game.instance_variable_get(:@port_authorities)[dsj] = [sea]
+    game.graph.clear
   end
 
   # Kobenhavn to Malmo (PB 4.5): two sea zones (Baltic), the Malmo token takes one in phase 2: one unit remains.
@@ -51,20 +59,23 @@ describe 'G18OE port authority and the city limit (§11.3.5)' do
     game.graph.clear
   end
 
-  it 'has an allowance of two for the owner of a marker and none otherwise' do
-    expect(game.port_authority_allowance(dsj)).to eq(0)
+  it 'has a pool of two for the owner of a marker and none otherwise' do
+    expect(game.sea_pool_total(dsj, game.phase)).to eq(0)
     own!(:north_sea)
-    expect(game.port_authority_allowance(dsj)).to eq(2)
+
+    expect(game.sea_pool_total(dsj, game.phase)).to eq(2)
   end
 
   it 'refuses two cities on a 2 train without the marker' do
     route = route_over(dsj, '2+2', 'I50', 'I52')
+
     expect { route.revenue }.to raise_error(Engine::RouteTooLong)
   end
 
   it 'takes the remaining sea zone off for the marker of the crossing\'s area' do
     own!(:north_sea)
     route = route_over(dsj, '2+2', 'I50', 'I52')
+
     expect { route.revenue }.not_to raise_error
     expect(route.distance_str).to eq('2')
   end
@@ -72,6 +83,7 @@ describe 'G18OE port authority and the city limit (§11.3.5)' do
   it 'takes nothing off for the marker of the other area' do
     own!(:mediterranean)
     route = route_over(dsj, '2+2', 'I50', 'I52')
+
     expect { route.revenue }.to raise_error(Engine::RouteTooLong)
   end
 
@@ -81,6 +93,7 @@ describe 'G18OE port authority and the city limit (§11.3.5)' do
     first = route_over(dsj, '2+2', 'I50', 'I52', routes: routes)
     second = route_over(dsj, '2+2', 'I50', 'I52', routes: routes)
     third = route_over(dsj, '2+2', 'I50', 'I52', routes: routes)
+
     expect { first.revenue }.not_to raise_error
     expect { second.revenue }.not_to raise_error
     expect { third.revenue }.to raise_error(Engine::RouteTooLong)
@@ -93,8 +106,9 @@ describe 'G18OE port authority and the city limit (§11.3.5)' do
     own!(:north_sea)
     routes = []
     3.times { route_over(dsj, '2+2', 'I50', 'I52', routes: routes) }
+
     routes.each { |route| expect { route.revenue(suppress_check_route_combination: true) }.not_to raise_error }
     expect { game.check_overlap(routes) }.not_to raise_error
-    expect(routes.sum { |r| r.instance_variable_get(:@steamship_use).to_i + r.instance_variable_get(:@port_authority_use).to_i }).to eq(3)
+    expect(game.sea_pool_total(dsj, game.phase)).to eq(3)
   end
 end

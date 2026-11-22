@@ -3,9 +3,12 @@
 require_relative '../engine_helper'
 require_relative 'helpers'
 
-# #357 (SC3): a sea crossing is a route chain without track between two port nodes (§11.3.4). The port access is
-# checked, not ridden; every sea zone counts against the city limit and takes a place of the row of cities
-# (assumption A1 of #60).
+# #357 (SC3) and #358 (SC4), rewritten on Chris' sea API in the triage (#563 Task 8): a sea crossing is a route chain
+# without track between two port nodes (§11.3.4). The port access is checked, not ridden; every sea zone counts against
+# the city limit and takes a place of the row of cities (assumption A1 of #60).
+# Old API -> Chris: sea_units -> sea_distance, route.chains[:sea] -> chain[:crossing], port_token_reducers -> the
+# token logic inside sea_distance, route.revenue GameError checks -> game.check_other / check_connected, distance_str
+# '2+1~' -> '2 + 1 sea'. Chris' own twin is sea_routes_spec (rows 1 to 14).
 describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
   include G18OESpecHelpers
 
@@ -19,6 +22,7 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
     tile = game.tiles.find { |t| t.name == name && !t.hex }
     tile.rotate!(rotation)
     game.hex_by_id(hex_id).lay(tile)
+    game.graph.clear
   end
 
   def node(hex_id)
@@ -28,6 +32,12 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
 
   def token!(hex_id, corporation)
     node(hex_id).place_token(corporation, corporation.next_token, free: true, check_tokenable: false)
+    game.graph.clear
+  end
+
+  def unplace!(hex_id)
+    node(hex_id).tokens.compact.each(&:remove!)
+    game.graph.clear
   end
 
   def train!(corporation, name)
@@ -36,32 +46,42 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
     train
   end
 
+  # The stops in order, each pair joined by its cheapest unused connection (a crossing, land track or a ferry).
   def route_over(corporation, name, *hex_ids, routes: [])
-    Engine::Route.new(game, game.phase, train!(corporation, name), routes: routes).tap do |route|
-      routes << route
-      hex_ids.each { |hex_id| route.touch_node(node(hex_id)) }
+    route = Engine::Route.new(game, game.phase, train!(corporation, name), routes: routes)
+    routes << route
+    hex_ids.each_cons(2) do |from, to|
+      chain = route.select(node(from), node(to)).first
+      raise "no connection #{from} - #{to}" unless chain
+
+      route.connection_data << route.segment(chain, left: node(from))
     end
+    route
   end
 
   def sea_chain?(chain)
-    chain[:paths].empty? && !chain[:sea].nil?
+    chain[:paths].empty? && chain[:crossing]&.kind == :crossing
+  end
+
+  def links(from, to, corporation)
+    game.sea_links(node(from), node(to), corporation)
   end
 
   describe 'DSJ Kobenhavn to Malmo (PB 4.5)' do
     before do
       lay_tile!('I52', '57', 0) # Malmo: track to the private port arrow (side 0)
       token!('I52', dsj) # the private Malmo port needs it (§11.3.6); it is also a port token (#358)
-      game.graph.clear
     end
 
     it 'crosses from the Kobenhavn offshore port and counts two sea zones' do
       route = route_over(dsj, '4', 'I50', 'I52')
 
       expect(route.chains.map { |chain| sea_chain?(chain) }).to eq([true])
-      expect(game.sea_units(route)).to eq(1) # 2 zones, the Malmo token takes one (phase 2)
+      expect(route.chains.first[:crossing].units).to eq(2)
+      expect(game.sea_distance(route)).to eq(1) # 2 zones, the Malmo token takes one (phase 2)
       expect { route.revenue }.not_to raise_error
       expect(route.stops).to contain_exactly(node('I50'), node('I52'))
-      expect(route.distance_str).to eq('2+1~')
+      expect(route.distance_str).to eq('2 + 1 sea')
     end
 
     it 'fits two cities and the one zone the Malmo token leaves on a 3 train (§11.3.3)' do
@@ -70,12 +90,10 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
       expect { route.revenue }.not_to raise_error
     end
 
-    it 'refuses the same route once the Malmo token is gone and two zones count' do
-      node('I52').tokens.each(&:remove!)
-      game.graph.clear
-      route = route_over(dsj, '3', 'I50', 'I52')
+    it 'refuses the same route once the Malmo token is gone (§11.3.6)' do
+      unplace!('I52')
 
-      expect(route.chains).to be_empty # the private Malmo port needs the token (§11.3.6)
+      expect(links('I50', 'I52', dsj)).to be_empty # the private Malmo port needs the token (§11.3.6)
     end
 
     it 'survives a run routes action written out and read back (replay)' do
@@ -88,7 +106,7 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
 
       expect(replayed.connection_hexes).to eq(route.connection_hexes)
       expect(replayed.visited_stops).to contain_exactly(node('I50'), node('I52'))
-      expect(game.sea_units(replayed)).to eq(1)
+      expect(game.sea_distance(replayed)).to eq(1)
       replayed.clear_cache!(all: false)
       expect(replayed.revenue).to eq(revenue)
     end
@@ -99,13 +117,13 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
       lay_tile!('AA20', '5', 4) # Valencia: sides 4 and 5 (port arrow and ferry end on side 5)
       lay_tile!('AB27', '5', 1) # Palma: sides 1 and 2 (ferry ends)
       token!('AA20', corp)
-      game.graph.clear
     end
 
     it 'counts one sea zone from Alger to Valencia' do
       route = route_over(corp, '3', 'AF25', 'AA20')
 
-      expect(game.sea_units(route)).to eq(0) # one zone, the Valencia token takes it (#358)
+      expect(route.chains.first[:crossing].units).to eq(1)
+      expect(game.sea_distance(route)).to eq(0) # one zone, the Valencia token takes it (#358)
       expect { route.revenue }.not_to raise_error
       expect(route.stops).to contain_exactly(node('AF25'), node('AA20'))
     end
@@ -113,17 +131,16 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
     it 'lets the ferry follow the port directly, over the same hex side (§11.3.7)' do
       route = route_over(corp, '5', 'AF25', 'AA20', 'AB27')
 
-      expect(route.chains.map { |chain| sea_chain?(chain) }).to contain_exactly(true, false)
-      expect(game.sea_units(route)).to eq(1) # zone 1 + ferry 1, one Valencia token: used once
+      expect(route.chains.map { |chain| sea_chain?(chain) }).to contain_exactly(true, false) # crossing, then the ferry track
+      expect(game.sea_distance(route)).to eq(1) # zone 1 + ferry 1, one Valencia token: used once
       expect { route.revenue }.not_to raise_error
     end
 
     it 'offers no crossing into the private Valencia port without a token (§11.3.6)' do
-      node('AA20').tokens.each(&:remove!)
+      unplace!('AA20')
       token!('AB27', corp)
-      route = route_over(corp, '5', 'AF25', 'AA20')
 
-      expect(route.chains).to be_empty
+      expect(links('AF25', 'AA20', corp).reject { |chain| chain[:crossing].kind == :ferry }).to be_empty
     end
   end
 
@@ -131,29 +148,25 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
     before do
       token!('C48', bjv)
       token!('F49', bjv)
-      game.graph.clear
     end
 
     it 'crosses from the Christiania offshore port without any track (§11.3.6)' do
       route = route_over(bjv, '3', 'C48', 'I50')
 
-      expect(game.sea_units(route)).to eq(0) # one zone, the Christiania token takes it (#358)
+      expect(game.sea_distance(route)).to eq(0) # one zone, the Christiania token takes it (#358)
       expect { route.revenue }.not_to raise_error
     end
 
     it 'offers no crossing from the Goteborg private port without track to its arrow' do
-      route = route_over(bjv, '8+8', 'F49', 'I50')
-
-      expect(route.chains).to be_empty
+      expect(links('F49', 'I50', bjv)).to be_empty
     end
 
     it 'refuses two crossings without a land hex side between them (§11.3.4)' do
       lay_tile!('F49', '57', 0) # Goteborg: track to the port arrow
-      game.graph.clear
       route = route_over(bjv, '8+8', 'C48', 'I50', 'F49')
 
       expect(route.chains.count { |chain| sea_chain?(chain) }).to eq(2)
-      expect { route.revenue }.to raise_error(Engine::GameError, /land hex side/)
+      expect { game.check_other(route) }.to raise_error(Engine::GameError, /land hex side/)
     end
 
     it 'lets two trains of one RR use the same ports and sea zones (§11.3.8)' do
@@ -162,7 +175,7 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
       route_over(bjv, '3', 'C48', 'I50', routes: routes)
 
       expect(routes.map { |route| route.chains.size }).to eq([1, 1])
-      expect { routes.each(&:revenue) }.not_to raise_error
+      expect { game.check_overlap(routes) }.not_to raise_error
     end
   end
 
@@ -170,47 +183,46 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
     before do
       lay_tile!('AB27', '5', 1) # Palma: ferry end on side 2 towards Barcelona
       token!('AB27', corp)
-      game.graph.clear
     end
 
     it 'may run on from Barcelona over the ferry when the city is open' do
       route = route_over(corp, '8+8', 'AF25', 'Z27', 'AB27')
 
-      expect(route.chains.map { |chain| sea_chain?(chain) }).to contain_exactly(true, false)
-      expect { route.revenue }.not_to raise_error
+      expect(route.chains.map { |chain| sea_chain?(chain) }).to contain_exactly(true, false) # crossing, then the ferry track
+      expect { game.check_connected(route, corp) }.not_to raise_error
     end
 
     it 'may not pass through Barcelona when another RR fills it' do
       token!('Z27', other)
       route = route_over(corp, '8+8', 'AF25', 'Z27', 'AB27')
 
-      expect(route.chains.map { |chain| sea_chain?(chain) }).to contain_exactly(true, false)
-      expect { route.revenue }.to raise_error(Engine::GameError, /not connected/)
+      expect(route.chains.map { |chain| sea_chain?(chain) }).to contain_exactly(true, false) # crossing, then the ferry track
+      expect { game.check_connected(route, corp) }.to raise_error(Engine::GameError, /not connected/)
     end
   end
 
   # #358 (SC4): a port token takes sea units off the city limit, per train (§11.3.5, §11.3.7, PB 4.5).
   describe 'port token reduction (§11.3.5, §11.3.7)' do
     def units(corporation, train, *hex_ids)
-      game.sea_units(route_over(corporation, train, *hex_ids))
+      game.sea_distance(route_over(corporation, train, *hex_ids))
     end
 
     describe 'DSJ Kobenhavn and Malmo' do
       before do
         lay_tile!('I52', '57', 0)
         token!('I52', dsj)
-        game.graph.clear
       end
 
       it 'takes one of two zones per token in phase 2 to 6, the Kobenhavn offshore token included' do
         expect(units(dsj, '4', 'I50', 'I52')).to eq(1)
         token!('I50', dsj)
-        game.graph.clear
+
         expect(units(dsj, '4', 'I50', 'I52')).to eq(0)
       end
 
       it 'takes two zones for one token in phase 7 and 8' do
         at_phase!(game, '7')
+
         expect(units(dsj, '4', 'I50', 'I52')).to eq(0)
       end
 
@@ -219,15 +231,14 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
         first = route_over(dsj, '4', 'I50', 'I52', routes: routes)
         second = route_over(dsj, '4', 'I50', 'I52', routes: routes)
 
-        expect([first, second].map { |route| game.sea_units(route) }).to eq([1, 1])
+        expect([first, second].map { |route| game.sea_distance(route) }).to eq([1, 1])
       end
 
       it 'does not take anything for a token of another RR' do
-        node('I52').tokens.each(&:remove!)
+        unplace!('I52')
         token!('I52', bjv) # a private port needs the token of the train's own RR: no crossing at all
-        game.graph.clear
 
-        expect(route_over(dsj, '4', 'I50', 'I52').chains).to be_empty
+        expect(links('I50', 'I52', dsj)).to be_empty
       end
     end
 
@@ -235,13 +246,12 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
       it 'is free with the Christiania token and counts one zone without any token' do
         expect(units(bjv, '3', 'C48', 'I50')).to eq(1)
         token!('C48', bjv)
-        game.graph.clear
+
         expect(units(bjv, '3', 'C48', 'I50')).to eq(0)
       end
 
       it 'keeps the crossing valid with no zone left to count' do
         token!('C48', bjv)
-        game.graph.clear
         route = route_over(bjv, '3', 'C48', 'I50')
 
         expect(route.chains.map { |chain| sea_chain?(chain) }).to eq([true])
@@ -254,7 +264,6 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
         lay_tile!('AA20', '5', 4)
         lay_tile!('AB27', '5', 1)
         token!('AA20', corp)
-        game.graph.clear
       end
 
       it 'uses the Valencia token on the zone or on the ferry, never on both' do
@@ -263,7 +272,6 @@ describe 'G18OE sea crossings (§11.3.4, §11.3.6, §11.3.8)' do
 
       it 'uses both tokens, the Palma token on the ferry beside it, and counts any further zone in full' do
         token!('AB27', corp)
-        game.graph.clear
 
         expect(units(corp, '5', 'AF25', 'AA20', 'AB27')).to eq(0)
       end

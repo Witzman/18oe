@@ -6,6 +6,8 @@ require_relative 'helpers'
 describe 'G18OE map zones against the board (#194)' do
   include G18OESpecHelpers
 
+  # TRIAGE #563 Task 8: red only for AB27 (Palma): Chris' NATIONAL_REGION_HEXES has no zone for Palma, the owner-evidenced
+  # board (#194, map.jpg) and the playbook say Spain. Map-data difference to Chris, decision open (spec-triage-A.md).
   let(:game) { new_game }
 
   # The board prints a zone name next to the island cities (map.jpg: Palma "Spain", Ajaccio "France",

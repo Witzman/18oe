@@ -60,9 +60,11 @@ describe 'G18OE sea zones (§11.3.4, §11.3.5)' do
   end
 
   # #474: the board prints a black dead-end arrow with a 0 circle at the lower left of Constantinople, no anchor;
+  # TRIAGE #563 Task 8: Chris' map data lists AA82 exit 0 as a public port (map.rb PORTS), not a dead end. Chris' solution
+  # is the target (rule 32); the owner's #474 reading of the board photo (dead end) is the open point, see spec-triage-A.md.
   # the Aegean side is reached by the offshore port AB73 (public, anchor with the label "Constantinople").
-  it 'has a dead end, not a port, at Constantinople exit 0 and opens the Aegean Sea by the offshore port' do
-    expect(game.class::PORTS['AA82'][0]).to eq(dead_end: true)
+  it 'has a public port (Chris data; #474 read a dead end) at Constantinople exit 0, the Aegean Sea by the offshore port' do
+    expect(game.class::PORTS['AA82'][0]).to eq(port: :public)
     expect(game.class::PORTS['AA82'][:offshore]).to eq(hex: 'AB73', port: :public)
     expect(game.port_sea_zone('AA82', :offshore)).to eq('Aegean Sea')
   end
