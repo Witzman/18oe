@@ -1,0 +1,59 @@
+diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
+index 84ff5ab..8d79f1c 100644
+--- a/lib/engine/game/g_18_oe/game.rb
++++ b/lib/engine/game/g_18_oe/game.rb
+@@ -927,6 +927,21 @@ module Engine
+           self.class::TRACK_RIGHTS_COST[region] || 0
+         end
+ 
++        # RB 9.1: the home token of a minor is paid from its treasury and, what that lacks, by its owner (#369). When no
++        # zone is affordable with both, the token costs what both hold.
++        def home_token_cost(minor, region)
++          cost = track_rights_cost(region)
++          funds = home_token_funds(minor)
++          return cost if @minor_available_regions.keys.any? { |r| track_rights_cost(r) <= funds }
++
++          [cost, funds].min
++        end
++
++        # Treasury of the minor plus the personal cash of its owner, who tops up the home token.
++        def home_token_funds(minor)
++          minor.cash + (minor.owner&.player? ? minor.owner.cash : 0)
++        end
++
+         def claim_region!(entity, region)
+           @minor_floated_regions[entity.id] = region
+           @minor_available_regions[region] -= 1
+diff --git a/lib/engine/game/g_18_oe/step/home_token.rb b/lib/engine/game/g_18_oe/step/home_token.rb
+index 39fc42e..c851155 100644
+--- a/lib/engine/game/g_18_oe/step/home_token.rb
++++ b/lib/engine/game/g_18_oe/step/home_token.rb
+@@ -15,7 +15,8 @@ module Engine
+ 
+               raise GameError, "Region #{region} is not available" unless @game.region_available?(region)
+ 
+-              token.price = @game.track_rights_cost(region)
++              token.price = @game.home_token_cost(action.entity, region)
++              top_up_home_token!(action.entity, token.price)
+               @game.claim_region!(action.entity, region)
+             end
+ 
+@@ -25,6 +26,18 @@ module Engine
+ 
+             @game.log << "The #{hex.location_name} patronage tile is removed"
+           end
++
++          private
++
++          # RB 9.1 (#369): the owning player pays what the minor's treasury lacks for its home token.
++          def top_up_home_token!(minor, price)
++            missing = price - minor.cash
++            return unless missing.positive?
++
++            owner = minor.owner
++            owner.spend(missing, minor)
++            @game.log << "#{owner.name} tops up #{@game.format_currency(missing)} for #{minor.name}'s home token"
++          end
+         end
+       end
+     end

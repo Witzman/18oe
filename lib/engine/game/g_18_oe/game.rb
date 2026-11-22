@@ -927,6 +927,21 @@ module Engine
           self.class::TRACK_RIGHTS_COST[region] || 0
         end
 
+        # RB 9.1: the home token of a minor is paid from its treasury and, what that lacks, by its owner (#369). When no
+        # zone is affordable with both, the token costs what both hold.
+        def home_token_cost(minor, region)
+          cost = track_rights_cost(region)
+          funds = home_token_funds(minor)
+          return cost if @minor_available_regions.keys.any? { |r| track_rights_cost(r) <= funds }
+
+          [cost, funds].min
+        end
+
+        # Treasury of the minor plus the personal cash of its owner, who tops up the home token.
+        def home_token_funds(minor)
+          minor.cash + (minor.owner&.player? ? minor.owner.cash : 0)
+        end
+
         def claim_region!(entity, region)
           @minor_floated_regions[entity.id] = region
           @minor_available_regions[region] -= 1
