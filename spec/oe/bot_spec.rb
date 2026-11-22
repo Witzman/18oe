@@ -109,6 +109,8 @@ RSpec.describe Oe::Bot do
 
         entity = action.entity
         next unless entity.corporation?
+        # only what it could run when its Route step came: Transfer Tokens, Buy Trains and Issue Shares act later
+        next unless %w[Track Token SpecialToken Assign HomeToken].include?(log.last[1])
 
         # the engine's own question (Game#can_run_route?, Graph#route_info), as its Route step asks it (#563)
         @stops_after[entity] = game.can_run_route?(entity) ? 2 : 0 # Chris' route_info: two stops (also over the sea) and a train

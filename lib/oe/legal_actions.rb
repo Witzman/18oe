@@ -158,7 +158,7 @@ module Oe
       extra_slot = company_extra_slot?(step, entity)
       token_cities(step, entity).select do |city|
         city.tokenable?(tokener, free: false, tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
-          connected_for_token?(step, entity, city) && first_round_token_ok?(step, tokener, tokens, city) &&
+          connected_for_token?(step, entity, tokener, city) && first_round_token_ok?(step, tokener, tokens, city) &&
           (!step.respond_to?(:pass_city_ok?) || step.pass_city_ok?(entity, city))
       end
     end
@@ -663,12 +663,19 @@ module Oe
       sample(offers)
     end
 
+    def connected_special_token?(step, entity)
+      step.is_a?(Engine::Step::SpecialToken) && entity.company? && step.respond_to?(:check_connected, true) &&
+        step.send(:connected_ability?, entity)
+    end
+
     # Tokens laid by operating (not home/merge tokens) must connect to a route
     # of the corporation; the step's own check says whether they do.
-    def connected_for_token?(step, entity, city)
-      return true unless step.is_a?(Engine::Step::Token)
+    # A private's token that needs a connection (Step::SpecialToken, connected ability) is checked for the corporation
+    # that places it, as the step does.
+    def connected_for_token?(step, entity, tokener, city)
+      return true unless step.is_a?(Engine::Step::Token) || connected_special_token?(step, entity)
 
-      step.check_connected(entity, city, city.hex)
+      step.check_connected(tokener, city, city.hex)
       true
     rescue Engine::GameError
       false

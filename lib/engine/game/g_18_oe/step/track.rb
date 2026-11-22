@@ -13,6 +13,40 @@ module Engine
           def setup
             super
             @points_used = 0
+            @refused_home_hexes = []
+          end
+
+          # RB 11.1.9: a yellow lay in a floated RR's home hex waits for its president (Step::HomeHexConsent).
+          def process_lay_tile(action)
+            presidents = @consented_lay.equal?(action) ? [] : @game.home_hex_consent_needed(action.entity, action.hex, action.tile)
+            return super if presidents.empty?
+
+            check_home_lay!(action)
+            @round.pending_home_lay = { action: action, presidents: presidents }
+            @game.log << "#{action.entity.name} asks #{presidents.map(&:name).join(', ')} for permission to lay " \
+                         "yellow track in the home hex #{action.hex.id}"
+          end
+
+          def lay_with_consent!(action)
+            @consented_lay = action
+            process_lay_tile(action)
+          ensure
+            @consented_lay = nil
+          end
+
+          def refuse_home_lay!(hex)
+            @refused_home_hexes << hex
+          end
+
+          # The held lay must be one the step would take, so nobody is asked about an impossible lay.
+          def check_home_lay!(action)
+            entity = action.entity
+            hex = action.hex
+            raise GameError, "#{hex.id} is not available to #{entity.name}" unless available_hex(entity, hex)
+
+            tile = upgradeable_tiles(entity, hex).find { |t| t.name == action.tile.name }
+            raise GameError, "#{hex.tile.name} is not upgradeable to #{action.tile.name}" unless tile
+            raise GameError, "#{action.tile.name} is not legally rotated" unless tile.legal_rotations.include?(action.rotation)
           end
 
           def potential_tile_colors(entity, hex)
@@ -124,6 +158,8 @@ module Engine
           end
 
           def tracker_available_hex(entity, hex)
+            return nil if @refused_home_hexes&.include?(hex)
+
             return nil unless @game.hex_within_national_region?(entity, hex)
 
             connected = hex_neighbors(entity, hex)

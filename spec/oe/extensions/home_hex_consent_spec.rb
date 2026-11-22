@@ -75,7 +75,7 @@ describe 'G18OE home hex permission (§11.1.9, extension)' do
 
       expect(game.hex_by_id('U34').tile.color).to eq(:yellow)
       expect(round.active_step).to be_a(Engine::Game::G18OE::Step::Track)
-      expect(round.active_step.points_left(minor)).to eq(1)
+      expect(round.active_step.send(:remaining_tile_points, minor)).to eq(1)
     end
 
     it 'cancels the lay and closes the hex for this step when the president refuses' do
@@ -86,7 +86,7 @@ describe 'G18OE home hex permission (§11.1.9, extension)' do
       expect(game.hex_by_id('U34').tile.color).to eq(:white)
       expect(round.active_step).to be_a(Engine::Game::G18OE::Step::Track)
       expect(round.active_step.available_hex(minor, game.hex_by_id('U34'))).to be_nil
-      expect(round.active_step.points_left(minor)).to eq(2)
+      expect(round.active_step.send(:remaining_tile_points, minor)).to eq(2)
     end
 
     it 'needs no permission when the home RR has the same president' do

@@ -25,6 +25,7 @@ require_relative 'step/merge_offer'
 require_relative 'step/merge_token'
 require_relative 'step/concession'
 require_relative 'step/choose_operating_position'
+require_relative 'step/home_hex_consent'
 require_relative 'step/reserve_share'
 require_relative 'step/orient_express_bonus'
 require_relative 'step/transfer_tokens'
@@ -940,6 +941,23 @@ module Engine
           face_value + [reserved_price - corporation.cash, 0].max
         end
 
+        # RB 11.1.9, part 2: "The home token hex of a floated RR may not have yellow track laid on it without the explicit
+        # permission of the RR's president. Un-floated RRs automatically provide this permission." Not in a two-player game.
+        def home_hex_of?(corporation, hex)
+          home = corporation.type == :minor ? corporation.tokens.first&.city&.hex&.id : corporation.coordinates
+          Array(home).include?(hex.id)
+        end
+
+        # Presidents (players) whose permission a yellow lay of `entity` on `hex` needs, in seat order.
+        def home_hex_consent_needed(entity, hex, tile)
+          return [] unless @players.size > 2 && hex.tile.color == :white && tile.color == :yellow
+
+          layer = entity.corporation? ? entity.owner : nil
+          @corporations.select do |corp|
+            corp.floated? && !corp.closed? && corp.owner&.player? && corp.owner != layer && home_hex_of?(corp, hex)
+          end.map(&:owner).uniq
+        end
+
         def operating_order
           floated_minors_and_regionals = @minor_regional_order.select { |c| c.floated? && !insolvent?(c) }
           floated_minors_and_regionals + @corporations.select { |c| %i[major national].include?(c.type) && c.floated? }.sort
@@ -1825,6 +1843,7 @@ module Engine
             Engine::Step::DiscardTrain,
             Engine::Step::HomeToken,
             G18OE::Step::Assign,
+            G18OE::Step::HomeHexConsent,
             G18OE::Step::Track,
             G18OE::Step::SpecialToken,
             G18OE::Step::Token,
