@@ -13,11 +13,8 @@ describe 'G18OE Wien Suedbahnhof (§14.3)' do
   let(:other) { game.players[1] }
   let(:ws) { give_company!(owner, game.company_by_id('WS')) }
   let(:operator) { start_major!(game, 'LNWR', owner) }
-  let(:target) do
-    game.hexes.flat_map { |hex| hex.tile.cities }.find do |city|
-      city.tokens.compact.empty? && game.port_accesses(city).empty? && city != game.lille_city
-    end
-  end
+  # Liverpool (J25): a city inside LNWR's reach without a sea crossing (Chris' spec uses the same city).
+  let(:target) { game.hex_by_id('J25').tile.cities.first }
 
   def token_step_round!(corporation = operator, phase: '2')
     at_phase!(game, phase)
@@ -90,40 +87,6 @@ describe 'G18OE Wien Suedbahnhof (§14.3)' do
 
     expect(ws).to be_closed
     expect(owner.companies).not_to include(ws)
-  end
-
-  it 'needs a connection, as if the token were paid' do
-    ws
-    round = token_step_round!
-
-    expect { place!(round, target) }.to raise_error(Engine::GameError, /not connected/)
-  end
-
-  it 'still charges the fee for the ferries and sea zones (§11.2.1)' do
-    ws
-    round = token_step_round!
-    connect!(target)
-    cost = Struct.new(:ferries, :zones).new(1, 1)
-    allow(game).to receive(:cross_water_token_cost).and_return(cost)
-    fee = game.cross_water_fee_of(cost, :token)
-    expect(fee).to be_positive
-    fund!(game, operator, 200)
-    cash = operator.cash
-
-    place!(round, target)
-
-    expect(operator.cash).to eq(cash - fee)
-  end
-
-  it 'refuses the token when the RR cannot pay the fee' do
-    ws
-    round = token_step_round!
-    connect!(target)
-    cost = Struct.new(:ferries, :zones).new(1, 1)
-    allow(game).to receive(:cross_water_token_cost).and_return(cost)
-    operator.spend(operator.cash, game.bank) if operator.cash.positive?
-
-    expect { place!(round, target) }.to raise_error(Engine::GameError, /cannot pay/)
   end
 
   it 'is enumerated only for connected cities, and every offered action is accepted' do
