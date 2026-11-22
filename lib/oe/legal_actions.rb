@@ -474,7 +474,7 @@ module Oe
     end
 
     def generate_buy_shares(step, entity)
-      return issue_actions(entity, @game.redeemable_shares(entity), A::BuyShares) if step.is_a?(Engine::Step::IssueShares)
+      return issue_actions(entity, step.redeemable_shares(entity), A::BuyShares) if step.is_a?(Engine::Step::IssueShares)
 
       bundles = []
       @game.corporations.each do |corporation|
@@ -502,7 +502,7 @@ module Oe
     end
 
     def generate_sell_shares(step, entity)
-      return issue_actions(entity, @game.issuable_shares(entity), A::SellShares) if step.is_a?(Engine::Step::IssueShares)
+      return issue_actions(entity, step.issuable_shares(entity), A::SellShares) if step.is_a?(Engine::Step::IssueShares)
       return [] unless entity.player?
 
       bundles = @game.corporations.flat_map { |corporation| @game.bundles_for_corporation(entity, corporation) }
@@ -512,16 +512,16 @@ module Oe
       end
     end
 
-    # A buy_company / buy_corporation from another player is a trade offer (§10.4, #202): the seller
-    # answers it in Step::TradeOffer. With `compact: true` the offer prices (every whole amount from
-    # 0 to the buyer's cash) are one range per target, like bids (#91); `company` is the target's id
+    # A buy_company / buy_corporation from another player is a direct trade (Chris' engine, #563): the buyer names
+    # a whole price from 0 to their cash, no consent step, only in the first stock round before any other action.
+    # With `compact: true` the prices are one range per target, like bids (#91); `company` is the target's id
     # (the private, or the minor corporation for buy_corporation).
     def generate_buy_company(step, entity)
       actions = step.buyable_bank_owned_companies(entity).map do |company|
         A::BuyCompany.new(entity, company: company, price: company.value)
       end
       step.purchasable_companies(entity).each do |company|
-        actions.concat(trade_offers(step, entity, company) { |price, give| A::BuyCompany.new(entity, company: company, price: price, give: give) })
+        actions.concat(trade_offers(step, entity, company) { |price| A::BuyCompany.new(entity, company: company, price: price) })
       end
       actions
     end
@@ -530,9 +530,7 @@ module Oe
       @game.corporations.flat_map do |corporation|
         next [] unless step.can_buy_corporation?(entity, corporation)
 
-        trade_offers(step, entity, corporation) do |price, give|
-          A::BuyCorporation.new(entity, corporation: corporation, price: price, give: give)
-        end
+        trade_offers(step, entity, corporation) { |price| A::BuyCorporation.new(entity, corporation: corporation, price: price) }
       end
     end
 
@@ -540,24 +538,10 @@ module Oe
       min, max = step.price_range(entity, target)
       if @compact
         type = target.corporation? ? 'buy_corporation' : 'buy_company'
-        # #524: at the certificate limit a cash-only purchase is refused (§4.1); the price does not change that.
-        if max >= min && step.valid_trade_objects?(yield(min, []), target)
-          @ranges << { type: type, entity: entity.id, company: target.id, min: min, max: max, step: 1 }
-        end
+        @ranges << { type: type, entity: entity.id, company: target.id, min: min, max: max, step: 1 } if max >= min
         return []
       end
-      offers = sample(amounts(min, max, 5)).map { |price| yield price, [] }.select { |action| step.valid_trade_objects?(action, target) }
-      offers + trade_swaps(step, entity, target, min, max) { |price, give| yield price, give }
-    end
-
-    # §10.4 (#517): offers that give one of the buyer's own minors / face up privates; the other
-    # side's extra objects and bigger bundles are the UI's to build (the engine takes any list).
-    def trade_swaps(step, entity, target, min, max)
-      swaps = step.tradable_objects(entity).flat_map do |object|
-        sample(amounts(min, max, 5)).map { |price| yield price, [object] }
-      end
-      swaps = swaps.select { |action| step.valid_trade_objects?(action, target) }
-      sample(swaps)
+      sample(amounts(min, max, 5)).map { |price| yield price }
     end
 
     # ---- choose -----------------------------------------------------------
@@ -566,8 +550,6 @@ module Oe
       case step
       when Engine::Game::G18OE::Step::BuySellParShares then stock_choices(step, entity)
       when Engine::Game::G18OE::Step::IssueShares then issue_choices(step, entity)
-      when Engine::Game::G18OE::Step::HochbergToken then hochberg_choices(step, entity)
-      when Engine::Game::G18OE::Step::SmlTrain then sml_choices(step, entity)
       else plain_choices(step, entity)
       end
     end
@@ -576,16 +558,6 @@ module Oe
       return [] unless step.respond_to?(:choices)
 
       step.choices.keys.map { |choice| A::Choose.new(entity, choice: choice) }
-    end
-
-    # §14.8: the private places its token on one of the rough hexes (the action's target).
-    def hochberg_choices(step, entity)
-      step.hexes.map { |hex| A::Choose.new(entity, choice: step.class::CHOICE, target: hex) }
-    end
-
-    # §14.10: the private gives the rusted 2+2 to the RR operating (the action's target).
-    def sml_choices(step, entity)
-      step.corporations(entity).map { |corporation| A::Choose.new(entity, choice: step.class::CHOICE, target: corporation) }
     end
 
     def issue_choices(step, entity)

@@ -17,14 +17,15 @@ RSpec.describe Oe::LegalActions do
   # but the enumerator finds none).
   Played = Struct.new(:checkpoints, :dead_end, :classes, keyword_init: true)
 
-  def play(build, seed:, steps:, every:)
+  # stop_when: optional block over the game, checked before each move (e.g. leave at the end of a round family).
+  def play(build, seed:, steps:, every:, stop_when: nil)
     rng = Random.new(seed)
     game = build.call
     history = []
     played = Played.new(checkpoints: [], dead_end: nil, classes: Hash.new(0))
 
     steps.times do |index|
-      break if game.finished
+      break if game.finished || stop_when&.call(game)
 
       before = game.raw_actions.size
       actions = Oe::LegalActions.new(game, limit: 8, rng: rng).call
@@ -132,6 +133,48 @@ RSpec.describe Oe::LegalActions do
       end
     end
 
+    # Major phase (stubbed like consolidation_build): shares of started majors can be bought and sold.
+    def stock_major_build
+      lambda do
+        game = new_game(%w[a b c])
+        allow(game).to receive(:major_phase?).and_return(true)
+        game.instance_variable_set(:@turn, 2)
+        game.players.each_with_index { |player, index| start_major!(game, %w[LNWR PLM SFAI][index], player) }
+        game.players.each { |player| fund!(game, player) }
+        enter_round!(game, game.stock_round)
+        game
+      end
+    end
+
+    # First stock round (turn 1): a player may buy a private from or a floated minor of another player (direct trade).
+    def stock_trade_build
+      lambda do
+        game = new_game(%w[a b c])
+        game.instance_variable_set(:@turn, 1)
+        start_minor!(game, "B", game.players[1], "SP")
+        game.players.each { |player| fund!(game, player) }
+        enter_round!(game, game.stock_round)
+        game
+      end
+    end
+
+    # §11.7 (#552): a major with two shares in the Open Market, in the issue step of its operating round.
+    def issue_build
+      lambda do
+        game = new_game(%w[a b])
+        major = start_major!(game, "LNWR", game.players.first)
+        game.remove_major_par_markers!
+        fund!(game, major)
+        game.phase.next!
+        round = enter_round!(game, game.operating_round(1))
+        game.share_pool.transfer_shares(Engine::ShareBundle.new(major.ipo_shares.first(2)), game.share_pool)
+        round.instance_variable_set(:@current_operator, major)
+        step = round_step(round, Engine::Game::G18OE::Step::IssueShares)
+        step.setup
+        game
+      end
+    end
+
     def stock_build
       lambda do
         game = new_game(%w[a b c])
@@ -155,6 +198,65 @@ RSpec.describe Oe::LegalActions do
 
       expect(played.classes.keys).to include("BuySellParShares/Choose", "BuySellParShares/Par")
       expect_all_accepted(stock_build, played)
+    end
+
+    # #567 (#563 Task 4a): the stock-round families only, up to the first operating round. Random play passes
+    # often and ends the round early, so several seeds are played and the action families are pooled.
+    it "offers only accepted stock-round actions (par, buy, sell, concession, merge, trade) until the first OR" do
+      classes = Hash.new(0)
+      (1..12).each do |seed|
+        played = play(stock_build, seed: seed, steps: 120, every: 2, stop_when: ->(g) { g.round.operating? })
+        played.classes.each { |k, v| classes[k] += v }
+        expect_all_accepted(stock_build, played)
+      end
+
+      expect(classes.keys).to include("BuySellParShares/Choose", "BuySellParShares/Par")
+    end
+
+    it "offers direct trades (buy_corporation of another player's minor, any price 0..cash) the engine accepts" do
+      classes = Hash.new(0)
+      (1..6).each do |seed|
+        played = play(stock_trade_build, seed: seed, steps: 30, every: 1, stop_when: ->(g) { g.round.operating? })
+        played.classes.each { |k, v| classes[k] += v }
+        expect_all_accepted(stock_trade_build, played)
+      end
+
+      expect(classes.keys).to include("BuySellParShares/BuyCorporation")
+    end
+
+    # The issue step is the last of an operating round, so the scenario calls the step directly (as Chris' spec does)
+    # instead of playing the round up to it (that is the 4c work).
+    it "offers corporate share transactions of the issue step that the step accepts (§11.7)" do
+      build = lambda do
+        game = issue_build.call
+        [game, round_step(game.round, Engine::Game::G18OE::Step::IssueShares)]
+      end
+      game, step = build.call
+      major = game.corporation_by_id("LNWR")
+      enumerator = described_class.new(game, limit: 8, rng: Random.new(1))
+      buys = enumerator.send(:generate_buy_shares, step, major)
+      sells = enumerator.send(:generate_sell_shares, step, major)
+
+      expect(buys).not_to be_empty
+      expect(sells).not_to be_empty
+      { process_buy_shares: buys, process_sell_shares: sells }.each do |processor, actions|
+        actions.each do |action|
+          fresh_game, fresh = build.call
+          copy = Engine::Action::Base.action_from_h(action.to_h.dup.tap { action.clear_cache }, fresh_game)
+          expect { fresh.public_send(processor, copy) }.not_to raise_error, "#{processor} #{action.to_h}"
+        end
+      end
+    end
+
+    it "offers only accepted share trades in a major-phase stock round (buy, sell, par)" do
+      classes = Hash.new(0)
+      (1..4).each do |seed|
+        played = play(stock_major_build, seed: seed, steps: 50, every: 2, stop_when: ->(g) { g.round.operating? })
+        played.classes.each { |k, v| classes[k] += v }
+        expect_all_accepted(stock_major_build, played)
+      end
+
+      expect(classes.keys).to include("BuySellParShares/BuyShares", "BuySellParShares/SellShares")
     end
 
     it "offers only accepted actions in an operating round with majors" do
