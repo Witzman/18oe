@@ -8,6 +8,7 @@ require_relative 'graph'
 require_relative 'sea_routes'
 require_relative 'orient_express_duty'
 require_relative 'nationals'
+require_relative 'bbbt'
 require_relative 'train'
 require_relative '../base'
 require_relative 'depot'
@@ -29,6 +30,8 @@ require_relative 'step/home_hex_consent'
 require_relative 'step/special_track'
 require_relative 'step/home_position'
 require_relative 'step/reserve_share'
+require_relative 'step/protect_share'
+require_relative 'step/custody_share'
 require_relative 'step/orient_express_bonus'
 require_relative 'step/transfer_tokens'
 require_relative 'step/route'
@@ -46,6 +49,7 @@ module Engine
         include G18OE::SeaRoutes
         include G18OE::OrientExpressDuty
         include G18OE::Nationals
+        include G18OE::Bbbt
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
         attr_reader :fast_start_minors, :concessions, :merged_minors, :wcf_placeholder, :minor_c_ability,
@@ -1207,8 +1211,10 @@ module Engine
           minor.placed_tokens.any? { |token| nodes.key?(token.city) }
         end
 
+        # RB 14.4 (2): a share in custodianship is the one "exchanged when merging in a minor".
         def merge_share(major)
-          major.treasury_shares.find { |share| !share.president } ||
+          treasury = major.treasury_shares.reject(&:president)
+          treasury.find { |share| bbbt_custody?(share) } || treasury.first ||
             @share_pool.shares_by_corporation[major].first
         end
 
@@ -1464,6 +1470,7 @@ module Engine
               new_stock_round
             when Engine::Round::Stock
               @reserved_shares = []
+              bbbt_end_of_stock_round!
               remove_major_par_markers!
               round = super
               @operating_rounds = final_operating_rounds if @turn == @final_turn
@@ -1847,6 +1854,8 @@ module Engine
             G18OE::Step::MergeDiscardTrain,
             G18OE::Step::MergeMinor,
             G18OE::Step::ReserveShare,
+            G18OE::Step::ProtectShare,
+            G18OE::Step::CustodyShare,
             G18OE::Step::BuySellParShares,
           ])
         end

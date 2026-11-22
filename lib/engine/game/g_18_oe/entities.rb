@@ -64,6 +64,14 @@ module Engine
                   '(3) At any time during a SR, prevent one RR\'s share marker from moving DOWN for the rest of that SR; '\
                   'place this private\'s marker on that share marker. '\
                   'Exercising ability (2) or (3) closes this private at end of the SR.',
+            abilities: [
+              {
+                type: 'choose_ability',
+                owner_type: 'player',
+                when: 'owning_player_or_turn',
+                choices: {},
+              },
+            ],
             auction_row: 2,
           },
           # -----------------------------------------------------------------------
