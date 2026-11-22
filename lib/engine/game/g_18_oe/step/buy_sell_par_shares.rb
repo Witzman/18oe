@@ -155,7 +155,7 @@ module Engine
           def choose_available?(entity)
             return can_act_on_any_private?(entity) unless non_private_choices_allowed?(entity)
 
-            can_merge_any?(entity) || can_remove_any_corporation?(entity) || can_reserve_any?(entity) ||
+            can_merge_any?(entity) || can_offer_any?(entity) || can_remove_any_corporation?(entity) || can_reserve_any?(entity) ||
               can_act_on_any_private?(entity)
           end
 
@@ -191,6 +191,10 @@ module Engine
                 %i[major national].include?(c.type) && c.president?(player) && !@game.merge_share(c)
               end &&
               @game.corporations.any? { |c| c.type == :minor && c.owner == player }
+          end
+
+          def can_offer_any?(player)
+            owned_minors(player).any? { |minor| !offer_choices(player, minor).empty? }
           end
 
           def can_merge_any?(player)
@@ -249,6 +253,7 @@ module Engine
           def entity_choices(target)
             return private_choices(target) if target.company?
             return {} unless non_private_choices_allowed?(current_entity)
+            return offer_choices(current_entity, target) if owned_minor?(current_entity, target) && @round.current_actions.empty?
 
             corporation = target
             choices = {}
@@ -268,6 +273,7 @@ module Engine
 
           def process_choose(action)
             return process_private_choice(action) if action.target&.company?
+            return process_offer(action) if offer_request?(action)
             raise GameError, "Cannot choose #{action.choice} while above the certificate limit" unless
               non_private_choices_allowed?(action.entity)
 
@@ -279,6 +285,42 @@ module Engine
 
             @round.merge_minor = minor
             track_action(action, minor)
+          end
+
+          # RB 10.5: the minor's owner offers it to the presidents of other players' majors (MergeOffer).
+          def process_offer(action)
+            target = action.target
+            raise GameError, "Cannot offer #{target.name}" if target.owner != action.entity || @round.current_actions.any?
+            raise GameError, "Cannot #{action.choice} #{target.name}" unless offer_allowed?(target, action.choice)
+
+            offer_step.start!(target, action)
+          end
+
+          def offer_request?(action)
+            target = action.target
+            %w[offer_or_merge offer_or_abandon].include?(action.choice) && target&.corporation? && target.type == :minor
+          end
+
+          def offer_allowed?(target, choice)
+            @game.loading || entity_choices(target).key?(choice)
+          end
+
+          def offer_choices(player, minor)
+            return {} unless @game.phase.available?('3') && @round.current_actions.empty?
+
+            @game.merge_offer_majors(minor).empty? ? {} : { 'offer_or_merge' => 'Offer' }
+          end
+
+          def owned_minor?(player, corporation)
+            corporation.corporation? && corporation.type == :minor && corporation.owner == player
+          end
+
+          def owned_minors(player)
+            @game.corporations.select { |corporation| owned_minor?(player, corporation) }
+          end
+
+          def offer_step
+            @round.steps.find { |step| step.is_a?(G18OE::Step::MergeOffer) }
           end
 
           def process_private_choice(action)

@@ -61,16 +61,6 @@ module Engine
             end
           end
 
-          def process_choose(action)
-            return super unless offer_request?(action)
-
-            target = action.target
-            raise GameError, "Cannot offer #{target.name}" if target.owner != action.entity || @round.current_actions.any?
-            raise GameError, "Cannot #{action.choice} #{target.name}" unless offer_allowed?(target, action.choice)
-
-            offer_step.start!(target, action)
-          end
-
           private
 
           def minor_consolidation_help(player, regionals)
@@ -97,15 +87,6 @@ module Engine
             end
           end
 
-          def offer_request?(action)
-            target = action.target
-            %w[offer_or_merge offer_or_abandon].include?(action.choice) && target&.corporation? && target.type == :minor
-          end
-
-          def offer_allowed?(target, choice)
-            @game.loading || entity_choices(target).key?(choice)
-          end
-
           def offer_choices(player, minor)
             return {} unless @round.current_actions.empty?
 
@@ -118,21 +99,10 @@ module Engine
             end
           end
 
-          def owned_minor?(player, corporation)
-            corporation.corporation? && corporation.type == :minor && corporation.owner == player
-          end
-
-          def owned_minors(player)
-            @game.corporations.select { |corporation| owned_minor?(player, corporation) }
-          end
-
           def presides_regional?(player)
             @game.corporations.any? { |c| c.type == :regional && c.president?(player) }
           end
 
-          def offer_step
-            @round.steps.find { |step| step.is_a?(G18OE::Step::MergeOffer) }
-          end
         end
       end
     end

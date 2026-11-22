@@ -1853,6 +1853,7 @@ module Engine
             G18OE::Step::MergeToken,
             G18OE::Step::MergeDiscardTrain,
             G18OE::Step::MergeMinor,
+            G18OE::Step::MergeOffer,
             G18OE::Step::ReserveShare,
             G18OE::Step::ProtectShare,
             G18OE::Step::CustodyShare,
