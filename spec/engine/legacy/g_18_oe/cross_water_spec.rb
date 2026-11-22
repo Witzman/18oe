@@ -115,7 +115,6 @@ describe 'G18OE track and tokens across open water (§11.1.3, §11.1.6, §11.2.1
       expect(game.cross_water_tile_fee(lnwr, hex('I50'), offshore)).to eq(20)
     end
 
-    # TRIAGE #563 Task 8: wrapper spec (Oe::LegalActions.affordable_lay?, Oe::View), belongs to Task 4b/5; red until then.
     it 'shows the fee in the price of the hex and leaves out a hex the RR cannot pay (view, enumerator)' do
       step = track_step
       tiles = step.upgradeable_tiles(lnwr, hex('K60')).map { |t| [t, t.legal_rotations.dup] }
@@ -125,22 +124,22 @@ describe 'G18OE track and tokens across open water (§11.1.3, §11.1.6, §11.2.1
       expect(price[:cost_parts]).to eq([{ label: 'sea', amount: 10 }])
 
       cash!(lnwr, 9)
-      expect(Oe::LegalActions.new(game).affordable_lay?(lnwr, hex('K60'))).to be(false)
+      # Chris' engine has only the per-tile fee (no hex-level minimum fee): the hex drops out of the lay options
+      # because none of its rotations is affordable, not through affordable_lay?
+      options = Oe::LegalActions.new(game).lay_tile_options(step, lnwr)
+      expect(options.map { |h, _| h.id }).not_to include('K60')
     end
 
-    # TRIAGE #563 Task 8: wrapper spec (Oe::RouteSearch), fate decided in Task 6 (RouteSearch entfaellt -> AutoRouter); red on purpose.
-    it 'does not start the route search at a stop reached over the sea' do
+    it 'offers no route that visits a stop reached over the sea' do
       with_trains!(game, lnwr)
-      expect(game.graph.connected_nodes(lnwr)).to include(city('I50')) # computed before the spy
-      search = Oe::RouteSearch.new(game)
-      nodes = []
-      allow(game.graph).to receive(:walk_token).and_wrap_original do |original, node, **opts, &block|
-        nodes << node
-        original.call(node, **opts, &block)
-      end
-      search.path(lnwr.trains, lnwr, walk_limit: 50)
+      expect(game.graph.connected_nodes(lnwr)).to include(city('I50'))
+      # Chris' AutoRouter walks from every connected node (the old RouteSearch skipped the sea-reached ones
+      # itself); what counts is that no candidate route comes out visiting the København stop
+      train_routes, = Oe::RouteSearch.new(game).path(lnwr.trains, lnwr, walk_limit: 50)
+      stops = train_routes.values.flatten.flat_map { |route| route.stops.map { |stop| stop.hex.id } }
 
-      expect(nodes).not_to include(city('I50'))
+      expect(stops).not_to be_empty
+      expect(stops).not_to include('I50')
     end
 
     it 'charges nothing where the RR reaches over land (§11.1.6)' do

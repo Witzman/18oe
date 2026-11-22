@@ -4,10 +4,11 @@
 # text only. Patch engine/patches/0017-brandt-brandau.patch: a tile_lay ability (4 free yellow lays on rough hexes, two per OR),
 # G18OE::Step::SpecialTrack, a hex token that closes the lay's track to RRs of other players (graph_skip_paths, route check,
 # national revenue) and removal by another RR in its Track step (RemoveHexToken, tile points and terrain cost).
-# Not covered here: the move enumerator (Oe::LegalActions) and the view.
+# The move enumerator is covered only as far as 'move enumerator' below (carried over from the old legacy spec); the view is not.
 
 require_relative '../../engine/engine_helper'
 require_relative '../../engine/g_18_oe/helpers'
+require 'oe/legal_actions'
 
 describe 'G18OE Brandt and Brandau, Engineers (RB 14.9, 11.3.10)' do
   include G18OESpecHelpers
@@ -169,6 +170,38 @@ describe 'G18OE Brandt and Brandau, Engineers (RB 14.9, 11.3.10)' do
       national = Struct.new(:type) { def corporation? = true }.new(:national)
 
       expect(other_track.bbe_removal_money(national, game.hex_by_id('R39'))).to eq(0)
+    end
+  end
+
+  # Carried over from spec/engine/legacy/g_18_oe/brandt_brandau_spec.rb (#563): what the wrapper's enumerator offers.
+  describe 'move enumerator (Oe::LegalActions)' do
+    def legal
+      Oe::LegalActions.new(game)
+    end
+
+    def company_lays(hex_id)
+      legal.call.select { |a| a.is_a?(Engine::Action::LayTile) && a.entity == bbe && a.hex.id == hex_id }
+    end
+
+    it 'offers the private\'s lay on a rough hex, and no third hex after two tokens in the OR' do
+      expect(company_lays('R39')).not_to be_empty
+      act!(round, company_lays('R39').first)
+      act!(round, company_lays('S38').first)
+
+      expect(company_lays('Q50')).to be_empty
+    end
+
+    it 'offers the removal of the token to the RR of another player' do
+      pending('Oe::LegalActions does not offer RemoveHexToken yet (finding #563: wrapper, not engine)')
+      place!('R39')
+      other_op = start_major!(game, 'CHN', other)
+      fund!(game, other_op, 500)
+      game.minor_regional_order.delete(other_op)
+      game.minor_regional_order.unshift(other_op)
+      enter_round!(game, game.operating_round(1)).setup
+
+      removal = legal.call.find { |a| a.is_a?(Engine::Action::RemoveHexToken) }
+      expect(removal&.hex&.id).to eq('R39')
     end
   end
 end

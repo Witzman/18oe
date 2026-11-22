@@ -457,18 +457,19 @@ describe 'G18OE Concession RR Phase (§8, §8.1)' do
       expect(step.can_buy?(b, lnwr.ipo_shares.first.to_bundle)).to be(true)
     end
 
-    it 'keeps the unparred regionals, but unparrable, when a par-only reaches the regional maximum (§8.2, #348)' do
+    it 'closes the six unparred regionals when a par-only reaches the regional maximum (§8.2, #348, Chris)' do
       concession_round!([a, b])
       float_regionals!(game, game.class::MAX_FLOATED_REGIONALS - 1, except: ['LNWR'])
       a.spend(a.cash - 100, game.bank)
+      left = game.corporations.select { |c| c.type == :regional && !c.ipoed && c.id != 'LNWR' }
       lnwr = par_only!(a)
 
       expect(lnwr).not_to be_closed
       expect(lnwr).not_to be_floated
       expect(game.minor_regional_order).to include(lnwr)
-      unparred = game.corporations.select { |c| c.type == :regional && !c.ipoed }
-      expect(unparred.size).to eq(6)
-      expect(unparred.map { |c| game.can_par?(c, b) }).to all(be(false))
+      # Chris' engine closes them (the legacy engine kept them, unparrable); they must not be parrable either way
+      expect(left.size).to eq(6)
+      expect(left).to all(be_closed)
     end
 
     it 'keeps the Regional/Minor phase while a parred regional is unfloated (§8.2)' do
