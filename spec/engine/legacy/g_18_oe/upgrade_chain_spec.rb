@@ -33,13 +33,13 @@ describe 'G18OE several upgrades of one hex in one lay track step (§11.1.1)' do
     lay!(:yellow)
     lay!(:green)
 
-    expect([hex.tile.color, step.points_left(major)]).to eq([:green, 3])
+    expect([hex.tile.color, step.send(:remaining_tile_points, major)]).to eq([:green, 3])
   end
 
   it 'lets a major go on to brown (triple upgrade, 1 + 2 + 2 points)' do
     %i[yellow green brown].each { |color| lay!(color) }
 
-    expect([hex.tile.color, step.points_left(major)]).to eq([:brown, 1])
+    expect([hex.tile.color, step.send(:remaining_tile_points, major)]).to eq([:brown, 1])
   end
 
   it 'refuses the gray quadruple upgrade to a major, which has only 6 points (needs 7)' do
@@ -54,7 +54,7 @@ describe 'G18OE several upgrades of one hex in one lay track step (§11.1.1)' do
     allow(game).to receive(:tile_point_budget).and_return(9)
     %i[yellow green brown gray].each { |color| lay!(color) }
 
-    expect([hex.tile.color, step.points_left(major)]).to eq([:gray, 2])
+    expect([hex.tile.color, step.send(:remaining_tile_points, major)]).to eq([:gray, 2])
   end
 
   it 'offers only the next color, never skips one (§11.1.3)' do

@@ -1,7 +1,12 @@
 # frozen_string_literal: true
 
-require_relative '../engine_helper'
-require_relative 'helpers'
+# EXTENSION (decision open, #557; 3 examples red until decided): rulebook 8.2 ends the Regional/Minor phase when the
+# 18th regional has FLOATED and then removes the six others; Chris closes them when the 18th is PARRED (diff-A A4,
+# step/buy_sell_par_shares.rb close_unfloated_regionals_at_maximum! uses regionals_in_play = ipoed).
+# Patch if kept: count floated regionals there and let Game#can_par? block at 18 in play.
+
+require_relative '../../engine/engine_helper'
+require_relative '../../engine/g_18_oe/helpers'
 
 # Assumption A2 of #342: the Regional/Minor RR Phase ends with the 18th regional that has FLOATED (§5.1.3, §8.2),
 # not with the 18th that has been parred.

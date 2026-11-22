@@ -6,7 +6,8 @@ require_relative 'helpers'
 # PB 5.4 "Two Player Full Game" (PDF p. 14): no concessions; up to 70 % of a major or national instead of
 # 60 % (§10.2); the Aggressive Game rules of PB 5.5 apply, so §11.1.9 Right-of-Way and §8.4 reserved shares
 # fall away. Each rule has its own detailed spec; this one pins them together for one two-player game and
-# plays the opening rounds (#499). Details: two_player_ownership_spec (70 %), right_of_way_spec (two-player
+# plays the opening rounds (#499). Right-of-Way off with two players: Chris' right_of_way_spec 'is not available in a
+# two-player game' (the engine has no right_of_way_rules? helper any more, #563 Task 8). Details: two_player_ownership_spec (70 %), right_of_way_spec (two-player
 # contexts), reserved_shares_spec ('is unavailable with two players'), setup_spec (cash, concessions).
 describe 'G18OE two-player full game (PB 5.4)' do
   include G18OESpecHelpers
@@ -19,18 +20,16 @@ describe 'G18OE two-player full game (PB 5.4)' do
       starting_cash: game.players.map(&:cash),
       concessions: game.companies.count { |c| c.type == :concession },
       major_cap: game.major_max_ownership_percent,
-      right_of_way: game.right_of_way_rules?,
       reserved_shares: game.reserved_shares?
-    ).to eq(starting_cash: [2600, 2600], concessions: 0, major_cap: 70, right_of_way: false, reserved_shares: false)
+    ).to eq(starting_cash: [2600, 2600], concessions: 0, major_cap: 70, reserved_shares: false)
   end
 
   it 'keeps the full-game rules with three players' do
     expect(
       concessions: three.companies.count { |c| c.type == :concession },
       major_cap: three.major_max_ownership_percent,
-      right_of_way: three.right_of_way_rules?,
       reserved_shares: three.reserved_shares?
-    ).to eq(concessions: 10, major_cap: 60, right_of_way: true, reserved_shares: true)
+    ).to eq(concessions: 10, major_cap: 60, reserved_shares: true)
   end
 
   describe 'opening rounds without concessions' do

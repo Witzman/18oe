@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
-require_relative '../engine_helper'
-require_relative 'helpers'
+# 36 of 39 examples are green on Chris' engine and go beyond his dividend_spec (rounding, par value, markers).
+# The 3 red ones ("move UP at the end of the second row", "DOWN in the top row", "£30") depend on the board market
+# grid, see stock_market_board_spec.rb (same patch).
+
+require_relative '../../engine/engine_helper'
+require_relative '../../engine/g_18_oe/helpers'
 
 describe 'G18OE dividends (§11.4, §4.4)' do
   include G18OESpecHelpers
