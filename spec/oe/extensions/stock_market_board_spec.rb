@@ -1,7 +1,12 @@
 # frozen_string_literal: true
 
-require_relative '../engine_helper'
-require_relative 'helpers'
+# EXTENSION, red until the patch exists (#563 Task 8/9): the market grid of the printed Info Board
+# (input/map/stockboard.png: nine rows, 30 to 550). Chris' G18OE::Game::MARKET has eight rows from 50 to 550 with
+# fewer fields per row. Patch: replace MARKET (and STOCKMARKET_COLORS/types if needed); StockMarket#up already
+# has the top-row rule. Decision #557 needed because Chris' table differs from the board.
+
+require_relative '../../engine/engine_helper'
+require_relative '../../engine/g_18_oe/helpers'
 
 # The grid of the printed Info Board (input/map/stockboard.png in the workshop, #482), nine rows; every row
 # starts at the physical column of its leftmost field, so the major par column (red) is column 4 in each row.

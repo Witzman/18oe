@@ -24,8 +24,12 @@ describe 'G18OE abbreviated last OR (§13)' do
     round.steps.map { |step| step.class.name.split('::').last }.grep_v(/EndGame|Message|Program/)
   end
 
+  # Chris' engine keeps the previous OR's run in operating_history (game_end_spec record_revenue!), not in
+  # Game#record_payout!.
   def remember_payout!(corporation, revenue, kind)
-    game.record_payout!(corporation, revenue, kind)
+    action = Engine::Action::Dividend.new(corporation, kind: kind.to_s)
+    runs = corporation.trains.map { |train| Struct.new(:train, :connection_hexes, :halts, :node_signatures).new(train, [], 0, []) }
+    corporation.operating_history[[3, 1]] = Engine::OperatingInfo.new(runs, action, revenue, {})
   end
 
   def start_round!(round_num)

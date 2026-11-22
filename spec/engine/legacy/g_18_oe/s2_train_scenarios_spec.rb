@@ -60,9 +60,11 @@ describe 'G18OE S2 train scenarios (§8.3, §11.6.4, §5.2)' do
       game.fulfill_train_obligation!(major)
       round = operating_round_for!(game, 1)
       at_phase!(game, '4')
+      # Chris' engine offers the national formation before the discard (form_national_spec); decline it.
+      game.national_formation_done!(game.national_formation_player) while game.national_formation_player
 
       expect(game.crowded_corps).to include(major)
-      step = round_step(round, Engine::Game::G18OE::Step::DiscardTrain)
+      step = round_step(round, Engine::Step::DiscardTrain)
       expect(step).to be_active
       act!(round, Engine::Action::DiscardTrain.new(major, train: trains.first))
 
