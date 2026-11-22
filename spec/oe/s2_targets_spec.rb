@@ -58,7 +58,7 @@ RSpec.describe "S2 target list, conversions, merges and train discards (#224)" d
     "consolidation abandon" => %w[consolidation/Consolidate/choose:offer_or_abandon],
     "consolidation offer" => %w[consolidation/Consolidate/choose:offer_or_merge],
     "consolidation answer" => %w[consolidation/MergeOffer/choose:merge_offer consolidation/MergeOffer/pass],
-    "national formation" => %w[operating/ConvertToNational/convert operating/ConvertToNational/pass],
+    "national formation" => %w[operating/FormNational/choose:convert operating/FormNational/choose:done],
     "lower train limit" => %w[operating/DiscardTrain/discard_train],
   }.freeze
 
@@ -159,6 +159,8 @@ RSpec.describe "S2 target list, conversions, merges and train discards (#224)" d
     game.fulfill_train_obligation!(major)
     operating_round_for!(game, 1)
     at_phase!(game, "4")
+    # Chris' FormNational window comes before the discard step; the player declines it.
+    act!(game.round, Engine::Action::Choose.new(game.players[0], choice: "done")) if game.national_formation_player
   end
 
   SCENARIOS.each do |name, keys|
