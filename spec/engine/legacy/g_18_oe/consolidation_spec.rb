@@ -22,7 +22,7 @@ describe 'G18OE consolidation (§5.1.5, §10.6)' do
   end
 
   it 'is triggered by the first level 5 train' do
-    expect(game.depot.upcoming.find { |t| t.name == '5' }.events).to eq([{ 'type' => 'consolidation_triggered' }])
+    expect(game.depot.upcoming.find { |t| t.name == '5' }.events).to eq([{ 'type' => 'consolidation_triggered' }, { 'type' => 'minor_d_token' }])
   end
 
   it 'replaces the stock round after the operating round set ends' do
@@ -104,8 +104,14 @@ describe 'G18OE consolidation (§5.1.5, §10.6)' do
   end
 
   it 'is followed by operating rounds in the same turn' do
-    consolidation!([%w[LNWR], %w[PLM], %w[SFAI]])
+    round = consolidation!([[], [], []])
+    start_major!(game, 'LNWR', game.players.first)
     turn = game.turn
+    expect(game.consolidation_complete).to be_falsey
+    game.players.each(&:pass!)
+    round.next_entity!
+
+    expect(game.consolidation_complete).to be(true)
     game.next_round!
 
     expect(game.round).to be_a(Engine::Round::G18OE::Operating)
