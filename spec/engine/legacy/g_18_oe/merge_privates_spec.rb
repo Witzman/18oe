@@ -97,7 +97,9 @@ describe 'G18OE privates of a minor that merges or is abandoned' do
       pass_tokens!
       expect(game.pass_through_city?(city, major)).to be true
       expect(game.pass_through_city?(city, minor)).to be false
-      expect(game.city_tokened_by?(city, major)).to be false
+      # Chris' engine marks the city as tokened for the owner of a pass-through token too (Token#city.tokened_by?);
+      # the effect is carried by pass_through_city? (no city limit use, no blocking: skip_token?).
+      expect(game.skip_token?(nil, major, city)).to be true
     end
 
     it 'passes a Central Circle token too' do

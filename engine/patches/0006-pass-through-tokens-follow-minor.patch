@@ -1,0 +1,45 @@
+diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
+index 1288f5e..84ff5ab 100644
+--- a/lib/engine/game/g_18_oe/game.rb
++++ b/lib/engine/game/g_18_oe/game.rb
+@@ -680,6 +680,20 @@ module Engine
+           clear_graph_for_entity(corporation)
+         end
+ 
++        # RB 14.5, 14.6: the pass-through token of a minor goes to the major it merges into (`major`); when the minor is
++        # abandoned (also by a merge into a national) the token is removed.
++        def transfer_pass_through_tokens!(minor, major = nil)
++          @pass_through_tokens.select { |_company, token| token.corporation == minor }.each do |company, token|
++            city = token.city
++            token.remove!
++            @pass_through_tokens.delete(company)
++            next unless major
++
++            place_pass_through_token!(company, major, city)
++          end
++          clear_graph
++        end
++
+         def pass_through_token_lines(corporation)
+           @pass_through_tokens.filter_map do |company, token|
+             next unless token.corporation == corporation
+@@ -1111,6 +1125,7 @@ module Engine
+           @log << "#{minor.name} is abandoned"
+           minor.trains.reject { |train| pullman?(train) }.each { |train| @depot.reclaim_train(train) }
+           minor.placed_tokens.each(&:remove!)
++          transfer_pass_through_tokens!(minor)
+           return_minor_d_token!(minor)
+           minor.spend(minor.cash, @bank) if minor.cash.positive?
+           @share_pool.transfer_shares(minor.presidents_share.to_bundle, minor.ipo_owner, allow_president_change: false)
+diff --git a/lib/engine/game/g_18_oe/step/merge_minor.rb b/lib/engine/game/g_18_oe/step/merge_minor.rb
+index 2e46482..708b98a 100644
+--- a/lib/engine/game/g_18_oe/step/merge_minor.rb
++++ b/lib/engine/game/g_18_oe/step/merge_minor.rb
+@@ -102,6 +102,7 @@ module Engine
+               @game.abandon_minor!(minor)
+             else
+               @game.add_minor_charter!(minor, major)
++              @game.transfer_pass_through_tokens!(minor, major)
+               @round.pending_acquisition = { minor: minor, corporation: major }
+               @round.steps.find { |step| step.is_a?(MergeToken) }.resolve_forced!
+             end

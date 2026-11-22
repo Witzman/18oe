@@ -102,6 +102,7 @@ module Engine
               @game.abandon_minor!(minor)
             else
               @game.add_minor_charter!(minor, major)
+              @game.transfer_pass_through_tokens!(minor, major)
               @round.pending_acquisition = { minor: minor, corporation: major }
               @round.steps.find { |step| step.is_a?(MergeToken) }.resolve_forced!
             end

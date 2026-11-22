@@ -680,6 +680,20 @@ module Engine
           clear_graph_for_entity(corporation)
         end
 
+        # RB 14.5, 14.6: the pass-through token of a minor goes to the major it merges into (`major`); when the minor is
+        # abandoned (also by a merge into a national) the token is removed.
+        def transfer_pass_through_tokens!(minor, major = nil)
+          @pass_through_tokens.select { |_company, token| token.corporation == minor }.each do |company, token|
+            city = token.city
+            token.remove!
+            @pass_through_tokens.delete(company)
+            next unless major
+
+            place_pass_through_token!(company, major, city)
+          end
+          clear_graph
+        end
+
         def pass_through_token_lines(corporation)
           @pass_through_tokens.filter_map do |company, token|
             next unless token.corporation == corporation
@@ -1111,6 +1125,7 @@ module Engine
           @log << "#{minor.name} is abandoned"
           minor.trains.reject { |train| pullman?(train) }.each { |train| @depot.reclaim_train(train) }
           minor.placed_tokens.each(&:remove!)
+          transfer_pass_through_tokens!(minor)
           return_minor_d_token!(minor)
           minor.spend(minor.cash, @bank) if minor.cash.positive?
           @share_pool.transfer_shares(minor.presidents_share.to_bundle, minor.ipo_owner, allow_president_change: false)
