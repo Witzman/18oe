@@ -13,7 +13,7 @@ describe 'G18OE cash settlement of a merger into another player\'s major (§10.5
   include G18OESpecHelpers
 
   let(:game) { new_game }
-  let(:round) { stock_round!(game) }
+  let(:round) { enter_round!(game, game.new_consolidation_round) }
   let(:owner) { round.current_entity }
   let(:rival) { game.players.find { |p| p != owner } }
   let(:minor) { start_minor!(game, 'B', owner, 'SP') }
@@ -23,7 +23,7 @@ describe 'G18OE cash settlement of a merger into another player\'s major (§10.5
     allow(game).to receive(:major_phase?).and_return(true)
     game.phase.next!
     minor
-    act!(round, Engine::Action::Choose.new(owner, choice: 'offer_or_merge', target: minor))
+    act!(round, Engine::Action::Choose.new(owner, choice: 'offer_or_abandon', target: minor))
   end
 
   def offer!(choice)
