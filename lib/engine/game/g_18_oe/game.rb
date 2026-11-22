@@ -26,6 +26,7 @@ require_relative 'step/merge_token'
 require_relative 'step/concession'
 require_relative 'step/choose_operating_position'
 require_relative 'step/home_hex_consent'
+require_relative 'step/home_position'
 require_relative 'step/reserve_share'
 require_relative 'step/orient_express_bonus'
 require_relative 'step/transfer_tokens'
@@ -86,6 +87,8 @@ module Engine
         FORCED_NATIONAL_CHOICE = 'national'
         MUST_SELL_IN_BLOCKS = false
         HOME_TOKEN_TIMING = :float
+        # RB 11.1.9: when a tile laid on the metropolis gives SB or MSP its home position, its own president chooses it
+        TOKEN_PLACEMENT_ON_TILE_LAY_ENTITY = :owner
         TILE_RESERVATION_BLOCKS_OTHERS = :always
         REVISITABLE_NODES = %w[town double_town].freeze
         # bank-break ends current OR; first level-8 purchase ends after one more full OR set
@@ -939,6 +942,25 @@ module Engine
           face_value = corporation.type == :minor ? G18OE::Step::BuyTrain::MINOR_CHARTER_VALUE : corporation.par_price.price * 2
           reserved_price = self.class::TRAINS.find { |train| train[:name] == '2+2' }[:price]
           face_value + [reserved_price - corporation.cash, 0].max
+        end
+
+        # RB 11.1.9, last paragraph: "The president may not select a home token position that triggers the need to place a
+        # green tile as outlined above if a token position is available that would not do so." Would the home station in
+        # `city` leave the RR unable to connect to another stop (so the Right-of-Way green tile would apply)?
+        def right_of_way_home_position_needed?(corporation, city)
+          return false unless @players.size > 2 && !@phase.tiles.include?(:green)
+
+          track = G18OE::Step::Track.new(self, @round)
+          track.instance_variable_set(:@points_used, 0)
+          !track.home_connectable?(corporation, track.send(:get_tile_lay, corporation), {}, city, corporation.cash)
+        end
+
+        # Positions of a metropolis the home station may take: those that do not trigger the green tile, or all of them
+        # when every one does.
+        def home_position_cities(corporation, hex)
+          open = hex.tile.cities.select { |city| city.tokenable?(corporation, free: true) }
+          fine = open.reject { |city| right_of_way_home_position_needed?(corporation, city) }
+          fine.empty? ? open : fine
         end
 
         # RB 11.1.9, part 2: "The home token hex of a floated RR may not have yellow track laid on it without the explicit
@@ -1841,7 +1863,7 @@ module Engine
             Engine::Step::Exchange,
             G18OE::Step::FormNational,
             Engine::Step::DiscardTrain,
-            Engine::Step::HomeToken,
+            G18OE::Step::Operating::HomeToken,
             G18OE::Step::Assign,
             G18OE::Step::HomeHexConsent,
             G18OE::Step::Track,

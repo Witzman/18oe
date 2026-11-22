@@ -1,0 +1,184 @@
+diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
+index f2ce8e8..1118b5d 100644
+--- a/lib/engine/game/g_18_oe/game.rb
++++ b/lib/engine/game/g_18_oe/game.rb
+@@ -26,6 +26,7 @@ require_relative 'step/merge_token'
+ require_relative 'step/concession'
+ require_relative 'step/choose_operating_position'
+ require_relative 'step/home_hex_consent'
++require_relative 'step/home_position'
+ require_relative 'step/reserve_share'
+ require_relative 'step/orient_express_bonus'
+ require_relative 'step/transfer_tokens'
+@@ -86,6 +87,8 @@ module Engine
+         FORCED_NATIONAL_CHOICE = 'national'
+         MUST_SELL_IN_BLOCKS = false
+         HOME_TOKEN_TIMING = :float
++        # RB 11.1.9: when a tile laid on the metropolis gives SB or MSP its home position, its own president chooses it
++        TOKEN_PLACEMENT_ON_TILE_LAY_ENTITY = :owner
+         TILE_RESERVATION_BLOCKS_OTHERS = :always
+         REVISITABLE_NODES = %w[town double_town].freeze
+         # bank-break ends current OR; first level-8 purchase ends after one more full OR set
+@@ -941,6 +944,25 @@ module Engine
+           face_value + [reserved_price - corporation.cash, 0].max
+         end
+ 
++        # RB 11.1.9, last paragraph: "The president may not select a home token position that triggers the need to place a
++        # green tile as outlined above if a token position is available that would not do so." Would the home station in
++        # `city` leave the RR unable to connect to another stop (so the Right-of-Way green tile would apply)?
++        def right_of_way_home_position_needed?(corporation, city)
++          return false unless @players.size > 2 && !@phase.tiles.include?(:green)
++
++          track = G18OE::Step::Track.new(self, @round)
++          track.instance_variable_set(:@points_used, 0)
++          !track.home_connectable?(corporation, track.send(:get_tile_lay, corporation), {}, city, corporation.cash)
++        end
++
++        # Positions of a metropolis the home station may take: those that do not trigger the green tile, or all of them
++        # when every one does.
++        def home_position_cities(corporation, hex)
++          open = hex.tile.cities.select { |city| city.tokenable?(corporation, free: true) }
++          fine = open.reject { |city| right_of_way_home_position_needed?(corporation, city) }
++          fine.empty? ? open : fine
++        end
++
+         # RB 11.1.9, part 2: "The home token hex of a floated RR may not have yellow track laid on it without the explicit
+         # permission of the RR's president. Un-floated RRs automatically provide this permission." Not in a two-player game.
+         def home_hex_of?(corporation, hex)
+@@ -1841,7 +1863,7 @@ module Engine
+             Engine::Step::Exchange,
+             G18OE::Step::FormNational,
+             Engine::Step::DiscardTrain,
+-            Engine::Step::HomeToken,
++            G18OE::Step::Operating::HomeToken,
+             G18OE::Step::Assign,
+             G18OE::Step::HomeHexConsent,
+             G18OE::Step::Track,
+diff --git a/lib/engine/game/g_18_oe/step/home_position.rb b/lib/engine/game/g_18_oe/step/home_position.rb
+new file mode 100644
+index 0000000..94bdc6d
+--- /dev/null
++++ b/lib/engine/game/g_18_oe/step/home_position.rb
+@@ -0,0 +1,44 @@
++# frozen_string_literal: true
++
++require_relative '../../../step/home_token'
++
++module Engine
++  module Game
++    module G18OE
++      module Step
++        # RB 11.1.9, last paragraph: a metropolis home position that triggers the Right-of-Way green tile is not chosen
++        # while another position does not (Game#home_position_cities). Oe::LegalActions asks #pass_city_ok? for the same
++        # positions.
++        module HomePosition
++          def pass_city_ok?(_entity, city)
++            corporation = token.corporation
++            return true unless @game.metropolis_hex?(city.hex) && corporation.corporation?
++
++            @game.home_position_cities(corporation, city.hex).include?(city)
++          end
++
++          def check_home_position!(action)
++            return if pass_city_ok?(action.entity, action.city)
++
++            raise GameError, "#{token.corporation.name} must choose a home token position that does not need the " \
++                             'Right-of-Way green tile (RB 11.1.9)'
++          end
++        end
++
++        # The operating round's home token step (a tile laid on a metropolis makes SB or MSP choose its position there):
++        # the engine's own step plus the position rule. G18OE::Step::HomeToken, which also claims a minor's track rights
++        # region, is for the stock and the concession round.
++        module Operating
++          class HomeToken < Engine::Step::HomeToken
++            include HomePosition
++
++            def process_place_token(action)
++              check_home_position!(action)
++              super
++            end
++          end
++        end
++      end
++    end
++  end
++end
+diff --git a/lib/engine/game/g_18_oe/step/home_token.rb b/lib/engine/game/g_18_oe/step/home_token.rb
+index c851155..fb3f4c2 100644
+--- a/lib/engine/game/g_18_oe/step/home_token.rb
++++ b/lib/engine/game/g_18_oe/step/home_token.rb
+@@ -1,13 +1,17 @@
+ # frozen_string_literal: true
+ 
+ require_relative '../../../step/home_token'
++require_relative 'home_position'
+ 
+ module Engine
+   module Game
+     module G18OE
+       module Step
+         class HomeToken < Engine::Step::HomeToken
++          include HomePosition
++
+           def process_place_token(action)
++            check_home_position!(action)
+             minor = action.entity.type == :minor
+             hex = action.city.hex
+             if minor
+diff --git a/lib/engine/game/g_18_oe/step/track.rb b/lib/engine/game/g_18_oe/step/track.rb
+index e64c2d8..4df6137 100644
+--- a/lib/engine/game/g_18_oe/step/track.rb
++++ b/lib/engine/game/g_18_oe/step/track.rb
+@@ -62,30 +62,43 @@ module Engine
+             home_connectable?(Array(entity_or_entities).first, 0, hex => tile)
+           end
+ 
+-          def home_connectable?(entity, points, laid = {})
+-            return false unless (home = entity.tokens.first&.city)
++          # With `cash` the search also counts the terrain cost of the lays and rejects a route whose lays the RR cannot pay
++          # or that would leave it unable to buy its reserved 2+2 (RB 11.1.9 "without causing a first turn bankruptcy").
++          def home_connectable?(entity, points, laid = {}, home = nil, cash = nil)
++            return false unless (home ||= entity.tokens.first&.city)
+ 
+             cheapest = {}
+-            queue = home.exits.map { |exit| [home.hex, exit, 0] } + yellow_lay_ends(entity, home.hex, home.tile, 0, points)
++            queue = home.exits.map { |exit| [home.hex, exit, 0, 0] } +
++                    affordable_lay_ends(entity, yellow_lay_ends(entity, home.hex, home.tile, 0, points), 0, cash)
+             until queue.empty?
+-              hex, exit, cost = queue.shift
+-              next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]] <= cost
++              hex, exit, cost, money = queue.shift
++              next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]].all? { |c, m| c <= cost && m <= money }
+ 
+-              cheapest[[hex.id, exit]] = cost
++              (cheapest[[hex.id, exit]] ||= []) << [cost, money]
+               crossings(hex, exit).each do |neighbor, edge|
+                 tile = laid[neighbor] || neighbor.tile
+                 paths = tile.paths.select { |path| path.exits.include?(edge) }.flat_map { |path| path.junction&.paths || [path] }
+                 return true if paths.any? { |path| path.nodes.any? { |node| node != home } }
+ 
+-                lay_ends = yellow_lay_ends(entity, neighbor, tile, cost, points)
++                lay_ends = affordable_lay_ends(entity, yellow_lay_ends(entity, neighbor, tile, cost, points), money, cash)
+                 return true if !lay_ends.empty? && !tile.city_towns.empty?
+ 
+-                queue.concat(paths.flat_map(&:exits).map { |track_exit| [neighbor, track_exit, cost] }, lay_ends)
++                queue.concat(paths.flat_map(&:exits).map { |track_exit| [neighbor, track_exit, cost, money] }, lay_ends)
+               end
+             end
+             false
+           end
+ 
++          # The lay ends of yellow_lay_ends with the money of the lay added; without `cash` no money is counted.
++          def affordable_lay_ends(entity, lay_ends, money, cash)
++            lay_ends.filter_map do |hex, exit, cost|
++              total = money + (cash ? hex.tile.upgrades.sum(&:cost) : 0)
++              next if cash && (total > cash || !@game.first_round_spend_allowed?(entity, total))
++
++              [hex, exit, cost, total]
++            end
++          end
++
+           def can_lay_tile?(entity)
+             return true if @game.track_token_placeable?(entity)
+ 

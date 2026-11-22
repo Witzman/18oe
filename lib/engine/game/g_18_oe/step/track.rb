@@ -62,28 +62,41 @@ module Engine
             home_connectable?(Array(entity_or_entities).first, 0, hex => tile)
           end
 
-          def home_connectable?(entity, points, laid = {})
-            return false unless (home = entity.tokens.first&.city)
+          # With `cash` the search also counts the terrain cost of the lays and rejects a route whose lays the RR cannot pay
+          # or that would leave it unable to buy its reserved 2+2 (RB 11.1.9 "without causing a first turn bankruptcy").
+          def home_connectable?(entity, points, laid = {}, home = nil, cash = nil)
+            return false unless (home ||= entity.tokens.first&.city)
 
             cheapest = {}
-            queue = home.exits.map { |exit| [home.hex, exit, 0] } + yellow_lay_ends(entity, home.hex, home.tile, 0, points)
+            queue = home.exits.map { |exit| [home.hex, exit, 0, 0] } +
+                    affordable_lay_ends(entity, yellow_lay_ends(entity, home.hex, home.tile, 0, points), 0, cash)
             until queue.empty?
-              hex, exit, cost = queue.shift
-              next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]] <= cost
+              hex, exit, cost, money = queue.shift
+              next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]].all? { |c, m| c <= cost && m <= money }
 
-              cheapest[[hex.id, exit]] = cost
+              (cheapest[[hex.id, exit]] ||= []) << [cost, money]
               crossings(hex, exit).each do |neighbor, edge|
                 tile = laid[neighbor] || neighbor.tile
                 paths = tile.paths.select { |path| path.exits.include?(edge) }.flat_map { |path| path.junction&.paths || [path] }
                 return true if paths.any? { |path| path.nodes.any? { |node| node != home } }
 
-                lay_ends = yellow_lay_ends(entity, neighbor, tile, cost, points)
+                lay_ends = affordable_lay_ends(entity, yellow_lay_ends(entity, neighbor, tile, cost, points), money, cash)
                 return true if !lay_ends.empty? && !tile.city_towns.empty?
 
-                queue.concat(paths.flat_map(&:exits).map { |track_exit| [neighbor, track_exit, cost] }, lay_ends)
+                queue.concat(paths.flat_map(&:exits).map { |track_exit| [neighbor, track_exit, cost, money] }, lay_ends)
               end
             end
             false
+          end
+
+          # The lay ends of yellow_lay_ends with the money of the lay added; without `cash` no money is counted.
+          def affordable_lay_ends(entity, lay_ends, money, cash)
+            lay_ends.filter_map do |hex, exit, cost|
+              total = money + (cash ? hex.tile.upgrades.sum(&:cost) : 0)
+              next if cash && (total > cash || !@game.first_round_spend_allowed?(entity, total))
+
+              [hex, exit, cost, total]
+            end
           end
 
           def can_lay_tile?(entity)
