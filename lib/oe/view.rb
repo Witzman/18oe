@@ -597,6 +597,13 @@ module Oe
         end
       # A non-blocking step (a private acting during Track, #81) is not the active step: ask the round's steps.
       label ||= safe { game.round.steps.find { |s| s.respond_to?(:choices) && s.choices.key?(choice) }&.choices&.[](choice) }
+      # A private's own ability choice (`choose_ability`, Chris' Step::SpecialChoose): its texts are the step's choices_ability.
+      if label.nil? && action.is_a?(Engine::Action::ChooseAbility)
+        label = safe do
+          game.round.steps.find { |s| s.respond_to?(:choices_ability) && s.choices_ability(action.entity).key?(choice) }
+            &.choices_ability(action.entity)&.[](choice)
+        end
+      end
       if label.nil? && step.respond_to?(:entity_choices)
         corp = safe { game.corporation_by_id(choice) }
         label = safe { step.entity_choices(corp)[choice] } if corp

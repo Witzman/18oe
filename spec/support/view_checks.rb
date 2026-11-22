@@ -22,7 +22,7 @@ module OeViewChecks
     errors << "#{name}: pass_description" unless prompt[:pass_description].is_a?(String) && !prompt[:pass_description].empty?
     errors << "#{name}: help" unless prompt[:help].nil? || prompt[:help].is_a?(String)
     errors << "#{name}: description differs from the step" unless prompt[:description] == step.description
-    chooses = prompt[:actions].select { |a| a["type"] == "choose" }
+    chooses = prompt[:actions].select { |a| %w[choose choose_ability].include?(a["type"]) } # a private's ability choice lists like a choose
     errors << "#{name}: #{chooses.size} choose actions but #{prompt[:choices].size} choices" unless chooses.size == prompt[:choices].size
     prompt[:choices].each do |c|
       errors << "#{name}: empty label for #{c[:choice]}" if c[:label].to_s.empty?
