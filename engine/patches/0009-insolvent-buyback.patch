@@ -1,0 +1,74 @@
+diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
+index 8d79f1c..9b34210 100644
+--- a/lib/engine/game/g_18_oe/game.rb
++++ b/lib/engine/game/g_18_oe/game.rb
+@@ -888,6 +888,18 @@ module Engine
+           major_phase? && @first_or_complete
+         end
+ 
++        def insolvent_corporations
++          @corporations.select { |corporation| insolvent?(corporation) }
++        end
++
++        # RB 11.6.5 step 4: face value (120 for a minor, twice the par value for a regional) plus the gap between the
++        # RR's treasury and the reserved 2+2.
++        def insolvent_buyback_price(corporation)
++          face_value = corporation.type == :minor ? G18OE::Step::BuyTrain::MINOR_CHARTER_VALUE : corporation.par_price.price * 2
++          reserved_price = self.class::TRAINS.find { |train| train[:name] == '2+2' }[:price]
++          face_value + [reserved_price - corporation.cash, 0].max
++        end
++
+         def operating_order
+           floated_minors_and_regionals = @minor_regional_order.select { |c| c.floated? && !insolvent?(c) }
+           floated_minors_and_regionals + @corporations.select { |c| %i[major national].include?(c.type) && c.floated? }.sort
+diff --git a/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb b/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
+index 0debdfd..4df9518 100644
+--- a/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
++++ b/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
+@@ -326,6 +326,7 @@ module Engine
+           end
+ 
+           def process_buy_shares(action)
++            return process_insolvent_buyback(action) if insolvent_buyback?(action.bundle)
+             return super unless reservation_prompt?(action)
+ 
+             check_legal_buy(action.entity, action.bundle, swap: action.swap)
+@@ -375,11 +376,38 @@ module Engine
+           end
+ 
+           def modify_purchase_price(bundle)
++            return @game.insolvent_buyback_price(bundle.corporation) if insolvent_buyback?(bundle)
+             return bundle.corporation.share_price.price * 2 if president_pool_overcap_buy?(current_entity, bundle)
+ 
+             super
+           end
+ 
++          # RB 11.6.5 step 4: the Open Market charter (minor) or president's certificate (regional) of an insolvent RR
++          # is bought as one stock action. can_buy? runs the usual checks (cash against modify_purchase_price,
++          # certificate limit, one purchase per turn).
++          def insolvent_buyback?(bundle)
++            !bundle.nil? && bundle.owner == @game.share_pool && !bundle.presidents_share.nil? &&
++              bundle.percent == bundle.corporation.presidents_percent && @game.insolvent?(bundle.corporation)
++          end
++
++          # The price goes to the bank, which financed the gap; the treasury keeps its cash and a regional its par value.
++          def process_insolvent_buyback(action)
++            player = action.entity
++            bundle = action.bundle
++            corporation = bundle.corporation
++            raise GameError, "Cannot buy #{corporation.name}" unless can_buy?(player, bundle)
++
++            price = @game.insolvent_buyback_price(corporation)
++            @round.players_bought[player][corporation] += bundle.percent
++            @game.share_pool.transfer_shares(bundle, player, spender: player, receiver: @game.bank, price: price,
++                                                             allow_president_change: false)
++            corporation.owner = player
++            @log << "#{player.name} buys the insolvent #{corporation.name} " \
++                    "#{corporation.type == :minor ? 'charter' : "president's certificate"} from the market " \
++                    "for #{@game.format_currency(price)}; #{corporation.name} operates again"
++            track_action(action, corporation)
++          end
++
+           def can_sell?(entity, bundle)
+             return false unless bundle
+             return false if %i[regional minor].include?(bundle.corporation.type)

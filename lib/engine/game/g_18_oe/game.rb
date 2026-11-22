@@ -888,6 +888,18 @@ module Engine
           major_phase? && @first_or_complete
         end
 
+        def insolvent_corporations
+          @corporations.select { |corporation| insolvent?(corporation) }
+        end
+
+        # RB 11.6.5 step 4: face value (120 for a minor, twice the par value for a regional) plus the gap between the
+        # RR's treasury and the reserved 2+2.
+        def insolvent_buyback_price(corporation)
+          face_value = corporation.type == :minor ? G18OE::Step::BuyTrain::MINOR_CHARTER_VALUE : corporation.par_price.price * 2
+          reserved_price = self.class::TRAINS.find { |train| train[:name] == '2+2' }[:price]
+          face_value + [reserved_price - corporation.cash, 0].max
+        end
+
         def operating_order
           floated_minors_and_regionals = @minor_regional_order.select { |c| c.floated? && !insolvent?(c) }
           floated_minors_and_regionals + @corporations.select { |c| %i[major national].include?(c.type) && c.floated? }.sort

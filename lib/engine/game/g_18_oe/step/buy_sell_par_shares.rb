@@ -326,6 +326,7 @@ module Engine
           end
 
           def process_buy_shares(action)
+            return process_insolvent_buyback(action) if insolvent_buyback?(action.bundle)
             return super unless reservation_prompt?(action)
 
             check_legal_buy(action.entity, action.bundle, swap: action.swap)
@@ -375,9 +376,36 @@ module Engine
           end
 
           def modify_purchase_price(bundle)
+            return @game.insolvent_buyback_price(bundle.corporation) if insolvent_buyback?(bundle)
             return bundle.corporation.share_price.price * 2 if president_pool_overcap_buy?(current_entity, bundle)
 
             super
+          end
+
+          # RB 11.6.5 step 4: the Open Market charter (minor) or president's certificate (regional) of an insolvent RR
+          # is bought as one stock action. can_buy? runs the usual checks (cash against modify_purchase_price,
+          # certificate limit, one purchase per turn).
+          def insolvent_buyback?(bundle)
+            !bundle.nil? && bundle.owner == @game.share_pool && !bundle.presidents_share.nil? &&
+              bundle.percent == bundle.corporation.presidents_percent && @game.insolvent?(bundle.corporation)
+          end
+
+          # The price goes to the bank, which financed the gap; the treasury keeps its cash and a regional its par value.
+          def process_insolvent_buyback(action)
+            player = action.entity
+            bundle = action.bundle
+            corporation = bundle.corporation
+            raise GameError, "Cannot buy #{corporation.name}" unless can_buy?(player, bundle)
+
+            price = @game.insolvent_buyback_price(corporation)
+            @round.players_bought[player][corporation] += bundle.percent
+            @game.share_pool.transfer_shares(bundle, player, spender: player, receiver: @game.bank, price: price,
+                                                             allow_president_change: false)
+            corporation.owner = player
+            @log << "#{player.name} buys the insolvent #{corporation.name} " \
+                    "#{corporation.type == :minor ? 'charter' : "president's certificate"} from the market " \
+                    "for #{@game.format_currency(price)}; #{corporation.name} operates again"
+            track_action(action, corporation)
           end
 
           def can_sell?(entity, bundle)
