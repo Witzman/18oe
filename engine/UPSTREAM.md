@@ -92,3 +92,8 @@ SOFTWARE.
 
 - `right_of_way_spec.rb` 'finds Barcelona a yellow route to the town next to it': expects side 1 connectable (true) instead of
   false because patch 0003 puts Palma (AB27) in the Spain zone (owner, who built the map, 2026-11-22: "Palma ist Spanien").
+- `stock_round_spec.rb` (six market-move examples), `setup_spec.rb` ('runs the market ...'): the market grid is that of the
+  printed board (nine rows, £30 to £550; engine/patches/0013, owner 2026-11-22: "Brett übernehmen"), so the expectations use
+  its coordinates.
+- `pass_through_routing_spec.rb` (Orient Express detection double): the double answers `connection_data` because
+  `orient_express_run?` now excludes sea-only runs (engine/patches/0012).

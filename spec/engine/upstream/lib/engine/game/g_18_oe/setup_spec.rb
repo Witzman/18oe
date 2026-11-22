@@ -118,8 +118,9 @@ describe 'G18OE setup' do
     expect(market_cells.select { |sp| sp.type == :convert_range }.map(&:price).sort).to eq([75, 80, 90, 100, 110, 120])
   end
 
-  it 'runs the market from £50 to £550 (§4.4)' do
-    expect(market_cells.map(&:price).minmax).to eq([50, 550])
+  # DEVIATION from upstream (owner decision 2026-11-22, engine/patches/0013): printed board grid, £30 to £550
+  it 'runs the market from £30 to £550 (§4.4)' do
+    expect(market_cells.map(&:price).minmax).to eq([30, 550])
   end
 
   it 'opens with the auction (§7)' do

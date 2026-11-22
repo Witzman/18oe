@@ -1,0 +1,45 @@
+diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
+index cefcff6..5ac6c6f 100644
+--- a/lib/engine/game/g_18_oe/game.rb
++++ b/lib/engine/game/g_18_oe/game.rb
+@@ -51,15 +51,18 @@ module Engine
+         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
+                            { group: :white, count: 3 }, { group: :green, count: 8 }].freeze
+ 
++        # The grid of the printed Info Board (nine rows, 30 to 550; every row starts at the physical column of its leftmost
++        # field, so the major par column (C) is column 4 and the regional par column (p) column 2 in each row).
+         MARKET = [
+-          ['', '110', '120C', '135', '150', '165', '180', '200', '225', '250', '280', '310', '350', '390', '440', '490', '550'],
+-          %w[90p 100 110C 120 135 150 165 180 200 225 250 280 310 350 390 440 490],
+-          %w[80p 90 100C 110 120 135 150 165 180 200 225 250 280 310],
+-          %w[75p 80 90C 100 110 120 135 150 165 180 200],
+-          %w[70p 75 80C 90 100 110 120 135 150],
+-          %w[65p 70 75C 80 90 100 110],
+-          %w[60p 65 70 75 80],
+-          %w[50 60 65 70],
++          ['', '', '', '110', '120C', '135', '150', '165', '180', '200', '225', '250', '280', '310', '350', '390', '440', '490', '550'],
++          ['', '', '90p', '100', '110C', '120', '135', '150', '165', '180', '200', '225', '250', '280', '310', '350', '390', '440', '490'],
++          ['', '75', '80p', '90', '100C', '110', '120', '135', '150', '165', '180', '200', '225', '250', '280', '310'],
++          ['65', '70', '75p', '80', '90C', '100', '110', '120', '135', '150', '165', '180', '200'],
++          ['60', '65', '70p', '75', '80C', '90', '100', '110', '120', '135', '150'],
++          ['55', '60', '65p', '70', '75C', '80', '90', '100', '110'],
++          ['50', '55', '60p', '65', '70', '75', '80'],
++          ['40', '50', '55', '60', '65', '70'],
++          ['30', '40', '50', '55', '60'],
+         ].freeze
+ 
+         PASS_THROUGH_TOKENS = {
+diff --git a/lib/engine/game/g_18_oe/stock_market.rb b/lib/engine/game/g_18_oe/stock_market.rb
+index 41bbd2b..e136cba 100644
+--- a/lib/engine/game/g_18_oe/stock_market.rb
++++ b/lib/engine/game/g_18_oe/stock_market.rb
+@@ -8,7 +8,8 @@ module Engine
+       class StockMarket < Engine::StockMarket
+         def up(corporation, coordinates)
+           r, c = coordinates
+-          return super unless r.zero?
++          # where no field lies above (the top row and the stepped left edge of the printed board) the marker moves right
++          return super unless r.zero? || share_price([r - 1, c]).nil?
+ 
+           share_price([r, c + 1]) ? [r, c + 1] : coordinates
+         end

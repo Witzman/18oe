@@ -3,6 +3,8 @@
 require 'spec_helper'
 require_relative 'helpers'
 
+# DEVIATION from upstream (owner decision 2026-11-22, engine/patches/0013): the market grid is that of the printed board
+# (nine rows, £30 to £550); the move expectations below use its coordinates.
 describe 'G18OE stock round (§4, §10)' do
   include G18OESpecHelpers
 
@@ -75,27 +77,27 @@ describe 'G18OE stock round (§4, §10)' do
   end
 
   it 'moves UP on the top row to the RIGHT (§4.4)' do
-    expect(move(:up, [0, 5])).to eq(180)
+    expect(move(:up, [0, 5])).to eq(150)
   end
 
   it 'does not move UP or RIGHT from £550 (§4.4)' do
-    expect(move(:up, [0, 16])).to eq(550)
-    expect(move(:right, [0, 16])).to eq(550)
+    expect(move(:up, [0, 18])).to eq(550)
+    expect(move(:right, [0, 18])).to eq(550)
   end
 
   it 'moves RIGHT off the end of a row UP (§4.4)' do
-    expect(move(:right, [2, 13])).to eq(350)
+    expect(move(:right, [2, 15])).to eq(350)
   end
 
   it 'moves LEFT off the start of a row DOWN (§4.4)' do
-    expect(move(:left, [6, 0])).to eq(50)
+    expect(move(:left, [6, 0])).to eq(40)
   end
 
-  it 'does not move LEFT from £50 (§4.4)' do
-    expect(move(:left, [7, 0])).to eq(50)
+  it 'does not move LEFT from £30 (§4.4)' do
+    expect(move(:left, [8, 0])).to eq(30)
   end
 
   it 'does not move DOWN from the bottom row (§4.4)' do
-    expect(move(:down, [7, 2])).to eq(65)
+    expect(move(:down, [8, 2])).to eq(50)
   end
 end

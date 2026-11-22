@@ -207,7 +207,7 @@ describe 'G18OE pass-through token routing (§14.5, §11.3.1, §11.3.4, §11.2.2
       destination = game.orient_express_destination_hexes.first.tile.cities.first
       allow(lnwr).to receive(:type).and_return(:major)
       pass_through!(cctc, lnwr, origin)
-      route = instance_double(Engine::Route, corporation: lnwr, visited_stops: [origin, destination])
+      route = instance_double(Engine::Route, corporation: lnwr, visited_stops: [origin, destination], connection_data: [])
 
       expect(game.orient_express_run?(route)).to be(true)
     end
