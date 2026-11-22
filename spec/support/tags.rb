@@ -21,6 +21,7 @@
 module OeSpecTags
   STAGE_TAGS = %i[game_flow full_game browser].freeze
   # Other metadata used in the suite (not stage tags).
-  OTHER = %i[seed_smoke].freeze
+  # :aggregate_failures is rspec's own metadata, used by Chris' specs in spec/engine/upstream.
+  OTHER = %i[seed_smoke aggregate_failures].freeze
   KNOWN = (STAGE_TAGS + OTHER).freeze
 end
