@@ -21,7 +21,8 @@ module Oe
 
     # Train supply of the Locomotive Works (rulebook 3.1, setup list; level 7 and 8 from
     # the same list further down), by train name of the base side.
-    TRAIN_SUPPLY = { '2+2' => 30, '3' => 20, '4' => 10, '5' => 8, '6' => 6, '7+7' => 14, '8+8' => 8 }.freeze
+    # Pullmans are depot trains on Chris' engine (#563 Task 5): ten of them.
+    TRAIN_SUPPLY = { '2+2' => 30, '3' => 20, '4' => 10, '5' => 8, '6' => 6, '7+7' => 14, '8+8' => 8, 'Pullman' => 10 }.freeze
     # Start of the game: the bank holds this, all of it goes to players/companies over time.
     BANK_CASH = 54_000
     # Added to the bank on the first level 8 purchase (rulebook 13, "remainder cash").
@@ -153,9 +154,9 @@ module Oe
     check(:train_limit, '11.6 Buy Trains, 5.2 Train Phases (excess goes in the discard step)',
           'no company holds more trains than the phase allows, unless a discard step is pending') do |g|
       next [] if g.finished
-      # 9.4: the national formation window (ConvertToNational) comes before the discard step, because a new
+      # 9.4: the national formation window (FormNational) comes before the discard step, because a new
       # national keeps even the rusting trains; a major over the new limit is only due once that window is over.
-      next [] if g.round.active_step.class.name.to_s.match?(/Discard|ConvertToNational/)
+      next [] if g.round.active_step.class.name.to_s.match?(/Discard|FormNational/)
 
       g.corporations.filter_map do |corp|
         next unless corp.floated? && !corp.closed?
