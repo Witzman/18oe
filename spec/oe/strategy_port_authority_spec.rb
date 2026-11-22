@@ -31,30 +31,29 @@ RSpec.describe "Strategy player buying a port authority marker (#56)" do
   end
 
   def buys_marker?(action)
-    action.is_a?(Engine::Action::Choose) && action.choice.to_s.start_with?("port_authority:")
+    action.is_a?(Engine::Action::SpecialBuy)
+  end
+
+  def seas(*list)
+    allow_any_instance_of(Oe::StrategyPlayer).to receive(:landing_seas).and_return(list)
   end
 
   it "offers the markers among the legal actions" do
-    expect(legal.grep(Engine::Action::Choose).map(&:choice)).to include("port_authority:north_sea")
+    expect(legal.grep(Engine::Action::SpecialBuy).map { |a| a.item.description }).to include("North Sea port authority")
   end
 
   it "buys the marker of the area its crossings lie in when cash is left over" do
-    allow(game).to receive(:sea_landings).with(lnwr).and_return(
-      [[:a, %w[S1]], [:b, %w[S2]]]
-    )
-    allow(game).to receive(:sea).with("S1").and_return(:north_sea)
-    allow(game).to receive(:sea).with("S2").and_return(:north_sea)
-    expect(choice.choice).to eq("port_authority:north_sea")
+    seas(:north_sea, :north_sea)
+    expect(choice.item.description).to eq("North Sea port authority")
   end
 
   it "does not buy without a crossing" do
-    allow(game).to receive(:sea_landings).with(lnwr).and_return([])
+    seas
     expect(buys_marker?(choice)).to be(false)
   end
 
   it "does not buy when the cash buffer is missing" do
-    allow(game).to receive(:sea_landings).with(lnwr).and_return([[:a, %w[S1]], [:b, %w[S2]]])
-    allow(game).to receive(:sea).and_return(:north_sea)
+    seas(:north_sea, :north_sea)
     lnwr.set_cash(200, game.bank)
     expect(buys_marker?(choice)).to be(false)
   end

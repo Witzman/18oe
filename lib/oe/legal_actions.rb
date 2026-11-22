@@ -623,13 +623,23 @@ module Oe
     # (`cost`, price plus the fee for the ferries and sea zones), always both. Home and merge tokens and a
     # private's token take no choice.
     def place_token_actions(step, entity, city, tokener)
-      return [A::PlaceToken.new(entity, city: city, tokener: tokener)] if entity.company? || !step.respond_to?(:selectable_token_choices)
+      if entity.company? || !step.respond_to?(:selectable_token_choices)
+        return [] if entity.company? && tokener && !company_token_affordable?(tokener, city)
+
+        return [A::PlaceToken.new(entity, city: city, tokener: tokener)]
+      end
 
       step.selectable_token_choices(entity, city).filter_map do |choice|
         next if choice[:cost] > entity.cash
 
         A::PlaceToken.new(entity, city: city, token_index: choice[:index], cost: choice[:cost])
       end
+    end
+
+    # A private's token is paid by the corporation that owns it (Step::Token#process_place_token checks its cash).
+    def company_token_affordable?(tokener, city)
+      # the private's token itself is free; the corporation pays the fee for ferries and sea zones (the step's check)
+      @game.cross_water_token_fee(tokener, city) <= tokener.cash
     end
 
     # §11.2.x Transfer Tokens: the buyer replaces a token of another RR (`slot` of the city) with one of its own
@@ -747,7 +757,9 @@ module Oe
       budget = train_budget(step, entity)
       step.buyable_trains(entity).flat_map do |train|
         min, max = step.spend_minmax(entity, train)
-        max = [max, budget].min
+        # A depot train is bought at its variant price whatever spend_minmax says (EBUY_FROM_OTHERS never caps it at
+        # the treasury): Step::Train#buy_train_action takes the rest from the president (RB 11.6.1, 11.6.4).
+        max = train.from_depot? ? budget : [max, budget].min
         train_offers(step, entity, train, min, max).select do |_variant, price|
           price <= max && price.positive? && cheapest_if_contributing?(step, train, price, entity)
         end.map { |variant, price| A::BuyTrain.new(entity, train: train, price: price, variant: variant) }

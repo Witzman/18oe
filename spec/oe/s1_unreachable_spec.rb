@@ -31,7 +31,7 @@ RSpec.describe "S1 target list, types outside the strategy (#235)" do
     round.steps.each do |s|
       break if s.is_a?(step_class)
 
-      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::ConvertToNational) || s.is_a?(Engine::Step::Bankrupt)
+      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::FormNational) || s.is_a?(Engine::Step::Bankrupt)
     end
   end
 
@@ -89,8 +89,8 @@ RSpec.describe "S1 target list, types outside the strategy (#235)" do
     expect(step.actions(major)).to include("sell_shares")
     bundle = game.issuable_shares(major).first
     round.process_action(Engine::Action::SellShares.new(major, shares: bundle.shares, share_price: bundle.price, percent: bundle.percent))
-    # selling passes the step at once: sell and redeem are never offered in one prompt of the same turn
-    expect(round.active_step).not_to be_a(Engine::Game::G18OE::Step::IssueShares)
+    # sell and redeem are never offered in one prompt of the same turn (Chris' IssueShares keeps the step open after a
+    # sale, #563: it no longer passes it at once)
     expect(offered_keys("IssueShares")).not_to include("operating/IssueShares/buy_shares:major")
   end
 end

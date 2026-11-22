@@ -311,7 +311,7 @@ module Oe
     # and without the money for one. Both moves are legal and on offer.
     # (Full payout was tried first: it leaves the treasuries empty but makes
     # the presidents rich, and the target stayed missing in 2600 actions.)
-    BANKRUPT_TARGET = "operating/BuyTrain/bankrupt"
+    BANKRUPT_TARGET = "operating/BuyTrain/choose:national"
 
     def starve_presidents(round, step, prompt, missing)
       return nil unless round == "operating" && missing.include?(BANKRUPT_TARGET)

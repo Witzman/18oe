@@ -23,7 +23,7 @@ RSpec.describe "Strategy player and bot in a forced train purchase (§11.6.4, #4
     round.steps.each do |s|
       break if s.is_a?(Engine::Game::G18OE::Step::BuyTrain)
 
-      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::ConvertToNational) || s.is_a?(Engine::Step::Bankrupt)
+      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::FormNational) || s.is_a?(Engine::Step::Bankrupt)
     end
   end
 
@@ -70,12 +70,13 @@ RSpec.describe "Strategy player and bot in a forced train purchase (§11.6.4, #4
 
     it "is offered the conversion and picks a move the engine accepts, never a share sale" do
       types = legal.map(&:type).uniq
-      expect(types).to include("bankrupt")
+      expect(types).to include("choose")
       expect(types).not_to include("sell_shares")
 
       choice = strategy_choice
-      expect(choice).to be_a(Engine::Action::Bankrupt)
-      expect(bot_choice).to be_a(Engine::Action::Bankrupt)
+      expect(choice).to be_a(Engine::Action::Choose)
+      expect(choice.choice).to eq(game.forced_national_choice)
+      expect(bot_choice).to be_a(Engine::Action::Choose)
       expect(accepted?(choice)).to be(true)
       expect(lnwr.type).to eq(:national)
       expect(game.finished).to be(false)

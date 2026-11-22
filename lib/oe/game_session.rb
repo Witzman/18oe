@@ -184,7 +184,9 @@ module Oe
     end
 
     def apply(action, db_seq)
-      @game.process_action(action)
+      # add_auto_actions: as 18xx.games' server does (Chris' engine): the stored action then carries what the step
+      # filled in (extra_cost, auto_actions), which replay (@game.loading) takes from the log instead of computing it.
+      @game.process_action(action, add_auto_actions: true)
       return unless @game.exception
 
       raise Rejected, "#{@game.exception.class}: #{@game.exception.message} (at seq #{db_seq})"

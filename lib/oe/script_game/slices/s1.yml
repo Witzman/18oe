@@ -90,4 +90,4 @@ games:
       # issue while this target is missing (ScriptGame#starve_presidents, #434).
       - operating/IssueShares/pass
       - operating/IssueShares/sell_shares:major
-      - operating/BuyTrain/bankrupt
+      - operating/BuyTrain/choose:national

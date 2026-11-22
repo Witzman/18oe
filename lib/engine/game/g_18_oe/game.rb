@@ -875,8 +875,16 @@ module Engine
         end
 
         def operating_order
-          floated_minors_and_regionals = @minor_regional_order.select(&:floated?)
+          floated_minors_and_regionals = @minor_regional_order.select { |c| c.floated? && !insolvent?(c) }
           floated_minors_and_regionals + @corporations.select { |c| %i[major national].include?(c.type) && c.floated? }.sort
+        end
+
+        # RB 11.6.5: after a first-round insolvency the charter or president's certificate is in the Open Market and
+        # the RR does not operate until a player owns it again. RB 10 allows a president's certificate in the Open
+        # Market only after such an insolvency, so the place of the share is the insolvency state.
+        def insolvent?(corporation)
+          %i[minor regional].include?(corporation.type) && corporation.floated? &&
+            corporation.presidents_share&.owner == @share_pool
         end
 
         def hex_within_national_region?(entity, hex)

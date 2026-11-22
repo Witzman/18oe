@@ -29,7 +29,7 @@ RSpec.describe "S1 target list, forced train purchase of a major (§11.6.4, #421
     round.steps.each do |s|
       break if s.is_a?(Engine::Game::G18OE::Step::BuyTrain)
 
-      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::ConvertToNational) || s.is_a?(Engine::Step::Bankrupt)
+      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::FormNational) || s.is_a?(Engine::Step::Bankrupt)
     end
   end
 
@@ -46,13 +46,13 @@ RSpec.describe "S1 target list, forced train purchase of a major (§11.6.4, #421
   end
 
   it "asks for the conversion of a major that cannot pay, and the enumerator offers it under that key" do
-    expect(rush["combos"]).to include("operating/BuyTrain/bankrupt")
+    expect(rush["combos"]).to include("operating/BuyTrain/choose:national")
 
     lnwr.set_cash(10, game.bank)
     alice.set_cash(50, game.bank)
     operate!(lnwr)
 
-    expect(offered_keys).to include("operating/BuyTrain/bankrupt")
+    expect(offered_keys).to include("operating/BuyTrain/choose:national")
     expect(offered_keys.grep(/sell_shares/)).to be_empty
   end
 end

@@ -232,8 +232,10 @@ RSpec.describe Oe::BotRunner, :game_flow do
     expect(picks[0]).to eq(picks[2])
   end
 
+  # SCHEMA_VERSION 5 (#566, #563): an old database loses its games (the engine changed, no converter); store_reset_spec
+  # covers the accounts. Here: the upgrade of a version-1 file still runs through all migrations.
   describe "store migration 2" do
-    it "upgrades an existing version-1 database and keeps its games" do
+    it "upgrades an existing version-1 database and discards its games" do
       Dir.mktmpdir do |dir|
         path = File.join(dir, "old.sqlite3")
         old = SQLite3::Database.new(path)
@@ -244,9 +246,7 @@ RSpec.describe Oe::BotRunner, :game_flow do
 
         upgraded = Oe::Store.new(path)
         expect(upgraded.schema_version).to eq(Oe::Store::SCHEMA_VERSION)
-        expect(upgraded.game(1)["seed"]).to eq(9)
-        upgraded.add_incident(game_id: 1, seq: 0, kind: "stuck", message: "m")
-        expect(upgraded.incidents(1).first).to include("kind" => "stuck", "message" => "m")
+        expect(upgraded.game(1)).to be_nil
         upgraded.close
       end
     end

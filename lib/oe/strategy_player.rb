@@ -20,6 +20,8 @@ module Oe
   # only play legal moves; it never makes the game illegal, only smarter.
   class StrategyPlayer
     TWO_PLUS_TWO = 100
+    PULLMAN_PAYBACK_ORS = 5
+    PULLMAN_CASH_BUFFER = 150
     BUFFER_PAR_CASH = 200
 
     def initialize(game, rng: Random.new(0))
@@ -48,12 +50,11 @@ module Oe
         !game.round.is_a?(Engine::Round::G18OE::Consolidation)
     end
 
-    # Port authority purchases (special_buy, §11.3.5) and the transfers between majors (§11.5, #57: place_token with
-    # a slot in Step::TransferTokens, choose in it) are not played by the bot yet (#563 Task 7 gives it rules in
-    # Chris' formats): it passes them. A Pullman is a depot train now and goes through the BuyTrain rules.
+    # The transfers between majors (§11.5, #57: place_token with a slot in Step::TransferTokens, choose in it) are not
+    # played by the bot yet: it passes them. A Pullman is a depot train (a BuyTrain rule below), a port authority a
+    # special_buy (pick_special_buy).
     def self.transfer_choice?(action)
-      action.is_a?(Engine::Action::SpecialBuy) ||
-        (action.is_a?(Engine::Action::PlaceToken) && !action.slot.nil?) ||
+      (action.is_a?(Engine::Action::PlaceToken) && !action.slot.nil?) ||
         (action.is_a?(Engine::Action::Choose) && action.choice.to_s.include?(':'))
     end
 
@@ -72,7 +73,7 @@ module Oe
       method = "choose_#{underscore(actions.first.class.name.split('::').last)}"
       Engine::Action.constants # (autoload no-op)
       # Order matters: first applicable specialised rule wins.
-      %w[BuyTrain Dividend Assign RunRoutes Bid Par Convert Merge DiscardTrain LayTile PlaceToken].each do |name|
+      %w[SpecialBuy BuyTrain Dividend Assign RunRoutes Bid Par Convert Merge DiscardTrain LayTile PlaceToken].each do |name|
         group = by_class[name]
         next unless group
 
@@ -163,6 +164,12 @@ module Oe
     def pick_buy_train(trains, by_class)
       return pick_national_train(trains, by_class) if trains.first.entity.type == :national
 
+      # A Pullman is a depot train (variant "Pullman"): bought by pick_pullman or not at all.
+      pullmans, trains = trains.partition { |a| @game.pullman?(a.train) }
+      pullman = pick_pullman(pullmans)
+      return pullman if pullman
+      return nil if trains.empty?
+
       # The enumerator offers every side of a double-sided card (#127). Choosing
       # the dearer side is v0.3 (bots on the full rules); until then the bot
       # buys the base side as before.
@@ -181,6 +188,44 @@ module Oe
 
       # Cannot pay: raise money first (issue shares, president sells shares).
       raise_money(by_class) || trains.min_by(&:price)
+    end
+
+    # §11.6.2, §11.3.9: a Pullman adds £10 per level of the highest train every OR. Buy one when it pays back within a
+    # few ORs, the RR already runs a train and keeps a cash buffer for its trains; the cheapest one offered (the
+    # Open Market's or Minor M's), never a second one.
+    def pick_pullman(options)
+      return nil if options.empty?
+
+      entity = options.first.entity
+      trains = entity.trains.reject { |train| @game.pullman?(train) }
+      return nil if trains.empty? || entity.trains.any? { |train| @game.pullman?(train) }
+
+      bonus = trains.map { |train| train.sym.to_i }.max * @game.pullman_bonus_per_level
+      option = options.min_by(&:price)
+      return nil if option.price > PULLMAN_PAYBACK_ORS * bonus || entity.cash < option.price + PULLMAN_CASH_BUFFER
+
+      option
+    end
+
+    # §11.3.5 (#56): a port authority takes sea units off a crossing in its water area. Buy it for the area where the RR's
+    # network has the most usable port landings (at least two, so a crossing exists), when it runs a train and keeps the
+    # cash buffer for its trains.
+    def pick_special_buy(buys, _by_class)
+      entity = buys.first.entity
+      return nil if entity.trains.empty? || entity.cash < @game.port_authority_cost + PULLMAN_CASH_BUFFER
+
+      best = landing_seas(entity).tally.select { |_sea, n| n >= 2 }.max_by { |_sea, n| n }&.first
+      buys.find { |a| a.item.description == @game.port_authority_name(best) } if best
+    end
+
+    def landing_seas(entity)
+      landings = @game.graph_for_entity(entity).sea_connectivity(entity).landings
+      landings.flat_map do |hex, edges|
+        edges.keys.filter_map do |edge|
+          zone = @game.sea_zone(hex.neighbors[edge]&.id)
+          @game.class::SEA_ZONES.dig(zone, :sea) if zone
+        end
+      end
     end
 
     # §11.6.6 (#64): a national claims the highest level unclaimed rusted train, then exchanges its
