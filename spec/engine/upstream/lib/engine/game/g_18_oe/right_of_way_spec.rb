@@ -139,7 +139,9 @@ describe 'G18OE Right-of-Way (§11.1.9)' do
       barcelona = game.corporation_by_id('CHN')
       place_token!(barcelona, game.hex_by_id('Z27'))
 
-      expect(step.home_connectable?(barcelona, 1)).to be(false)
+      # DEVIATION from upstream (owner decision 2026-11-22, engine/patches/0003): Palma (AB27) is in the Spain zone, so
+      # Barcelona's side 1 is connectable (upstream expects false).
+      expect(step.home_connectable?(barcelona, 1)).to be(true)
       expect(step.home_connectable?(barcelona, 2)).to be(true)
     end
 

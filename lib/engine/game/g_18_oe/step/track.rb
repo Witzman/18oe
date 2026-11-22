@@ -116,6 +116,13 @@ module Engine
             @points_used += points_cost
           end
 
+          # RB 11.6.4 para. 2: no paid lay that leaves the reserved 2+2 unpayable. The patronage payout of the same lay
+          # counts against the cost.
+          def pay_tile_cost!(entity_or_entities, tile, rotation, hex, spender, cost, extra_cost)
+            @game.check_first_round_spend!(spender, cost, net_cost: cost - @game.patronage_payout(hex))
+            super
+          end
+
           def tracker_available_hex(entity, hex)
             return nil unless @game.hex_within_national_region?(entity, hex)
 

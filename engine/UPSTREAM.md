@@ -87,3 +87,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Known deviations of upstream specs (spec/engine/upstream)
+
+- `right_of_way_spec.rb` 'finds Barcelona a yellow route to the town next to it': expects side 1 connectable (true) instead of
+  false because patch 0003 puts Palma (AB27) in the Spain zone (owner, who built the map, 2026-11-22: "Palma ist Spanien").

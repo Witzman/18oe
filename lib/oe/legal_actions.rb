@@ -137,7 +137,8 @@ module Oe
       terrain = @game.upgrade_cost(hex.tile, hex, entity, entity)
       rotations.select do |rotation|
         tile.rotate!(rotation)
-        terrain + @game.cross_water_tile_fee(entity, hex, tile).to_i <= entity.cash
+        cost = terrain + @game.cross_water_tile_fee(entity, hex, tile).to_i
+        cost <= entity.cash && @game.first_round_spend_allowed?(entity, cost - @game.patronage_payout(hex))
       end
     end
 
@@ -157,7 +158,7 @@ module Oe
       extra_slot = company_extra_slot?(step, entity)
       token_cities(step, entity).select do |city|
         city.tokenable?(tokener, free: false, tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
-          connected_for_token?(step, entity, city) &&
+          connected_for_token?(step, entity, city) && first_round_token_ok?(step, tokener, tokens, city) &&
           (!step.respond_to?(:pass_city_ok?) || step.pass_city_ok?(entity, city))
       end
     end
@@ -630,7 +631,7 @@ module Oe
       end
 
       step.selectable_token_choices(entity, city).filter_map do |choice|
-        next if choice[:cost] > entity.cash
+        next if choice[:cost] > entity.cash || !@game.first_round_spend_allowed?(entity, choice[:cost])
 
         A::PlaceToken.new(entity, city: city, token_index: choice[:index], cost: choice[:cost])
       end
@@ -639,7 +640,8 @@ module Oe
     # A private's token is paid by the corporation that owns it (Step::Token#process_place_token checks its cash).
     def company_token_affordable?(tokener, city)
       # the private's token itself is free; the corporation pays the fee for ferries and sea zones (the step's check)
-      @game.cross_water_token_fee(tokener, city) <= tokener.cash
+      fee = @game.cross_water_token_fee(tokener, city)
+      fee <= tokener.cash && (!@game.respond_to?(:first_round_spend_allowed?) || @game.first_round_spend_allowed?(tokener, fee))
     end
 
     # §11.2.x Transfer Tokens: the buyer replaces a token of another RR (`slot` of the city) with one of its own
@@ -679,6 +681,13 @@ module Oe
 
       region = @game.region_for_hex(city.hex)
       @game.region_available?(region) && tokener.cash >= @game.track_rights_cost(region)
+    end
+
+    # RB 11.6.4 para. 2: a paid token may not leave the reserved 2+2 unpayable.
+    def first_round_token_ok?(step, tokener, tokens, city)
+      return true if step.is_a?(Engine::Step::HomeToken) || !@game.respond_to?(:first_round_spend_allowed?)
+
+      @game.first_round_spend_allowed?(tokener, tokens.map(&:price).min.to_i + @game.cross_water_token_fee(tokener, city).to_i)
     end
 
     def token_cities(step, entity)

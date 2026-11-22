@@ -1,0 +1,87 @@
+diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
+index 9b34210..526f734 100644
+--- a/lib/engine/game/g_18_oe/game.rb
++++ b/lib/engine/game/g_18_oe/game.rb
+@@ -888,6 +888,41 @@ module Engine
+           major_phase? && @first_or_complete
+         end
+ 
++        # RB 11.6.4 para. 2: a player may not force a RR into first-round insolvency by spending money on track or tokens.
++        # The rule undoes such spending (tokens first, then paid track, each refunded); the engine instead refuses it up
++        # front: while the reserved 2+2 is still owed, a paid lay or token is legal only if the RR's and its president's
++        # cash still cover that 2+2 afterwards. In the first OR no money arrives between Track/Token and BuyTrain, and
++        # Track comes before Token, so a token is what the guard drops first, as the rule does. `cost` is the net spend
++        # (a patronage payout of the same lay already deducted).
++        def first_round_spend_allowed?(entity, cost)
++          reserve = first_round_train_reserve(entity)
++          return true if reserve.nil? || !cost.positive?
++
++          entity.cash + entity.owner.cash - cost >= reserve
++        end
++
++        def check_first_round_spend!(entity, cost, net_cost: cost, what: 'track')
++          return if first_round_spend_allowed?(entity, net_cost)
++
++          raise GameError, "#{entity.name} cannot spend #{format_currency(cost)} on #{what}: its cash and its " \
++                           "president's would no longer cover the reserved 2+2 (§11.6.4)"
++        end
++
++        # Price of the reserved 2+2 the RR still has to buy (RB 11.6.1), or nil when it owes none: obligation fulfilled or
++        # over, the RR already has a train, or no player owns it.
++        def first_round_train_reserve(entity)
++          return unless entity&.corporation? && entity.floated? && entity.trains.empty? && entity.owner&.player?
++          return if fulfilled_train_obligation?(entity)
++
++          depot.depot_trains.find { |train| train.name == '2+2' && train.from_depot? }&.price
++        end
++
++        # What fulfilling the patronage tile on this hex would pay now (RB 11.1.8), 0 without one.
++        def patronage_payout(hex)
++          payouts = hex.tile.patronage
++          payouts ? payouts[patronage_color].to_i : 0
++        end
++
+         def insolvent_corporations
+           @corporations.select { |corporation| insolvent?(corporation) }
+         end
+diff --git a/lib/engine/game/g_18_oe/step/token.rb b/lib/engine/game/g_18_oe/step/token.rb
+index 8978b8d..974e5fb 100644
+--- a/lib/engine/game/g_18_oe/step/token.rb
++++ b/lib/engine/game/g_18_oe/step/token.rb
+@@ -25,6 +25,18 @@ module Engine
+             track_rights_available_hex(entity, hex)
+           end
+ 
++          # RB 11.6.4 para. 2: a paid token obeys the same guard as a paid lay.
++          def pay_token_cost(entity, cost, city)
++            @game.check_first_round_spend!(entity, cost, what: 'a token')
++            super
++          end
++
++          # RB 11.6.4 para. 2: no token while its price would leave the reserved 2+2 unpayable; the step then has
++          # nothing to offer.
++          def can_place_token?(entity)
++            super && @game.first_round_spend_allowed?(entity, min_token_price(available_tokens(entity)))
++          end
++
+           def process_place_token(action)
+             entity = action.entity
+             token = selected_token(action)
+diff --git a/lib/engine/game/g_18_oe/step/track.rb b/lib/engine/game/g_18_oe/step/track.rb
+index 4a6a105..f13454d 100644
+--- a/lib/engine/game/g_18_oe/step/track.rb
++++ b/lib/engine/game/g_18_oe/step/track.rb
+@@ -116,6 +116,13 @@ module Engine
+             @points_used += points_cost
+           end
+ 
++          # RB 11.6.4 para. 2: no paid lay that leaves the reserved 2+2 unpayable. The patronage payout of the same lay
++          # counts against the cost.
++          def pay_tile_cost!(entity_or_entities, tile, rotation, hex, spender, cost, extra_cost)
++            @game.check_first_round_spend!(spender, cost, net_cost: cost - @game.patronage_payout(hex))
++            super
++          end
++
+           def tracker_available_hex(entity, hex)
+             return nil unless @game.hex_within_national_region?(entity, hex)
+ 
