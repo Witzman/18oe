@@ -10,6 +10,8 @@ module Engine
         class Track < Engine::Step::Track
           include SkipAbbreviatedRound
 
+          attr_reader :points_used
+
           def setup
             super
             @points_used = 0
@@ -97,6 +99,59 @@ module Engine
 
               [hex, exit, cost, total]
             end
+          end
+
+          def tile_points_left(entity)
+            remaining_tile_points(entity)
+          end
+
+          # The bookkeeping of a lay made by a private (SpecialTrack): the RR's tile points are spent as in its own lay.
+          def record_special_lay!(entity, action, old_tile, points_cost)
+            @points_used += points_cost
+            @game.after_lay_tile(entity, old_tile, action.tile)
+            @round.num_laid_track += 1
+            @round.laid_hexes << action.hex
+          end
+
+          # RB 14.9: another RR may remove a Brandt & Brandau token: it pays the hex's original terrain cost (a national
+          # only the tile point) and one tile point (two on a metropolis), and lays no track.
+          def bbe_removal_points(hex)
+            @game.metropolis_hex?(hex) ? 2 : 1
+          end
+
+          def bbe_removal_money(entity, hex)
+            @game.upgrade_cost(hex.original_tile, hex, entity, entity)
+          end
+
+          def bbe_removable_hexes(entity)
+            return [] unless @game.bbe_blocked_for?(entity)
+
+            @game.bbe_token_hexes.select { |hex| bbe_removal_points(hex) <= remaining_tile_points(entity) }
+          end
+
+          def actions(entity)
+            actions = super
+            return actions unless entity == current_entity && !bbe_removable_hexes(entity).empty?
+
+            actions.empty? ? %w[remove_hex_token pass] : actions + %w[remove_hex_token]
+          end
+
+          def process_remove_hex_token(action)
+            entity = action.entity
+            hex = action.hex
+            raise GameError, "No Brandt and Brandau token on #{hex.id} to remove" unless bbe_removable_hexes(entity).include?(hex)
+
+            money = bbe_removal_money(entity, hex)
+            raise GameError, "#{entity.name} cannot pay #{@game.format_currency(money)}" if money > entity.cash
+
+            @game.check_first_round_spend!(entity, money)
+            entity.spend(money, @game.bank) if money.positive?
+            points = bbe_removal_points(hex)
+            @points_used += points
+            @game.log << "#{entity.name} pays #{@game.format_currency(money)} and #{points} tile point(s) to remove " \
+                         "the token on #{hex.id}"
+            @game.bbe_remove_token!(hex)
+            pass! unless can_lay_tile?(entity)
           end
 
           def can_lay_tile?(entity)

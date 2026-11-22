@@ -26,6 +26,7 @@ require_relative 'step/merge_token'
 require_relative 'step/concession'
 require_relative 'step/choose_operating_position'
 require_relative 'step/home_hex_consent'
+require_relative 'step/special_track'
 require_relative 'step/home_position'
 require_relative 'step/reserve_share'
 require_relative 'step/orient_express_bonus'
@@ -48,7 +49,7 @@ module Engine
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
         attr_reader :fast_start_minors, :concessions, :merged_minors, :wcf_placeholder, :minor_c_ability,
-                    :hochberg_token_hex, :swift_metropolitan_train
+                    :hochberg_token_hex, :swift_metropolitan_train, :bbe_token_hexes
 
         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
                            { group: :white, count: 3 }, { group: :green, count: 8 }].freeze
@@ -551,6 +552,7 @@ module Engine
           @hochberg_token_hex = nil
           @hochberg_printed_revenue = {}
           setup_nationals
+          setup_bbe_ability!
 
           corporations.each do |corp|
             corp.par_via_exchange = companies.find { |c| c.sym == corp.id } if corp.type == :minor
@@ -1866,6 +1868,7 @@ module Engine
             G18OE::Step::Operating::HomeToken,
             G18OE::Step::Assign,
             G18OE::Step::HomeHexConsent,
+            G18OE::Step::SpecialTrack,
             G18OE::Step::Track,
             G18OE::Step::SpecialToken,
             G18OE::Step::Token,
@@ -2215,7 +2218,63 @@ module Engine
           add_on_train?(:pullman, route.train) ? "#{str} + Pullman" : str
         end
 
+        # RB 14.9 Brandt & Brandau, Engineers: a token on a hex closes the track laid with it to every RR of another player
+        # (RB 11.3.10: for a national's revenue as well) until another RR removes the token.
+        BBE_TOKEN_LOGO = '/logos/18_oe/bbe.svg' # ASSUMPTION: no artwork yet, placeholder path
+
+        def bbe_company
+          company_by_id('BBE')
+        end
+
+        # The ability's hexes: unbuilt rough (hill, mountain) hexes without a city or metropolis, set once at setup.
+        def setup_bbe_ability!
+          @bbe_token_hexes = []
+          ability = bbe_company&.all_abilities&.find { |a| a.type == :tile_lay }
+          return unless ability
+
+          ability.hexes = hexes.select do |hex|
+            hex.tile.color == :white && hex.tile.cities.empty? && hex.tile.terrain.intersect?(self.class::GREEN_TERRAIN) &&
+              !metropolis_hex?(hex)
+          end.map(&:id)
+        end
+
+        def bbe_blocked_for?(corporation)
+          return false if @bbe_token_hexes.empty? || !corporation.respond_to?(:owner)
+
+          corporation.owner != bbe_company&.owner
+        end
+
+        def graph_skip_paths(corporation)
+          return super unless bbe_blocked_for?(corporation)
+
+          @bbe_token_hexes.flat_map { |hex| hex.tile.paths }.to_h { |path| [path, true] }
+        end
+
+        def bbe_place_token!(hex, company)
+          token = Engine::Token.new(company, logo: BBE_TOKEN_LOGO, simple_logo: BBE_TOKEN_LOGO, type: :bbe)
+          hex.place_token(token, logo: BBE_TOKEN_LOGO)
+          @bbe_token_hexes << hex
+          clear_graph
+          @log << "#{company.name} token placed on #{hex.id}"
+          flip_private!(company) if company.all_abilities.none? { |a| a.type == :tile_lay } && !face_down_private?(company)
+        end
+
+        def bbe_remove_token!(hex)
+          hex.tokens.find { |t| t.type == :bbe }.remove!
+          @bbe_token_hexes.delete(hex)
+          clear_graph
+          @log << "Brandt and Brandau token removed from #{hex.id}"
+          return unless @bbe_token_hexes.empty? && bbe_company.all_abilities.none? { |a| a.type == :tile_lay }
+
+          remove_private!(bbe_company)
+          @log << "#{bbe_company.name} is removed from the game"
+        end
+
         def check_connected(route, corporation)
+          if bbe_blocked_for?(corporation) && route.paths.any? { |path| @bbe_token_hexes.include?(path.hex) }
+            raise GameError, 'Route uses track marked by a Brandt and Brandau token'
+          end
+
           route.connection_data.each_cons(2) do |a, b|
             next if !a[:chain][:paths].empty? && !b[:chain][:paths].empty?
 

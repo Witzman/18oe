@@ -191,6 +191,22 @@ module Engine
                   'when no tokens remain on the map. To remove a token, another RR must pay the original terrain '\
                   'cost and expend one tile point (two for a metropolis), without placing track. '\
                   'Nationals skip the terrain cost but still expend tile points.',
+            # RB 14.9: four free yellow lays on rough terrain, at most two per OR; the hexes are filled in at setup
+            # (Game#setup_bbe_ability!).
+            abilities: [
+              {
+                type: 'tile_lay',
+                owner_type: 'player',
+                when: 'owning_player_track',
+                count: 4,
+                count_per_or: 2,
+                free: true,
+                special: false,
+                connect: false,
+                tiles: [],
+                hexes: [],
+              },
+            ],
             auction_row: 4,
           },
           {
