@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# EXTENSION (#563 Task 8/9): red on Chris' engine until the patch for BBBT custody/protect/re-par choices exists. Source of the old code: main:lib/engine/game/g_18_oe/bbbt.rb.
+# Triage: notes/rueckport-differenz/spec-triage-B.md. Do not delete; Task 9 turns it green.
+
 require_relative '../engine_helper'
 require_relative 'helpers'
 require 'oe/legal_actions'

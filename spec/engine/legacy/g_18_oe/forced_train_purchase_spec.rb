@@ -15,7 +15,6 @@ describe 'G18OE forced train purchase (§11.6.4, #354)' do
   let!(:lnwr) { start_major!(game, 'LNWR', alice) }
   let(:round) { at_phase!(game, '4') && operating_round_for!(game, 1) }
   let(:step) { round_step(round, Engine::Game::G18OE::Step::BuyTrain) }
-  let(:bankrupt_step) { round_step(round, Engine::Step::Bankrupt) }
 
   # The major operates and has reached its Buy Trains step.
   def operate!(corporation)
@@ -24,7 +23,7 @@ describe 'G18OE forced train purchase (§11.6.4, #354)' do
     round.steps.each do |s|
       break if s.is_a?(Engine::Game::G18OE::Step::BuyTrain)
 
-      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::ConvertToNational) || s.is_a?(Engine::Step::Bankrupt)
+      s.pass!
     end
   end
 
@@ -119,7 +118,7 @@ describe 'G18OE forced train purchase (§11.6.4, #354)' do
     end
   end
 
-  describe 'bankruptcy of the major is its conversion into a national' do
+  describe 'bankruptcy of the major is its conversion into a national (Chris: choose national, §11.6.4)' do
     before do
       lnwr.set_cash(10, game.bank)
       alice.set_cash(50, game.bank)
@@ -128,14 +127,13 @@ describe 'G18OE forced train purchase (§11.6.4, #354)' do
 
     it 'is offered when treasury and president\'s cash do not reach the cheapest train, shares ignored' do
       expect(alice.shares_of(lnwr)).not_to be_empty
-      expect(game.can_go_bankrupt?(alice, lnwr)).to be(true)
-      expect(bankrupt_step.actions(lnwr)).to eq(['bankrupt'])
-      expect(legal.select { |a| a.type == 'bankrupt' }.map(&:entity)).to eq([lnwr])
+      expect(game.forced_national_conversion?(lnwr)).to be(true)
+      expect(step.actions(lnwr)).to include('choose')
     end
 
     it 'takes the private cash for the bank, turns the major into a national and the game goes on' do
       bank_before = game.bank.cash
-      act!(round, Engine::Action::Bankrupt.new(lnwr))
+      act!(round, Engine::Action::Choose.new(lnwr, choice: 'national'))
 
       expect(alice.cash).to eq(0)
       expect(game.bank.cash).to eq(bank_before + 50 + 10)
@@ -146,9 +144,10 @@ describe 'G18OE forced train purchase (§11.6.4, #354)' do
     end
 
     it 'is no longer bound to buy a train afterwards' do
-      act!(round, Engine::Action::Bankrupt.new(lnwr))
+      act!(round, Engine::Action::Choose.new(lnwr, choice: 'national'))
 
-      expect(game.round.current_entity).not_to eq(lnwr)
+      expect(game.forced_national_conversion?(lnwr)).to be(false)
+      expect(step.actions(lnwr)).to eq([])
     end
   end
 
@@ -156,13 +155,12 @@ describe 'G18OE forced train purchase (§11.6.4, #354)' do
     before { operate!(lnwr) }
 
     it 'does not offer bankruptcy' do
-      expect(game.can_go_bankrupt?(alice, lnwr)).to be(false)
-      expect(bankrupt_step.actions(lnwr)).to eq([])
-      expect(legal.map(&:type)).not_to include('bankrupt')
+      expect(game.forced_national_conversion?(lnwr)).to be(false)
+      expect(step.actions(lnwr)).not_to include('choose')
     end
 
     it 'refuses it when asked for anyway' do
-      expect { act!(round, Engine::Action::Bankrupt.new(lnwr)) }.to raise_error(/cannot process action bankrupt/)
+      expect { act!(round, Engine::Action::Choose.new(lnwr, choice: 'national')) }.to raise_error(Engine::GameError)
       expect(lnwr.type).to eq(:major)
     end
   end
@@ -172,6 +170,7 @@ describe 'G18OE forced train purchase (§11.6.4, #354)' do
     lnwr.set_cash(0, game.bank)
     alice.set_cash(0, game.bank)
 
+    expect(game.forced_national_conversion?(lnwr)).to be(false)
     expect(game.can_go_bankrupt?(alice, lnwr)).to be(false)
   end
 end

@@ -31,23 +31,23 @@ describe 'G18OE privates of a minor that merges or is abandoned' do
     act!(round, Engine::Action::Pass.new(round.current_entity)) while round.active_step.is_a?(token_step)
   end
 
+  # Chris: the SML train is taken from the rusted pool of the Locomotive Works (acquire_swift_metropolitan_train!).
   def give_sml_train!(corporation)
     train = game.depot.upcoming.find { |t| t.name == '2+2' }
-    game.remove_train(train)
+    game.depot.reclaim_train(train)
     train.rusted = true
-    train.owner = nil
-    game.sml_assign!(sml, corporation)
-    train
+    game.acquire_swift_metropolitan_train!(corporation)
+    game.swift_metropolitan_train
   end
 
   def pass_token_for(corporation)
     game.hexes.flat_map { |hex| hex.tile.cities }.flat_map(&:extra_tokens)
-        .select { |token| game.pass_token?(token) && token.corporation == corporation }
+        .select { |token| token.type == :pass_through && token.corporation == corporation }
   end
 
   def port_city
     game.hexes.flat_map { |hex| hex.tile.cities }
-        .find { |city| game.port_accesses(city).any? && city.tokens.compact.empty? }
+        .find { |city| game.port_hex?(city.hex) && city.tokens.compact.empty? }
   end
 
   describe 'Swift Metropolitan Line (§14.10)' do
@@ -58,7 +58,7 @@ describe 'G18OE privates of a minor that merges or is abandoned' do
       pass_tokens!
       expect(major.trains).to include(sml_train)
       expect(round.active_step).not_to be_a(Engine::Game::G18OE::Step::MergeDiscardTrain)
-      expect(game.sml_train?(sml_train)).to be true
+      expect(sml_train.extra).to be true
     end
 
     it 'offers only the ordinary trains of the minor to be declined' do
@@ -74,12 +74,14 @@ describe 'G18OE privates of a minor that merges or is abandoned' do
     end
   end
 
+  # EXTENSION (#563 Task 9, patch 'pass-through tokens follow a merging minor'): red on Chris' engine. A merge into a
+  # major moves the token to the major, a merge into a national and an abandonment remove it (owner decision 2026-11-20, #509).
   describe 'pass-through tokens (§14.5, §14.6)' do
     # Owner decision 2026-11-20: a major takes over all tokens of a merged minor, without a choice.
     it 'passes the token of a minor merged into a major to the major' do
       major
       city = port_city
-      game.place_pass_token!(shtc, city, minor)
+      game.place_pass_through_token!(shtc, minor, city)
       merge!
       pass_tokens!
       expect(pass_token_for(minor)).to be_empty
@@ -90,19 +92,19 @@ describe 'G18OE privates of a minor that merges or is abandoned' do
     it 'gives the major the effect of the token: no city limit use, no blocking' do
       major
       city = port_city
-      game.place_pass_token!(shtc, city, minor)
+      game.place_pass_through_token!(shtc, minor, city)
       merge!
       pass_tokens!
-      expect(game.pass_token_city?(city, major)).to be true
-      expect(game.pass_token_city?(city, minor)).to be false
+      expect(game.pass_through_city?(city, major)).to be true
+      expect(game.pass_through_city?(city, minor)).to be false
       expect(game.city_tokened_by?(city, major)).to be false
     end
 
     it 'passes a Central Circle token too' do
       major
       city = game.hexes.flat_map { |hex| hex.tile.cities }
-                 .find { |c| game.port_accesses(c).empty? && c.tokens.compact.empty? }
-      game.place_pass_token!(game.company_by_id('CCTC'), city, minor)
+                 .find { |c| !game.port_hex?(c.hex) && c.tokens.compact.empty? }
+      game.place_pass_through_token!(game.company_by_id('CCTC'), minor, city)
       merge!
       pass_tokens!
       expect(city.extra_tokens.map(&:corporation)).to eq([major])
@@ -111,7 +113,7 @@ describe 'G18OE privates of a minor that merges or is abandoned' do
     it 'removes the token of a minor merged into a national (abandoned, §10.5)' do
       national = start_major!(game, 'PLM', player)
       game.form_national!(national)
-      game.place_pass_token!(shtc, port_city, minor)
+      game.place_pass_through_token!(shtc, minor, port_city)
       act!(round, Engine::Action::Choose.new(round.current_entity, choice: minor.id))
       act!(round, Engine::Action::Merge.new(minor, corporation: national))
       expect(pass_token_for(minor)).to be_empty
@@ -119,7 +121,7 @@ describe 'G18OE privates of a minor that merges or is abandoned' do
     end
 
     it 'leaves no pass token of an abandoned minor on the map (§9.5 step 3)' do
-      game.place_pass_token!(shtc, port_city, minor)
+      game.place_pass_through_token!(shtc, minor, port_city)
       game.abandon_minor!(minor)
       expect(pass_token_for(minor)).to be_empty
     end

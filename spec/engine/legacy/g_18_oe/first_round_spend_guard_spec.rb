@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# EXTENSION (#563 Task 8/9): red on Chris' engine until the patch for first-round spend guard, #576 exists. Source of the old code: main:lib/engine/game/g_18_oe/step/track.rb, token.rb (first_round_train_reserve).
+# Triage: notes/rueckport-differenz/spec-triage-B.md. Do not delete; Task 9 turns it green.
+
 require_relative '../engine_helper'
 require_relative 'helpers'
 require 'oe/legal_actions'

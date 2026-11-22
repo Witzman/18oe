@@ -33,7 +33,7 @@ describe 'G18OE minor K, Vermilion Seal mail contract (§15.10)' do
     operating_round_for!(game, 1, setup: true)
     messages = game.log.map(&:message)
 
-    expect(messages.index('K receives mail contract of £20')).to be < messages.index('a operates K')
+    expect(messages.index('K collects £20 from Mail Contract')).to be < messages.index('a operates K')
   end
 
   it 'pays again at the start of every OR' do
@@ -58,6 +58,7 @@ describe 'G18OE minor K, Vermilion Seal mail contract (§15.10)' do
     end
 
     it 'pays in the first, normally played OR and not in the abbreviated second one' do
+      pending "Chris pays at every OR setup, the abbreviated one included (Round::Operating#setup calls payout_companies, rulebook 15.10 'beginning of each OR'); the old reading (13: the 2nd OR only repeats revenue) is dropped (#563 Task 8)"
       before = k.cash
       operating_round_for!(game, 1, setup: true)
       expect(k.cash - before).to eq(40)
@@ -67,6 +68,7 @@ describe 'G18OE minor K, Vermilion Seal mail contract (§15.10)' do
     end
 
     it 'pays nothing from the bank in the abbreviated OR' do
+      pending "Chris pays at every OR setup, the abbreviated one included; see the example above (#563 Task 8)"
       operating_round_for!(game, 1, setup: true)
       bank_cash = game.bank.cash
       operating_round_for!(game, 2, setup: true)
@@ -91,7 +93,7 @@ describe 'G18OE minor K, Vermilion Seal mail contract (§15.10)' do
   it 'logs the payment' do
     operating_round_for!(game, 1, setup: true)
 
-    expect(game.log.map(&:message)).to include(a_string_matching(/\AK receives mail contract of £20\z/))
+    expect(game.log.map(&:message)).to include(a_string_matching(/\AK collects £20 from Mail Contract\z/))
   end
 
   it 'pays nothing while K is not started' do
@@ -133,7 +135,7 @@ describe 'G18OE minor K, Vermilion Seal mail contract (§15.10)' do
       game.abandon_minor!(k)
       bank_before = game.bank.cash
       cash_before = k.cash
-      game.pay_mail_contract!
+      game.payout_companies
 
       expect(k.cash).to eq(cash_before)
       expect(game.bank.cash).to eq(bank_before)
@@ -142,7 +144,7 @@ describe 'G18OE minor K, Vermilion Seal mail contract (§15.10)' do
     it 'still pays a floated K that is not abandoned' do
       at_phase!(game, '3')
       before = k.cash
-      game.pay_mail_contract!
+      game.payout_companies
 
       expect(k.cash - before).to eq(40)
     end

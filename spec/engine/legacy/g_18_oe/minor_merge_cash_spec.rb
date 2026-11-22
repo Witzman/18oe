@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# EXTENSION (#563 Task 8/9): red on Chris' engine until the patch for cash price in the merge offer 'merge_offer:<n>' (#467) exists. Source of the old code: main:lib/engine/game/g_18_oe/step/merge_offer.rb; red also because Chris' offer runs in the Consolidation round, not in the SR: rewrite the setup to enter_round!(game, game.new_consolidation_round).
+# Triage: notes/rueckport-differenz/spec-triage-B.md. Do not delete; Task 9 turns it green.
+
 require_relative '../engine_helper'
 require_relative 'helpers'
 

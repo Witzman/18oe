@@ -155,6 +155,9 @@ describe 'G18OE floating minors (§9.1)' do
   # home token from its treasury alone (§9.1 step 4). The rulebook is silent; owner decision (#369, 2026-11-19):
   # the owning player tops up the rest from personal cash. Only if the player cannot cover it either, the minor
   # pays what the two together hold (#367 fallback).
+  # EXTENSION (#563 Task 9): red on Chris' engine until the patch 'home token top-up by the owning player' (#367/#369) exists.
+  # See spec-triage-B.md.
+
   describe 'home token of a minor with too little cash (#369)' do
     def float_poor!(zone, treasury)
       minor = par_minor!(treasury: treasury)

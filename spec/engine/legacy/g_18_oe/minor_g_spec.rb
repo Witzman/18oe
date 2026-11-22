@@ -23,8 +23,8 @@ describe 'G18OE minor G, two extra tile points (§15.7, §11.1)' do
   it 'shows the 5 points to the minor in its lay track step every OR (§15.7)' do
     start_minor!(game, 'G', player, 'SP')
 
-    expect(operating!.active_step.description).to eq('5 track points')
-    expect(enter_round!(game, game.operating_round(2)).active_step.description).to eq('5 track points')
+    expect(operating!.active_step.help).to eq('5 track points')
+    expect(enter_round!(game, game.operating_round(2)).active_step.help).to eq('5 track points')
   end
 
   it 'does not give a regional or a major the bonus without the ability (§11.1)' do
