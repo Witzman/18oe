@@ -1,0 +1,2 @@
+tobymao/18xx @ 2dfb88b925179852f6ff382aae8a3be6c1dd6293: spec/lib/engine/game/g_18_oe and g_18_oe_uk_fr, copied byte for byte into lib/ here.
+spec_helper.rb is ours (shim).
