@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Offline proof that lib/engine* is exactly what bin/engine-sync made (engine/MANIFEST).   bin/engine-check [--root <dir>]
+require_relative "../engine/sync"
+
+root = ARGV.index("--root") ? ARGV[ARGV.index("--root") + 1] : File.expand_path("..", __dir__)
+problems = EngineSync.check(File.expand_path(root))
+if problems.empty?
+  puts "engine-check: ok (#{File.read(File.join(root, 'engine', 'PIN')).strip[0, 9]})"
+else
+  warn "engine-check: lib/engine differs from engine/MANIFEST. Change it only through bin/engine-sync " \
+       "(engine/local, engine/patches):"
+  warn problems.map { |p| "  #{p}" }
+  exit 1
+end

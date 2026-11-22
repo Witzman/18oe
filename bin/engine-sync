@@ -1,0 +1,23 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Regenerate lib/engine from upstream tobymao/18xx.   bin/engine-sync <sha> [--upstream <local clone>] [--root <dir>]
+# See engine/UPSTREAM.md and engine/sync.rb.
+require_relative "../engine/sync"
+
+args = ARGV.dup
+opt = lambda do |name|
+  i = args.index(name)
+  i ? (args.delete_at(i); args.delete_at(i)) : nil
+end
+root = opt.call("--root") || File.expand_path("..", __dir__)
+upstream = opt.call("--upstream")
+sha = args.shift
+abort "usage: bin/engine-sync <sha> [--upstream <path>] [--root <dir>]" unless sha && args.empty?
+
+begin
+  puts "engine-sync: lib/engine = upstream@#{EngineSync.sync(File.expand_path(root), sha, upstream: upstream)}"
+rescue EngineSync::Error => e
+  warn e.message
+  exit 1
+end
