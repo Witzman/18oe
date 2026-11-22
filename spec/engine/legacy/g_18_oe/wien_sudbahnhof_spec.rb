@@ -138,6 +138,8 @@ describe 'G18OE Wien Suedbahnhof (§14.3)' do
     expect { act!(round, places.first) }.not_to raise_error
   end
 
+  # EXTENSION (#563 Task 9): red until patch 'Wien Suedbahnhof pays the White Cliffs Ferry token' (Step::SpecialToken, cost 0 named by the owner; §14.3).
+
   describe 'with the White Cliffs Ferry (§14.3, §14.7)' do
     let(:wcf) { give_company!(owner, game.company_by_id('WCF')) }
     let(:lille) { game.lille_city }

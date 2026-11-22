@@ -144,6 +144,7 @@ describe 'G18OE merging a minor into a major in a Stock Round (§10.5)' do
     expect(game.bank.cash).to eq(bank_before + 120)
   end
 
+  # EXTENSION (#563 Task 9): red until the BBBT patch (custody share is the one exchanged on a merge).
   # §14.4 (2), S. 43: a share in custodianship is "exchanged when merging in a minor" (#510).
   it 'exchanges the share in BBBT custodianship, not the first free one (§14.4 (2))' do
     major
@@ -199,6 +200,8 @@ describe 'G18OE merging a minor into a major in a Stock Round (§10.5)' do
 
   # #424: the owner receives the share at once, the minor closes only after its tokens; in between the
   # minor charter must not count as well (§4.1 counts a minor charter, §10.5 exchanges it for the share).
+  # EXTENSION (#563 Task 9): red until patch 'minor charter does not count twice while a merge is pending' (#424): Step::MergeMinor sets minor.presidents_share.counts_for_limit = false.
+
   it 'exchanges the minor charter for the share without raising the certificate count (§4.1, §10.5)' do
     major
     place_minor_token!('Q38')

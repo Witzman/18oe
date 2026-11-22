@@ -47,7 +47,7 @@ describe 'G18OE first-round insolvency (§11.6.5)' do
     it 'lets nobody operate the minor until it is owned again' do
       step.skip!
 
-      expect(round.skip_entity?(minor)).to be(true)
+      expect(game.operating_order).not_to include(minor)
     end
   end
 

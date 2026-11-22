@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# EXTENSION (#563 Task 8/9): red on Chris' engine until the patch for home token top-up by the owning player (#367/#369) exists. Source of the old code: Step::HomeToken / pay_home_token_cost!.
+# Triage: notes/rueckport-differenz/spec-triage-B.md. Do not delete; Task 9 turns it green.
+
 require_relative '../engine_helper'
 require_relative 'helpers'
 

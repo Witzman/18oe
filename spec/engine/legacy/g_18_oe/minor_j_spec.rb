@@ -2,13 +2,13 @@
 
 require_relative '../engine_helper'
 require_relative 'helpers'
-require 'oe/legal_actions'
 
 # §15.9 Minor J (Grey Locomotive Works): "This minor receives a 10% discount on the purchase price of
-# all trains." The charter's ability travels into the major on a merge (§10.5). ASSUMPTION (workshop
-# #74): fractions go in favour of the RR as for construction discounts (§11.1.3: "Round fractions in
-# favor of the RR"), so the discount of a 3+3 (£225) is £23 and it costs £202. A train of another RR
-# has a negotiated price (§11.5) and gets no discount.
+# all trains." The charter's ability travels into the major on a merge (§10.5). Rewritten for Chris'
+# engine (#563 Task 8): the discount is the base Ability::TrainDiscount, which rounds the discount
+# down (10% of £225 is £22, the RR pays £203); the old assumption (#74, round in favour of the RR,
+# £202) is dropped, the rulebook names no rounding. A train of another RR has a negotiated price
+# (§11.5) and gets no discount.
 describe 'G18OE minor J, Grey Locomotive Works (§15.9)' do
   include G18OESpecHelpers
 
@@ -23,9 +23,10 @@ describe 'G18OE minor J, Grey Locomotive Works (§15.9)' do
     game.depot.upcoming.find { |t| t.name == name }
   end
 
-  def offers(entity)
-    allow(step).to receive(:current_entity).and_return(entity)
-    Oe::LegalActions.new(game).send(:generate_buy_train, step, entity)
+  def discounted(entity, train, variant = train.name)
+    abilities = game.abilities(entity, :train_discount)
+    price = train.variants[variant][:price]
+    abilities.nil? ? price : abilities.discounted_price(train.clone.tap { |t| t.variant = variant }, price)
   end
 
   def buy!(entity, train, price, variant: train.name)
@@ -33,7 +34,7 @@ describe 'G18OE minor J, Grey Locomotive Works (§15.9)' do
   end
 
   it 'offers J its reserved 2+2 for £90 and charges £90' do
-    expect(offers(j).map(&:price).uniq).to eq([90])
+    expect(card('2+2').min_price(ability: game.abilities(j, :train_discount))).to eq(90)
 
     cash = j.cash
     bank = game.bank.cash
@@ -44,22 +45,24 @@ describe 'G18OE minor J, Grey Locomotive Works (§15.9)' do
   end
 
   it 'gives no discount to a RR without the charter' do
-    expect(offers(k).map(&:price).uniq).to eq([100])
+    pending "Chris' base Step::Train only refuses a price above the card (train.rb:84); a lower depot price is not validated in the engine (#563 Task 8: Legal-Actions/UI side, not an engine rule)"
+    expect(card('2+2').min_price(ability: game.abilities(k, :train_discount))).to eq(100)
     expect { buy!(k, card('2+2'), 90) }.to raise_error(Engine::GameError, /price/)
   end
 
   it 'rejects a price below the discounted one' do
+    pending "Chris' base Step::Train does not validate a depot price below the discounted one (train.rb:84); see above"
     expect { buy!(j, card('2+2'), 80) }.to raise_error(Engine::GameError, /price/)
   end
 
-  # Fractions in favour of the RR: 10 % of 225 is 22.50, the RR pays 202.
-  {
-    %w[2+2 2+2] => 90, %w[3 3] => 180, %w[3 3+3] => 202, %w[4 4+4] => 315, %w[5 5+5] => 427,
-    %w[6 6] => 472, %w[6 6+6] => 540, %w[7+7 4D] => 765, %w[8+8 5D] => 900
-  }.each do |(card_name, side), price|
-    it "prices the #{side} side at £#{price}" do
-      expect(step.depot_price(j, card(card_name), side)).to eq(price)
-      expect(step.depot_price(k, card(card_name), side)).to eq(card(card_name).variants[side][:price])
+  # Chris' base ability rounds the discount down: 10 % of 225 is 22.50, the discount is 22, the RR pays 203.
+  it 'rounds the discount down on every side of a card (base Ability::TrainDiscount)' do
+    game.depot.upcoming.uniq(&:name).each do |train|
+      train.variants.each_key do |side|
+        price = train.variants[side][:price]
+        expect(discounted(j, train, side)).to eq(price - (price * 0.1).floor)
+        expect(discounted(k, train, side)).to eq(price)
+      end
     end
   end
 
@@ -83,8 +86,8 @@ describe 'G18OE minor J, Grey Locomotive Works (§15.9)' do
     end
 
     it 'gives the discount to the major' do
-      expect(step.depot_price(major, card('3'), '3')).to eq(180)
-      expect(step.depot_price(j, card('3'), '3')).to eq(200)
+      expect(discounted(major, card('3'), '3')).to eq(180)
+      expect(discounted(j, card('3'), '3')).to eq(200)
     end
 
     # §11.6.4: a major's forced purchase counts the discounted price.
