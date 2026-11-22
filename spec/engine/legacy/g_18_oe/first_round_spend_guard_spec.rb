@@ -2,7 +2,7 @@
 
 require_relative '../engine_helper'
 require_relative 'helpers'
-require_relative '../../../lib/oe/legal_actions'
+require 'oe/legal_actions'
 
 # §11.6.4 para. 2 (RB l. 4629-4641): no paid track or token that drives a RR into
 # first-round insolvency. Built as a guard instead of the rule's refund (workshop #352).
