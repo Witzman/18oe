@@ -452,48 +452,41 @@ RSpec.describe Engine::Game::G18OE::Graph, "#without_ferry_prices" do
   end
 end
 
-# #315/#319: the path search runs on every prompt and bot move; unbounded, one
-# search in a phase-8 network took 47 s. It is bounded by a visit count.
-RSpec.describe Oe::LegalActions::RoutePicker do
-  include G18OESpecHelpers
-
-  it "bounds the path search" do
-    game = new_game
-    corp = game.corporation_by_id("LNWR")
-    allow_any_instance_of(Oe::RouteSearch).to receive(:path) do |_router, _trains, _corp, **opts|
-      expect(opts[:walk_limit]).to eq(described_class::WALK_LIMIT)
-      expect(opts).not_to have_key(:path_timeout)
-      [{}]
-    end
-    expect(described_class.new(game, corp).call).to eq([])
-    expect(described_class::WALK_LIMIT).to be_between(1000, 20_000)
-  end
-end
-
-# #319: walk_limit bounds the number of visits deterministically (no wall clock).
+# #315/#319, #574: the path search runs on every prompt and bot move; it is Chris' Engine::AutoRouter#path (no
+# walk limit in the core: it is bounded by the wall clock path_timeout and the route_limit per train).
 RSpec.describe Oe::RouteSearch do
   include G18OESpecHelpers
 
-  def search(walk_limit)
+  def search(**opts)
     game = new_game
     corp = start_major!(game, "LNWR", game.players[0])
     game.phase.next!
     game.buy_train(corp, game.depot.upcoming.first, :free)
-    router = described_class.new(game)
-    routes, cut = router.path(game.route_trains(corp), corp, walk_limit: walk_limit)
-    [routes.transform_keys(&:name).transform_values { |rs| rs.map(&:revenue) }, cut, router.walks]
+    routes, cut = described_class.new(game).path(game.route_trains(corp), corp, **opts)
+    [routes.transform_keys(&:name).transform_values { |rs| rs.map(&:revenue) }, cut]
   end
 
-  it "stops after walk_limit visits, the same way every time" do
-    full, full_cut, total = search(nil)
-    expect(full_cut).to be(false)
-    expect(total).to be > 2
+  it "gives the same routes every time when it is not cut off" do
+    first, cut = search
+    expect(cut).to be(false)
+    expect(first.values.flatten).not_to be_empty
+    expect(search).to eq([first, false])
+  end
 
-    limited, cut, walks = search(2)
-    expect(cut).to be(true)
-    expect(walks).to be < total
-    expect(search(2)).to eq([limited, cut, walks])
-    expect(search(total)).to eq([full, false, total])
+  it "keeps at most route_limit routes per train, the best first" do
+    full, = search
+    limited, = search(route_limit: 2)
+
+    expect(limited.values.map(&:size).max).to be <= 2
+    expect(limited).to eq(full.transform_values { |revenues| revenues.first(2) })
+  end
+
+  it "passes only the options the core router knows" do
+    allow_any_instance_of(Engine::AutoRouter).to receive(:path) do |_router, _trains, _corp, **opts|
+      expect(opts.keys).to contain_exactly(:path_timeout)
+      [{}, false]
+    end
+    described_class.new(new_game).path([], nil, path_timeout: 5, walk_limit: 10)
   end
 end
 

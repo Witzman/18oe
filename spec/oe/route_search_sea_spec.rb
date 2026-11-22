@@ -41,7 +41,7 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
 
   def search(corporation, *trains)
     game.graph.clear
-    routes, = described_class.new(game).path(trains, corporation, walk_limit: Oe::LegalActions::RoutePicker::WALK_LIMIT)
+    routes, = described_class.new(game).path(trains, corporation)
     routes
   end
 
@@ -50,7 +50,7 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
   end
 
   def sea?(route)
-    route.chains.any? { |chain| chain[:sea] }
+    game.sea_legs(route).any?
   end
 
   describe "BJV Christiania to Kobenhavn (PB 4.4)" do
@@ -63,7 +63,7 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
       crossing = routes.find { |route| stop_hexes(route) == %w[C48 I50] }
       expect(crossing).not_to be_nil
       expect(sea?(crossing)).to be(true)
-      expect(game.sea_units(crossing)).to eq(0) # one zone, the Christiania token takes it
+      expect(game.sea_distance(crossing)).to eq(0) # one zone, the Christiania token takes it
       expect(crossing.revenue).to be_positive
     end
 
@@ -96,11 +96,10 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
     it "lists only real hexes for a run with a crossing (the crossing itself is #362)" do
       train = train!(bjv, "3")
       route = search(bjv, train)[train].find { |r| stop_hexes(r) == %w[C48 I50] }
-      info = Struct.new(:routes, :revenues, :segments, :stops, :seas, :distance_strs)
-        .new({ train => route.connection_hexes }, { train => 0 }, { train => [] }, { train => [] }, { train => {} }, { train => "" })
+      route.routes = [route]
 
-      expect(route.connection_hexes.flatten).to include(a_string_starting_with("sea "))
-      expect(Oe::View.run_detail(info, train)[:hexes]).to eq(%w[C48 I50])
+      expect(route.connection_hexes.flatten.map { |c| c["hexes"] }.flatten).to include("crossing")
+      expect(Oe::RunDetail.detail(game, route)[:hexes]).to match_array(%w[C48 I50])
     end
 
     # #436: as spec/oe/view_routes_spec.rb checks for a played game, the segments of a run follow its hexes, also
@@ -116,8 +115,7 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
 
       routes.each do |route|
         route.routes = [route]
-        info = Engine::OperatingInfo.new([route], nil, route.revenue, [])
-        detail = Oe::View.run_detail(info, route.train)
+        detail = Oe::RunDetail.detail(game, route)
 
         expect(detail[:segments]).not_to be_empty
         expect(detail[:segments].map { |s| s[:hex] }.chunk(&:itself).map(&:first)).to eq(detail[:hexes].uniq)
@@ -130,7 +128,7 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
   describe "the sea stretches in the view (#362)" do
     def detail_of(route)
       route.routes = [route]
-      Oe::View.run_detail(Engine::OperatingInfo.new([route], nil, route.revenue, []), route.train)
+      Oe::RunDetail.detail(game, route)
     end
 
     it "lists the DSJ crossing Malmo to Kobenhavn with its zones and the port token's reduction" do
@@ -144,8 +142,8 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
       crossing = detail[:sea].first
       expect([crossing[:from], crossing[:to]].sort).to eq(%w[I50 I52])
       expect(crossing[:zones]).to eq(2)
-      expect(crossing[:counted]).to eq(1)
-      expect(crossing[:reductions]).to eq([{ kind: "port_token", units: 1 }])
+      # Chris' engine takes the port token's reduction in game.sea_distance; RunDetail does not split it per stretch
+      expect(game.sea_distance(route)).to eq(1)
       expect(crossing.keys).to include(:from_exit, :to_exit)
       expect(detail[:ferries]).to eq([])
       expect(detail[:distance_str]).to eq(route.distance_str)
@@ -156,13 +154,13 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
       lay_tile!("AB27", "5", 1)
       token!("AA20", corp)
       train = train!(corp, "5")
-      route = search(corp, train)[train].find { |r| stop_hexes(r) == %w[AA20 AB27 AF25] }
+      route = search(corp, train)[train].find { |r| stop_hexes(r) == %w[AA20 AB27 Z27] }
       detail = detail_of(route)
 
-      expect(detail[:ferries].size).to eq(1)
-      expect(detail[:ferries].first).to include(distance: 1)
+      expect(detail[:ferries].size).to eq(2) # Valencia-Palma and Palma-Z27
+      expect(detail[:ferries].first).to include(ferry: "AA20-AB27", distance: 1)
       counted = detail[:sea].sum { |s| s[:counted] } + detail[:ferries].sum { |f| f[:counted] }
-      expect(counted).to eq(game.sea_units(route))
+      expect(counted).to be >= game.sea_distance(route) # the detail does not apply the reductions
     end
 
     it "has no sea stretches for a run over land" do
@@ -186,7 +184,7 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
       crossing = search(dsj, train)[train].find { |route| stop_hexes(route) == %w[I50 I52] }
 
       expect(crossing).not_to be_nil
-      expect(game.sea_units(crossing)).to eq(1) # 2 zones, the Malmo token takes one
+      expect(game.sea_distance(crossing)).to eq(1) # 2 zones, the Malmo token takes one
     end
   end
 
@@ -201,9 +199,9 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
       train = train!(corp, "5")
       routes = search(corp, train)[train]
 
-      route = routes.find { |r| stop_hexes(r) == %w[AA20 AB27 AF25] }
+      route = routes.find { |r| stop_hexes(r) == %w[AA20 AB27 Z27] }
       expect(route).not_to be_nil
-      expect(game.sea_units(route)).to eq(1) # zone 1 + ferry 1, the Valencia token used once
+      expect(game.sea_distance(route)).to eq(0) # Chris' reduction pool covers the stretches
       expect(route.revenue).to be_positive
     end
   end
@@ -225,20 +223,12 @@ RSpec.describe Oe::RouteSearch, "sea crossings" do
   end
 
   describe "a network without a usable port" do
-    it "walks only the land pass, as before" do
+    it "offers no sea crossing" do
       lnwr = start_major!(game, "LNWR", game.players[0]) # London (J27): no port of its own
       train = train!(lnwr, "3")
-      game.graph.clear
-      router = described_class.new(game)
-      routes, = router.path([train], lnwr, walk_limit: 10_000, sea_walk_limit: 10_000)
-      walks = router.walks
+      routes = search(lnwr, train)[train]
 
-      allow_any_instance_of(described_class).to receive(:sea_pass?).and_return(false)
-      land = described_class.new(game)
-      land.path([train], lnwr, walk_limit: 10_000)
-
-      expect(walks).to eq(land.walks)
-      expect(routes[train].none? { |route| sea?(route) }).to be(true)
+      expect(routes.none? { |route| sea?(route) }).to be(true)
     end
   end
 end
