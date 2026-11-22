@@ -48,26 +48,17 @@ module Oe
         !game.round.is_a?(Engine::Round::G18OE::Consolidation)
     end
 
-    # Buying or discarding a Pullman (§11.6.2, #55). The bot rule is pick_pullman; every other Pullman
-    # choice stays out of play (a random one would discard cars, or take a car from another bot who
-    # buys it back: #428).
-    PULLMAN_PAYBACK_ORS = 5
-    PULLMAN_CASH_BUFFER = 150
-
-    # Token and port authority marker transfers between majors (§11.5, #57, #469) are not used by the bot yet: it passes the step.
-    def self.pullman_choice?(action)
-      action.is_a?(Engine::Action::Choose) &&
-        action.choice.to_s.start_with?('pullman_', 'port_authority:', 'transfer_token:', 'transfer_marker:')
+    # Port authority purchases (special_buy, §11.3.5) and the transfers between majors (§11.5, #57: place_token with
+    # a slot in Step::TransferTokens, choose in it) are not played by the bot yet (#563 Task 7 gives it rules in
+    # Chris' formats): it passes them. A Pullman is a depot train now and goes through the BuyTrain rules.
+    def self.transfer_choice?(action)
+      action.is_a?(Engine::Action::SpecialBuy) ||
+        (action.is_a?(Engine::Action::PlaceToken) && !action.slot.nil?) ||
+        (action.is_a?(Engine::Action::Choose) && action.choice.to_s.include?(':'))
     end
 
     def choose(actions)
-      pullman = pick_pullman(actions)
-      return pullman if pullman
-
-      marker = pick_port_authority(actions)
-      return marker if marker
-
-      actions = actions.reject { |a| self.class.pullman_choice?(a) } if actions.any? { |a| !self.class.pullman_choice?(a) }
+      actions = actions.reject { |a| self.class.transfer_choice?(a) } if actions.any? { |a| !self.class.transfer_choice?(a) }
       actions = actions.reject { |a| self.class.trade_offer?(a) } if actions.any? { |a| !self.class.trade_offer?(a) }
       actions = actions.reject { |a| self.class.merge_offer?(@game, a) } if actions.any? { |a| !self.class.merge_offer?(@game, a) }
       # Like Oe::Bot (#128): actions a private issues itself (White Cliffs Ferry's
@@ -92,40 +83,6 @@ module Oe
     end
 
     private
-
-    # §11.6.2, §11.3.9: a Pullman adds £10 per level of the highest train every OR. Buy one from the Open
-    # Market (no royalty) or Minor M when it pays back within a few ORs, the RR already runs a train and
-    # keeps a cash buffer for its trains. Never from another RR, and never a second one.
-    def pick_pullman(actions)
-      options = actions.select { |a| self.class.pullman_choice?(a) && %w[pullman_market pullman_m].include?(a.choice) }
-      return nil if options.empty?
-
-      entity = options.first.entity
-      trains = @game.counted_trains(entity)
-      return nil if trains.empty?
-
-      bonus = trains.map { |train| train.sym.to_i }.max * Engine::Game::G18OE::National::PULLMAN_PER_LEVEL
-      price = Engine::Game::G18OE::Pullman::PULLMAN_PRICE # Minor J's discount is ignored: a safe bound
-      return nil if price > PULLMAN_PAYBACK_ORS * bonus || entity.cash < price + PULLMAN_CASH_BUFFER
-
-      options.find { |a| a.choice == 'pullman_market' } || options.first
-    end
-
-    # §11.3.5 (#56): a marker takes two sea units off a crossing in its water area. Buy it for the area where the
-    # RR's network has the most usable crossing ends (at least two, so a crossing exists), when it runs a train
-    # and keeps the cash buffer for its trains. Never for an area without a crossing.
-    def pick_port_authority(actions)
-      options = actions.select { |a| a.is_a?(Engine::Action::Choose) && @game.port_authority_choice?(a.choice) }
-      return nil if options.empty?
-
-      entity = options.first.entity
-      price = Engine::Game::G18OE::PortAuthority::PORT_AUTHORITY_PRICE
-      return nil if @game.counted_trains(entity).empty? || entity.cash < price + PULLMAN_CASH_BUFFER
-
-      ends = @game.sea_landings(entity).flat_map { |_node, zones| zones.map { |zone| @game.sea(zone) } }
-      best = ends.tally.select { |_area, n| n >= 2 }.max_by { |_area, n| n }&.first
-      options.find { |a| a.choice == "port_authority:#{best}" } if best
-    end
 
     def underscore(name)
       name.gsub(/([a-z])([A-Z])/, '\1_\2').downcase

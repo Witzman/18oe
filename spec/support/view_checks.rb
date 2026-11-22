@@ -35,7 +35,7 @@ module OeViewChecks
   # --- operating context (#123) ------------------------------------------------------------------------
 
   def check_shape(ctx)
-    expect(ctx.keys).to eq(%i[track token dividend train stock trade])
+    expect(ctx.keys).to eq(%i[track token dividend train stock])
     JSON.generate(ctx)
   end
 
@@ -47,16 +47,24 @@ module OeViewChecks
   end
 
   def check_track(track, view, step, entity, game)
-    expect(track[:points]).to eq(budget: game.tile_point_budget(entity), used: step.points_used, left: step.points_left(entity))
+    # Chris' Step::Track keeps the points itself: get_tile_lay is the budget, remaining_tile_points (private) what is left
+    left = step.send(:remaining_tile_points, entity)
+    expect(track[:points]).to eq(budget: step.get_tile_lay(entity), used: step.get_tile_lay(entity) - left, left: left)
     expect(track[:hexes]).not_to be_nil if view[:prompt][:viewer_to_act]
     (track[:hexes] || []).each do |h|
       hex = game.hex_by_id(h[:hex])
       expect(step.available_hex(entity, hex)).to be_truthy
-      # #360: plus the fee for the sea zones to the hex (§11.1.6)
-      expect(h[:cost]).to eq(game.upgrade_cost(hex.tile, hex, entity, entity) + game.cross_water_track_fee(entity, hex).to_i)
+      # #360: plus the fee for the sea zones to the hex (§11.1.6), the fewest a legal tile and rotation there costs
+      # (Step::Track charges it as the action's extra_cost: cross_water_tile_fee)
+      terrain = game.upgrade_cost(hex.tile, hex, entity, entity)
+      fees = h[:tiles].flat_map do |t|
+        tile = game.tiles.find { |x| x.name == t[:name] && x.hex.nil? } || game.tiles.find { |x| x.name == t[:name] }
+        t[:rotations].map { |r| tile.rotate!(r); game.cross_water_tile_fee(entity, hex, tile).to_i } # rubocop:disable Style/Semicolon
+      end
+      expect(h[:cost]).to eq(terrain + (fees.min || 0))
       expect(h[:cost_parts].sum { |p| p[:amount] }).to eq(h[:cost])
       expect(h[:points]).to be <= track[:points][:left], "#{h[:hex]}: #{h[:points]} points, #{track[:points][:left]} left"
-      expect(h[:points]).to eq(step.points_for_lay(entity, hex)) # #426: with the E/F extra point
+      expect(h[:points]).to eq(game.tile_point_cost(entity, old_tile: hex.tile)) # #426: with the E/F extra point
       # #360: a tile none of whose rotations the cash can pay (the sea zone fee depends on the sides) is left out of the
       # panel, so the panel lists a subset of the engine's upgradeable tiles; the enumeration check below compares the
       # rotations (and so the omitted tiles) with the legal actions (#458)

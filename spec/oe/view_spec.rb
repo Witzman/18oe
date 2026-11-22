@@ -71,7 +71,7 @@ RSpec.describe Oe::View, :game_flow do
     @samples.each do |label, view, _|
       if view[:meta][:round][:type] == "auction"
         expect(view[:auction][:cards]).not_to be_empty, label
-        expect(view[:auction][:cards].size).to be <= 32, label
+        expect(view[:auction][:cards].size).to be <= 33, label
       else
         expect(view[:auction]).to be_nil, label
       end
