@@ -88,6 +88,9 @@ module Engine
             else
               @log << "#{minor.name} merges into #{major.name} by track connection; #{minor.owner.name} receives no share"
             end
+            # RB 10.5 exchanges the minor charter: it stops counting towards the certificate limit (4.1) now, not
+            # only when the minor closes after its tokens are resolved.
+            minor.presidents_share.counts_for_limit = false
             transfer_treasury(minor, cash_recipient)
             @round.merge_trains = { corporation: major, trains: move_trains!(minor, major) }
             @game.minor_regional_order.delete(minor)
