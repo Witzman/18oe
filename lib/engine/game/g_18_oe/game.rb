@@ -6,6 +6,7 @@ require_relative 'map'
 require_relative 'stock_market'
 require_relative 'graph'
 require_relative 'sea_routes'
+require_relative 'orient_express_duty'
 require_relative 'nationals'
 require_relative 'train'
 require_relative '../base'
@@ -40,6 +41,7 @@ module Engine
         include G18OE::Entities
         include G18OE::Map
         include G18OE::SeaRoutes
+        include G18OE::OrientExpressDuty
         include G18OE::Nationals
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
@@ -1909,7 +1911,8 @@ module Engine
           return false unless route.corporation&.type == :major
 
           visited = route.visited_stops.map(&:hex)
-          visited.intersect?(orient_express_destination_hexes) && visited.intersect?(orient_express_origin_hexes)
+          visited.intersect?(orient_express_destination_hexes) && visited.intersect?(orient_express_origin_hexes) &&
+            !sea_only_run?(route)
         end
 
         def orient_express_route(routes)

@@ -723,6 +723,10 @@ module Oe
       combos = RouteSearch.new(@game).combinations(candidates)
       return [] if combos.empty?
 
+      # RB 12.2 (#512): when the best routes need a combination, only that one is offered
+      required = @game.orient_express_required(entity, [])
+      return [A::DoubleHeadTrains.new(entity, trains: required[:combine])] if required&.dig(:combine)
+
       need = OrientExpressReach.new(@game, entity).fewest_cities(candidates)
       return [] unless need
 
@@ -836,9 +840,15 @@ module Oe
         @entity = entity
       end
 
+      # RB 12.2 (#512): when the routes picked leave out an Orient Express run the RR must make, the best routes found with
+      # it are offered instead (the engine rejects the others); the game reuses this search's candidates. A combination
+      # comes first (generate_double_head_trains offers it): no run before it.
       def call
         router = RouteSearch.new(@game)
-        router.pick(combined_first(router.train_routes(@entity)))
+        train_routes = router.train_routes(@entity)
+        chosen = router.pick(combined_first(train_routes))
+        required = @game.orient_express_required(@entity, chosen, train_routes)
+        required ? required[:routes] : chosen
       end
 
       private
