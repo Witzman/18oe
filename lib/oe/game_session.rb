@@ -27,7 +27,7 @@ module Oe
       end
     end
 
-    UPSTREAM_COMMIT = "06b3f0b37" # engine/UPSTREAM.md
+    UPSTREAM_COMMIT = File.read(File.expand_path("../../engine/PIN", __dir__)).strip[0, 9] # engine/PIN
     GAME_CLASS = -> { Engine::Game::G18OE::Game }
     # Undo/redo would rewrite history; the log stays append-only for now.
     FORBIDDEN = %w[undo redo].freeze
