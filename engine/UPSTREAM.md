@@ -9,6 +9,23 @@ engine.
   upstream `lib/` (assets, auth, mail, ...) is needed to load or run the
   18OE game.
 
+## How this tree is made (#564, #563)
+
+`lib/engine.rb` and `lib/engine/` are **generated, never edited by hand**:
+
+    bin/engine-sync <sha> [--upstream <local clone>]   upstream@sha, minus foreign titles,
+                                                       plus engine/local/*.patch, then engine/patches/*.patch
+    bin/engine-check                                   offline: every file matches engine/MANIFEST (CI, `changes` job)
+
+- This file is engine/UPSTREAM.md (outside the generated tree, so a sync never wipes it).
+- `engine/PIN`: the upstream commit. `engine/MANIFEST`: sha256 of every file of the tree.
+- `engine/local/`: load paths only (the `require_all` replacements below); never goes upstream.
+- `engine/patches/`: rules and features 18xx lacks and we already have, one patch each, later one upstream PR each.
+- Until Task 2 of #563 the tree is still the old hand-modified import (own changes inside, see
+  `notes/rueckport-differenz/diff-Kern.md` in the workshop); PIN/MANIFEST then only freeze that state so no
+  further hand edit slips in. `bin/engine-sync 06b3f0b37` reproduces the loading patch exactly; every other
+  difference to it is an own change that Task 2 replaces with upstream master.
+
 ## Removed
 
 - All other game titles: every `lib/engine/game/g_*` directory and its
