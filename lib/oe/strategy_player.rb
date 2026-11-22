@@ -232,7 +232,7 @@ module Oe
     # lowest rusted train for a higher one; it never takes a train from its own majors. Then it passes.
     def pick_national_train(trains, by_class)
       level = ->(train) { train.sym.to_i }
-      pool = trains.select { |a| a.train.owner.nil? }
+      pool = trains.reject { |a| a.train.owned_by_corporation? }
       claim = pool.select { |a| a.exchange.nil? }.max_by { |a| level.call(a.train) }
       return claim if claim
 
