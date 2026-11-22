@@ -99,4 +99,69 @@ RSpec.describe Oe::LegalActions, "track and token formats" do
       buys.each { |action| expect(accepted?(build, action)).to be(true), action.to_h.inspect }
     end
   end
+
+  describe "swift metropolitan line: choose_ability" do
+    let(:build) do
+      lambda do
+        game = new_game
+        player = game.players.first
+        give_company!(player, game.company_by_id("SML"))
+        minor = start_minor!(game, "K", player, "RU")
+        major = start_major!(game, "LNWR", player)
+        game.phase.next! until game.phase.available?("4")
+        2.times { game.buy_train(minor, game.depot.upcoming.find { |t| t.name == "2+2" }, :free) }
+        game.rust_trains!(game.depot.upcoming.find { |t| t.name == "4" }, minor)
+        operating_round_for(game, major)
+        game
+      end
+    end
+
+    it "offers the ability's choice to the owner and the engine accepts it" do
+      game = build.call
+      abilities = described_class.new(game, limit: 6).call.grep(Engine::Action::ChooseAbility)
+
+      expect(abilities.map { |a| a.choice }).to eq(["preserve"])
+      abilities.each { |action| expect(accepted?(build, action)).to be(true), action.to_h.inspect }
+    end
+  end
+
+  describe "pullman: a depot train with its own price, and the add-on choice in the route step" do
+    let(:build) do
+      lambda do
+        game = new_game
+        player = game.players.first
+        major = start_major!(game, "LNWR", player)
+        fund!(game, major, 900)
+        game.phase.next! until game.phase.available?("4")
+        game.depot.depot_trains(clear: true)
+        game.buy_train(major, game.depot.upcoming.find { |t| t.name == "4" }, :free)
+        [game, major]
+      end
+    end
+
+    it "offers a Pullman from the depot at a price the buy step accepts" do
+      game, major = build.call
+      step = round_step(operating_round_for(game, major), Engine::Game::G18OE::Step::BuyTrain)
+      offers = described_class.new(game, limit: 40).send(:generate_buy_train, step, major)
+      pullmans = offers.select { |a| game.pullman?(a.train) }
+
+      expect(pullmans).not_to be_empty
+      pullmans.each do |action|
+        fresh_game, fresh_major = build.call
+        fresh_step = round_step(operating_round_for(fresh_game, fresh_major), Engine::Game::G18OE::Step::BuyTrain)
+        copy = Engine::Action::Base.action_from_h(action.to_h.dup.tap { action.clear_cache }, fresh_game)
+        expect { fresh_step.process_buy_train(copy) }.not_to raise_error, action.to_h.inspect
+      end
+    end
+
+    it "offers the Pullman's attachment to a train as a choose in the route step" do
+      game, major = build.call
+      game.buy_train(major, game.depot.upcoming.find { |t| game.pullman?(t) }, :free)
+      round = operating_round_for(game, major)
+      act!(game, Engine::Action::Pass.new(major)) until round.active_step.is_a?(Engine::Game::G18OE::Step::Route)
+      choices = described_class.new(game, limit: 10).send(:generate_choose, round.active_step, major)
+
+      expect(choices.map(&:choice)).to include(a_string_matching(/\Apullman:/))
+    end
+  end
 end

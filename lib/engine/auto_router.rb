@@ -300,6 +300,8 @@ module Engine
       bitfield[entry] |= mask
     end
 
+    # MRI (no Opal) must not run the JavaScript combiner below as a shell command (#563 engine/local).
+    if RUBY_ENGINE == 'opal'
     %x{
       class Autorouter {
         constructor(router, trains_to_routes_map, update_callback) {
@@ -531,5 +533,6 @@ module Engine
         return new Promise(resolve => requestAnimationFrame(resolve));
       }
     }
+    end
   end
 end

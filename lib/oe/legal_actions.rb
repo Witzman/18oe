@@ -740,10 +740,6 @@ module Oe
       combos = RouteSearch.new(@game).combinations(candidates)
       return [] if combos.empty?
 
-      # §12.2 (#512): when the best routes need a combination, only that one is offered
-      required = @game.orient_express_required(entity, [])
-      return [A::DoubleHeadTrains.new(entity, trains: required[:combine])] if required&.dig(:combine)
-
       need = OrientExpressReach.new(@game, entity).fewest_cities(candidates)
       return [] unless need
 
@@ -769,6 +765,12 @@ module Oe
         RouteSearch.new(@game).orient_express_routes(@entity, trains)
           .map { |route| route.visited_stops.count { |stop| !stop.town? } }.min
       end
+    end
+
+    # A private's own ability choice (Chris' Step::SpecialChoose, §14.10 Swift Metropolitan Line: `preserve`):
+    # `choose_ability` with the ability's choice key; the receiving RR is the one operating.
+    def generate_choose_ability(step, entity)
+      step.choices_ability(entity).keys.map { |choice| A::ChooseAbility.new(entity, choice: choice.to_s) }
     end
 
     def generate_dividend(step, entity)
@@ -798,14 +800,12 @@ module Oe
     # [variant name, price] pairs. A depot train is offered once per variant the
     # engine allows (Step::Train#buyable_train_variants): 3 and 3+3, 4 and 4+4,
     # 5 and 5+5, 6 and 6+6, 7+7 and 4D, 8+8 and 5D (RB 11.6, the double-sided
-    # cards), each at its own price (less Minor J's discount, §15.9). A train of
+    # cards), each at its own price (the variant's, as the engine's Step::Train checks it). A train of
     # another railroad keeps the side it was bought with: no variant.
     def train_offers(step, entity, train, min, max)
       return other_train_prices(train, min, max).map { |price| [nil, price] } unless train.from_depot?
 
-      step.send(:buyable_train_variants, train, entity).map do |variant|
-        [variant[:name], step.depot_price(entity, train, variant[:name])]
-      end
+      step.send(:buyable_train_variants, train, entity).map { |variant| [variant[:name], variant[:price]] }
     end
 
     # A train from another corporation: the engine's whole span (RB 11.6,
@@ -839,39 +839,14 @@ module Oe
     # Picks, per train, the best-revenue non-conflicting route found by the
     # engine's path search. (AutoRouter#route, the combiner, is Opal-only.)
     class RoutePicker
-      # Visits the path search may make (RouteSearch walk_limit, #319). It runs
-      # on every prompt and bot move; unbounded, one search in a phase-8 network
-      # walked 266000 visits in 47 s. The limit is a count, not wall-clock time
-      # (the former 3 s path_timeout, #315), so the routes offered do not depend
-      # on the machine, and it also stops a single long walk. Nodes are searched
-      # best first (own tokens, offboards, revenue). Measured (4p seed 1,
-      # phases 7-8, 40 searches): 21 s instead of 169 s in all, at most 2.3 s
-      # instead of 47 s; revenue equal in 35 of 40, the others -100, -20 (3x)
-      # and +300 (the picker is greedy, more candidates are not always better).
-      WALK_LIMIT = RouteSearch::WALK_LIMIT
-      # Visits of the second pass, the one that also crosses the sea (#359): it
-      # runs only for an RR whose network reaches a port it may use, after the
-      # land pass, so land routes keep their WALK_LIMIT. Measured in the PR.
-      SEA_WALK_LIMIT = RouteSearch::SEA_WALK_LIMIT
-
       def initialize(game, entity)
         @game = game
         @entity = entity
       end
 
-      # §12.2 (#512): when the routes picked leave out an Orient Express run the
-      # RR must make, the best routes found with it are offered instead (the
-      # engine rejects the others); the game reuses this search's candidates.
       def call
         router = RouteSearch.new(@game)
-        train_routes = router.train_routes(@entity)
-        chosen = router.pick(combined_first(train_routes))
-        required = @game.respond_to?(:orient_express_required) &&
-                   @game.orient_express_required(@entity, chosen, train_routes)
-        return chosen unless required
-
-        # a combination comes first (generate_double_head_trains offers it); no run before it
-        required[:routes]
+        router.pick(combined_first(router.train_routes(@entity)))
       end
 
       private

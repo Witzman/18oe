@@ -43,7 +43,7 @@ RSpec.describe Oe::LegalActions, "double_head_trains on the real map (#411)" do
     combine = described_class.new(game).call.grep(Engine::Action::DoubleHeadTrains).first
     act!(game, combine)
     combined = major.trains.find { |t| game.combined_train?(t) }
-    expect(combined.name).to eq("4+4")
+    expect(combined.name).to eq("4+4C") # Chris' name for a combined train
 
     after = described_class.new(game).call
     run = after.grep(Engine::Action::RunRoutes).first
