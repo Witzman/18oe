@@ -4,7 +4,7 @@
 engine.
 
 - Source: https://github.com/tobymao/18xx
-- Commit: `06b3f0b37bddbf587a5e39424a3511b5e4674c47` (06b3f0b37), dated 2026-11-09 02:12:32 -0500
+- Commit: the one in `engine/PIN` (upstream master with Chris' 18OE state, `crericha`, maintainer; moved only by a pull request, see `notes/traps/engine-sync.md` in the workshop). The nightly workflow `engine-upstream-watch` keeps one issue open while upstream is ahead on core or 18OE paths.
 - Imported paths: `lib/engine.rb`, `lib/engine/`. Nothing else from the
   upstream `lib/` (assets, auth, mail, ...) is needed to load or run the
   18OE game.
@@ -21,10 +21,13 @@ engine.
 - `engine/PIN`: the upstream commit. `engine/MANIFEST`: sha256 of every file of the tree.
 - `engine/local/`: load paths only (the `require_all` replacements below); never goes upstream.
 - `engine/patches/`: rules and features 18xx lacks and we already have, one patch each, later one upstream PR each.
-- Until Task 2 of #563 the tree is still the old hand-modified import (own changes inside, see
-  `notes/rueckport-differenz/diff-Kern.md` in the workshop); PIN/MANIFEST then only freeze that state so no
-  further hand edit slips in. `bin/engine-sync 06b3f0b37` reproduces the loading patch exactly; every other
-  difference to it is an own change that Task 2 replaces with upstream master.
+- Order of a sync: upstream@pin, minus foreign titles, `engine/local/*.patch` (load paths, MRI-only fixes), then
+  `engine/patches/*.patch` in file name order. Each patch needs its own spec in `spec/oe/extensions/` (red without it) and
+  is shaped like a later upstream pull request (existing ability classes, step/round hooks, game mixins; CLAUDE.md
+  rules 11 and 32). No pull request, issue or comment goes to upstream until the owner says so.
+- Known deviations of Chris' specs (`spec/engine/upstream`) caused by a patch are listed at the end of this file.
+- The wrapper, the bots and the web UI live outside the generated tree (`lib/oe`, `app.rb`, `web/`) and use the engine
+  only through its normal interface.
 
 ## Removed
 
