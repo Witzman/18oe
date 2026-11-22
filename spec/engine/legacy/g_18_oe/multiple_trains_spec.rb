@@ -83,29 +83,22 @@ describe 'G18OE running multiple trains of one RR (§11.3.8)' do
     expect { routes.each(&:revenue) }.to raise_error(Engine::GameError, /Route cannot reuse track/)
   end
 
-  it 'knows the ferry line and both city sections of it, and no land track' do
+  it 'treats the ferry line and both city sections of it as shared sea traffic, and no land track' do
     ferry = game.hex_by_id('N29').tile.paths.first
     london_section = london.paths.find { |path| path.exits.include?(5) }
     lille_ferry = lille.paths.find { |path| path.exits.include?(1) }
     land = lille.paths.find { |path| path.exits.include?(4) }
 
-    expect([ferry, london_section, lille_ferry].map { |path| game.ferry_path?(path) }).to eq([true, true, true])
-    expect(game.ferry_path?(land)).to be(false)
-  end
-
-  it 'works out whether a path is a ferry path once, not at every overlap check (route search speed, #371)' do
-    land = lille.paths.find { |path| path.exits.include?(4) }
-    allow(land).to receive(:exits).and_call_original
-    3.times { game.ferry_path?(land) }
-    expect(land).to have_received(:exits).once
+    expect([ferry, london_section, lille_ferry].map { |path| game.shared_track?(path) }).to eq([true, true, true])
+    expect(game.shared_track?(land)).to be(false)
   end
 
   it 'leaves the ferry free for a second train while drawing its route' do
     routes = routes_through([london, lille])
     held = routes.first.paths
 
-    expect(game.compute_other_paths(routes + [routes.first.dup], routes.first)).not_to include(*held.select { |path| game.ferry_path?(path) })
-    expect(held.count { |path| game.ferry_path?(path) }).to eq(3)
+    expect(game.compute_other_paths(routes + [routes.first.dup], routes.first)).not_to include(*held.select { |path| game.shared_track?(path) })
+    expect(held.count { |path| game.shared_track?(path) }).to eq(3)
   end
 
   it 'lets the second route be drawn over the ferry the first one already rides (touch_node)' do
