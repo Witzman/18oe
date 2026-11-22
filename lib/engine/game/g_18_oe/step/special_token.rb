@@ -32,7 +32,11 @@ module Engine
           def process_place_token(action)
             return process_pass_through_token(action) if pass_through_ability?(action.entity)
 
-            if connected_ability?(action.entity)
+            wien = ferry_payer(action)
+            if wien
+              charter_price = action.token.price
+              action.token.price = 0
+            elsif connected_ability?(action.entity)
               operator = @game.token_owner(action.entity)
               action.token = available_tokens(action.entity).first
               check_connected(operator, action.city, action.city.hex)
@@ -47,6 +51,10 @@ module Engine
 
             super
             @game.remove_wcf_placeholder! if action.entity.id == 'WCF'
+            return unless wien
+
+            @log << "#{wien.name} pays for the #{action.entity.name} token"
+            wien.close!
           ensure
             action.token.price = charter_price if charter_price
           end
@@ -94,6 +102,19 @@ module Engine
 
           def connected?(ability)
             ability.type == :token && ability.connected
+          end
+
+          # RB 14.3: the Wien Sudbahnhof of the same owner may pay the White Cliffs Ferry token; the action says so with
+          # cost 0. Both privates close.
+          def ferry_payer(action)
+            return unless action.entity.id == 'WCF'
+            return if action.cost.nil?
+            raise GameError, 'A White Cliffs Ferry token costs nothing only when Wien Sudbahnhof pays it' unless action.cost.zero?
+
+            wien = @game.company_by_id('WS')
+            return wien if !wien.closed? && wien.owner == action.entity.owner
+
+            raise GameError, "Wien Sudbahnhof of #{action.entity.owner&.name} cannot pay the ferry token"
           end
 
           def recorded_fee(action, operator)
