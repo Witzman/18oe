@@ -137,16 +137,17 @@ describe 'G18OE Orient Express (§12)' do
       route = sea_route('M28', 'AA82')
 
       expect(route.chains.map { |chain| chain[:crossing].nil? }).to eq([false])
-      # Chris: not a quiet non-run but an illegal route (check_other raises, sea_routes row 15), the legacy wrapper
-      # let it run as an ordinary route without the bonus.
-      expect { game.check_other(route) }.to raise_error(Engine::GameError, /sea crossings/)
+      # Patch 0012 (OrientExpressDuty): a sea-only route is no Orient Express run (orient_express_run? is false, so no
+      # bonus and no duty), but an ordinary route when the train is not combined; the combined-train rule below rejects it.
+      expect(game.orient_express_run?(route)).to be(false)
+      expect { game.check_other(route) }.not_to raise_error
     end
 
     it 'does not let a combined train run London over the sea to Constantinople' do
       route = sea_route('M28', 'AA82')
       allow(game).to receive(:combined_train?).with(route.train).and_return(true)
 
-      expect { game.check_other(route) }.to raise_error(Engine::GameError, 'An Orient Express run may not consist entirely of sea crossings')
+      expect { game.check_other(route) }.to raise_error(Engine::GameError, 'Combined trains may only run an Orient Express route')
     end
 
     it 'is an Orient Express run once land track between Marseille and Toulon lies on the way' do
