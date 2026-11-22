@@ -164,4 +164,34 @@ RSpec.describe Oe::LegalActions, "track and token formats" do
       expect(choices.map(&:choice)).to include(a_string_matching(/\Apullman:/))
     end
   end
+
+  describe "forced conversion to a national (§11.6.4): choose in the train step" do
+    let(:build) do
+      lambda do
+        game = new_game
+        player = game.players.first
+        lnwr = start_major!(game, "LNWR", player)
+        round = Engine::Round::Operating.new(game, [Engine::Game::G18OE::Step::BuyTrain, Engine::Game::G18OE::Step::NationalBuyTrains], round_num: 2)
+        [lnwr, player].each { |e| e.spend(e.cash, game.bank) if e.cash.positive? }
+        game.bank.spend(50, lnwr)
+        game.fulfill_train_obligation!(lnwr)
+        game.instance_variable_set(:@first_or_complete, true)
+        game.depot.upcoming.select { |t| t.name == "2+2" }.each { |t| game.depot.remove_train(t) }
+        round.entities = [lnwr]
+        round.instance_variable_set(:@current_operator, lnwr)
+        enter_round!(game, round)
+        allow(game).to receive(:major_phase?).and_return(true)
+        [game, lnwr, round_step(round, Engine::Game::G18OE::Step::BuyTrain)]
+      end
+    end
+
+    it "offers the conversion as the step's choice, and the step accepts it" do
+      game, lnwr, step = build.call
+      choices = described_class.new(game).send(:generate_choose, step, lnwr)
+
+      expect(choices.map(&:choice)).to eq([game.forced_national_choice])
+      _fresh_game, fresh_lnwr, fresh_step = build.call
+      expect { fresh_step.process_choose(Engine::Action::Choose.new(fresh_lnwr, choice: choices.first.choice)) }.not_to raise_error
+    end
+  end
 end

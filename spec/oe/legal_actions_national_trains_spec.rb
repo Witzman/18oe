@@ -35,7 +35,7 @@ RSpec.describe Oe::LegalActions, "national trains (§11.6.6)" do
     round.steps.each do |s|
       break if s.is_a?(Engine::Game::G18OE::Step::BuyTrain)
 
-      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::ConvertToNational) || s.is_a?(Engine::Step::Bankrupt)
+      s.pass! unless s.is_a?(Engine::Step::Bankrupt)
     end
   end
 
@@ -58,12 +58,15 @@ RSpec.describe Oe::LegalActions, "national trains (§11.6.6)" do
     buys = legal.select { |a| a.is_a?(Engine::Action::BuyTrain) }
 
     expect(buys.map(&:price).uniq).to eq([0])
-    expect(buys.map { |a| [a.train.name, a.exchange&.name] }).to contain_exactly(["3", nil], ["3", "2+2"], ["4", "2+2"])
+    # Chris' format: every variant of a taken train is its own action (a 3 comes as "3" and "3+3")
+    expect(buys.map { |a| [a.train.name, a.variant.to_s, a.exchange&.name] }).to contain_exactly(
+      ["3", "3", nil], ["3", "3+3", nil], ["3", "3", "2+2"], ["3", "3+3", "2+2"], ["4", "4", "2+2"] # the upgrade takes the train as it runs
+    )
     expect(legal.map(&:type)).to include("pass")
   end
 
   it "has the offered claim accepted by the engine" do
-    action = legal.find { |a| a.is_a?(Engine::Action::BuyTrain) && a.exchange.nil? }
+    action = legal.find { |a| a.is_a?(Engine::Action::BuyTrain) && a.exchange.nil? && a.variant.to_s == "3+3" }
     game.process_action(action)
     expect(game.exception).to be_nil
     expect(lnwr.trains.map(&:name)).to contain_exactly("2+2", "3+3")

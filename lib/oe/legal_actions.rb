@@ -122,32 +122,22 @@ module Oe
       end
     end
 
-    # The lay's terrain cost fits the cash, and in 18OE's first OR it leaves the
-    # reserved 2+2 payable (§11.6.4, workshop #352; patronage of the hex counted).
+    # The lay's terrain cost fits the cash (a private's lay pays no terrain, §14.9).
     def affordable_lay?(entity, hex)
-      cost = @game.upgrade_cost(hex.tile, hex, entity, entity)
-      # 18OE §11.1.6 (#360): the fee for the sea zones to the hex, the fewest a tile there can cost
-      cost += @game.cross_water_track_fee(entity, hex).to_i if @game.respond_to?(:cross_water_track_fee)
-      return false if cost > entity.cash
-      return true unless @game.respond_to?(:first_round_spend_allowed?)
-
-      @game.first_round_spend_allowed?(entity, cost - @game.patronage_payout(hex))
+      @game.upgrade_cost(hex.tile, hex, entity, entity) <= entity.cash
     end
 
-    # 18OE §11.1.6 (#360): the fee for the sea zones depends on the sides the tile connects to, so a rotation
-    # whose fee the cash (or the first-OR reserve) cannot pay is left out. On the real map, before any trial lay.
+    # 18OE §11.1.6: the fee for the sea zones depends on the sides the tile connects to (Step::Track charges it as
+    # the action's `extra_cost`), so a rotation whose fee the cash cannot pay is left out. On the real map, before
+    # any trial lay.
     def affordable_rotations(entity, hex, tile)
       rotations = tile.legal_rotations.dup
-      return rotations if entity.company? || !@game.respond_to?(:cross_water_track_fee)
+      return rotations if entity.company? || !@game.respond_to?(:cross_water_tile_fee)
 
       terrain = @game.upgrade_cost(hex.tile, hex, entity, entity)
       rotations.select do |rotation|
         tile.rotate!(rotation)
-        fee = @game.cross_water_track_fee(entity, hex, tile).to_i
-        next true if fee.zero?
-
-        cost = terrain + fee
-        cost <= entity.cash && @game.first_round_spend_allowed?(entity, cost - @game.patronage_payout(hex))
+        terrain + @game.cross_water_tile_fee(entity, hex, tile).to_i <= entity.cash
       end
     end
 
@@ -167,7 +157,7 @@ module Oe
       extra_slot = company_extra_slot?(step, entity)
       token_cities(step, entity).select do |city|
         city.tokenable?(tokener, free: false, tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
-          token_spend_ok?(step, tokener, tokens, city) && connected_for_token?(step, entity, city) &&
+          connected_for_token?(step, entity, city) &&
           (!step.respond_to?(:pass_city_ok?) || step.pass_city_ok?(entity, city))
       end
     end
@@ -196,11 +186,6 @@ module Oe
 
       tile.rotate!(rotation)
       old_tile = hex.tile
-      # §11.1.9 (#63): the Right-of-Way green tile must connect the home station to another stop
-      if step.respond_to?(:right_of_way_lay?) && step.right_of_way_lay?(entity, hex, tile) &&
-         !with_tile_laid(entity, hex, tile) { @game.right_of_way_connected?(entity) }
-        return false
-      end
       # without old track every new path is new track: only the graph-free part can fail
       return towns_kept?(old_tile, tile) if old_tile.paths.empty?
 
@@ -604,17 +589,6 @@ module Oe
       end
     end
 
-    # §14.9: another RR removes a Brandt & Brandau token (pays the hex's terrain price and tile points).
-    # Pricing logs the zone discount, which the enumeration must not write (#296).
-    def generate_remove_hex_token(step, entity)
-      without_log do
-        step.bbe_removable_hexes(entity).select do |hex|
-          money = step.bbe_removal_money(entity, hex)
-          money <= entity.cash && @game.first_round_spend_allowed?(entity, money)
-        end
-      end.map { |hex| A::RemoveHexToken.new(entity, hex: hex) }
-    end
-
     # §15.4 Minor D / §14.8 Hochberg: the private places its token on a hex (the action's target), as the step's
     # own `available_hex` allows (Chris' Step::Assign; the train marker of Minor L is a `choose`, 4c).
     def generate_assign(step, entity)
@@ -686,16 +660,6 @@ module Oe
       true
     rescue Engine::GameError
       false
-    end
-
-    # 18OE first OR: a bought token must leave the reserved 2+2 payable (§11.6.4,
-    # workshop #352). Home tokens are paid at floating, not here. The spend is the token's price plus the
-    # fee for the ferries and sea zones to the city (§11.2.1, #61), as the engine's Token step charges it (#457).
-    def token_spend_ok?(step, tokener, tokens, city)
-      return true if step.is_a?(Engine::Step::HomeToken) || !@game.respond_to?(:first_round_spend_allowed?)
-
-      fee = @game.respond_to?(:cross_water_token_fee) ? @game.cross_water_token_fee(tokener, city).to_i : 0
-      @game.first_round_spend_allowed?(tokener, tokens.map(&:price).min.to_i + fee)
     end
 
     # 18OE: a minor's home token claims a track-rights region and pays for it from the minor's treasury
@@ -790,11 +754,18 @@ module Oe
       end
     end
 
-    # §11.6.6 (#64): a national takes trains at price 0; `exchange` is the rusted train it gives back.
+    # §11.6.6 (#64): a national takes trains at price 0, in Chris' format (Step::NationalBuyTrains): a claim of a rusted
+    # train from the Locomotive Works names the `variant`; an exchange (`exchange` = the rusted train it gives back)
+    # is a swap for a higher rusted train (any variant) or an upgrade to a running train of the owner's majors
+    # (its own name). The game lists the exchanges as [given, taken, variant, 0] (discountable_trains_for).
     def national_trains(step, entity)
-      step.national_train_offers(entity).map do |train, exchange|
-        A::BuyTrain.new(entity, train: train, price: 0, exchange: exchange)
+      claims = step.buyable_trains(entity).flat_map do |train|
+        train.variants.keys.map { |variant| A::BuyTrain.new(entity, train: train, price: 0, variant: variant) }
       end
+      exchanges = @game.discountable_trains_for(entity).map do |given, train, variant, _discount|
+        A::BuyTrain.new(entity, train: train, price: 0, variant: variant, exchange: given)
+      end
+      claims + exchanges
     end
 
     # [variant name, price] pairs. A depot train is offered once per variant the
