@@ -258,11 +258,12 @@ module Engine
           end
 
           def private_choices(company)
+            return repar_choices_for(current_entity).select { company.owner == current_entity } if @converting
             return {} unless can_act_on_private?(current_entity, company)
 
             choices = { 'remove_private' => 'Remove from game' }
             choices['flip_private'] = 'Flip face down' unless @game.face_down_private?(company)
-            choices
+            choices.merge(@game.bbbt_choices(company)) # RB 14.4
           end
 
           def process_choose(action)
@@ -285,7 +286,11 @@ module Engine
             company = action.target
             raise GameError, "Cannot #{action.choice} #{company.name}" unless private_choices(company).key?(action.choice)
 
-            if action.choice == 'flip_private'
+            if @converting && action.choice.start_with?(Bbbt::BBBT_REPAR)
+              @repar_cell = @game.bbbt_repar!(company, @converting, action.choice)
+            elsif @game.bbbt_choice?(action.choice)
+              @game.bbbt_exercise!(company, action.choice)
+            elsif action.choice == 'flip_private'
               @log << "#{player.name} turns #{company.name} face down"
               @game.flip_private!(company)
             else
@@ -315,7 +320,7 @@ module Engine
 
           def reservation_prompt?(action)
             return false unless @game.reserved_shares?
-            return false if @game.turn != 1 || @converting || @round.pending_share_buy
+            return false if @game.turn != 1 || @converting || @round.pending_share_buy || pending_custody_buy?
 
             bundle = action.bundle
             corporation = bundle.corporation
@@ -327,7 +332,12 @@ module Engine
 
           def process_buy_shares(action)
             return process_insolvent_buyback(action) if insolvent_buyback?(action.bundle)
-            return super unless reservation_prompt?(action)
+
+            unless reservation_prompt?(action)
+              return if hold_buy_for_bbbt?(action)
+
+              return super
+            end
 
             check_legal_buy(action.entity, action.bundle, swap: action.swap)
             @round.pending_share_buy = action
@@ -462,9 +472,11 @@ module Engine
             # Step 3: Locate the major par cell (right×2, up×1 from original par)
             # Using original_par_price ensures correct placement even if the regional
             # somehow moved before conversion.
-            target_price = @game.stock_market.find_relative_share_price(
+            # RB 14.4 (1): the owner of the private may pick the target instead.
+            target_price = @repar_cell || @game.stock_market.find_relative_share_price(
               corporation.original_par_price, corporation, %i[right right up]
             )
+            @repar_cell = nil
 
             # Step 4: Move stock market token to major par cell and update par_price.
             # Directly calling move() avoids relying on three incremental moves from
@@ -543,8 +555,40 @@ module Engine
           end
 
           def process_sell_shares(action)
+            return if hold_sale_for_bbbt?(action)
+
             super
             @sold = true
+          end
+
+          # RB 14.4 (3): the sale waits for the owner of the private (Step::ProtectShare) before the marker moves.
+          def hold_sale_for_bbbt?(action)
+            # only in a stock round (the consolidation round has no Step::ProtectShare)
+            return false if !@round.respond_to?(:pending_share_sale) || @round.pending_share_sale
+            return false unless @game.bbbt_sale_window_owner(action.bundle)
+
+            raise GameError, "Cannot sell shares of #{action.bundle.corporation.name}" if
+              !can_sell?(action.entity, action.bundle) && !action.swap
+
+            @round.pending_share_sale = action
+            true
+          end
+
+          # RB 14.4 (2): a purchase of a share of the private owner's RR waits for the owner (Step::CustodyShare).
+          # After a declined reservation (Step::ReserveShare) the window still follows; once answered it is not asked
+          # again for the same purchase.
+          def hold_buy_for_bbbt?(action)
+            # only in a stock round (the consolidation round has no Step::CustodyShare)
+            return false if !@round.respond_to?(:pending_custody_buy) || pending_custody_buy?
+            return false if @converting || @converted || !@game.bbbt_purchase_window_owner(action.entity, action.bundle)
+
+            check_legal_buy(action.entity, action.bundle, swap: action.swap)
+            @round.pending_custody_buy = action
+            true
+          end
+
+          def pending_custody_buy?
+            @round.respond_to?(:pending_custody_buy) && !@round.pending_custody_buy.nil?
           end
 
           def process_convert(action)
@@ -620,8 +664,22 @@ module Engine
             actions = []
             ipo_bundle = @converting.ipo_shares.first&.to_bundle
             actions << 'buy_shares' if ipo_bundle && can_buy?(entity, ipo_bundle)
+            actions << 'choose' if repar_available?(entity)
             actions << 'pass'
             actions
+          end
+
+          # RB 14.4 (1) at the conversion of the owner's own regional: the new major's par value, chosen before it
+          # floats. The general re-par is a private choice (Game#bbbt_choices).
+          def repar_available?(player)
+            !repar_choices_for(player).empty?
+          end
+
+          def repar_choices_for(player)
+            return {} unless @converting && !@repar_cell
+
+            company = player.companies.find { |c| c == @game.bbbt_company && !@game.face_down_private?(c) }
+            company ? @game.bbbt_repar_choices(company, @converting) : {}
           end
 
           def converted_actions(entity)
@@ -645,6 +703,7 @@ module Engine
 
           def reserved_for_another?(entity, bundle)
             return false unless bundle
+            return true if @game.bbbt_custody_blocks?(entity, bundle) # RB 14.4 (2)
 
             corporation = bundle.corporation
             bundle.shares.include?(@game.reserved_share(corporation)) && entity != corporation.owner
