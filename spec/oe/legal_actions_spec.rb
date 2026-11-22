@@ -259,6 +259,21 @@ RSpec.describe Oe::LegalActions do
       expect(classes.keys).to include("BuySellParShares/BuyShares", "BuySellParShares/SellShares")
     end
 
+    # #568 (#563 Task 4b): track and token families only, up to the first step of the 4c families (route, trains).
+    TRACK_TOKEN_STEPS = %w[Assign Track SpecialToken Token HomeToken MergeToken TransferTokens].freeze
+
+    it "offers only accepted track and token actions (lay_tile, place_token, home token, assign) in an operating round" do
+      classes = Hash.new(0)
+      (1..6).each do |seed|
+        played = play(operating_build, seed: seed, steps: 40, every: 1,
+                                       stop_when: ->(g) { !TRACK_TOKEN_STEPS.include?(g.round.active_step.class.name.split("::").last) })
+        played.classes.each { |k, v| classes[k] += v }
+        expect_all_accepted(operating_build, played)
+      end
+
+      expect(classes.keys).to include("Track/LayTile", "Token/PlaceToken")
+    end
+
     it "offers only accepted actions in an operating round with majors" do
       played = play(operating_build, seed: 3, steps: 150, every: 6)
 

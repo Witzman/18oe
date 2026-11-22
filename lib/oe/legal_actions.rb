@@ -69,7 +69,7 @@ module Oe
       actions = step.active_entities.reject(&:closed?).flat_map do |entity|
         step.actions(entity).flat_map { |type| generate(type, step, entity) }
       end
-      actions + acting_for(step) + company_actions(step) + bankrupt_actions
+      actions + acting_for(step) + company_actions(step) + bankrupt_actions + special_buy_actions
     end
 
     # The whole choice space of a tile lay, not sampled (#123): per affordable
@@ -615,22 +615,66 @@ module Oe
       end.map { |hex| A::RemoveHexToken.new(entity, hex: hex) }
     end
 
-    # §15.4: Minor D (or the major holding its charter) places its Green Junction token in any city
-    # except a metropolis or red zone, reachable or not, in the lay track step; the target is the hex.
-    # §15.11: Minor L (or the major holding its charter) puts its +1+1 marker on one of its trains that
-    # has not run, in the run trains step; the target is the train.
+    # §15.4 Minor D / §14.8 Hochberg: the private places its token on a hex (the action's target), as the step's
+    # own `available_hex` allows (Chris' Step::Assign; the train marker of Minor L is a `choose`, 4c).
     def generate_assign(step, entity)
-      return step.krasnaya_trains(entity).map { |train| A::Assign.new(entity, target: train) } if step.respond_to?(:krasnaya_trains)
-      return [] unless step.respond_to?(:green_junction_hexes)
+      hexes = @game.hexes.select { |hex| step.available_hex(entity, hex) }
+      sample(hexes).map { |hex| A::Assign.new(entity, target: hex) }
+    end
 
-      sample(step.green_junction_hexes(entity)).map { |hex| A::Assign.new(entity, target: hex) }
+    # Port Authority (§11.3.5): the step is not blocking, so the active step never names it; the round's steps do.
+    def special_buy_actions
+      entity = @game.round.current_entity
+      return [] unless entity&.corporation? && @game.round.operating?
+
+      @game.round.steps.select { |s| s.is_a?(Engine::Step::SpecialBuy) }.flat_map do |step|
+        step.actions(entity).include?('special_buy') ? generate('special_buy', step, entity) : []
+      end
+    end
+
+    def generate_special_buy(step, entity)
+      step.buyable_items(entity).map { |item| A::SpecialBuy.new(entity, item: item) }
     end
 
     # A private places the token of the corporation it acts for (#128): the
     # action names it as `tokener`, as the engine's own PlaceToken does.
     def generate_place_token(step, entity)
+      return generate_transfer_token(step, entity) if step.is_a?(Engine::Game::G18OE::Step::TransferTokens)
+
       tokener = entity.company? ? @game.token_owner(entity) : nil
-      sample(token_targets(step, entity)).map { |city| A::PlaceToken.new(entity, city: city, tokener: tokener) }
+      sample(token_targets(step, entity)).flat_map { |city| place_token_actions(step, entity, city, tokener) }
+    end
+
+    # Chris' format (#563): a station token bought in 18OE names the charter token (`token_index`) and its cost
+    # (`cost`, price plus the fee for the ferries and sea zones), always both. Home and merge tokens and a
+    # private's token take no choice.
+    def place_token_actions(step, entity, city, tokener)
+      return [A::PlaceToken.new(entity, city: city, tokener: tokener)] if entity.company? || !step.respond_to?(:selectable_token_choices)
+
+      step.selectable_token_choices(entity, city).filter_map do |choice|
+        next if choice[:cost] > entity.cash
+
+        A::PlaceToken.new(entity, city: city, token_index: choice[:index], cost: choice[:cost])
+      end
+    end
+
+    # §11.2.x Transfer Tokens: the buyer replaces a token of another RR (`slot` of the city) with one of its own
+    # charter tokens; `cost` is its price plus the transfer fee, which the step checks.
+    def generate_transfer_token(step, buyer)
+      offers = @game.hexes.flat_map do |hex|
+        hex.tile.cities.flat_map do |city|
+          (city.tokens + city.extra_tokens).each_with_index.flat_map do |token, slot|
+            next [] unless step.can_replace_token?(buyer, token)
+
+            step.selectable_token_choices(buyer, city).filter_map do |choice|
+              next if choice[:cost] > buyer.cash
+
+              A::PlaceToken.new(buyer, city: city, slot: slot, token_index: choice[:index], cost: choice[:cost])
+            end
+          end
+        end
+      end
+      sample(offers)
     end
 
     # Tokens laid by operating (not home/merge tokens) must connect to a route
@@ -654,12 +698,13 @@ module Oe
       @game.first_round_spend_allowed?(tokener, tokens.map(&:price).min.to_i + fee)
     end
 
-    # 18OE: a minor's home token claims a track-rights region and pays for it.
+    # 18OE: a minor's home token claims a track-rights region and pays for it from the minor's treasury
+    # (Step::HomeToken: token.price = track_rights_cost).
     def home_region_ok?(step, tokener, city)
       return true unless step.is_a?(Engine::Game::G18OE::Step::HomeToken) && tokener.type == :minor
 
       region = @game.region_for_hex(city.hex)
-      @game.region_available?(region) && @game.home_token_funds(tokener) >= @game.home_token_cost(tokener, region)
+      @game.region_available?(region) && tokener.cash >= @game.track_rights_cost(region)
     end
 
     def token_cities(step, entity)
