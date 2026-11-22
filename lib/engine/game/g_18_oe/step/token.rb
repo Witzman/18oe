@@ -1,69 +1,74 @@
 # frozen_string_literal: true
 
 require_relative '../../../step/token'
-require_relative 'port_authority_purchase'
+require_relative 'skip_abbreviated_round'
+require_relative 'station_token_selection'
+require_relative 'track_rights_tokener'
 
 module Engine
   module Game
     module G18OE
       module Step
         class Token < Engine::Step::Token
-          include PortAuthorityPurchase
+          include SkipAbbreviatedRound
+          include StationTokenSelection
+          include TrackRightsTokener
 
           def actions(entity)
-            return ACTIONS if entity == current_entity && !@round.tokened && @game.abilities(entity, :token)
+            return [] if skip?
+            return ACTIONS if entity == current_entity && !@round.tokened && token_ability?(entity)
 
             super
-          end
-
-          # §11.6.4 para. 2 (workshop #352): no token while its price would leave the
-          # reserved 2+2 unpayable; the step then has nothing to offer.
-          def can_place_token?(entity)
-            super && @game.first_round_spend_allowed?(entity, min_token_price(available_tokens(entity)))
-          end
-
-          # §11.2.1 (#360, #61): the fee for the ferries and sea zones to the city is taken before the token stands (it
-          # would make the city a station of the RR) and paid with the token's price.
-          def place_token(entity, city, token, connected: true, **opts)
-            @water_cost = connected ? @game.cross_water_token_cost(entity, city) : nil
-            @water_fee = @game.cross_water_fee_of(@water_cost, :token).to_i
-            super
-          ensure
-            @water_cost = @water_fee = nil
-          end
-
-          def pay_token_cost(entity, cost, city)
-            fee = @water_fee.to_i
-            @game.check_first_round_spend!(entity, cost + fee, what: 'a token')
-            super(entity, cost + fee, city)
-            @game.log_cross_water_fee(entity, @water_cost, :token, 'the token (§11.2.1)') if fee.positive?
           end
 
           def available_hex(entity, hex)
-            return nil unless @game.city_in_track_rights?(entity, hex)
-
-            super
+            track_rights_available_hex(entity, hex)
           end
 
-          def check_connected(entity, city, hex)
-            city_string = hex.tile.cities.size > 1 ? " city #{city.index}" : ''
-            unless @game.city_in_track_rights?(entity, hex)
-              raise GameError, "Cannot place token on #{hex.name} because it is outside #{entity.name}'s track rights zone"
-            end
+          def process_place_token(action)
+            entity = action.entity
+            token = selected_token(action)
+            raise GameError, 'Select an available station token from the charter' unless available_station_token?(entity, token)
 
-            return if @game.loading
+            cost = token_cost(action, token)
+            raise GameError, "#{entity.name} cannot afford the #{@game.format_currency(cost)} token cost" if cost > entity.cash
 
-            unless @game.token_graph_for_entity(entity).connected_nodes(entity)[city]
-              raise GameError, "Cannot place token on #{hex.name}#{city_string} because it is not connected"
-            end
+            charter_price = token.price
+            action.token = token
+            action.cost = cost
+            token.price = cost
+            super
+          ensure
+            token.price = charter_price if charter_price
+          end
 
-            # §11.2: "If the RR's treasury has insufficient cash to pay the fees, the token may not be placed."
-            fee = @game.cross_water_token_fee(entity, city).to_i
-            tokens = available_tokens(entity)
-            return if fee.zero? || tokens.empty? || min_token_price(tokens) + fee <= entity.cash
+          private
 
-            raise GameError, "#{entity.name} cannot pay the token and #{@game.format_currency(fee)} for the ferries and sea zones " \
-                             "to #{hex.name}#{city_string} (§11.2.1)"
+          def station_token_fee(entity, city)
+            @game.cross_water_token_fee(entity, city)
+          end
+
+          def token_cost(action, token)
+            raise GameError, 'Include the station token cost' if !action.token_index.nil? && !action.cost.is_a?(Integer)
+            return action.cost if @game.loading
+
+            validated_token_cost(action, token.price + station_token_fee(action.entity, action.city))
+          end
+
+          def token_ability?(entity)
+            pass_through_ability?(entity) || unconnected_token_ability?(entity)
+          end
+
+          def pass_through_ability?(entity)
+            @game.abilities(entity, :token) { |ability| return true if @game.pass_through_token_company?(ability.owner) }
+            false
+          end
+
+          def unconnected_token_ability?(entity)
+            return false unless entity.next_token
+
+            @game.abilities(entity, :token) { |ability| return true unless ability.connected }
+            false
           end
         end
       end

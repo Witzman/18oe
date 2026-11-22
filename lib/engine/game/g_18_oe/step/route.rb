@@ -7,100 +7,111 @@ module Engine
     module G18OE
       module Step
         class Route < Engine::Step::Route
+          ORIENT_EXPRESS_HELP = '2+2, 3 and 4 trains may be combined into one train to make an Orient Express run. '\
+                                'A combined train must run an Orient Express route; use Undo to cancel a combination.'
+          SEA_HELP = 'Click a city or town across the sea to add a crossing; each sea zone and ferry distance counts '\
+                     "against the train's city limit, less 1 per port token on the route (2 from Phase 7)."
+          POOL_HELP = " Port authorities and Minor H reduce the railroad's total, shared by its trains; "\
+                      'the trains earning most use it first.'
+
+          ADD_ON_CHOICE_SEPARATOR = ':'
+
           def actions(entity)
-            # §11.3.10: a national runs no routes; Dividend counts its revenue.
-            return [] if (entity.corporation? && entity.type == :national) || @game.repeated_payout(entity, @round)
+            return [] if @game.repeat_last_revenue?(entity) || @game.national?(entity)
 
             actions = super
             return actions if actions.empty?
 
-            # §15.11: Minor L's marker, assigned at the beginning of the run trains step (upstream `assign`)
-            actions += %w[assign] unless @game.krasnaya_trains(entity).empty?
-            actions += %w[choose] unless choices_for(entity).empty?
-            return actions if @game.double_head_candidates(entity).size < 2
-            return actions if !@game.loading && !@game.orient_express_reachable?(entity)
-
-            actions + %w[double_head_trains]
+            actions += %w[double_head_trains] if combining_offered?(entity)
+            actions += %w[choose] if @game.train_add_ons(entity).any? { |type| !add_on_choices(entity, type).empty? }
+            actions
           end
 
-          # §11.3.9 (#55): the president says which train carries the Pullman; it adds £10 per level of that
-          # train. Offered before the routes are run, one choice per train that does not carry it now.
-          def choices
-            choices_for(current_entity)
+          def combining_offered?(entity)
+            return false if @game.double_head_candidates(entity).size < 2
+
+            @game.loading || @game.orient_express_reachable?(entity)
           end
 
           def choice_name
-            'Pullman, port authority'
+            'Attach to a train'
           end
 
-          # §11.3.5 (#56): the port authority marker may be bought before the Buy Trains step, so here too.
-          def choices_for(entity)
-            pullman_choices(entity).merge(@game.port_authority_choices(entity))
+          def choices
+            @game.train_add_ons(current_entity).flat_map do |type|
+              name = @game.train_add_on_name(type)
+              add_on_choices(current_entity, type).map do |train|
+                ["#{type}#{ADD_ON_CHOICE_SEPARATOR}#{train.id}", "#{name} on #{train.name} train"]
+              end
+            end.to_h
           end
 
-          def port_authority_choices(entity)
-            @game.port_authority_choices(entity)
-          end
-
-          def pullman_choices(entity)
-            return {} unless entity&.corporation? && entity == current_entity && @game.pullman?(entity)
-            return {} if entity.type == :national || @round.routes.any?
-
-            carrying = @game.pullman_train(entity)
-            entity.trains.reject { |train| train == carrying }.to_h do |train|
-              ["pullman_on:#{train.id}", "Attach Pullman to the #{train.name} train"]
-            end
+          def add_on_choices(entity, type)
+            current = @game.add_on_train(type)
+            @game.route_trains(entity).reject { |train| train.operated || train == current }
           end
 
           def process_choose(action)
             entity = action.entity
-            choice = action.choice
-            return @game.buy_port_authority!(entity, choice) if @game.port_authority_choice?(choice)
+            type_key, train_id = action.choice.split(ADD_ON_CHOICE_SEPARATOR, 2)
+            type = @game.train_add_ons(entity).find { |t| t.to_s == type_key }
+            raise GameError, 'Cannot attach that' unless type
 
-            raise GameError, "#{choice} is not a Pullman choice on offer (§11.3.9)" unless pullman_choices(entity).key?(choice)
+            name = @game.train_add_on_name(type)
+            train = add_on_choices(entity, type).find { |t| t.id == train_id }
+            raise GameError, "Cannot attach the #{name} to that train" unless train
 
-            train = entity.trains.find { |t| t.id == choice.delete_prefix('pullman_on:') }
-            @game.pullman_attach!(entity, train)
+            @round.add_on_trains[type] = train
+            @log << "#{entity.name} attaches the #{name} to the #{train.name} train"
           end
 
-          def krasnaya_trains(entity)
-            @game.krasnaya_trains(entity)
+          def train_name(_corporation, train)
+            names = @game.train_add_on_names(train)
+            names.empty? ? train.name : "#{train.name} (#{names.join(', ')})"
           end
 
-          def process_assign(action)
-            entity = action.entity
-            raise GameError, "#{entity.name} cannot assign the Krasnaya Strela marker now" unless entity == current_entity
-            raise GameError, 'The Krasnaya Strela marker goes on a train' unless action.target.is_a?(Engine::Train)
+          def log_skip(entity)
+            return if @game.repeat_last_revenue?(entity) || @game.national?(entity)
 
-            @game.krasnaya_assign!(entity, action.target)
+            super
           end
 
           def help
             base_help = super
-            # §12.2 (#512): known only once the routes have been searched for this prompt (no search here)
-            if current_entity.type == :major && @game.orient_express_required_known?(current_entity)
-              base_help = Array(base_help).reject(&:empty?) + [@game.class::ORIENT_EXPRESS_REQUIRED]
-            end
-            return base_help if current_entity.type != :major || !@game.non_permanent_trains?
+            extra = []
+            extra << ORIENT_EXPRESS_HELP if current_entity.type == :major && @game.non_permanent_trains?
+            extra << sea_help if @game.sea_connectivityable?(current_entity)
+            return base_help if extra.empty?
 
-            Array(base_help).reject(&:empty?) + [
-              '2+2, 3 and 4 trains may be combined into one train to make an Orient Express run. '\
-              'A combined train must run an Orient Express route; use Undo to cancel a combination.',
-            ]
+            Array(base_help).reject(&:empty?) + extra
+          end
+
+          def sea_help
+            pool = !@game.port_authorities(current_entity).empty? || @game.minor_h_reduction?(current_entity)
+            pool ? SEA_HELP + POOL_HELP : SEA_HELP
           end
 
           def round_state
-            super.merge(combined_trains: {}, orient_express_revenue: nil)
+            super.merge(combined_trains: {}, orient_express_revenue: nil, add_on_trains: {})
+          end
+
+          def double_head_trains_title
+            'Combine trains'
+          end
+
+          def double_head_trains_description
+            'Combine two or more non-permanent trains (levels 2, 3 and 4) into one train to make an Orient Express run. '\
+              'A combined train must run an Orient Express route. Use Undo to cancel a combination.'
           end
 
           def setup
             super
             @round.combined_trains = {}
             @round.orient_express_revenue = nil
+            @round.add_on_trains = {}
           end
 
           def process_run_routes(action)
-            check_orient_express_duty!(action)
             super
             @round.orient_express_revenue = @game.orient_express_train_revenue(@round.routes)
             remove_combined_trains!
@@ -124,6 +135,7 @@ module Engine
             train.owner = corporation
             corporation.trains << train
             @round.combined_trains[train] = trains
+            @round.add_on_trains.each { |type, add_on_train| @round.add_on_trains[type] = train if trains.include?(add_on_train) }
 
             @log << "#{corporation.name} combines #{trains.map(&:name).sort.join(', ')} into "\
                     "#{an(train.distance[1]['pay'])} #{train.name} train for the Orient Express"
@@ -140,22 +152,6 @@ module Engine
 
           private
 
-          # §12.2 (#512): routes that leave out an Orient Express run the best routes include are rejected.
-          # Not while loading: the action was checked when it was first processed, and a replay would run the
-          # route search again for every such run.
-          def check_orient_express_duty!(action)
-            return if @game.loading
-            return unless (required = @game.orient_express_required(action.entity, action.routes))
-
-            what = if required[:combine]
-                     "Combining #{required[:combine].map(&:name).sort.join(', ')} (§12.1) and running it earns"
-                   else
-                     'Routes with it earn'
-                   end
-            raise GameError, "#{@game.class::ORIENT_EXPRESS_REQUIRED} #{what} "\
-                             "#{@game.format_currency(required[:revenue])}."
-          end
-
           def remove_combined_trains!
             @round.combined_trains.each_key do |train|
               @game.remove_train(train)
@@ -166,25 +162,23 @@ module Engine
           def combined_train!(trains)
             sym = trains.map(&:id).sort.join('_')
 
-            # §12.1/§15.11: the rows are the sum of the components' rows as they are now (a component may
-            # carry the Krasnaya Strela marker), also for a combination already made in an earlier OR
-            cities, towns = trains.map { |component| @game.distance(component) }.transpose.map(&:sum)
-            distance = [
-              { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
-              { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
-            ]
             if (train = @game.train_by_id("#{sym}-0"))
               train.operated = false
               train.rusted = false
             else
-              train = Engine::Train.new(name: sym, distance: distance, price: 0)
+              cities, towns = trains.map { |component| @game.distance(component) }.transpose.map(&:sum)
+              distance = [
+                { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
+                { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
+              ]
+              level = trains.map(&:level).max
+              train = G18OE::Train.new(name: sym, distance: distance, price: 0, level: level)
+              train.name = "#{cities}+#{towns}C"
 
               @game.depot.add_train(train)
               @game.update_trains_cache
               @game.remove_train(train)
             end
-            train.distance = distance
-            train.name = "#{cities}+#{towns}"
 
             train.reserved = true
             train

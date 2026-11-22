@@ -11,55 +11,35 @@ module Engine
           include Engine::Step::HalfPay
 
           def actions(entity)
-            return [] if %i[minor national].include?(entity.type) || @game.repeated_payout(entity, @round)
+            return [] if %i[minor national].include?(entity.type) || @game.repeat_last_revenue?(entity)
 
             super
           end
 
-          # The abbreviated OR (§13) has no Track step, but OperatingInfo records the laid hexes.
-          def round_state
-            super.merge(laid_hexes: [])
-          end
-
-          # §13 abbreviated OR: the same revenue, paid out the same way. §11.3.10: a national runs no
-          # routes; its revenue is counted over its home track rights zone (G18OE::National).
           def total_revenue
-            last = @game.repeated_payout(current_entity, @round)
-            return last[:revenue] if last
-            return @game.national_revenue(current_entity) if current_entity.type == :national
+            return @game.last_revenue_info(current_entity).revenue if current_entity && @game.repeat_last_revenue?(current_entity)
+            return national_revenue.total if current_entity && @game.national?(current_entity)
 
             super
-          end
-
-          def process_dividend(action)
-            revenue = total_revenue
-            super
-            @game.record_payout!(action.entity, revenue, action.kind)
           end
 
           def skip!
-            if (last = @game.repeated_payout(current_entity, @round))
-              return process_dividend(Action::Dividend.new(current_entity, kind: last[:kind]))
+            if @game.repeat_last_revenue?(current_entity)
+              kind = @game.last_revenue_info(current_entity).dividend_kind
+              @log << "#{current_entity.name} repeats its revenue from OR #{@game.turn}.#{@round.round_num - 1}"
+              return process_dividend(Action::Dividend.new(current_entity, kind: kind))
             end
 
             case current_entity.type
             when :minor
               kind = total_revenue.zero? ? 'withhold' : 'half'
             when :national
-              log_national_run(current_entity)
+              log_national_revenue
               kind = total_revenue.zero? ? 'withhold' : 'payout'
             else
               return super
             end
             process_dividend(Action::Dividend.new(current_entity, kind: kind))
-          end
-
-          def log_national_run(entity)
-            revenue = total_revenue
-            return if revenue.zero?
-
-            @log << "#{entity.name} runs its national service for #{@game.format_currency(revenue)} " \
-                    "(#{@game.national_run_str(entity)})"
           end
 
           def half_pay_withhold_amount(_entity, revenue)
@@ -83,6 +63,28 @@ module Engine
             else
               %i[withhold half payout]
             end
+          end
+
+          private
+
+          def log_national_revenue
+            revenue = national_revenue
+            capacity = "capacity #{revenue.city_capacity} cities, #{revenue.doubled_capacity} doubled, "\
+                       "#{revenue.town_capacity} towns"
+            cities = "cities #{@game.format_currency(revenue.city_revenue)} (#{revenue.linked_city_values.size} linked, "\
+                     "#{revenue.unlinked_city_count} unlinked, #{revenue.filler_city_count} at "\
+                     "#{@game.format_currency(@game.national_filler_city_revenue)})"
+            towns = "towns #{@game.format_currency(revenue.town_revenue)} (#{revenue.linked_town_values.size} linked, "\
+                    "#{revenue.unlinked_town_count} unlinked, #{revenue.filler_town_count} at "\
+                    "#{@game.format_currency(@game.national_filler_town_revenue)})"
+            pullman = "Pullman #{@game.format_currency(revenue.pullman_revenue)}"
+            @log << "#{current_entity.name} runs as a national (#{capacity}): #{cities}, #{towns}, #{pullman}"
+          end
+
+          def national_revenue
+            @national_revenue = nil unless @national_revenue_entity == current_entity
+            @national_revenue_entity = current_entity
+            @national_revenue ||= @game.national_revenue(current_entity)
           end
         end
       end
