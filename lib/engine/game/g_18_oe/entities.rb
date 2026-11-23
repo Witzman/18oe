@@ -33,10 +33,8 @@ module Engine
             value: 40,
             revenue: 10,
             desc: 'During any RR\'s Place Token step, the owner may place one station token from any '\
-                  'controlled RR on the map for free. The token must be reachable by that RR as if it were '\
-                  'paid for; the cost of crossing ferries and sea zones (§11.2.1) still applies. '\
+                  'controlled RR on the map for free (sea-zone crossing costs still apply). '\
                   'If also owning the White Cliffs Ferry, this private may pay for that token\'s placement cost.',
-            # §14.3 (#77): see Step::SpecialToken#process_free_token; used once: exercising the ability removes the private, §6.1 (p. 17).
             abilities: [
               {
                 type: 'token',
@@ -45,10 +43,10 @@ module Engine
                 hexes: [],
                 from_owner: true,
                 connected: true,
+                discount: 1,
                 count: 1,
                 closed_when_used_up: true,
                 special_only: true,
-                price: 0,
               },
             ],
             auction_row: 2,
@@ -60,12 +58,20 @@ module Engine
             revenue: 10,
             desc: 'One marker. Exercise one of three abilities: '\
                   '(1) During any SR or a controlled RR\'s OR, re-set the par value of one owned regional or major '\
-                  'that still has its par value marker to any valid par value for that type. '\
+                  'to any valid par value for that type. '\
                   '(2) Place one share of any RR into custodianship — reserved for the owner; '\
                   'place this private\'s marker on the share. '\
                   '(3) At any time during a SR, prevent one RR\'s share marker from moving DOWN for the rest of that SR; '\
                   'place this private\'s marker on that share marker. '\
-                  'Exercising ability (1) or (2) removes this private at once; (3) removes it at the end of the SR.',
+                  'Exercising ability (2) or (3) closes this private at end of the SR.',
+            abilities: [
+              {
+                type: 'choose_ability',
+                owner_type: 'player',
+                when: 'owning_player_or_turn',
+                choices: {},
+              },
+            ],
             auction_row: 2,
           },
           # -----------------------------------------------------------------------
@@ -83,7 +89,6 @@ module Engine
                   'and other RRs\' tokens in the city do not block them. '\
                   'The token city need not be reachable but may not serve as the sole token on a route, '\
                   'nor be used to place further tokens.',
-            # §14.5 (#79): a pass-through token in a port city, see Game#pass_token_city? and Step::SpecialToken.
             abilities: [
               {
                 type: 'token',
@@ -93,7 +98,6 @@ module Engine
                 extra_slot: true,
                 connected: false,
                 count: 1,
-                closed_when_used_up: true,
                 special_only: true,
                 price: 0,
               },
@@ -111,7 +115,6 @@ module Engine
                   'and other RRs\' tokens in the city do not block them. '\
                   'The token city need not be reachable but may not serve as the sole token on a route, '\
                   'nor be used to place further tokens.',
-            # §14.6 (#80): a pass-through token, see Game#pass_token_city? and Step::SpecialToken.
             abilities: [
               {
                 type: 'token',
@@ -121,7 +124,6 @@ module Engine
                 extra_slot: true,
                 connected: false,
                 count: 1,
-                closed_when_used_up: true,
                 special_only: true,
                 price: 0,
               },
@@ -139,7 +141,8 @@ module Engine
                   'Place Token step and closes the private. Until then the ferry through Lille stays open to every RR '\
                   'even when Lille is full; afterwards only RRs with a token in Lille (or the Central Circle '\
                   'token) may take the ferry to London or pass through Lille from London. If a national\'s '\
-                  'formation removes the token, Lille is open to every RR for good. See §11.2.2 and §14.7.',
+                  'formation removes the token, the ferry through Lille is open to every RR again. See §11.2.2 and '\
+                  '§14.7.',
             abilities: [
               {
                 type: 'token',
@@ -172,6 +175,15 @@ module Engine
                   'Turn the private face-down to indicate placement. Any RR controlled by the private\'s owner may '\
                   'count the token as a town when running a route through the hex, collecting £10 (Phase 2), '\
                   '£20 (Phase 3–4), £40 (Phase 5–6) or £60 (Phase 7–8).',
+            abilities: [
+              {
+                type: 'assign_hexes',
+                hexes: [],
+                count: 1,
+                when: 'owning_player_track',
+                owner_type: 'player',
+              },
+            ],
             auction_row: 4,
           },
           {
@@ -187,8 +199,8 @@ module Engine
                   'when no tokens remain on the map. To remove a token, another RR must pay the original terrain '\
                   'cost and expend one tile point (two for a metropolis), without placing track. '\
                   'Nationals skip the terrain cost but still expend tile points.',
-            # §14.9: four free yellow lays on rough terrain, at most two per OR. The hexes are filled
-            # in at game setup (G18OE::Game#setup_bbe_ability!). Face-down/removal: Game#bbe_*.
+            # RB 14.9: four free yellow lays on rough terrain, at most two per OR; the hexes are filled in at setup
+            # (Game#setup_bbe_ability!).
             abilities: [
               {
                 type: 'tile_lay',
@@ -215,6 +227,15 @@ module Engine
                   'This train does not count against the train limit, cannot run on track already used by '\
                   'the RR\'s other trains in the same OR, and can never be sold. '\
                   'If held by a minor, the train transfers to the major when the minor merges.',
+            abilities: [
+              {
+                type: 'choose_ability',
+                owner_type: 'player',
+                when: 'owning_player_or_turn',
+                after_phase: '3',
+                choices: { preserve: 'Preserve a rusted 2+2' },
+              },
+            ],
             auction_row: 4,
           },
           # -----------------------------------------------------------------------
@@ -329,9 +350,21 @@ module Engine
             value: 120,
             revenue: 0,
             desc: 'Purchased in the auction to acquire the Minor D charter. '\
-                  'Exchange this private during a Stock Round to float Minor D.',
+                  'Exchange this private during a Stock Round to float Minor D; it then stays with the minor, '\
+                  'and with the major the minor merges into. The president may place its token in any '\
+                  'non-metropolis, non-red-zone city on the map (even unreachable) during the RR\'s lay track '\
+                  'step. Trains run to or through that city earn a +£20 bonus (Phase 2–4). At Phase 5 start, '\
+                  'the +£20 token is removed; the president may place a new token in the same or a different '\
+                  'eligible city for a +£40 bonus (Phase 5+).',
             auction_row: 6,
             abilities: [
+              {
+                type: 'assign_hexes',
+                hexes: [],
+                count: 1,
+                when: 'track',
+                owner_type: 'corporation',
+              },
               {
                 type: 'exchange',
                 corporations: %w[D],
@@ -525,6 +558,20 @@ module Engine
             desc: 'Right to take the tenth stock action in the first stock round.',
             auction_row: 11,
           },
+          {
+            name: 'Mail Contract',
+            sym: 'MAIL',
+            value: 0,
+            revenue: 20,
+            desc: 'Held by Minor K and passes with it to the major that absorbs it. Paid to the owning '\
+                  'RR\'s treasury at the start of each OR, not as part of train revenue: £20 (Phase 2), '\
+                  '£40 (Phases 3-4), £50 (Phases 5-6), £60 (Phases 7-8).',
+            abilities: [
+              { type: 'revenue_change', revenue: 40, on_phase: '3' },
+              { type: 'revenue_change', revenue: 50, on_phase: '5' },
+              { type: 'revenue_change', revenue: 60, on_phase: '7' },
+            ],
+          },
         ].freeze
 
         CORPORATIONS = [
@@ -583,9 +630,9 @@ module Engine
             abilities: [
               {
                 type: 'description',
-                description: 'At the start of each OR, the president may choose this minor\'s operating '\
-                             'position: first, last, or normal order. The choice is announced before '\
-                             'any other RR operates that OR.',
+                description: 'At the start of each OR, the president may choose this minor\'s or its acquiring major\'s '\
+                             'operating position: first, last, or normal within its operating group. '\
+                             'The choice is announced before any RR operates that OR.',
               },
             ],
           },
@@ -600,16 +647,6 @@ module Engine
             max_ownership_percent: 100,
             color: '#3CB371',
             text_color: 'black',
-            abilities: [
-              {
-                type: 'description',
-                description: 'The president may place this minor\'s token in any non-metropolis, '\
-                             'non-red-zone city on the map (even unreachable). Trains run to or through '\
-                             'that city earn a +£20 bonus (Phase 2–4). At Phase 5 start, the +£20 token '\
-                             'is removed; the president may place a new token in the same or a different '\
-                             'eligible city for a +£40 bonus (Phase 5+). Placed during the lay track step.',
-              },
-            ],
           },
           {
             name: 'Blue Coast Bridge Construction Company',
@@ -625,10 +662,14 @@ module Engine
             abilities: [
               {
                 type: 'description',
-                description: '33% discount on water/coast/river (blue terrain cost) track construction '\
-                             'anywhere (§15.5); with the 20% zone discount the discount in that zone is 50% '\
-                             '(§11.1.5). Once per OR one extra tile point, only for a yellow tile on a hex with '\
-                             'blue terrain cost (§15.5).',
+                count_per_or: 1,
+                description: 'Terrain discount: 33% off blue (water/coast, river and lake) construction costs. '\
+                             'Track-rights zone discount: 20% off construction within Spain/Portugal, Italy, '\
+                             'Sweden/Norway/Denmark or Russia when the RR has track rights there. '\
+                             'When both apply, they combine to give a 50% discount. '\
+                             'Round the final construction cost down to whole pounds. '\
+                             'Each OR, 1 extra tile point for a yellow lay on blue terrain, '\
+                             'including 1 point toward a metropolis.',
               },
             ],
           },
@@ -646,10 +687,14 @@ module Engine
             abilities: [
               {
                 type: 'description',
-                description: '33% discount on mountain/rough (green terrain cost) track construction '\
-                             'anywhere (§15.6); with the 20% zone discount the discount in that zone is 50% '\
-                             '(§11.1.5). Once per OR one extra tile point, only for a yellow tile on a hex with '\
-                             'green terrain cost (§15.6).',
+                count_per_or: 1,
+                description: 'Terrain discount: 33% off green (mountain, hill and rough) construction costs. '\
+                             'Track-rights zone discount: 20% off construction within Spain/Portugal, Italy, '\
+                             'Sweden/Norway/Denmark or Russia when the RR has track rights there. '\
+                             'When both apply, they combine to give a 50% discount. '\
+                             'Round the final construction cost down to whole pounds. '\
+                             'Each OR, 1 extra tile point for a yellow lay on green terrain, '\
+                             'including 1 point toward a metropolis.',
               },
             ],
           },
@@ -703,8 +748,6 @@ module Engine
             text_color: 'black',
             abilities: [
               {
-                # §15.9: upstream's train discount; G18OE#setup turns the rate into an amount per side,
-                # fractions in favour of the RR.
                 type: 'train_discount',
                 discount: 0.1,
                 trains: [],
@@ -724,15 +767,6 @@ module Engine
             float_percent: 100,
             max_ownership_percent: 100,
             color: '#CD5C5C',
-            abilities: [
-              {
-                type: 'description',
-                description: 'Mail contract: at the start of each OR the bank pays directly to treasury '\
-                             '(not counted as train revenue): £20 (Phase 2), £40 (Phase 3–4), '\
-                             '£50 (Phase 5–6), £60 (Phase 7–8). '\
-                             'Available immediately for track or token placement that OR.',
-              },
-            ],
           },
           {
             name: 'Krasnaya Strela',

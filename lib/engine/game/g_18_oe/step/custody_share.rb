@@ -6,11 +6,11 @@ module Engine
   module Game
     module G18OE
       module Step
-        # §14.4 (2) (#514): custodianship "may be exercised at any time during a SR, including at the moment another
+        # RB 14.4 (2) : custodianship "may be exercised at any time during a SR, including at the moment another
         # player is purchasing a share of stock in the owning player's RR". The purchase (held by
         # Step::BuySellParShares) waits here, as a sale waits in Step::ProtectShare: `choose` puts the share into
         # custodianship and the purchase does not happen (the buyer keeps the stock action, as at a reservation,
-        # §8.4), `pass` completes it.
+        # RB 8.4), `pass` completes it.
         class CustodyShare < Engine::Step::Base
           CHOICE = 'custody'
 

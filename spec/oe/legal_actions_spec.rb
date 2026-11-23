@@ -17,14 +17,15 @@ RSpec.describe Oe::LegalActions do
   # but the enumerator finds none).
   Played = Struct.new(:checkpoints, :dead_end, :classes, keyword_init: true)
 
-  def play(build, seed:, steps:, every:)
+  # stop_when: optional block over the game, checked before each move (e.g. leave at the end of a round family).
+  def play(build, seed:, steps:, every:, stop_when: nil)
     rng = Random.new(seed)
     game = build.call
     history = []
     played = Played.new(checkpoints: [], dead_end: nil, classes: Hash.new(0))
 
     steps.times do |index|
-      break if game.finished
+      break if game.finished || stop_when&.call(game)
 
       before = game.raw_actions.size
       actions = Oe::LegalActions.new(game, limit: 8, rng: rng).call
@@ -132,6 +133,48 @@ RSpec.describe Oe::LegalActions do
       end
     end
 
+    # Major phase (stubbed like consolidation_build): shares of started majors can be bought and sold.
+    def stock_major_build
+      lambda do
+        game = new_game(%w[a b c])
+        allow(game).to receive(:major_phase?).and_return(true)
+        game.instance_variable_set(:@turn, 2)
+        game.players.each_with_index { |player, index| start_major!(game, %w[LNWR PLM SFAI][index], player) }
+        game.players.each { |player| fund!(game, player) }
+        enter_round!(game, game.stock_round)
+        game
+      end
+    end
+
+    # First stock round (turn 1): a player may buy a private from or a floated minor of another player (direct trade).
+    def stock_trade_build
+      lambda do
+        game = new_game(%w[a b c])
+        game.instance_variable_set(:@turn, 1)
+        start_minor!(game, "B", game.players[1], "SP")
+        game.players.each { |player| fund!(game, player) }
+        enter_round!(game, game.stock_round)
+        game
+      end
+    end
+
+    # §11.7 (#552): a major with two shares in the Open Market, in the issue step of its operating round.
+    def issue_build
+      lambda do
+        game = new_game(%w[a b])
+        major = start_major!(game, "LNWR", game.players.first)
+        game.remove_major_par_markers!
+        fund!(game, major)
+        game.phase.next!
+        round = enter_round!(game, game.operating_round(1))
+        game.share_pool.transfer_shares(Engine::ShareBundle.new(major.ipo_shares.first(2)), game.share_pool)
+        round.instance_variable_set(:@current_operator, major)
+        step = round_step(round, Engine::Game::G18OE::Step::IssueShares)
+        step.setup
+        game
+      end
+    end
+
     def stock_build
       lambda do
         game = new_game(%w[a b c])
@@ -155,6 +198,80 @@ RSpec.describe Oe::LegalActions do
 
       expect(played.classes.keys).to include("BuySellParShares/Choose", "BuySellParShares/Par")
       expect_all_accepted(stock_build, played)
+    end
+
+    # #567 (#563 Task 4a): the stock-round families only, up to the first operating round. Random play passes
+    # often and ends the round early, so several seeds are played and the action families are pooled.
+    it "offers only accepted stock-round actions (par, buy, sell, concession, merge, trade) until the first OR" do
+      classes = Hash.new(0)
+      (1..12).each do |seed|
+        played = play(stock_build, seed: seed, steps: 120, every: 2, stop_when: ->(g) { g.round.operating? })
+        played.classes.each { |k, v| classes[k] += v }
+        expect_all_accepted(stock_build, played)
+      end
+
+      expect(classes.keys).to include("BuySellParShares/Choose", "BuySellParShares/Par")
+    end
+
+    it "offers direct trades (buy_corporation of another player's minor, any price 0..cash) the engine accepts" do
+      classes = Hash.new(0)
+      (1..6).each do |seed|
+        played = play(stock_trade_build, seed: seed, steps: 30, every: 1, stop_when: ->(g) { g.round.operating? })
+        played.classes.each { |k, v| classes[k] += v }
+        expect_all_accepted(stock_trade_build, played)
+      end
+
+      expect(classes.keys).to include("BuySellParShares/BuyCorporation")
+    end
+
+    # The issue step is the last of an operating round, so the scenario calls the step directly (as Chris' spec does)
+    # instead of playing the round up to it (that is the 4c work).
+    it "offers corporate share transactions of the issue step that the step accepts (§11.7)" do
+      build = lambda do
+        game = issue_build.call
+        [game, round_step(game.round, Engine::Game::G18OE::Step::IssueShares)]
+      end
+      game, step = build.call
+      major = game.corporation_by_id("LNWR")
+      enumerator = described_class.new(game, limit: 8, rng: Random.new(1))
+      buys = enumerator.send(:generate_buy_shares, step, major)
+      sells = enumerator.send(:generate_sell_shares, step, major)
+
+      expect(buys).not_to be_empty
+      expect(sells).not_to be_empty
+      { process_buy_shares: buys, process_sell_shares: sells }.each do |processor, actions|
+        actions.each do |action|
+          fresh_game, fresh = build.call
+          copy = Engine::Action::Base.action_from_h(action.to_h.dup.tap { action.clear_cache }, fresh_game)
+          expect { fresh.public_send(processor, copy) }.not_to raise_error, "#{processor} #{action.to_h}"
+        end
+      end
+    end
+
+    it "offers only accepted share trades in a major-phase stock round (buy, sell, par)" do
+      classes = Hash.new(0)
+      (1..4).each do |seed|
+        played = play(stock_major_build, seed: seed, steps: 50, every: 2, stop_when: ->(g) { g.round.operating? })
+        played.classes.each { |k, v| classes[k] += v }
+        expect_all_accepted(stock_major_build, played)
+      end
+
+      expect(classes.keys).to include("BuySellParShares/BuyShares", "BuySellParShares/SellShares")
+    end
+
+    # #568 (#563 Task 4b): track and token families only, up to the first step of the 4c families (route, trains).
+    TRACK_TOKEN_STEPS = %w[Assign Track SpecialToken Token HomeToken MergeToken TransferTokens].freeze
+
+    it "offers only accepted track and token actions (lay_tile, place_token, home token, assign) in an operating round" do
+      classes = Hash.new(0)
+      (1..6).each do |seed|
+        played = play(operating_build, seed: seed, steps: 40, every: 1,
+                                       stop_when: ->(g) { !TRACK_TOKEN_STEPS.include?(g.round.active_step.class.name.split("::").last) })
+        played.classes.each { |k, v| classes[k] += v }
+        expect_all_accepted(operating_build, played)
+      end
+
+      expect(classes.keys).to include("Track/LayTile", "Token/PlaceToken")
     end
 
     it "offers only accepted actions in an operating round with majors" do
@@ -305,78 +422,41 @@ RSpec.describe Oe::LegalActions, "#lay_tile_options log" do
   end
 end
 
-# #373: a trial lay is asked only what it connects, so the walks that price the paid ferries are skipped there.
-RSpec.describe Engine::Game::G18OE::Graph, "#without_ferry_prices" do
-  include G18OESpecHelpers
-
-  let(:game) do
-    g = new_game(%w[a b c])
-    start_major!(g, "LNWR", g.players[0])
-    g
-  end
-  let(:corp) { game.corporation_by_id("LNWR") }
-  let(:graph) { game.graph_for_entity(corp) }
-
-  it "leaves the ferries unpriced inside the block and prices them lazily outside" do
-    graph.without_ferry_prices do
-      game.clear_graph_for_entity(corp)
-      graph.connected_paths(corp)
-      expect(graph.instance_variable_get(:@ferry_pending)).to be_nil
-    end
-
-    game.clear_graph_for_entity(corp)
-    graph.connected_paths(corp)
-    expect(graph.instance_variable_get(:@ferry_pending)).to have_key(corp)
-  end
-
-  it "restores the flag when the block raises" do
-    expect { graph.without_ferry_prices { raise "boom" } }.to raise_error("boom")
-    expect(graph.instance_variable_get(:@ferry_pricing_off)).to be_nil
-  end
-end
-
-# #315/#319: the path search runs on every prompt and bot move; unbounded, one
-# search in a phase-8 network took 47 s. It is bounded by a visit count.
-RSpec.describe Oe::LegalActions::RoutePicker do
-  include G18OESpecHelpers
-
-  it "bounds the path search" do
-    game = new_game
-    corp = game.corporation_by_id("LNWR")
-    allow_any_instance_of(Oe::RouteSearch).to receive(:path) do |_router, _trains, _corp, **opts|
-      expect(opts[:walk_limit]).to eq(described_class::WALK_LIMIT)
-      expect(opts).not_to have_key(:path_timeout)
-      [{}]
-    end
-    expect(described_class.new(game, corp).call).to eq([])
-    expect(described_class::WALK_LIMIT).to be_between(1000, 20_000)
-  end
-end
-
-# #319: walk_limit bounds the number of visits deterministically (no wall clock).
+# #315/#319, #574: the path search runs on every prompt and bot move; it is Chris' Engine::AutoRouter#path (no
+# walk limit in the core: it is bounded by the wall clock path_timeout and the route_limit per train).
 RSpec.describe Oe::RouteSearch do
   include G18OESpecHelpers
 
-  def search(walk_limit)
+  def search(**opts)
     game = new_game
     corp = start_major!(game, "LNWR", game.players[0])
     game.phase.next!
     game.buy_train(corp, game.depot.upcoming.first, :free)
-    router = described_class.new(game)
-    routes, cut = router.path(game.route_trains(corp), corp, walk_limit: walk_limit)
-    [routes.transform_keys(&:name).transform_values { |rs| rs.map(&:revenue) }, cut, router.walks]
+    routes, cut = described_class.new(game).path(game.route_trains(corp), corp, **opts)
+    [routes.transform_keys(&:name).transform_values { |rs| rs.map(&:revenue) }, cut]
   end
 
-  it "stops after walk_limit visits, the same way every time" do
-    full, full_cut, total = search(nil)
-    expect(full_cut).to be(false)
-    expect(total).to be > 2
+  it "gives the same routes every time when it is not cut off" do
+    first, cut = search
+    expect(cut).to be(false)
+    expect(first.values.flatten).not_to be_empty
+    expect(search).to eq([first, false])
+  end
 
-    limited, cut, walks = search(2)
-    expect(cut).to be(true)
-    expect(walks).to be < total
-    expect(search(2)).to eq([limited, cut, walks])
-    expect(search(total)).to eq([full, false, total])
+  it "keeps at most route_limit routes per train, the best first" do
+    full, = search
+    limited, = search(route_limit: 2)
+
+    expect(limited.values.map(&:size).max).to be <= 2
+    expect(limited).to eq(full.transform_values { |revenues| revenues.first(2) })
+  end
+
+  it "passes only the options the core router knows" do
+    allow_any_instance_of(Engine::AutoRouter).to receive(:path) do |_router, _trains, _corp, **opts|
+      expect(opts.keys).to contain_exactly(:path_timeout)
+      [{}, false]
+    end
+    described_class.new(new_game).path([], nil, path_timeout: 5, walk_limit: 10)
   end
 end
 

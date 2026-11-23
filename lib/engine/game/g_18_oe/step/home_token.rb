@@ -26,12 +26,14 @@ module Engine
 
             super
 
-            @game.fulfill_patronage!(action.entity, hex, lowest: true) if minor
+            return if !minor || !@game.remove_patronage!(hex)
+
+            @game.log << "The #{hex.location_name} patronage tile is removed"
           end
 
           private
 
-          # #369: the owning player pays what the minor's treasury lacks for its home token.
+          # RB 9.1 (#369): the owning player pays what the minor's treasury lacks for its home token.
           def top_up_home_token!(minor, price)
             missing = price - minor.cash
             return unless missing.positive?

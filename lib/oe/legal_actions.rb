@@ -69,7 +69,7 @@ module Oe
       actions = step.active_entities.reject(&:closed?).flat_map do |entity|
         step.actions(entity).flat_map { |type| generate(type, step, entity) }
       end
-      actions + acting_for(step) + company_actions(step) + bankrupt_actions
+      actions + acting_for(step) + company_actions(step) + bankrupt_actions + special_buy_actions
     end
 
     # The whole choice space of a tile lay, not sampled (#123): per affordable
@@ -122,31 +122,22 @@ module Oe
       end
     end
 
-    # The lay's terrain cost fits the cash, and in 18OE's first OR it leaves the
-    # reserved 2+2 payable (§11.6.4, workshop #352; patronage of the hex counted).
+    # The lay's terrain cost fits the cash (a private's lay pays no terrain, §14.9).
     def affordable_lay?(entity, hex)
-      cost = @game.upgrade_cost(hex.tile, hex, entity, entity)
-      # 18OE §11.1.6 (#360): the fee for the sea zones to the hex, the fewest a tile there can cost
-      cost += @game.cross_water_track_fee(entity, hex).to_i if @game.respond_to?(:cross_water_track_fee)
-      return false if cost > entity.cash
-      return true unless @game.respond_to?(:first_round_spend_allowed?)
-
-      @game.first_round_spend_allowed?(entity, cost - @game.patronage_payout(hex))
+      @game.upgrade_cost(hex.tile, hex, entity, entity) <= entity.cash
     end
 
-    # 18OE §11.1.6 (#360): the fee for the sea zones depends on the sides the tile connects to, so a rotation
-    # whose fee the cash (or the first-OR reserve) cannot pay is left out. On the real map, before any trial lay.
+    # 18OE §11.1.6: the fee for the sea zones depends on the sides the tile connects to (Step::Track charges it as
+    # the action's `extra_cost`), so a rotation whose fee the cash cannot pay is left out. On the real map, before
+    # any trial lay.
     def affordable_rotations(entity, hex, tile)
       rotations = tile.legal_rotations.dup
-      return rotations if entity.company? || !@game.respond_to?(:cross_water_track_fee)
+      return rotations if entity.company? || !@game.respond_to?(:cross_water_tile_fee)
 
       terrain = @game.upgrade_cost(hex.tile, hex, entity, entity)
       rotations.select do |rotation|
         tile.rotate!(rotation)
-        fee = @game.cross_water_track_fee(entity, hex, tile).to_i
-        next true if fee.zero?
-
-        cost = terrain + fee
+        cost = terrain + @game.cross_water_tile_fee(entity, hex, tile).to_i
         cost <= entity.cash && @game.first_round_spend_allowed?(entity, cost - @game.patronage_payout(hex))
       end
     end
@@ -167,7 +158,7 @@ module Oe
       extra_slot = company_extra_slot?(step, entity)
       token_cities(step, entity).select do |city|
         city.tokenable?(tokener, free: false, tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
-          token_spend_ok?(step, tokener, tokens, city) && connected_for_token?(step, entity, city) &&
+          connected_for_token?(step, entity, tokener, city) && first_round_token_ok?(step, tokener, tokens, city) &&
           (!step.respond_to?(:pass_city_ok?) || step.pass_city_ok?(entity, city))
       end
     end
@@ -196,11 +187,6 @@ module Oe
 
       tile.rotate!(rotation)
       old_tile = hex.tile
-      # §11.1.9 (#63): the Right-of-Way green tile must connect the home station to another stop
-      if step.respond_to?(:right_of_way_lay?) && step.right_of_way_lay?(entity, hex, tile) &&
-         !with_tile_laid(entity, hex, tile) { @game.right_of_way_connected?(entity) }
-        return false
-      end
       # without old track every new path is new track: only the graph-free part can fail
       return towns_kept?(old_tile, tile) if old_tile.paths.empty?
 
@@ -285,8 +271,7 @@ module Oe
       old_tile.hex = nil
       tile.hex = hex
       @game.clear_graph_for_entity(entity)
-      graph = @game.graph_for_entity(entity)
-      graph.respond_to?(:without_ferry_prices) ? graph.without_ferry_prices { yield } : yield
+      yield
     ensure
       if old_tile
         tile.hex = tile_hex
@@ -474,7 +459,7 @@ module Oe
     end
 
     def generate_buy_shares(step, entity)
-      return issue_actions(entity, @game.redeemable_shares(entity), A::BuyShares) if step.is_a?(Engine::Step::IssueShares)
+      return issue_actions(entity, step.redeemable_shares(entity), A::BuyShares) if step.is_a?(Engine::Step::IssueShares)
 
       bundles = []
       @game.corporations.each do |corporation|
@@ -502,7 +487,7 @@ module Oe
     end
 
     def generate_sell_shares(step, entity)
-      return issue_actions(entity, @game.issuable_shares(entity), A::SellShares) if step.is_a?(Engine::Step::IssueShares)
+      return issue_actions(entity, step.issuable_shares(entity), A::SellShares) if step.is_a?(Engine::Step::IssueShares)
       return [] unless entity.player?
 
       bundles = @game.corporations.flat_map { |corporation| @game.bundles_for_corporation(entity, corporation) }
@@ -512,16 +497,16 @@ module Oe
       end
     end
 
-    # A buy_company / buy_corporation from another player is a trade offer (§10.4, #202): the seller
-    # answers it in Step::TradeOffer. With `compact: true` the offer prices (every whole amount from
-    # 0 to the buyer's cash) are one range per target, like bids (#91); `company` is the target's id
+    # A buy_company / buy_corporation from another player is a direct trade (Chris' engine, #563): the buyer names
+    # a whole price from 0 to their cash, no consent step, only in the first stock round before any other action.
+    # With `compact: true` the prices are one range per target, like bids (#91); `company` is the target's id
     # (the private, or the minor corporation for buy_corporation).
     def generate_buy_company(step, entity)
       actions = step.buyable_bank_owned_companies(entity).map do |company|
         A::BuyCompany.new(entity, company: company, price: company.value)
       end
       step.purchasable_companies(entity).each do |company|
-        actions.concat(trade_offers(step, entity, company) { |price, give| A::BuyCompany.new(entity, company: company, price: price, give: give) })
+        actions.concat(trade_offers(step, entity, company) { |price| A::BuyCompany.new(entity, company: company, price: price) })
       end
       actions
     end
@@ -530,9 +515,7 @@ module Oe
       @game.corporations.flat_map do |corporation|
         next [] unless step.can_buy_corporation?(entity, corporation)
 
-        trade_offers(step, entity, corporation) do |price, give|
-          A::BuyCorporation.new(entity, corporation: corporation, price: price, give: give)
-        end
+        trade_offers(step, entity, corporation) { |price| A::BuyCorporation.new(entity, corporation: corporation, price: price) }
       end
     end
 
@@ -540,24 +523,10 @@ module Oe
       min, max = step.price_range(entity, target)
       if @compact
         type = target.corporation? ? 'buy_corporation' : 'buy_company'
-        # #524: at the certificate limit a cash-only purchase is refused (§4.1); the price does not change that.
-        if max >= min && step.valid_trade_objects?(yield(min, []), target)
-          @ranges << { type: type, entity: entity.id, company: target.id, min: min, max: max, step: 1 }
-        end
+        @ranges << { type: type, entity: entity.id, company: target.id, min: min, max: max, step: 1 } if max >= min
         return []
       end
-      offers = sample(amounts(min, max, 5)).map { |price| yield price, [] }.select { |action| step.valid_trade_objects?(action, target) }
-      offers + trade_swaps(step, entity, target, min, max) { |price, give| yield price, give }
-    end
-
-    # §10.4 (#517): offers that give one of the buyer's own minors / face up privates; the other
-    # side's extra objects and bigger bundles are the UI's to build (the engine takes any list).
-    def trade_swaps(step, entity, target, min, max)
-      swaps = step.tradable_objects(entity).flat_map do |object|
-        sample(amounts(min, max, 5)).map { |price| yield price, [object] }
-      end
-      swaps = swaps.select { |action| step.valid_trade_objects?(action, target) }
-      sample(swaps)
+      sample(amounts(min, max, 5)).map { |price| yield price }
     end
 
     # ---- choose -----------------------------------------------------------
@@ -566,8 +535,6 @@ module Oe
       case step
       when Engine::Game::G18OE::Step::BuySellParShares then stock_choices(step, entity)
       when Engine::Game::G18OE::Step::IssueShares then issue_choices(step, entity)
-      when Engine::Game::G18OE::Step::HochbergToken then hochberg_choices(step, entity)
-      when Engine::Game::G18OE::Step::SmlTrain then sml_choices(step, entity)
       else plain_choices(step, entity)
       end
     end
@@ -576,16 +543,6 @@ module Oe
       return [] unless step.respond_to?(:choices)
 
       step.choices.keys.map { |choice| A::Choose.new(entity, choice: choice) }
-    end
-
-    # §14.8: the private places its token on one of the rough hexes (the action's target).
-    def hochberg_choices(step, entity)
-      step.hexes.map { |hex| A::Choose.new(entity, choice: step.class::CHOICE, target: hex) }
-    end
-
-    # §14.10: the private gives the rusted 2+2 to the RR operating (the action's target).
-    def sml_choices(step, entity)
-      step.corporations(entity).map { |corporation| A::Choose.new(entity, choice: step.class::CHOICE, target: corporation) }
     end
 
     def issue_choices(step, entity)
@@ -632,62 +589,111 @@ module Oe
       end
     end
 
-    # §14.9: another RR removes a Brandt & Brandau token (pays the hex's terrain price and tile points).
-    # Pricing logs the zone discount, which the enumeration must not write (#296).
-    def generate_remove_hex_token(step, entity)
-      without_log do
-        step.bbe_removable_hexes(entity).select do |hex|
-          money = step.bbe_removal_money(entity, hex)
-          money <= entity.cash && @game.first_round_spend_allowed?(entity, money)
-        end
-      end.map { |hex| A::RemoveHexToken.new(entity, hex: hex) }
+    # §15.4 Minor D / §14.8 Hochberg: the private places its token on a hex (the action's target), as the step's
+    # own `available_hex` allows (Chris' Step::Assign; the train marker of Minor L is a `choose`, 4c).
+    def generate_assign(step, entity)
+      hexes = @game.hexes.select { |hex| step.available_hex(entity, hex) }
+      sample(hexes).map { |hex| A::Assign.new(entity, target: hex) }
     end
 
-    # §15.4: Minor D (or the major holding its charter) places its Green Junction token in any city
-    # except a metropolis or red zone, reachable or not, in the lay track step; the target is the hex.
-    # §15.11: Minor L (or the major holding its charter) puts its +1+1 marker on one of its trains that
-    # has not run, in the run trains step; the target is the train.
-    def generate_assign(step, entity)
-      return step.krasnaya_trains(entity).map { |train| A::Assign.new(entity, target: train) } if step.respond_to?(:krasnaya_trains)
-      return [] unless step.respond_to?(:green_junction_hexes)
+    # Port Authority (§11.3.5): the step is not blocking, so the active step never names it; the round's steps do.
+    def special_buy_actions
+      entity = @game.round.current_entity
+      return [] unless entity&.corporation? && @game.round.operating?
 
-      sample(step.green_junction_hexes(entity)).map { |hex| A::Assign.new(entity, target: hex) }
+      @game.round.steps.select { |s| s.is_a?(Engine::Step::SpecialBuy) }.flat_map do |step|
+        step.actions(entity).include?('special_buy') ? generate('special_buy', step, entity) : []
+      end
+    end
+
+    def generate_special_buy(step, entity)
+      step.buyable_items(entity).map { |item| A::SpecialBuy.new(entity, item: item) }
     end
 
     # A private places the token of the corporation it acts for (#128): the
     # action names it as `tokener`, as the engine's own PlaceToken does.
     def generate_place_token(step, entity)
+      return generate_transfer_token(step, entity) if step.is_a?(Engine::Game::G18OE::Step::TransferTokens)
+
       tokener = entity.company? ? @game.token_owner(entity) : nil
-      sample(token_targets(step, entity)).map { |city| A::PlaceToken.new(entity, city: city, tokener: tokener) }
+      sample(token_targets(step, entity)).flat_map { |city| place_token_actions(step, entity, city, tokener) }
+    end
+
+    # Chris' format (#563): a station token bought in 18OE names the charter token (`token_index`) and its cost
+    # (`cost`, price plus the fee for the ferries and sea zones), always both. Home and merge tokens and a
+    # private's token take no choice.
+    def place_token_actions(step, entity, city, tokener)
+      if entity.company? || !step.respond_to?(:selectable_token_choices)
+        return [] if entity.company? && tokener && !company_token_affordable?(tokener, city)
+
+        return [A::PlaceToken.new(entity, city: city, tokener: tokener)]
+      end
+
+      step.selectable_token_choices(entity, city).filter_map do |choice|
+        next if choice[:cost] > entity.cash || !@game.first_round_spend_allowed?(entity, choice[:cost])
+
+        A::PlaceToken.new(entity, city: city, token_index: choice[:index], cost: choice[:cost])
+      end
+    end
+
+    # A private's token is paid by the corporation that owns it (Step::Token#process_place_token checks its cash).
+    def company_token_affordable?(tokener, city)
+      # the private's token itself is free; the corporation pays the fee for ferries and sea zones (the step's check)
+      fee = @game.cross_water_token_fee(tokener, city)
+      fee <= tokener.cash && (!@game.respond_to?(:first_round_spend_allowed?) || @game.first_round_spend_allowed?(tokener, fee))
+    end
+
+    # §11.2.x Transfer Tokens: the buyer replaces a token of another RR (`slot` of the city) with one of its own
+    # charter tokens; `cost` is its price plus the transfer fee, which the step checks.
+    def generate_transfer_token(step, buyer)
+      offers = @game.hexes.flat_map do |hex|
+        hex.tile.cities.flat_map do |city|
+          (city.tokens + city.extra_tokens).each_with_index.flat_map do |token, slot|
+            next [] unless step.can_replace_token?(buyer, token)
+
+            step.selectable_token_choices(buyer, city).filter_map do |choice|
+              next if choice[:cost] > buyer.cash
+
+              A::PlaceToken.new(buyer, city: city, slot: slot, token_index: choice[:index], cost: choice[:cost])
+            end
+          end
+        end
+      end
+      sample(offers)
+    end
+
+    def connected_special_token?(step, entity)
+      step.is_a?(Engine::Step::SpecialToken) && entity.company? && step.respond_to?(:check_connected, true) &&
+        step.send(:connected_ability?, entity)
     end
 
     # Tokens laid by operating (not home/merge tokens) must connect to a route
     # of the corporation; the step's own check says whether they do.
-    def connected_for_token?(step, entity, city)
-      return true unless step.is_a?(Engine::Step::Token)
+    # A private's token that needs a connection (Step::SpecialToken, connected ability) is checked for the corporation
+    # that places it, as the step does.
+    def connected_for_token?(step, entity, tokener, city)
+      return true unless step.is_a?(Engine::Step::Token) || connected_special_token?(step, entity)
 
-      step.check_connected(entity, city, city.hex)
+      step.check_connected(tokener, city, city.hex)
       true
     rescue Engine::GameError
       false
     end
 
-    # 18OE first OR: a bought token must leave the reserved 2+2 payable (§11.6.4,
-    # workshop #352). Home tokens are paid at floating, not here. The spend is the token's price plus the
-    # fee for the ferries and sea zones to the city (§11.2.1, #61), as the engine's Token step charges it (#457).
-    def token_spend_ok?(step, tokener, tokens, city)
-      return true if step.is_a?(Engine::Step::HomeToken) || !@game.respond_to?(:first_round_spend_allowed?)
-
-      fee = @game.respond_to?(:cross_water_token_fee) ? @game.cross_water_token_fee(tokener, city).to_i : 0
-      @game.first_round_spend_allowed?(tokener, tokens.map(&:price).min.to_i + fee)
-    end
-
-    # 18OE: a minor's home token claims a track-rights region and pays for it.
+    # 18OE: a minor's home token claims a track-rights region and pays for it from the minor's treasury
+    # (Step::HomeToken: token.price = track_rights_cost).
     def home_region_ok?(step, tokener, city)
       return true unless step.is_a?(Engine::Game::G18OE::Step::HomeToken) && tokener.type == :minor
 
       region = @game.region_for_hex(city.hex)
-      @game.region_available?(region) && @game.home_token_funds(tokener) >= @game.home_token_cost(tokener, region)
+      @game.region_available?(region) && tokener.cash >= @game.track_rights_cost(region)
+    end
+
+    # RB 11.6.4 para. 2: a paid token may not leave the reserved 2+2 unpayable.
+    def first_round_token_ok?(step, tokener, tokens, city)
+      return true if step.is_a?(Engine::Step::HomeToken) || !@game.respond_to?(:first_round_spend_allowed?)
+
+      @game.first_round_spend_allowed?(tokener, tokens.map(&:price).min.to_i + @game.cross_water_token_fee(tokener, city).to_i)
     end
 
     def token_cities(step, entity)
@@ -723,7 +729,7 @@ module Oe
       combos = RouteSearch.new(@game).combinations(candidates)
       return [] if combos.empty?
 
-      # §12.2 (#512): when the best routes need a combination, only that one is offered
+      # RB 12.2 (#512): when the best routes need a combination, only that one is offered
       required = @game.orient_express_required(entity, [])
       return [A::DoubleHeadTrains.new(entity, trains: required[:combine])] if required&.dig(:combine)
 
@@ -754,6 +760,12 @@ module Oe
       end
     end
 
+    # A private's own ability choice (Chris' Step::SpecialChoose, §14.10 Swift Metropolitan Line: `preserve`):
+    # `choose_ability` with the ability's choice key; the receiving RR is the one operating.
+    def generate_choose_ability(step, entity)
+      step.choices_ability(entity).keys.map { |choice| A::ChooseAbility.new(entity, choice: choice.to_s) }
+    end
+
     def generate_dividend(step, entity)
       step.dividend_types.map { |kind| A::Dividend.new(entity, kind: kind.to_s) }
     end
@@ -764,31 +776,38 @@ module Oe
       budget = train_budget(step, entity)
       step.buyable_trains(entity).flat_map do |train|
         min, max = step.spend_minmax(entity, train)
-        max = [max, budget].min
+        # A depot train is bought at its variant price whatever spend_minmax says (EBUY_FROM_OTHERS never caps it at
+        # the treasury): Step::Train#buy_train_action takes the rest from the president (RB 11.6.1, 11.6.4).
+        max = train.from_depot? ? budget : [max, budget].min
         train_offers(step, entity, train, min, max).select do |_variant, price|
           price <= max && price.positive? && cheapest_if_contributing?(step, train, price, entity)
         end.map { |variant, price| A::BuyTrain.new(entity, train: train, price: price, variant: variant) }
       end
     end
 
-    # §11.6.6 (#64): a national takes trains at price 0; `exchange` is the rusted train it gives back.
+    # §11.6.6 (#64): a national takes trains at price 0, in Chris' format (Step::NationalBuyTrains): a claim of a rusted
+    # train from the Locomotive Works names the `variant`; an exchange (`exchange` = the rusted train it gives back)
+    # is a swap for a higher rusted train (any variant) or an upgrade to a running train of the owner's majors
+    # (its own name). The game lists the exchanges as [given, taken, variant, 0] (discountable_trains_for).
     def national_trains(step, entity)
-      step.national_train_offers(entity).map do |train, exchange|
-        A::BuyTrain.new(entity, train: train, price: 0, exchange: exchange)
+      claims = step.buyable_trains(entity).flat_map do |train|
+        train.variants.keys.map { |variant| A::BuyTrain.new(entity, train: train, price: 0, variant: variant) }
       end
+      exchanges = @game.discountable_trains_for(entity).map do |given, train, variant, _discount|
+        A::BuyTrain.new(entity, train: train, price: 0, variant: variant, exchange: given)
+      end
+      claims + exchanges
     end
 
     # [variant name, price] pairs. A depot train is offered once per variant the
     # engine allows (Step::Train#buyable_train_variants): 3 and 3+3, 4 and 4+4,
     # 5 and 5+5, 6 and 6+6, 7+7 and 4D, 8+8 and 5D (RB 11.6, the double-sided
-    # cards), each at its own price (less Minor J's discount, §15.9). A train of
+    # cards), each at its own price (the variant's, as the engine's Step::Train checks it). A train of
     # another railroad keeps the side it was bought with: no variant.
     def train_offers(step, entity, train, min, max)
       return other_train_prices(train, min, max).map { |price| [nil, price] } unless train.from_depot?
 
-      step.send(:buyable_train_variants, train, entity).map do |variant|
-        [variant[:name], step.depot_price(entity, train, variant[:name])]
-      end
+      step.send(:buyable_train_variants, train, entity).map { |variant| [variant[:name], variant[:price]] }
     end
 
     # A train from another corporation: the engine's whole span (RB 11.6,
@@ -822,39 +841,20 @@ module Oe
     # Picks, per train, the best-revenue non-conflicting route found by the
     # engine's path search. (AutoRouter#route, the combiner, is Opal-only.)
     class RoutePicker
-      # Visits the path search may make (RouteSearch walk_limit, #319). It runs
-      # on every prompt and bot move; unbounded, one search in a phase-8 network
-      # walked 266000 visits in 47 s. The limit is a count, not wall-clock time
-      # (the former 3 s path_timeout, #315), so the routes offered do not depend
-      # on the machine, and it also stops a single long walk. Nodes are searched
-      # best first (own tokens, offboards, revenue). Measured (4p seed 1,
-      # phases 7-8, 40 searches): 21 s instead of 169 s in all, at most 2.3 s
-      # instead of 47 s; revenue equal in 35 of 40, the others -100, -20 (3x)
-      # and +300 (the picker is greedy, more candidates are not always better).
-      WALK_LIMIT = RouteSearch::WALK_LIMIT
-      # Visits of the second pass, the one that also crosses the sea (#359): it
-      # runs only for an RR whose network reaches a port it may use, after the
-      # land pass, so land routes keep their WALK_LIMIT. Measured in the PR.
-      SEA_WALK_LIMIT = RouteSearch::SEA_WALK_LIMIT
-
       def initialize(game, entity)
         @game = game
         @entity = entity
       end
 
-      # §12.2 (#512): when the routes picked leave out an Orient Express run the
-      # RR must make, the best routes found with it are offered instead (the
-      # engine rejects the others); the game reuses this search's candidates.
+      # RB 12.2 (#512): when the routes picked leave out an Orient Express run the RR must make, the best routes found with
+      # it are offered instead (the engine rejects the others); the game reuses this search's candidates. A combination
+      # comes first (generate_double_head_trains offers it): no run before it.
       def call
         router = RouteSearch.new(@game)
         train_routes = router.train_routes(@entity)
         chosen = router.pick(combined_first(train_routes))
-        required = @game.respond_to?(:orient_express_required) &&
-                   @game.orient_express_required(@entity, chosen, train_routes)
-        return chosen unless required
-
-        # a combination comes first (generate_double_head_trains offers it); no run before it
-        required[:routes]
+        required = @game.orient_express_required(@entity, chosen, train_routes)
+        required ? required[:routes] : chosen
       end
 
       private

@@ -7,8 +7,7 @@ require "oe/view"
 require "oe/bot"
 
 # #53: forming nationals (§9.4) at the first train of Train Phase 4, 6, 8. The
-# player decides: `convert` per major (issued by the corporation, as the
-# regional conversion of the stock round) and `pass`.
+# player decides (Chris' format, #563): `choose <major id>` per major, and `choose done`.
 RSpec.describe Oe::LegalActions, "national formation" do
   include G18OESpecHelpers
 
@@ -26,32 +25,41 @@ RSpec.describe Oe::LegalActions, "national formation" do
     game.phase.buying_train!(lnwr, train, game.depot)
   end
 
-  it "offers a convert per major of the player and a pass" do
+  it "offers a choose per major of the player and done" do
     actions = described_class.call(game)
 
-    expect(actions.map { |a| [a.type, a.entity.id] }).to contain_exactly(%w[pass a], %w[convert LNWR], %w[convert GWR])
+    expect(actions.map { |a| [a.type, a.entity.id, a.choice] }).to contain_exactly(%w[choose a LNWR], %w[choose a GWR], %w[choose a done])
   end
 
-  it "offers the remaining majors after a conversion" do
-    act!(round, Engine::Action::Convert.new(gwr))
-    expect(described_class.call(game).map { |a| [a.type, a.entity.id] }).to contain_exactly(%w[pass a], %w[convert LNWR])
+  it "offers the remaining majors after a conversion, and the engine accepts each offer" do
+    act!(round, Engine::Action::Choose.new(alice, choice: "GWR"))
+    offers = described_class.call(game)
+
+    expect(offers.map(&:choice)).to contain_exactly("LNWR", "done")
+    offers.each do |offer|
+      game.process_action(offer.to_h.dup.tap { offer.clear_cache })
+      expect(game.exception).to be_nil, offer.choice
+      break
+    end
   end
 
   it "names the step, its help and the pass in the prompt" do
     prompt = Oe::View.render(game, viewer: alice.id)[:prompt]
 
-    expect(prompt[:step]).to eq("ConvertToNational")
+    expect(prompt[:step]).to eq("FormNational")
     expect(prompt[:description]).to eq("Form Nationals")
-    expect(prompt[:help]).to include("Train Phase 4", "LNWR", "GWR")
-    expect(prompt[:pass_description]).to include("Done")
+    # Chris' Step::FormNational has no help text; the player text is the UI's (text.ts).
+    expect(prompt[:help]).to be_nil
+    expect(prompt[:pass_description]).to eq("Pass")
     expect(prompt[:unsupported]).to be_empty
-    expect(prompt[:acting_as].map { |a| a[:entity] }).to contain_exactly("a", "LNWR", "GWR")
+    expect(prompt[:acting_as].map { |a| a[:entity] }).to contain_exactly("a")
   end
 
   it "lets the bot decline until nationals operate (#64)" do
     action = Oe::Bot.new(game, rng: Random.new(1)).choose(player_id: alice.id)
 
-    expect(action).to be_a(Engine::Action::Pass)
+    expect(action).to be_a(Engine::Action::Choose)
+    expect(action.choice).to eq("done")
     expect(action.entity).to eq(alice)
   end
 end

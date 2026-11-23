@@ -45,8 +45,8 @@ games:
       - stock/MergeToken/pass
       - stock/MergeDiscardTrain/discard_train
       - stock/MergeDiscardTrain/pass
-      - operating/ConvertToNational/convert
-      - operating/ConvertToNational/pass
+      - operating/FormNational/choose:convert
+      - operating/FormNational/choose:done
   - name: rush game with 3 players, consolidation round
     seed: 1
     finish: false

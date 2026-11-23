@@ -109,10 +109,11 @@ RSpec.describe Oe::Bot do
 
         entity = action.entity
         next unless entity.corporation?
+        # only what it could run when its Route step came: Transfer Tokens, Buy Trains and Issue Shares act later
+        next unless %w[Track Token SpecialToken Assign HomeToken].include?(log.last[1])
 
-        # #360: stops reached only over the sea (for track and tokens, §11.1.6) are not stops a train reaches by land
-        graph = game.graph_for_entity(entity)
-        @stops_after[entity] = graph.connected_nodes(entity).count { |node, _| graph.water_zones_to_node(entity, node).zero? }
+        # the engine's own question (Game#can_run_route?, Graph#route_info), as its Route step asks it (#563)
+        @stops_after[entity] = game.can_run_route?(entity) ? 2 : 0 # Chris' route_info: two stops (also over the sea) and a train
       end
       [game, log]
     end
@@ -139,7 +140,8 @@ RSpec.describe Oe::Bot do
     it "runs a route with revenue for every company with a train that has one to run in OR 1.2" do
       game, log = play_until(1, &until_or12_done)
       runs = in_or(log, "1.2", "Route").select { |a| a.is_a?(Engine::Action::RunRoutes) }
-      with_train = game.corporations.select { |c| c.floated? && !c.trains.empty? }
+      # an insolvent minor or regional (RB 11.6.5) sits in the Open Market and does not operate
+      with_train = game.corporations.select { |c| c.floated? && !c.trains.empty? && !game.insolvent?(c) }
       expect(runs.map { |a| a.routes.sum(&:revenue) }).to all(be_positive)
       # A company with a train but fewer than two connected stops has no route to run. Measured for seed 1
       # (#314): the five without a run are all that case (no cash or no legal lay left: no upgradeable

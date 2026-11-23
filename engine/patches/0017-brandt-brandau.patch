@@ -1,0 +1,294 @@
+diff --git a/lib/engine/game/g_18_oe/entities.rb b/lib/engine/game/g_18_oe/entities.rb
+index a6760a3..56a3090 100644
+--- a/lib/engine/game/g_18_oe/entities.rb
++++ b/lib/engine/game/g_18_oe/entities.rb
+@@ -191,6 +191,22 @@ module Engine
+                   'when no tokens remain on the map. To remove a token, another RR must pay the original terrain '\
+                   'cost and expend one tile point (two for a metropolis), without placing track. '\
+                   'Nationals skip the terrain cost but still expend tile points.',
++            # RB 14.9: four free yellow lays on rough terrain, at most two per OR; the hexes are filled in at setup
++            # (Game#setup_bbe_ability!).
++            abilities: [
++              {
++                type: 'tile_lay',
++                owner_type: 'player',
++                when: 'owning_player_track',
++                count: 4,
++                count_per_or: 2,
++                free: true,
++                special: false,
++                connect: false,
++                tiles: [],
++                hexes: [],
++              },
++            ],
+             auction_row: 4,
+           },
+           {
+diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
+index 1118b5d..59a0ee8 100644
+--- a/lib/engine/game/g_18_oe/game.rb
++++ b/lib/engine/game/g_18_oe/game.rb
+@@ -26,6 +26,7 @@ require_relative 'step/merge_token'
+ require_relative 'step/concession'
+ require_relative 'step/choose_operating_position'
+ require_relative 'step/home_hex_consent'
++require_relative 'step/special_track'
+ require_relative 'step/home_position'
+ require_relative 'step/reserve_share'
+ require_relative 'step/orient_express_bonus'
+@@ -48,7 +49,7 @@ module Engine
+         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
+                       :consolidation_triggered, :consolidation_complete
+         attr_reader :fast_start_minors, :concessions, :merged_minors, :wcf_placeholder, :minor_c_ability,
+-                    :hochberg_token_hex, :swift_metropolitan_train
++                    :hochberg_token_hex, :swift_metropolitan_train, :bbe_token_hexes
+ 
+         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
+                            { group: :white, count: 3 }, { group: :green, count: 8 }].freeze
+@@ -551,6 +552,7 @@ module Engine
+           @hochberg_token_hex = nil
+           @hochberg_printed_revenue = {}
+           setup_nationals
++          setup_bbe_ability!
+ 
+           corporations.each do |corp|
+             corp.par_via_exchange = companies.find { |c| c.sym == corp.id } if corp.type == :minor
+@@ -1866,6 +1868,7 @@ module Engine
+             G18OE::Step::Operating::HomeToken,
+             G18OE::Step::Assign,
+             G18OE::Step::HomeHexConsent,
++            G18OE::Step::SpecialTrack,
+             G18OE::Step::Track,
+             G18OE::Step::SpecialToken,
+             G18OE::Step::Token,
+@@ -2215,7 +2218,63 @@ module Engine
+           add_on_train?(:pullman, route.train) ? "#{str} + Pullman" : str
+         end
+ 
++        # RB 14.9 Brandt & Brandau, Engineers: a token on a hex closes the track laid with it to every RR of another player
++        # (RB 11.3.10: for a national's revenue as well) until another RR removes the token.
++        BBE_TOKEN_LOGO = '/logos/18_oe/bbe.svg' # ASSUMPTION: no artwork yet, placeholder path
++
++        def bbe_company
++          company_by_id('BBE')
++        end
++
++        # The ability's hexes: unbuilt rough (hill, mountain) hexes without a city or metropolis, set once at setup.
++        def setup_bbe_ability!
++          @bbe_token_hexes = []
++          ability = bbe_company&.all_abilities&.find { |a| a.type == :tile_lay }
++          return unless ability
++
++          ability.hexes = hexes.select do |hex|
++            hex.tile.color == :white && hex.tile.cities.empty? && hex.tile.terrain.intersect?(self.class::GREEN_TERRAIN) &&
++              !metropolis_hex?(hex)
++          end.map(&:id)
++        end
++
++        def bbe_blocked_for?(corporation)
++          return false if @bbe_token_hexes.empty? || !corporation.respond_to?(:owner)
++
++          corporation.owner != bbe_company&.owner
++        end
++
++        def graph_skip_paths(corporation)
++          return super unless bbe_blocked_for?(corporation)
++
++          @bbe_token_hexes.flat_map { |hex| hex.tile.paths }.to_h { |path| [path, true] }
++        end
++
++        def bbe_place_token!(hex, company)
++          token = Engine::Token.new(company, logo: BBE_TOKEN_LOGO, simple_logo: BBE_TOKEN_LOGO, type: :bbe)
++          hex.place_token(token, logo: BBE_TOKEN_LOGO)
++          @bbe_token_hexes << hex
++          clear_graph
++          @log << "#{company.name} token placed on #{hex.id}"
++          flip_private!(company) if company.all_abilities.none? { |a| a.type == :tile_lay } && !face_down_private?(company)
++        end
++
++        def bbe_remove_token!(hex)
++          hex.tokens.find { |t| t.type == :bbe }.remove!
++          @bbe_token_hexes.delete(hex)
++          clear_graph
++          @log << "Brandt and Brandau token removed from #{hex.id}"
++          return unless @bbe_token_hexes.empty? && bbe_company.all_abilities.none? { |a| a.type == :tile_lay }
++
++          remove_private!(bbe_company)
++          @log << "#{bbe_company.name} is removed from the game"
++        end
++
+         def check_connected(route, corporation)
++          if bbe_blocked_for?(corporation) && route.paths.any? { |path| @bbe_token_hexes.include?(path.hex) }
++            raise GameError, 'Route uses track marked by a Brandt and Brandau token'
++          end
++
+           route.connection_data.each_cons(2) do |a, b|
+             next if !a[:chain][:paths].empty? && !b[:chain][:paths].empty?
+ 
+diff --git a/lib/engine/game/g_18_oe/national_revenue.rb b/lib/engine/game/g_18_oe/national_revenue.rb
+index 8021c5f..4b13b98 100644
+--- a/lib/engine/game/g_18_oe/national_revenue.rb
++++ b/lib/engine/game/g_18_oe/national_revenue.rb
+@@ -113,7 +113,7 @@ module Engine
+         end
+ 
+         def linked?(node)
+-          node.walk(converging_path: false) do |path, _, _|
++          node.walk(converging_path: false, skip_paths: @game.graph_skip_paths(@corporation)) do |path, _, _|
+             return true if path.nodes.any? { |other| other.hex != node.hex } || offshore_ferry?(path)
+           end
+           false
+@@ -148,7 +148,8 @@ module Engine
+             visited_paths = {}
+             zone_hexes.flat_map { |hex| hex.tile.cities }.reject { |city| city.paths.empty? }.each do |city|
+               found << offshore_sea(city.hex)
+-              city.walk(visited: visited, visited_paths: visited_paths, converging_path: false) do |path, _, _|
++              city.walk(visited: visited, visited_paths: visited_paths, converging_path: false,
++                    skip_paths: @game.graph_skip_paths(@corporation)) do |path, _, _|
+                 found.concat(arrow_seas(path))
+                 found.concat(path.nodes.select(&:city?).map { |node| offshore_sea(node.hex) })
+               end
+diff --git a/lib/engine/game/g_18_oe/step/special_track.rb b/lib/engine/game/g_18_oe/step/special_track.rb
+new file mode 100644
+index 0000000..f53c879
+--- /dev/null
++++ b/lib/engine/game/g_18_oe/step/special_track.rb
+@@ -0,0 +1,64 @@
++# frozen_string_literal: true
++
++require_relative '../../../step/special_track'
++
++module Engine
++  module Game
++    module G18OE
++      module Step
++        # RB 14.9 Brandt & Brandau, Engineers: in the Track step of a RR of its owner the private places one of its tokens on
++        # a rough hex and lays a yellow tile there at no terrain cost. The lay spends the operating RR's tile points
++        # (Track#record_special_lay!); the tile_lay ability gives the count (4, two per OR), the hexes and the free lay.
++        class SpecialTrack < Engine::Step::SpecialTrack
++          ACTIONS = %w[lay_tile].freeze
++
++          def actions(entity)
++            return [] unless entity.company? && abilities(entity) && entity.owner == operator.owner
++            return [] if track_step.nil? || track_step.tile_points_left(operator) < 1
++
++            ACTIONS
++          end
++
++          def available_hex(entity, hex)
++            return unless (ability = abilities(entity))
++            return unless ability.hexes.include?(hex.id) && hex.tile.color == :white
++            return unless track_step.tile_points_left(operator) >= @game.tile_point_cost(operator, old_tile: hex.tile)
++
++            track_step.tracker_available_hex(operator, hex)
++          end
++
++          def hex_neighbors(entity, hex)
++            return unless abilities(entity)
++
++            track_step.hex_neighbors(operator, hex)
++          end
++
++          def process_lay_tile(action)
++            company = action.entity
++            ability = abilities(company)
++            raise GameError, "#{company.name} cannot lay a tile now" unless ability
++            raise GameError, "#{action.hex.id} cannot be built on now" unless available_hex(company, action.hex)
++
++            old_tile = action.hex.tile
++            points_cost = @game.tile_point_cost(operator, old_tile: old_tile)
++            lay_tile(action, spender: operator)
++            ability.use!
++            track_step.record_special_lay!(operator, action, old_tile, points_cost)
++            @game.bbe_place_token!(action.hex, company)
++            track_step.pass! unless track_step.can_lay_tile?(operator)
++          end
++
++          private
++
++          def operator
++            @game.current_entity
++          end
++
++          def track_step
++            @round.steps.find { |step| step.is_a?(G18OE::Step::Track) }
++          end
++        end
++      end
++    end
++  end
++end
+diff --git a/lib/engine/game/g_18_oe/step/track.rb b/lib/engine/game/g_18_oe/step/track.rb
+index 4df6137..29445ed 100644
+--- a/lib/engine/game/g_18_oe/step/track.rb
++++ b/lib/engine/game/g_18_oe/step/track.rb
+@@ -10,6 +10,8 @@ module Engine
+         class Track < Engine::Step::Track
+           include SkipAbbreviatedRound
+ 
++          attr_reader :points_used
++
+           def setup
+             super
+             @points_used = 0
+@@ -99,6 +101,59 @@ module Engine
+             end
+           end
+ 
++          def tile_points_left(entity)
++            remaining_tile_points(entity)
++          end
++
++          # The bookkeeping of a lay made by a private (SpecialTrack): the RR's tile points are spent as in its own lay.
++          def record_special_lay!(entity, action, old_tile, points_cost)
++            @points_used += points_cost
++            @game.after_lay_tile(entity, old_tile, action.tile)
++            @round.num_laid_track += 1
++            @round.laid_hexes << action.hex
++          end
++
++          # RB 14.9: another RR may remove a Brandt & Brandau token: it pays the hex's original terrain cost (a national
++          # only the tile point) and one tile point (two on a metropolis), and lays no track.
++          def bbe_removal_points(hex)
++            @game.metropolis_hex?(hex) ? 2 : 1
++          end
++
++          def bbe_removal_money(entity, hex)
++            @game.upgrade_cost(hex.original_tile, hex, entity, entity)
++          end
++
++          def bbe_removable_hexes(entity)
++            return [] unless @game.bbe_blocked_for?(entity)
++
++            @game.bbe_token_hexes.select { |hex| bbe_removal_points(hex) <= remaining_tile_points(entity) }
++          end
++
++          def actions(entity)
++            actions = super
++            return actions unless entity == current_entity && !bbe_removable_hexes(entity).empty?
++
++            actions.empty? ? %w[remove_hex_token pass] : actions + %w[remove_hex_token]
++          end
++
++          def process_remove_hex_token(action)
++            entity = action.entity
++            hex = action.hex
++            raise GameError, "No Brandt and Brandau token on #{hex.id} to remove" unless bbe_removable_hexes(entity).include?(hex)
++
++            money = bbe_removal_money(entity, hex)
++            raise GameError, "#{entity.name} cannot pay #{@game.format_currency(money)}" if money > entity.cash
++
++            @game.check_first_round_spend!(entity, money)
++            entity.spend(money, @game.bank) if money.positive?
++            points = bbe_removal_points(hex)
++            @points_used += points
++            @game.log << "#{entity.name} pays #{@game.format_currency(money)} and #{points} tile point(s) to remove " \
++                         "the token on #{hex.id}"
++            @game.bbe_remove_token!(hex)
++            pass! unless can_lay_tile?(entity)
++          end
++
+           def can_lay_tile?(entity)
+             return true if @game.track_token_placeable?(entity)
+ 

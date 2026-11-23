@@ -1,0 +1,706 @@
+diff --git a/lib/engine/game/g_18_oe/bbbt.rb b/lib/engine/game/g_18_oe/bbbt.rb
+new file mode 100644
+index 0000000..2237c24
+--- /dev/null
++++ b/lib/engine/game/g_18_oe/bbbt.rb
+@@ -0,0 +1,236 @@
++# frozen_string_literal: true
++
++module Engine
++  module Game
++    module G18OE
++      # RB 14.4 Barclay, Bevan, Barclay and Tritton. The owner exercises one of three abilities with the private's one
++      # marker: (1) re-set the par value of one owned regional or major that still has its par value marker (during a
++      # stock action in any SR, or in that RR's OR), (2) put one share into custodianship, (3) keep one RR's share value
++      # marker from moving DOWN for the rest of the SR. The private's choices on the owner's SR turn come from
++      # Step::BuySellParShares (like Chris' remove_private/flip_private); (2) and (3) are also offered at the moment
++      # another player buys or sells (Step::CustodyShare, Step::ProtectShare, as Step::ReserveShare for RB 8.4); (1)
++      # in the OR is the private's choose_ability (Step::SpecialChoose). (1) and (2) remove the private at once
++      # (RB 6.1), (3) at the end of the SR.
++      module Bbbt
++        BBBT_CUSTODY = 'bbbt_custody'
++        BBBT_PROTECT = 'bbbt_protect'
++        BBBT_REPAR = 'bbbt_repar'
++
++        def bbbt_company
++          company_by_id('BBBT')
++        end
++
++        # The choices of the private on its owner's SR turn: {choice => text}. The step has checked that the private may
++        # act (owner's turn, not face down).
++        def bbbt_choices(company)
++          return {} unless company == bbbt_company && !@bbbt_used
++
++          choices = {}
++          @corporations.each do |corporation|
++            bbbt_repar_cells(company, corporation).each do |cell|
++              choices["#{BBBT_REPAR}:#{corporation.id}:#{cell.price}"] = "Re-Par #{corporation.name}: #{format_currency(cell.price)}"
++            end
++            choices["#{BBBT_CUSTODY}:#{corporation.id}"] = "Custodianship: share of #{corporation.name}" if bbbt_custody_share(corporation)
++            choices["#{BBBT_PROTECT}:#{corporation.id}"] = "Protect #{corporation.name} from falling" if bbbt_protectable?(corporation)
++          end
++          choices
++        end
++
++        # RB 14.4 (1) while the owner's regional converts: any major par value for the new major; {choice => text}.
++        def bbbt_repar_choices(company, corporation)
++          return {} unless company == bbbt_company && !@bbbt_used && !company.closed? && company.owner == corporation.owner
++
++          bbbt_major_par_cells.to_h { |cell| ["#{BBBT_REPAR}:#{cell.price}", "Re-Par: #{format_currency(cell.price)}"] }
++        end
++
++        # The major par values (the red convert-range cells of the share price table), lowest first.
++        def bbbt_major_par_cells
++          @stock_market.market.flatten.compact.select { |cell| cell.type == :convert_range }.sort_by(&:price)
++        end
++
++        def bbbt_repar_cell(price)
++          bbbt_major_par_cells.find { |cell| cell.price == price }
++        end
++
++        # Returns the chosen par cell; the private is used up (closed) at once, the step applies the cell.
++        def bbbt_repar!(company, corporation, choice)
++          cell = bbbt_repar_cell(choice.split(':', 2).last.to_i)
++          raise GameError, "#{choice} is not a major par value" unless cell
++
++          @bbbt_used = true
++          @log << "#{company.owner.name} re-sets the par value of #{corporation.name} to #{format_currency(cell.price)} " \
++                  "as it converts to a major (#{company.name}); #{company.name} leaves the game"
++          company.close!
++          cell
++        end
++
++        # RB 14.4 (1): the RR must have a marker on the Par Values section of the Info Board (RB 10.7: a major's until
++        # the end of the SR in which it floats, a regional's until it expands). The par values of the RR's type, without
++        # its current one.
++        def bbbt_repar_cells(company, corporation)
++          return [] unless company == bbbt_company && !@bbbt_used && !company.closed? && !face_down_private?(company)
++          return [] if corporation.closed? || !company.owner&.player? || corporation.owner != company.owner
++
++          cells =
++            case corporation.type
++            when :regional then corporation.floated? ? @stock_market.par_prices : []
++            when :major then corporation.always_market_price ? [] : bbbt_major_par_cells
++            else []
++            end
++          cells.reject { |cell| cell == corporation.par_price }.sort_by(&:price)
++        end
++
++        # A regional takes the new value as its par value (its share value is its par value, and the expansion follows
++        # the new letter, RB 9.3); a major's par value marker moves, its share value marker stays (a brief effect).
++        def bbbt_repar_now!(company, corporation, price)
++          cell = bbbt_repar_cells(company, corporation).find { |c| c.price == price }
++          raise GameError, "#{format_currency(price)} is not a par value #{corporation.name} can take" unless cell
++
++          if corporation.type == :regional
++            @stock_market.move(corporation, cell.coordinates)
++            corporation.original_par_price = cell
++          end
++          corporation.par_price = cell
++          @bbbt_used = true
++          @log << "#{company.owner.name} re-sets the par value of #{corporation.name} to #{format_currency(cell.price)} " \
++                  "(#{company.name}); #{company.name} leaves the game"
++          company.close!
++        end
++
++        def bbbt_choice?(choice)
++          choice.start_with?(BBBT_CUSTODY, BBBT_PROTECT, BBBT_REPAR)
++        end
++
++        def bbbt_exercise!(company, choice)
++          kind, id, price = choice.split(':', 3)
++          corporation = corporation_by_id(id)
++          raise GameError, "Unknown corporation #{id}" unless corporation
++          return bbbt_repar_now!(company, corporation, price.to_i) if kind == BBBT_REPAR
++
++          if kind == BBBT_CUSTODY
++            bbbt_custody!(company, corporation)
++          else
++            bbbt_protect!(company, corporation)
++          end
++          @bbbt_used = true
++        end
++
++        # RB 14.4 (2): a share of any RR still in the RR's treasury; of a regional only a secondary (25 %) share, and
++        # only while both are in the treasury. Never the president's share.
++        def bbbt_custody_share(corporation)
++          return if corporation.closed? || !corporation.ipoed
++
++          shares = corporation.ipo_shares.reject { |share| share.president || bbbt_custody?(share) }
++          return if corporation.type == :regional && shares.size < 2
++
++          shares.last
++        end
++
++        # In custody while the share is still in the treasury; bought or exchanged ends it.
++        def bbbt_custody?(share)
++          (@bbbt_custody ||= {}).key?(share) && share.owner == share.corporation.ipo_owner
++        end
++
++        # RB 14.4 (2): "This share may not be purchased by any other player."
++        def bbbt_custody_blocks?(entity, bundle)
++          return false unless bundle
++
++          bundle.shares.any? { |share| bbbt_custody?(share) && @bbbt_custody[share] != entity }
++        end
++
++        def bbbt_custody!(company, corporation, share = bbbt_custody_share(corporation))
++          raise GameError, "No share of #{corporation.name} can be put into custodianship" unless share
++
++          owner = company.owner
++          (@bbbt_custody ||= {})[share] = owner
++          @log << "#{owner.name} puts a share of #{corporation.name} into custodianship (#{company.name}): " \
++                  "reserved for #{owner.name}; #{company.name} leaves the game"
++          # RB 6.1: the private leaves the game at once; its marker stays on the share until it is bought or exchanged
++          # at a minor's merge, kept in @bbbt_custody.
++          company.close!
++        end
++
++        # RB 14.4 (2), "at the moment another player is purchasing a share of stock in the owning player's RR": the
++        # owner of the private if the purchase of `bundle` by `buyer` (a share from the treasury of a RR whose
++        # president is the owner) could be stopped by custodianship, else nil.
++        def bbbt_purchase_window_owner(buyer, bundle)
++          company = bbbt_company
++          return if company.nil? || company.closed? || @bbbt_used || face_down_private?(company)
++
++          owner = company.owner
++          corporation = bundle.corporation
++          return unless owner&.player? && owner != buyer && corporation.owner == owner
++          return if bundle.presidents_share || bundle.owner != corporation.ipo_owner || !bbbt_custody_share(corporation)
++
++          owner
++        end
++
++        # The owner answers the window with "custody": the share being bought goes into custodianship.
++        def bbbt_custody_at_purchase!(company, bundle)
++          bbbt_custody!(company, bundle.corporation, bundle.shares.first)
++          @bbbt_used = true
++        end
++
++        # RB 14.4 (3): the share value marker of any RR (also a foreign one) may not move DOWN for the rest of the SR.
++        def bbbt_protectable?(corporation)
++          !corporation.closed? && corporation.ipoed && !corporation.share_price.nil?
++        end
++
++        def bbbt_protect!(company, corporation)
++          raise GameError, "#{corporation.name} cannot be protected" unless bbbt_protectable?(corporation)
++
++          @bbbt_protected = corporation
++          @log << "#{company.owner.name} protects the share value of #{corporation.name} from moving down for the " \
++                  "rest of the stock round (#{company.name})"
++        end
++
++        def bbbt_exercised?
++          !!@bbbt_used
++        end
++
++        # RB 14.4 (3), "at the moment another player is selling a share": the owner of the private if a sale of
++        # `bundle` by another player would move the share value marker down and the private can still protect it.
++        def bbbt_sale_window_owner(bundle)
++          company = bbbt_company
++          return if company.nil? || company.closed? || @bbbt_used || face_down_private?(company)
++
++          owner = company.owner
++          corporation = bundle.corporation
++          return unless owner&.player? && owner != bundle.owner
++          return if !bbbt_protectable?(corporation) || bbbt_protected?(corporation)
++
++          owner if sell_movement(corporation).to_s.start_with?('down')
++        end
++
++        # The owner answers the window with "protect": same effect as the choice on the owner's own turn.
++        def bbbt_protect_at_sale!(company, corporation)
++          bbbt_protect!(company, corporation)
++          @bbbt_used = true
++        end
++
++        def bbbt_protected?(corporation)
++          !@bbbt_protected.nil? && @bbbt_protected == corporation
++        end
++
++        # The sale still happens, the marker stays where it is.
++        def sell_shares_and_change_price(bundle, allow_president_change: true, swap: nil, movement: nil)
++          return super unless bbbt_protected?(bundle.corporation)
++
++          @log << "#{bundle.corporation.name}'s share value does not move down (#{bbbt_company.name})"
++          super(bundle, allow_president_change: allow_president_change, swap: swap, movement: :none)
++        end
++
++        # RB 14.4 (3): "When the SR ends, remove the marker and the private certificate from play." (1) and (2) have
++        # removed it already (RB 6.1).
++        def bbbt_end_of_stock_round!
++          @bbbt_protected = nil
++          company = bbbt_company
++          return unless @bbbt_used && company && !company.closed?
++
++          @log << "#{company.name} leaves the game at the end of the stock round"
++          company.close!
++        end
++      end
++    end
++  end
++end
+diff --git a/lib/engine/game/g_18_oe/entities.rb b/lib/engine/game/g_18_oe/entities.rb
+index a6760a3..7994fc8 100644
+--- a/lib/engine/game/g_18_oe/entities.rb
++++ b/lib/engine/game/g_18_oe/entities.rb
+@@ -64,6 +64,14 @@ module Engine
+                   '(3) At any time during a SR, prevent one RR\'s share marker from moving DOWN for the rest of that SR; '\
+                   'place this private\'s marker on that share marker. '\
+                   'Exercising ability (2) or (3) closes this private at end of the SR.',
++            abilities: [
++              {
++                type: 'choose_ability',
++                owner_type: 'player',
++                when: 'owning_player_or_turn',
++                choices: {},
++              },
++            ],
+             auction_row: 2,
+           },
+           # -----------------------------------------------------------------------
+diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
+index 1118b5d..7925e27 100644
+--- a/lib/engine/game/g_18_oe/game.rb
++++ b/lib/engine/game/g_18_oe/game.rb
+@@ -8,6 +8,7 @@ require_relative 'graph'
+ require_relative 'sea_routes'
+ require_relative 'orient_express_duty'
+ require_relative 'nationals'
++require_relative 'bbbt'
+ require_relative 'train'
+ require_relative '../base'
+ require_relative 'depot'
+@@ -28,6 +29,8 @@ require_relative 'step/choose_operating_position'
+ require_relative 'step/home_hex_consent'
+ require_relative 'step/home_position'
+ require_relative 'step/reserve_share'
++require_relative 'step/protect_share'
++require_relative 'step/custody_share'
+ require_relative 'step/orient_express_bonus'
+ require_relative 'step/transfer_tokens'
+ require_relative 'step/route'
+@@ -45,6 +48,7 @@ module Engine
+         include G18OE::SeaRoutes
+         include G18OE::OrientExpressDuty
+         include G18OE::Nationals
++        include G18OE::Bbbt
+         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
+                       :consolidation_triggered, :consolidation_complete
+         attr_reader :fast_start_minors, :concessions, :merged_minors, :wcf_placeholder, :minor_c_ability,
+@@ -1205,8 +1209,10 @@ module Engine
+           minor.placed_tokens.any? { |token| nodes.key?(token.city) }
+         end
+ 
++        # RB 14.4 (2): a share in custodianship is the one "exchanged when merging in a minor".
+         def merge_share(major)
+-          major.treasury_shares.find { |share| !share.president } ||
++          treasury = major.treasury_shares.reject(&:president)
++          treasury.find { |share| bbbt_custody?(share) } || treasury.first ||
+             @share_pool.shares_by_corporation[major].first
+         end
+ 
+@@ -1462,6 +1468,7 @@ module Engine
+               new_stock_round
+             when Engine::Round::Stock
+               @reserved_shares = []
++              bbbt_end_of_stock_round!
+               remove_major_par_markers!
+               round = super
+               @operating_rounds = final_operating_rounds if @turn == @final_turn
+@@ -1845,6 +1852,8 @@ module Engine
+             G18OE::Step::MergeDiscardTrain,
+             G18OE::Step::MergeMinor,
+             G18OE::Step::ReserveShare,
++            G18OE::Step::ProtectShare,
++            G18OE::Step::CustodyShare,
+             G18OE::Step::BuySellParShares,
+           ])
+         end
+diff --git a/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb b/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
+index 4df9518..74a686f 100644
+--- a/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
++++ b/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
+@@ -258,11 +258,12 @@ module Engine
+           end
+ 
+           def private_choices(company)
++            return repar_choices_for(current_entity).select { company.owner == current_entity } if @converting
+             return {} unless can_act_on_private?(current_entity, company)
+ 
+             choices = { 'remove_private' => 'Remove from game' }
+             choices['flip_private'] = 'Flip face down' unless @game.face_down_private?(company)
+-            choices
++            choices.merge(@game.bbbt_choices(company)) # RB 14.4
+           end
+ 
+           def process_choose(action)
+@@ -285,7 +286,11 @@ module Engine
+             company = action.target
+             raise GameError, "Cannot #{action.choice} #{company.name}" unless private_choices(company).key?(action.choice)
+ 
+-            if action.choice == 'flip_private'
++            if @converting && action.choice.start_with?(Bbbt::BBBT_REPAR)
++              @repar_cell = @game.bbbt_repar!(company, @converting, action.choice)
++            elsif @game.bbbt_choice?(action.choice)
++              @game.bbbt_exercise!(company, action.choice)
++            elsif action.choice == 'flip_private'
+               @log << "#{player.name} turns #{company.name} face down"
+               @game.flip_private!(company)
+             else
+@@ -315,7 +320,7 @@ module Engine
+ 
+           def reservation_prompt?(action)
+             return false unless @game.reserved_shares?
+-            return false if @game.turn != 1 || @converting || @round.pending_share_buy
++            return false if @game.turn != 1 || @converting || @round.pending_share_buy || pending_custody_buy?
+ 
+             bundle = action.bundle
+             corporation = bundle.corporation
+@@ -327,7 +332,12 @@ module Engine
+ 
+           def process_buy_shares(action)
+             return process_insolvent_buyback(action) if insolvent_buyback?(action.bundle)
+-            return super unless reservation_prompt?(action)
++
++            unless reservation_prompt?(action)
++              return if hold_buy_for_bbbt?(action)
++
++              return super
++            end
+ 
+             check_legal_buy(action.entity, action.bundle, swap: action.swap)
+             @round.pending_share_buy = action
+@@ -462,9 +472,11 @@ module Engine
+             # Step 3: Locate the major par cell (right×2, up×1 from original par)
+             # Using original_par_price ensures correct placement even if the regional
+             # somehow moved before conversion.
+-            target_price = @game.stock_market.find_relative_share_price(
++            # RB 14.4 (1): the owner of the private may pick the target instead.
++            target_price = @repar_cell || @game.stock_market.find_relative_share_price(
+               corporation.original_par_price, corporation, %i[right right up]
+             )
++            @repar_cell = nil
+ 
+             # Step 4: Move stock market token to major par cell and update par_price.
+             # Directly calling move() avoids relying on three incremental moves from
+@@ -543,10 +555,42 @@ module Engine
+           end
+ 
+           def process_sell_shares(action)
++            return if hold_sale_for_bbbt?(action)
++
+             super
+             @sold = true
+           end
+ 
++          # RB 14.4 (3): the sale waits for the owner of the private (Step::ProtectShare) before the marker moves.
++          def hold_sale_for_bbbt?(action)
++            # only in a stock round (the consolidation round has no Step::ProtectShare)
++            return false if !@round.respond_to?(:pending_share_sale) || @round.pending_share_sale
++            return false unless @game.bbbt_sale_window_owner(action.bundle)
++
++            raise GameError, "Cannot sell shares of #{action.bundle.corporation.name}" if
++              !can_sell?(action.entity, action.bundle) && !action.swap
++
++            @round.pending_share_sale = action
++            true
++          end
++
++          # RB 14.4 (2): a purchase of a share of the private owner's RR waits for the owner (Step::CustodyShare).
++          # After a declined reservation (Step::ReserveShare) the window still follows; once answered it is not asked
++          # again for the same purchase.
++          def hold_buy_for_bbbt?(action)
++            # only in a stock round (the consolidation round has no Step::CustodyShare)
++            return false if !@round.respond_to?(:pending_custody_buy) || pending_custody_buy?
++            return false if @converting || @converted || !@game.bbbt_purchase_window_owner(action.entity, action.bundle)
++
++            check_legal_buy(action.entity, action.bundle, swap: action.swap)
++            @round.pending_custody_buy = action
++            true
++          end
++
++          def pending_custody_buy?
++            @round.respond_to?(:pending_custody_buy) && !@round.pending_custody_buy.nil?
++          end
++
+           def process_convert(action)
+             @converting = action.entity
+             track_action(action, action.entity)
+@@ -620,10 +664,24 @@ module Engine
+             actions = []
+             ipo_bundle = @converting.ipo_shares.first&.to_bundle
+             actions << 'buy_shares' if ipo_bundle && can_buy?(entity, ipo_bundle)
++            actions << 'choose' if repar_available?(entity)
+             actions << 'pass'
+             actions
+           end
+ 
++          # RB 14.4 (1) at the conversion of the owner's own regional: the new major's par value, chosen before it
++          # floats. The general re-par is a private choice (Game#bbbt_choices).
++          def repar_available?(player)
++            !repar_choices_for(player).empty?
++          end
++
++          def repar_choices_for(player)
++            return {} unless @converting && !@repar_cell
++
++            company = player.companies.find { |c| c == @game.bbbt_company && !@game.face_down_private?(c) }
++            company ? @game.bbbt_repar_choices(company, @converting) : {}
++          end
++
+           def converted_actions(entity)
+             actions = []
+             actions << 'sell_shares' if can_sell_any?(entity)
+@@ -645,6 +703,7 @@ module Engine
+ 
+           def reserved_for_another?(entity, bundle)
+             return false unless bundle
++            return true if @game.bbbt_custody_blocks?(entity, bundle) # RB 14.4 (2)
+ 
+             corporation = bundle.corporation
+             bundle.shares.include?(@game.reserved_share(corporation)) && entity != corporation.owner
+diff --git a/lib/engine/game/g_18_oe/step/custody_share.rb b/lib/engine/game/g_18_oe/step/custody_share.rb
+new file mode 100644
+index 0000000..a94b7a9
+--- /dev/null
++++ b/lib/engine/game/g_18_oe/step/custody_share.rb
+@@ -0,0 +1,99 @@
++# frozen_string_literal: true
++
++require_relative '../../../step/base'
++
++module Engine
++  module Game
++    module G18OE
++      module Step
++        # RB 14.4 (2) : custodianship "may be exercised at any time during a SR, including at the moment another
++        # player is purchasing a share of stock in the owning player's RR". The purchase (held by
++        # Step::BuySellParShares) waits here, as a sale waits in Step::ProtectShare: `choose` puts the share into
++        # custodianship and the purchase does not happen (the buyer keeps the stock action, as at a reservation,
++        # RB 8.4), `pass` completes it.
++        class CustodyShare < Engine::Step::Base
++          CHOICE = 'custody'
++
++          def round_state
++            super.merge(pending_custody_buy: nil)
++          end
++
++          def active?
++            !!@round.pending_custody_buy
++          end
++
++          def blocks?
++            active?
++          end
++
++          def active_entities
++            active? ? [owner] : []
++          end
++
++          def actions(entity)
++            active? && entity == owner ? %w[choose pass] : []
++          end
++
++          def choice_available?(entity)
++            active? && entity == owner
++          end
++
++          def choices
++            { CHOICE => "Put the share of #{corporation.name} into custodianship" }
++          end
++
++          def choice_name
++            "Custodianship for #{corporation.name}? #{buyer.name} is purchasing a share"
++          end
++
++          def pass_description
++            'Let the purchase happen'
++          end
++
++          def description
++            'Custodianship'
++          end
++
++          def hide_corporations?
++            true
++          end
++
++          def process_choose(action)
++            raise GameError, 'Cannot put the share into custodianship' unless action.choice == CHOICE
++
++            held = @round.pending_custody_buy
++            @game.bbbt_custody_at_purchase!(@game.bbbt_company, held.bundle)
++            @log << "#{buyer.name}'s purchase is cancelled; #{buyer.name} may choose a different action"
++            @round.pending_custody_buy = nil
++          end
++
++          def process_pass(action)
++            held = @round.pending_custody_buy
++            @log << "#{action.entity.name} does not put the share of #{corporation.name} into custodianship " \
++                    "(#{@game.bbbt_company.name})"
++            buy_step.process_buy_shares(held)
++            @round.pending_custody_buy = nil
++          end
++
++          private
++
++          def corporation
++            @round.pending_custody_buy.bundle.corporation
++          end
++
++          def buyer
++            @round.pending_custody_buy.entity
++          end
++
++          def owner
++            @game.bbbt_company.owner
++          end
++
++          def buy_step
++            @round.steps.find { |step| step.is_a?(G18OE::Step::BuySellParShares) }
++          end
++        end
++      end
++    end
++  end
++end
+diff --git a/lib/engine/game/g_18_oe/step/protect_share.rb b/lib/engine/game/g_18_oe/step/protect_share.rb
+new file mode 100644
+index 0000000..47c13aa
+--- /dev/null
++++ b/lib/engine/game/g_18_oe/step/protect_share.rb
+@@ -0,0 +1,95 @@
++# frozen_string_literal: true
++
++require_relative '../../../step/base'
++
++module Engine
++  module Game
++    module G18OE
++      module Step
++        # RB 14.4 (3) : "at the moment another player is selling a share of stock" the owner of Barclay, Bevan,
++        # Barclay and Tritton may protect that RR's share value marker from moving DOWN for the rest of the SR.
++        # The sale (held by Step::BuySellParShares) waits here, as a purchase waits in Step::ReserveShare:
++        # `choose` protects, `pass` lets the marker move.
++        class ProtectShare < Engine::Step::Base
++          CHOICE = 'protect'
++
++          def round_state
++            super.merge(pending_share_sale: nil)
++          end
++
++          def active?
++            !!@round.pending_share_sale
++          end
++
++          def blocks?
++            active?
++          end
++
++          def active_entities
++            active? ? [owner] : []
++          end
++
++          def actions(entity)
++            active? && entity == owner ? %w[choose pass] : []
++          end
++
++          def choice_available?(entity)
++            active? && entity == owner
++          end
++
++          def choices
++            { CHOICE => "Protect #{corporation.name}" }
++          end
++
++          def choice_name
++            "Protect #{corporation.name} from falling? #{@round.pending_share_sale.entity.name} is selling a share"
++          end
++
++          def pass_description
++            'Let it fall'
++          end
++
++          def description
++            'Protect Share Value'
++          end
++
++          def hide_corporations?
++            true
++          end
++
++          def process_choose(action)
++            raise GameError, 'Cannot protect' unless action.choice == CHOICE
++
++            @game.bbbt_protect_at_sale!(@game.bbbt_company, corporation)
++            complete_sale
++          end
++
++          def process_pass(action)
++            @log << "#{action.entity.name} lets #{corporation.name}'s share value fall (#{@game.bbbt_company.name})"
++            complete_sale
++          end
++
++          private
++
++          def complete_sale
++            held = @round.pending_share_sale
++            sell_step.process_sell_shares(held)
++            @round.pending_share_sale = nil
++          end
++
++          def corporation
++            @round.pending_share_sale.bundle.corporation
++          end
++
++          def owner
++            @game.bbbt_company.owner
++          end
++
++          def sell_step
++            @round.steps.find { |step| step.is_a?(G18OE::Step::BuySellParShares) }
++          end
++        end
++      end
++    end
++  end
++end
+diff --git a/lib/engine/game/g_18_oe/step/special_choose.rb b/lib/engine/game/g_18_oe/step/special_choose.rb
+index dea1886..1eafcbc 100644
+--- a/lib/engine/game/g_18_oe/step/special_choose.rb
++++ b/lib/engine/game/g_18_oe/step/special_choose.rb
+@@ -7,7 +7,33 @@ module Engine
+     module G18OE
+       module Step
+         class SpecialChoose < Engine::Step::SpecialChoose
++          # RB 14.4 (1) in the OR: the choices of Barclay, Bevan, Barclay and Tritton are the other par values of the
++          # operating RR, so the private acts only while it has some.
++          def actions(entity)
++            return super unless entity == @game.bbbt_company
++
++            choices_ability(entity).empty? ? [] : super
++          end
++
++          def choices_ability(entity)
++            return super unless entity == @game.bbbt_company
++
++            operator = @round.current_operator
++            return {} unless operator&.corporation?
++
++            @game.bbbt_repar_cells(entity, operator).to_h do |cell|
++              ["#{Bbbt::BBBT_REPAR}:#{cell.price}", "Re-Par #{operator.name}: #{@game.format_currency(cell.price)}"]
++            end
++          end
++
+           def process_choose_ability(action)
++            company = action.entity
++            if company == @game.bbbt_company
++              raise GameError, "Unknown choice #{action.choice}" unless choices_ability(company).key?(action.choice)
++
++              return @game.bbbt_repar_now!(company, @round.current_operator, action.choice.split(':', 2).last.to_i)
++            end
++
+             @game.acquire_swift_metropolitan_train!(@round.current_operator)
+             @game.remove_private!(action.entity)
+           end

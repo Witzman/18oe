@@ -14,8 +14,16 @@ module Oe
   # transactions are BEGIN IMMEDIATE so a second process also queues behind
   # the writer (busy_timeout) instead of failing half way.
   class Store
-    SCHEMA_VERSION = 4
+    SCHEMA_VERSION = 5
     DEFAULT_PATH = "/data/18oe.sqlite3"
+
+    # The engine switch to 18xx.games' own engine (#563) changed the action format: stored games cannot be
+    # replayed and are dropped, with their actions and incidents. Accounts stay. No converter (owner, 2026-11-22).
+    DISCARD_GAMES_SQL = <<~SQL
+      DELETE FROM incidents;
+      DELETE FROM actions;
+      DELETE FROM games;
+    SQL
 
     MIGRATIONS = {
       1 => <<~SQL,
@@ -57,11 +65,12 @@ module Oe
           created_at    TEXT NOT NULL
         );
       SQL
-      4 => <<~SQL
+      4 => <<~SQL,
         -- Who is to act and in which round, written with every action so that
         -- the list and /version never replay (#152). NULL = not yet derived.
         ALTER TABLE games ADD COLUMN turn TEXT;  -- JSON: {round: {type:, number:}, acting: ["p0", ...]}
       SQL
+      5 => DISCARD_GAMES_SQL,
     }.freeze
 
     # A UNIQUE constraint on accounts was hit; `field` is :name or :email.
@@ -140,6 +149,12 @@ module Oe
       transaction { true }
     rescue SQLite3::Exception
       false
+    end
+
+    # Deletes every game with its actions and incidents; accounts stay (#566).
+    def discard_games!
+      transaction { @db.execute_batch(DISCARD_GAMES_SQL) }
+      @mutex.synchronize { @sessions.clear }
     end
 
     def schema_version

@@ -58,7 +58,7 @@ module Engine
           def trains(corporation)
             return [] unless corporation == @round.merge_trains&.dig(:corporation)
 
-            corporation.trains.reject { |train| @game.sml_train?(train) }
+            corporation.trains.reject { |train| @game.extra_train?(train) }
           end
 
           private
@@ -67,10 +67,7 @@ module Engine
             merge_trains = @round.merge_trains
             return [] unless merge_trains
 
-            merge_trains[:trains].select do |train|
-              # §14.10: the preserved 2+2 goes into the major with its restriction; it is never declined
-              train.owner == merge_trains[:corporation] && !@game.sml_train?(train)
-            end
+            merge_trains[:trains].select { |train| train.owner == merge_trains[:corporation] && !@game.extra_train?(train) }
           end
         end
       end

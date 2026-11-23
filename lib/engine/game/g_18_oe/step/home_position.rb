@@ -6,9 +6,9 @@ module Engine
   module Game
     module G18OE
       module Step
-        # §11.1.9, last paragraph: a metropolis home position that triggers the Right-of-Way green tile is not
-        # chosen while another position does not (Game#home_position_cities). Oe::LegalActions asks
-        # #pass_city_ok? for the same positions.
+        # RB 11.1.9, last paragraph: a metropolis home position that triggers the Right-of-Way green tile is not chosen
+        # while another position does not (Game#home_position_cities). Oe::LegalActions asks #pass_city_ok? for the same
+        # positions.
         module HomePosition
           def pass_city_ok?(_entity, city)
             corporation = token.corporation
@@ -21,13 +21,13 @@ module Engine
             return if pass_city_ok?(action.entity, action.city)
 
             raise GameError, "#{token.corporation.name} must choose a home token position that does not need the " \
-                             'Right-of-Way green tile (§11.1.9)'
+                             'Right-of-Way green tile (RB 11.1.9)'
           end
         end
 
-        # The operating round's home token step (a tile laid on a metropolis makes SB or MSP choose its position
-        # there): the engine's own step plus the position rule. G18OE::Step::HomeToken, which also claims a minor's
-        # track rights region, is for the stock and the concession round.
+        # The operating round's home token step (a tile laid on a metropolis makes SB or MSP choose its position there):
+        # the engine's own step plus the position rule. G18OE::Step::HomeToken, which also claims a minor's track rights
+        # region, is for the stock and the concession round.
         module Operating
           class HomeToken < Engine::Step::HomeToken
             include HomePosition

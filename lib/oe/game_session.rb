@@ -27,7 +27,7 @@ module Oe
       end
     end
 
-    UPSTREAM_COMMIT = "06b3f0b37" # engine/UPSTREAM.md
+    UPSTREAM_COMMIT = File.read(File.expand_path("../../engine/PIN", __dir__)).strip[0, 9] # engine/PIN
     GAME_CLASS = -> { Engine::Game::G18OE::Game }
     # Undo/redo would rewrite history; the log stays append-only for now.
     FORBIDDEN = %w[undo redo].freeze
@@ -184,7 +184,9 @@ module Oe
     end
 
     def apply(action, db_seq)
-      @game.process_action(action)
+      # add_auto_actions: as 18xx.games' server does (Chris' engine): the stored action then carries what the step
+      # filled in (extra_cost, auto_actions), which replay (@game.loading) takes from the log instead of computing it.
+      @game.process_action(action, add_auto_actions: true)
       return unless @game.exception
 
       raise Rejected, "#{@game.exception.class}: #{@game.exception.message} (at seq #{db_seq})"

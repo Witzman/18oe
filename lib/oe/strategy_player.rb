@@ -20,6 +20,8 @@ module Oe
   # only play legal moves; it never makes the game illegal, only smarter.
   class StrategyPlayer
     TWO_PLUS_TWO = 100
+    PULLMAN_PAYBACK_ORS = 5
+    PULLMAN_CASH_BUFFER = 150
     BUFFER_PAR_CASH = 200
 
     def initialize(game, rng: Random.new(0))
@@ -48,26 +50,16 @@ module Oe
         !game.round.is_a?(Engine::Round::G18OE::Consolidation)
     end
 
-    # Buying or discarding a Pullman (§11.6.2, #55). The bot rule is pick_pullman; every other Pullman
-    # choice stays out of play (a random one would discard cars, or take a car from another bot who
-    # buys it back: #428).
-    PULLMAN_PAYBACK_ORS = 5
-    PULLMAN_CASH_BUFFER = 150
-
-    # Token and port authority marker transfers between majors (§11.5, #57, #469) are not used by the bot yet: it passes the step.
-    def self.pullman_choice?(action)
-      action.is_a?(Engine::Action::Choose) &&
-        action.choice.to_s.start_with?('pullman_', 'port_authority:', 'transfer_token:', 'transfer_marker:')
+    # The transfers between majors (§11.5, #57: place_token with a slot in Step::TransferTokens, choose in it) are not
+    # played by the bot yet: it passes them. A Pullman is a depot train (a BuyTrain rule below), a port authority a
+    # special_buy (pick_special_buy).
+    def self.transfer_choice?(action)
+      (action.is_a?(Engine::Action::PlaceToken) && !action.slot.nil?) ||
+        (action.is_a?(Engine::Action::Choose) && action.choice.to_s.include?(':'))
     end
 
     def choose(actions)
-      pullman = pick_pullman(actions)
-      return pullman if pullman
-
-      marker = pick_port_authority(actions)
-      return marker if marker
-
-      actions = actions.reject { |a| self.class.pullman_choice?(a) } if actions.any? { |a| !self.class.pullman_choice?(a) }
+      actions = actions.reject { |a| self.class.transfer_choice?(a) } if actions.any? { |a| !self.class.transfer_choice?(a) }
       actions = actions.reject { |a| self.class.trade_offer?(a) } if actions.any? { |a| !self.class.trade_offer?(a) }
       actions = actions.reject { |a| self.class.merge_offer?(@game, a) } if actions.any? { |a| !self.class.merge_offer?(@game, a) }
       # Like Oe::Bot (#128): actions a private issues itself (White Cliffs Ferry's
@@ -81,7 +73,7 @@ module Oe
       method = "choose_#{underscore(actions.first.class.name.split('::').last)}"
       Engine::Action.constants # (autoload no-op)
       # Order matters: first applicable specialised rule wins.
-      %w[BuyTrain Dividend Assign RunRoutes Bid Par Convert Merge DiscardTrain LayTile PlaceToken].each do |name|
+      %w[SpecialBuy BuyTrain Dividend Assign RunRoutes Bid Par Convert Merge DiscardTrain LayTile PlaceToken].each do |name|
         group = by_class[name]
         next unless group
 
@@ -92,40 +84,6 @@ module Oe
     end
 
     private
-
-    # §11.6.2, §11.3.9: a Pullman adds £10 per level of the highest train every OR. Buy one from the Open
-    # Market (no royalty) or Minor M when it pays back within a few ORs, the RR already runs a train and
-    # keeps a cash buffer for its trains. Never from another RR, and never a second one.
-    def pick_pullman(actions)
-      options = actions.select { |a| self.class.pullman_choice?(a) && %w[pullman_market pullman_m].include?(a.choice) }
-      return nil if options.empty?
-
-      entity = options.first.entity
-      trains = @game.counted_trains(entity)
-      return nil if trains.empty?
-
-      bonus = trains.map { |train| train.sym.to_i }.max * Engine::Game::G18OE::National::PULLMAN_PER_LEVEL
-      price = Engine::Game::G18OE::Pullman::PULLMAN_PRICE # Minor J's discount is ignored: a safe bound
-      return nil if price > PULLMAN_PAYBACK_ORS * bonus || entity.cash < price + PULLMAN_CASH_BUFFER
-
-      options.find { |a| a.choice == 'pullman_market' } || options.first
-    end
-
-    # §11.3.5 (#56): a marker takes two sea units off a crossing in its water area. Buy it for the area where the
-    # RR's network has the most usable crossing ends (at least two, so a crossing exists), when it runs a train
-    # and keeps the cash buffer for its trains. Never for an area without a crossing.
-    def pick_port_authority(actions)
-      options = actions.select { |a| a.is_a?(Engine::Action::Choose) && @game.port_authority_choice?(a.choice) }
-      return nil if options.empty?
-
-      entity = options.first.entity
-      price = Engine::Game::G18OE::PortAuthority::PORT_AUTHORITY_PRICE
-      return nil if @game.counted_trains(entity).empty? || entity.cash < price + PULLMAN_CASH_BUFFER
-
-      ends = @game.sea_landings(entity).flat_map { |_node, zones| zones.map { |zone| @game.sea(zone) } }
-      best = ends.tally.select { |_area, n| n >= 2 }.max_by { |_area, n| n }&.first
-      options.find { |a| a.choice == "port_authority:#{best}" } if best
-    end
 
     def underscore(name)
       name.gsub(/([a-z])([A-Z])/, '\1_\2').downcase
@@ -206,6 +164,12 @@ module Oe
     def pick_buy_train(trains, by_class)
       return pick_national_train(trains, by_class) if trains.first.entity.type == :national
 
+      # A Pullman is a depot train (variant "Pullman"): bought by pick_pullman or not at all.
+      pullmans, trains = trains.partition { |a| @game.pullman?(a.train) }
+      pullman = pick_pullman(pullmans)
+      return pullman if pullman
+      return nil if trains.empty?
+
       # The enumerator offers every side of a double-sided card (#127). Choosing
       # the dearer side is v0.3 (bots on the full rules); until then the bot
       # buys the base side as before.
@@ -226,11 +190,49 @@ module Oe
       raise_money(by_class) || trains.min_by(&:price)
     end
 
+    # §11.6.2, §11.3.9: a Pullman adds £10 per level of the highest train every OR. Buy one when it pays back within a
+    # few ORs, the RR already runs a train and keeps a cash buffer for its trains; the cheapest one offered (the
+    # Open Market's or Minor M's), never a second one.
+    def pick_pullman(options)
+      return nil if options.empty?
+
+      entity = options.first.entity
+      trains = entity.trains.reject { |train| @game.pullman?(train) }
+      return nil if trains.empty? || entity.trains.any? { |train| @game.pullman?(train) }
+
+      bonus = trains.map { |train| train.sym.to_i }.max * @game.pullman_bonus_per_level
+      option = options.min_by(&:price)
+      return nil if option.price > PULLMAN_PAYBACK_ORS * bonus || entity.cash < option.price + PULLMAN_CASH_BUFFER
+
+      option
+    end
+
+    # §11.3.5 (#56): a port authority takes sea units off a crossing in its water area. Buy it for the area where the RR's
+    # network has the most usable port landings (at least two, so a crossing exists), when it runs a train and keeps the
+    # cash buffer for its trains.
+    def pick_special_buy(buys, _by_class)
+      entity = buys.first.entity
+      return nil if entity.trains.empty? || entity.cash < @game.port_authority_cost + PULLMAN_CASH_BUFFER
+
+      best = landing_seas(entity).tally.select { |_sea, n| n >= 2 }.max_by { |_sea, n| n }&.first
+      buys.find { |a| a.item.description == @game.port_authority_name(best) } if best
+    end
+
+    def landing_seas(entity)
+      landings = @game.graph_for_entity(entity).sea_connectivity(entity).landings
+      landings.flat_map do |hex, edges|
+        edges.keys.filter_map do |edge|
+          zone = @game.sea_zone(hex.neighbors[edge]&.id)
+          @game.class::SEA_ZONES.dig(zone, :sea) if zone
+        end
+      end
+    end
+
     # §11.6.6 (#64): a national claims the highest level unclaimed rusted train, then exchanges its
     # lowest rusted train for a higher one; it never takes a train from its own majors. Then it passes.
     def pick_national_train(trains, by_class)
       level = ->(train) { train.sym.to_i }
-      pool = trains.select { |a| a.train.owner.nil? }
+      pool = trains.reject { |a| a.train.owned_by_corporation? }
       claim = pool.select { |a| a.exchange.nil? }.max_by { |a| level.call(a.train) }
       return claim if claim
 
@@ -293,6 +295,10 @@ module Oe
       return entity_actions if entity_actions
 
       if (choose = by_class['Choose'])
+        # FormNational window (§9.4, #64): `choose done` declines to form a national until the bot rule of v0.3.
+        done = choose.find { |a| a.choice.to_s == 'done' }
+        return done if done
+
         merges = choose.select { |a| a.target.nil? || a.choice.to_s.start_with?('offer', 'merge') }
         return pick(merges.empty? ? choose : merges) unless by_class['Pass']
       end

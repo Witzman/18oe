@@ -78,7 +78,8 @@ RSpec.describe Oe::MapData do
     it "gives every land city a zone except the eight the engine leaves without" do
       cities = hexes.select { |h| h[:kind] == "land" && h[:cities] }
       without = cities.reject { |h| h[:zone] }.map { |h| h[:id] }
-      # MINOR_EXCLUDED_HOME_CITIES minus Jassy (S76, zone BRS); Palma (AB27) is in SP since #194
+      # MINOR_EXCLUDED_HOME_CITIES minus Jassy (S76, zone BRS); Palma (AB27) has no zone on Chris' map, but
+      # engine/patches/0003-palma-spain-zone.patch puts it into SP (as on ours since #194), so it is not in this list
       expect(without).to match_array(%w[W64 W74 Y70 AA62 AB69 AD79 AE72 AA82])
       expect(cities.filter_map { |h| h[:zone] }.uniq - data[:zones].map { |z| z[:id] }).to be_empty
     end

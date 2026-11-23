@@ -37,7 +37,7 @@ function show(value: unknown): string {
 
 /** The engine's label of a `choose` action (#124, `prompt.choices`); null when the view lists none for it. */
 export function choiceLabel(g: Game, a: Action): string | null {
-  if (a.type !== "choose") return null;
+  if (a.type !== "choose" && a.type !== "choose_ability") return null;
   const c = g.state.prompt.choices?.find((x) => x.choice === String(a.choice) && x.entity === a.entity && (x.target ?? null) === (a.target ?? null));
   if (!c || c.label === "") return null;
   const label = choiceText(a) ?? c.label;

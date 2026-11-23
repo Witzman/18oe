@@ -174,9 +174,9 @@ RSpec.describe Oe::Invariants do
       with_trains!(g, corp, *(["3"] * (g.train_limit(corp) + 1)))
       operating_round_for!(g, 1, setup: true)
       track = g.round.steps.find { |s| s.class.name.include?("Track") }
-      convert = g.round.steps.find { |s| s.class.name.include?("ConvertToNational") }
+      convert = g.round.steps.find { |s| s.class.name.include?("FormNational") }
       expect(convert).not_to be_nil
-      # The step order is ConvertToNational, then DiscardTrain: while players may still form nationals,
+      # The step order is FormNational, then DiscardTrain: while players may still form nationals,
       # a major over the new limit is not yet a violation (it keeps even the rusting trains, 9.4).
       allow(g.round).to receive(:active_step).and_return(convert)
       expect(violations(g, :train_limit)).to be_empty

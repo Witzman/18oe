@@ -121,7 +121,7 @@ RSpec.describe Oe::LegalActions, "double_head_trains (#136)" do
       act!(game, combine)
 
       combined = major.trains.find { |t| game.combined_train?(t) }
-      expect(combined.name).to eq("4+4")
+      expect(combined.name).to eq("4+4C") # Chris' name for a combined train (Step::Route#combined_train!)
       after = described_class.new(game).call
       expect(combos(after)).to eq([])
 

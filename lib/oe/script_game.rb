@@ -24,7 +24,8 @@ module Oe
   # is rejected, if a prompt is empty although it is somebody's turn, or if
   # the game does not end regularly.
   #
-  # Keys: "round/Step/type", for `choose` "round/Step/choose:<choice>".
+  # Keys: "round/Step/type", for `choose` "round/Step/choose:<choice>" (FormNational: "choose:convert" for any
+  # corporation, "choose:done" for declining).
   class ScriptGame
     SLICE_DIR = File.join(__dir__, "script_game", "slices")
 
@@ -88,7 +89,7 @@ module Oe
     def key(round, step, action)
       type = action["type"]
       detail = case type
-               when "choose" then action["choice"]
+               when "choose" then step == "FormNational" && action["choice"] != "done" ? "convert" : action["choice"]
                when "par" then corporation_type(action["corporation"])
                when "buy_company" then "trade" if trade_offer?(action)
                when "buy_shares", "sell_shares" then corporation_type(action["shares"].first.sub(/_\d+\z/, ""))
@@ -311,7 +312,7 @@ module Oe
     # and without the money for one. Both moves are legal and on offer.
     # (Full payout was tried first: it leaves the treasuries empty but makes
     # the presidents rich, and the target stayed missing in 2600 actions.)
-    BANKRUPT_TARGET = "operating/BuyTrain/bankrupt"
+    BANKRUPT_TARGET = "operating/BuyTrain/choose:national"
 
     def starve_presidents(round, step, prompt, missing)
       return nil unless round == "operating" && missing.include?(BANKRUPT_TARGET)

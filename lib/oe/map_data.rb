@@ -304,7 +304,7 @@ module Oe
     end
 
     # The eight track-rights zones (hex lists) plus zone ids that only exist as
-    # a per-city override in the engine (CITY_NATIONAL_ZONE, e.g. "BRS" for
+    # a per-city override in the engine (CITY_TOWN_NATIONAL_ZONE, e.g. "BRS" for
     # Jassy): those carry `city_override: true` and no hex list.
     def zones(klass, zone_hexes)
       listed = zone_hexes.map do |id, ids|
@@ -316,7 +316,7 @@ module Oe
           asterisked: klass::ASTERISKED_ZONES.include?(id),
         }.compact
       end
-      overrides = klass::CITY_NATIONAL_ZONE.values.uniq - zone_hexes.keys
+      overrides = klass::CITY_TOWN_NATIONAL_ZONE.values.uniq - zone_hexes.keys
       listed + overrides.map { |id| { id: id, hexes: 0, city_override: true } }
     end
 

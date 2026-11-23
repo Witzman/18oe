@@ -56,7 +56,7 @@ RSpec.describe "Oe::View order (#122)", :game_flow do
         key = [meta[:round][:turn], meta[:round][:number]]
         # Minor C (#70): while the president of Golden Bell has not chosen its place, the order is still the
         # normal one; it is re-announced once, after the choice (the choice holds for this round only).
-        pending = game.golden_bell_pending?
+        pending = game.round.active_step.is_a?(Engine::Game::G18OE::Step::ChooseOperatingPosition) # Minor C's choice (Chris' step)
         if key == announced && announced_pending && !pending
           announced_ids = order.map { |o| o[:id] }
           announced_pending = false
@@ -84,6 +84,10 @@ RSpec.describe "Oe::View order (#122)", :game_flow do
             o = order.index { |e| e[:id] == operator.id }
             expect(order.map { |e| e[:done] }).to eq(order.each_index.map { |j| j < o })
             out_of_turn += 1
+          elsif pending
+            # Minor C's choice (Chris' Step::ChooseOperatingPosition) names Golden Bell as current while the
+            # first operator of the order has not run yet: nothing is done
+            expect(order.map { |e| e[:done] }).to all(be(false))
           else
             expect(order.map { |o| o[:done] }).to eq(order.each_index.map { |j| j < i })
             seen << cur[:id]

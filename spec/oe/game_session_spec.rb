@@ -66,7 +66,7 @@ RSpec.describe Oe::GameSession do
     session = described_class.create(store, seats: seats, seed: 7)
     row = store.game(session.id)
     expect(row["seed"]).to eq(7)
-    expect(row["engine_rev"]).to match(/\A06b3f0b37\+\h{12}\z/)
+    expect(row["engine_rev"]).to match(/\A#{File.read(File.expand_path("../../engine/PIN", __dir__)).strip[0, 9]}\+\h{12}\z/)
     expect(row["status"]).to eq("active")
     expect(row["seats"].size).to eq(4)
   end

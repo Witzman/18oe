@@ -17,8 +17,8 @@ RSpec.describe "Oe::View texts and catalog (#124)" do
   describe "catalog" do
     let(:catalog) { Oe::Catalog.build }
 
-    it "holds 10 privates, 12 minors, 10 concessions and 24 regionals" do
-      expect(catalog.transform_values(&:size)).to eq(privates: 10, minors: 12, concessions: 10, regionals: 24)
+    it "holds 11 privates, 12 minors, 10 concessions and 24 regionals" do
+      expect(catalog.transform_values(&:size)).to eq(privates: 11, minors: 12, concessions: 10, regionals: 24)
     end
 
     it "has name, text, value and income of every card, and ids that are unique per kind" do
@@ -187,9 +187,9 @@ RSpec.describe "Oe::View texts and catalog (#124)" do
       expect(steps).to include("Track", "BuyTrain")
     end
 
-    # #425: Hochberg's token (§14.8) is the choice of a non-blocking step during Track; its label was looked up
-    # only in the active step, so the view showed the choice's id.
-    it "labels the choice of a non-blocking step: Hochberg's token during Track (#425)" do
+    # §14.8 in Chris' format: Hochberg's token is an `assign` of the private (a hex target), offered during Track by
+    # a non-blocking step; there is no choice to label any more (#425 was about that label).
+    it "offers Hochberg's token during Track as assign actions of the private (#425)" do
       give_company!(game.players[0], game.company_by_id("HMLC"))
       start_major!(game, "LNWR", game.players[0])
       operating_round_for!(game, 1, setup: true)
@@ -197,12 +197,15 @@ RSpec.describe "Oe::View texts and catalog (#124)" do
       prompt = prompt_of(game)
 
       expect(prompt[:step]).to eq("Track")
-      expect(prompt[:choices].map { |c| c[:label] }.uniq).to eq(["Place token"])
+      assigns = prompt[:actions].select { |a| a["type"] == "assign" }
+      expect(assigns).not_to be_empty
+      expect(assigns.map { |a| a["entity"] }.uniq).to eq(["HMLC"])
+      expect(prompt[:choices]).to be_empty
     end
   end
 
   describe "companies" do
-    it "lists all 32 cards with owner, closed, face-down and abilities, hiding a foreign face-down card's abilities" do
+    it "lists all 33 cards with owner, closed, face-down and abilities, hiding a foreign face-down card's abilities" do
       game = G::Game.new(%w[p0 p1 p2 p3], id: 1, seed: 1)
       rng = Random.new(1)
       strategist = Oe::StrategyPlayer.new(game, rng: rng)
@@ -214,8 +217,8 @@ RSpec.describe "Oe::View texts and catalog (#124)" do
       end
       view = Oe::View.render(game, viewer: "p0", log: nil, actions: false)
       list = view[:companies]
-      expect(list.size).to eq(32)
-      expect(list.map { |c| c[:kind] }.tally).to eq("private" => 10, "minor" => 12, "concession" => 10)
+      expect(list.size).to eq(33) # +1: Swift Metropolitan Line (upstream #13163)
+      expect(list.map { |c| c[:kind] }.tally).to eq("private" => 11, "minor" => 12, "concession" => 10)
       view[:players].each do |pl|
         mine = list.select { |c| c[:owner] == { kind: "player", id: pl[:id] } }.map { |c| c[:id] }
         expect(mine.sort).to eq(pl[:companies].map { |c| c[:id] }.sort)

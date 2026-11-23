@@ -26,7 +26,7 @@ RSpec.describe "Strategy player buying a train from another corporation (#428)" 
     round.steps.each do |s|
       break if s.is_a?(Engine::Game::G18OE::Step::BuyTrain)
 
-      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::ConvertToNational) || s.is_a?(Engine::Step::Bankrupt)
+      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::FormNational) || s.is_a?(Engine::Step::Bankrupt)
     end
   end
 

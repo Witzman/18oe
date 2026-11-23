@@ -19,15 +19,14 @@ RSpec.describe "Strategy player buying a Pullman (#55)" do
     cars
     game.fulfill_train_obligation!(lnwr)
     game.instance_variable_set(:@first_or_complete, true)
-    game.event_pullmans_available!
-    game.instance_variable_set(:@pullman_market, 1)
+    allow_any_instance_of(Oe::StrategyPlayer).to receive(:landing_seas).and_return([]) # no port authority here
     lnwr.set_cash(600, game.bank)
     round.instance_variable_set(:@entity_index, round.entities.index(lnwr))
     round.instance_variable_set(:@current_operator, lnwr)
     round.steps.each do |s|
       break if s.is_a?(Engine::Game::G18OE::Step::BuyTrain)
 
-      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::ConvertToNational) || s.is_a?(Engine::Step::Bankrupt)
+      s.pass! unless s.is_a?(Engine::Game::G18OE::Step::FormNational) || s.is_a?(Engine::Step::Bankrupt)
     end
   end
 
@@ -39,29 +38,35 @@ RSpec.describe "Strategy player buying a Pullman (#55)" do
     Oe::StrategyPlayer.new(game, rng: Random.new(1)).choose(legal)
   end
 
-  it "offers the Pullman among the legal actions" do
-    expect(legal.grep(Engine::Action::Choose).map(&:choice)).to include("pullman_market")
+  # A Pullman is a depot train now (Chris' engine): a BuyTrain with the variant "Pullman".
+  def pullman_buy?(action)
+    action.is_a?(Engine::Action::BuyTrain) && game.pullman?(action.train)
   end
 
-  it "buys it from the Open Market when the train pays it back and cash is left" do
-    expect(choice).to be_a(Engine::Action::Choose)
-    expect(choice.choice).to eq("pullman_market")
+  it "offers the Pullman among the legal actions" do
+    expect(legal.any? { |a| pullman_buy?(a) }).to be(true)
+  end
+
+  it "buys it when the train pays it back and cash is left" do
+    expect(pullman_buy?(choice)).to be(true)
+    expect(choice.price).to eq(150)
   end
 
   it "does not buy when the cash buffer is missing" do
     lnwr.set_cash(200, game.bank)
-    expect(choice.is_a?(Engine::Action::Choose) && choice.choice.start_with?("pullman_")).to be(false)
+    expect(pullman_buy?(choice)).to be(false)
   end
 
   it "does not buy when the highest train is too low to pay it back" do
     game.depot.remove_train(lnwr.trains.first)
     lnwr.trains.clear
     with_trains!(game, lnwr, "2+2")
-    expect(choice.is_a?(Engine::Action::Choose) && choice.choice.start_with?("pullman_")).to be(false)
+    expect(pullman_buy?(choice)).to be(false)
   end
 
   it "never buys a second one" do
-    game.receive_pullman!(lnwr)
-    expect(choice.is_a?(Engine::Action::Choose) && choice.choice.start_with?("pullman_")).to be(false)
+    pullman = game.depot.depot_trains.find { |train| game.pullman?(train) }
+    game.buy_train(lnwr, pullman, :free)
+    expect(pullman_buy?(choice)).to be(false)
   end
 end

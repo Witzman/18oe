@@ -6,7 +6,7 @@ module Engine
   module Game
     module G18OE
       module Step
-        # §14.4 (3) (#476): "at the moment another player is selling a share of stock" the owner of Barclay, Bevan,
+        # RB 14.4 (3) : "at the moment another player is selling a share of stock" the owner of Barclay, Bevan,
         # Barclay and Tritton may protect that RR's share value marker from moving DOWN for the rest of the SR.
         # The sale (held by Step::BuySellParShares) waits here, as a purchase waits in Step::ReserveShare:
         # `choose` protects, `pass` lets the marker move.

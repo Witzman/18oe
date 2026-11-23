@@ -3,6 +3,7 @@
 require "engine"
 require_relative "legal_actions"
 require_relative "coverage"
+require_relative "run_detail"
 
 module Oe
   # The JSON view model (#35): everything the client may render, as plain
@@ -190,13 +191,13 @@ module Oe
         reserved: reserved(game, corp),
         trains: corp.trains.map { |t| train(t) },
         tokens: corp.tokens.map { |t| { used: t.used ? true : false, hex: t.city&.hex&.id } },
-        last_run: last_run(corp),
+        last_run: last_run(game, corp),
         track_rights: Array(safe { game.track_rights_zones(corp) }).map(&:to_s),
         orient_express_marker: game.orient_express_marker?(corp) ? true : false,
         # §11.6.2 (#55): owns a Pullman (a national always has its printed one, §11.3.10)
         pullman: corp.type == :national || safe { game.pullman?(corp) } ? true : false,
         # §11.3.5 (#56): the water area of its port authority marker (north_sea, mediterranean) or nil
-        port_authority: safe { game.port_authority(corp) }&.to_s,
+        port_authority: safe { game.port_authorities(corp).first }&.to_s,
         status: Array(safe { game.status_array(corp) }).flatten.map(&:to_s),
         regional_state: regional_state(game, corp),
       }
@@ -281,13 +282,18 @@ module Oe
     # current one stays current while its home token is still to be placed. nil
     # before the concession round began.
     def concession(game)
-      owners = game.concession_owners
-      return unless owners
+      return unless game.concessions?
 
-      running = round_type(game.round) == "concession" && !game.finished ? game.round.current_concession : nil
-      game.concessions.map do |c|
-        status = c.equal?(running) ? "current" : c.closed? ? "done" : "open"
-        { id: c.id, name: c.name, owner: owners[c.id], status: status }
+      if round_type(game.round) == "concession"
+        running = game.finished ? nil : game.round.current_concession
+        # the round's entities are the holders at its start (Round::G18OE::Concession#select_entities)
+        game.concessions.zip(game.round.entities).map do |c, owner|
+          status = c.equal?(running) ? "current" : c.closed? ? "done" : "open"
+          { id: c.id, name: c.name, owner: owner&.id, status: status }
+        end
+      elsif game.concessions.all?(&:closed?)
+        # after the round the holders are gone (Chris' engine keeps no record): the ladder shows all done
+        game.concessions.map { |c| { id: c.id, name: c.name, owner: nil, status: "done" } }
       end
     end
 
@@ -356,33 +362,16 @@ module Oe
       end
     end
 
-    def last_run(corp)
+    def last_run(game, corp)
       info = corp.operating_history.to_a.last&.last
       return unless info
 
       {
         revenue: info.revenue,
         dividend: info.dividend_kind&.to_s,
-        # Per train (#119): the run as driven. `segments` are the paths in order
-        # (hex id, exit edges, node indexes); `stops` the places visited with
-        # their revenue for that train. Captured when the run was paid out.
-        routes: info.routes.keys.map { |t| run_detail(info, t) },
-      }
-    end
-
-    def run_detail(info, train)
-      {
-        train: train.id,
-        name: train.name,
-        revenue: info.revenues[train],
-        # a sea crossing's id holds "sea a.b" between its port hexes (#357): `hexes` are the land hexes only;
-        # the crossings and ferries are `sea` and `ferries` (#362)
-        hexes: info.routes[train].flatten.map(&:to_s).reject { |id| id.start_with?("sea ") },
-        segments: info.segments[train],
-        stops: info.stops[train],
-        distance_str: info.distance_strs[train],
-        sea: info.seas[train][:sea],
-        ferries: info.seas[train][:ferries],
+        # Per train (#119): the run as driven. `segments` are the paths in order (hex id, exit edges, node
+        # indexes); `stops` the places visited with their revenue for that train (Oe::RunDetail).
+        routes: RunDetail.of(game, corp) || [],
       }
     end
 
@@ -403,8 +392,16 @@ module Oe
         discarded: depot.discarded.map(&:name),
         schedule: schedule(game),
         # Minor M's Pullman cars (§11.6.2, #55): on sale since the first 4 train; cars left at M and in the Open Market
-        pullmans: { available: game.pullmans_available?, supply: game.pullman_supply, market: game.pullman_market },
+        pullmans: pullmans(game),
       }
+    end
+
+    # Pullman cars (§11.6.2, #55) are depot trains in Chris' engine: `supply` not yet on sale (upcoming), `market` on
+    # sale from the depot or the Open Market; `available` once one is on sale (since the first 4 train).
+    def pullmans(game)
+      depot = game.depot
+      market = (depot.depot_trains + depot.discarded).count { |t| game.pullman?(t) }
+      { available: market.positive?, supply: depot.upcoming.count { |t| game.pullman?(t) }, market: market }
     end
 
     # Train limit per corporation type of a phase entry (#123): the phase hash's
@@ -464,7 +461,7 @@ module Oe
       return if game.finished
 
       step = game.round.active_step
-      return unless step.respond_to?(:tiered_auction_companies) && step.respond_to?(:open_bidders)
+      return unless step.respond_to?(:tiered_auction_companies)
 
       cards = step.companies
       {
@@ -474,7 +471,8 @@ module Oe
         current: step.auctioning&.id,
         to_act: step.active_entities.map(&:id),
         passed: game.players.select(&:passed?).map(&:id),
-        open_bidders: step.open_bidders.map(&:id),
+        # the players still in an open auction: Chris' step keeps them in @open_bidders, with no reader (read only)
+        open_bidders: Array(step.instance_variable_get(:@open_bidders)).map(&:id),
       }
     end
 
@@ -550,7 +548,8 @@ module Oe
         # step is, its help, the label of its pass button, the question of a
         # `choose` and the label of every offered choice.
         description: step && safe { step.description },
-        help: step && safe { step.help }.then { |h| h.to_s.empty? ? nil : h },
+        # Chris' steps may answer a list of paragraphs (his UI lists them): one text with a blank line between
+        help: step && safe { step.help }.then { |h| (h.is_a?(Array) ? h.join("\n\n") : h.to_s).then { |text| text.empty? ? nil : text } },
         pass_description: step && safe { step.pass_description },
         choice_name: step && safe { step.respond_to?(:choice_name) ? step.choice_name : nil },
         choices: choices(game, step, offered),
@@ -598,6 +597,13 @@ module Oe
         end
       # A non-blocking step (a private acting during Track, #81) is not the active step: ask the round's steps.
       label ||= safe { game.round.steps.find { |s| s.respond_to?(:choices) && s.choices.key?(choice) }&.choices&.[](choice) }
+      # A private's own ability choice (`choose_ability`, Chris' Step::SpecialChoose): its texts are the step's choices_ability.
+      if label.nil? && action.is_a?(Engine::Action::ChooseAbility)
+        label = safe do
+          game.round.steps.find { |s| s.respond_to?(:choices_ability) && s.choices_ability(action.entity).key?(choice) }
+            &.choices_ability(action.entity)&.[](choice)
+        end
+      end
       if label.nil? && step.respond_to?(:entity_choices)
         corp = safe { game.corporation_by_id(choice) }
         label = safe { step.entity_choices(corp)[choice] } if corp
@@ -635,16 +641,14 @@ module Oe
     #   dividend: per option the amount per share, to the treasury, the new price
     #   train:    train limit, obligation, reserved 2+2, president's contribution
     #   stock:    price and new share price of the offered share actions (#47)
-    #   trade:    the trade offer a seller answers (§10.4, #202)
     # `legal` (an Oe::LegalActions) is given only for the viewer to act: choice
     # spaces that need the enumeration (tile lays, token targets) are nil otherwise.
     # complete: `offered` is the unsampled legal set (no limit), so the track
     # panel can be built from its lay_tile actions instead of a second
     # enumeration (#340).
     def context(game, step, legal, offered = [], complete: false)
-      empty = { track: nil, token: nil, dividend: nil, train: nil, stock: nil, trade: nil }
+      empty = { track: nil, token: nil, dividend: nil, train: nil, stock: nil }
       return empty.merge(stock: safe { stock_context(game, step, offered) }) if stock_step?(step)
-      return empty.merge(trade: safe { trade_context(step) }) if step.is_a?(Engine::Game::G18OE::Step::TradeOffer)
       return empty unless step
 
       entity = safe { step.current_entity }
@@ -656,27 +660,7 @@ module Oe
         dividend: step.is_a?(Engine::Step::Dividend) ? safe { dividend_context(game, step, entity) } : nil,
         train: step.is_a?(Engine::Step::BuyTrain) ? safe { train_context(game, step, entity) } : nil,
         stock: nil,
-        trade: nil,
       }
-    end
-
-    # The open trade offer (§10.4, #202) the seller answers: `choose` accept_trade or `pass` (decline).
-    #   trade: { buyer:, seller:, kind: "company" | "corporation", target: id, price:, give: [obj], also: [obj] }
-    #   (obj = { kind:, id: }, the swap objects of §10.4, #517)
-    def trade_context(step)
-      offer = step.pending_offer
-      return nil unless offer
-
-      minor = offer.is_a?(Engine::Action::BuyCorporation)
-      target = minor ? offer.corporation : offer.company
-      { buyer: offer.entity.id, seller: target.owner.id, kind: minor ? "corporation" : "company",
-        target: target.id, price: offer.price,
-        give: trade_objects(offer.give), also: trade_objects(offer.also) }
-    end
-
-    # The objects of a swap (§10.4, #517): { kind: "company" | "corporation", id: }.
-    def trade_objects(objects)
-      objects.map { |object| { kind: object.corporation? ? "corporation" : "company", id: object.id } }
     end
 
     # Every private, minor charter and concession and where it is now (#124,
@@ -792,8 +776,10 @@ module Oe
 
     def track_context(game, step, entity, legal, offered = nil)
       budget = step.get_tile_lay(entity)
+      # Chris' Step::Track counts the points internally (remaining_tile_points, private)
+      left = step.send(:remaining_tile_points, entity)
       {
-        points: { budget: budget, used: step.points_used, left: step.points_left(entity) },
+        points: { budget: budget, used: budget - left, left: left },
         hexes: legal && without_log(game) { track_hexes(game, step, entity, lay_options(step, entity, legal, offered)) },
       }
     end
@@ -822,10 +808,10 @@ module Oe
     def track_hexes(game, step, entity, options)
       options.map do |hex, tiles|
         cost = game.upgrade_cost(hex.tile, hex, entity, entity)
-        sea = sea_fee(game, entity, hex)
+        sea = sea_fee(game, entity, hex, tiles)
         {
           hex: hex.id,
-          points: step.points_for_lay(entity, hex),
+          points: game.tile_point_cost(entity, old_tile: hex.tile),
           cost: cost + sea,
           cost_parts: cost_parts(hex.tile, cost) + (sea.positive? ? [{ label: "sea", amount: sea }] : []),
           tiles: tiles.map { |tile, rotations| { name: tile.name.to_s, color: tile.color.to_s, rotations: rotations } },
@@ -833,9 +819,18 @@ module Oe
       end
     end
 
-    # 18OE §11.1.6 (#360): the fee for the sea zones to the hex, the fewest a tile there can cost.
-    def sea_fee(game, entity, hex)
-      game.respond_to?(:cross_water_track_fee) ? game.cross_water_track_fee(entity, hex).to_i : 0
+    # 18OE §11.1.6 (#360): the fee for the sea zones to the hex, the fewest a legal tile and rotation there costs
+    # (Step::Track charges it as the action's extra_cost).
+    def sea_fee(game, entity, hex, tiles)
+      return 0 unless game.respond_to?(:cross_water_tile_fee)
+
+      fees = tiles.flat_map do |tile, rotations|
+        rotations.map do |rotation|
+          tile.rotate!(rotation)
+          game.cross_water_tile_fee(entity, hex, tile).to_i
+        end.tap { tile.rotate!(0) }
+      end
+      fees.min || 0
     end
 
     # Terrain cost per upgrade of the hex's tile (label = its terrains), then
@@ -907,7 +902,7 @@ module Oe
     def dividend_routes(game)
       Array(safe { game.round.routes }).map do |route|
         { train: route.train.name, hexes: route.hexes.map(&:id), revenue: route.revenue,
-          distance_str: route.distance_str }.merge(route.sea_detail)
+          distance_str: route.distance_str }.merge(RunDetail.sea_detail(game, route))
       end
     end
 
@@ -942,7 +937,8 @@ module Oe
       depot_trains = step.buyable_trains(entity).select(&:from_depot?)
       cheapest = depot_trains.map(&:price).min
       must = step.must_buy_train?(entity) ? true : false
-      reserved = step.respond_to?(:reserved_train) ? step.reserved_train : nil
+      # the reserved 2+2 of the first round (§11.6.4): Chris' Step::BuyTrain recognises it by name and depot
+      reserved = game.depot.depot_trains.find { |t| t.name == '2+2' && t.from_depot? }
       {
         limit: game.train_limit(entity),
         count: entity.trains.size,

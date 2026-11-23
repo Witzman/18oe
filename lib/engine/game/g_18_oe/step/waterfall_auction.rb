@@ -7,11 +7,6 @@ module Engine
     module G18OE
       module Step
         class WaterfallAuction < Engine::Step::WaterfallAuction
-          # Players still in the open auction (empty unless one is running); read by Oe::View (#120).
-          def open_bidders
-            @open_bidders.dup
-          end
-
           def setup
             super
             @companies = @companies.sort_by { |c| [c.auction_row, c.value, c.sym[/\d+/].to_i, c.sym] }
@@ -84,7 +79,7 @@ module Engine
             return unless @game.company_becomes_minor?(company)
 
             treasury_amount = [price, @game.class::MINOR_MAX_TREASURY].min
-            return unless treasury_amount.positive? # a minor reduced to 0 starts with an empty treasury
+            return unless treasury_amount.positive?
 
             @game.bank.spend(treasury_amount, @game.corporations.find { |minor| minor.name == company.sym })
           end

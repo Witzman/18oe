@@ -76,6 +76,7 @@ module Engine
 
             pending_token.remove!
             action.city.exchange_token(new_token)
+            @game.clear_graph
             @game.log << "#{pending_corporation.name} replaces #{pending_minor.name} token on #{action.city.hex.name}"
 
             resolve_forced!
@@ -100,19 +101,19 @@ module Engine
           end
 
           def forced_decline?(token)
-            pending_corporation.type == :national || pending_corporation.unplaced_tokens.empty? ||
+            pending_corporation.unplaced_tokens.empty? ||
               token.city.hex.tile.cities.any? { |city| city.tokened_by?(pending_corporation) }
           end
 
           def decline!(token, verb)
             hex_name = token.city.hex.name
             token.remove!
+            @game.clear_graph
             @game.log << "#{pending_corporation.name} #{verb} #{pending_minor.name} token on #{hex_name}"
           end
 
           def close_minor!
             @game.close_corporation(pending_minor)
-            @game.abandon_merged_minor!(pending_minor, pending_corporation) if pending_corporation.type == :national
             @round.pending_acquisition = nil
           end
         end

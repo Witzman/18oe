@@ -1,0 +1,30 @@
+# Nightly upstream watch (#579, #563 Task 11): is engine/PIN behind tobymao/18xx master on the core or 18OE paths?
+# Opens/updates/closes exactly one issue (.github/scripts/engine-upstream-watch.rb). Read-only on upstream.
+name: engine-upstream-watch
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: engine-upstream-watch
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+      - name: compare engine/PIN with upstream master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ruby .github/scripts/engine-upstream-watch.rb

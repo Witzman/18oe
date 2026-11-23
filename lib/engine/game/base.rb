@@ -251,6 +251,8 @@ module Engine
       # :single_slot_cities -- token cannot be placed if tile contains any single slot cities
       TILE_RESERVATION_BLOCKS_OTHERS = :never
 
+      REVISITABLE_NODES = [].freeze
+
       COMPANIES = [].freeze
       COMPANY_CLASS = Company
 
@@ -1356,6 +1358,7 @@ module Engine
           raise NotImplementedError
         end
         log_share_price(corporation, old_price) if sell_movement(corporation) != :none
+        share_price_changed(corporation, old_price)
       end
 
       def sold_out_increase?(_corporation)
@@ -1369,6 +1372,12 @@ module Engine
       def sold_out_stock_movement(corporation)
         @stock_market.move_up(corporation)
       end
+
+      # Called after a share sale, the end of a stock round and a dividend may
+      # have moved a corporation's share price; `from` is the price before the
+      # move (it can be the current price if nothing moved). Override it for
+      # rules that depend on where the price lands.
+      def share_price_changed(_entity, _from); end
 
       def log_share_price(entity, from, steps = nil, log_steps: false)
         from_price = from.price
@@ -1411,7 +1420,7 @@ module Engine
       end
 
       def must_buy_train?(entity)
-        entity.trains.empty? &&
+        entity.trains.all? { |train| extra_train?(train) } &&
           !depot.depot_trains.empty? &&
           (self.class::MUST_BUY_TRAIN == :always ||
            (self.class::MUST_BUY_TRAIN == :route && @graph.route_info(entity)&.dig(:route_train_purchase)))
@@ -1456,10 +1465,6 @@ module Engine
         route_distance(route).to_s
       end
 
-      def route_sea_detail(_route)
-        { sea: [], ferries: [] }
-      end
-
       def route_distance(route)
         route.visited_stops.sum(&:visit_cost)
       end
@@ -1476,7 +1481,11 @@ module Engine
       end
 
       def compute_other_paths(routes, route)
-        routes.reject { |r| r == route }.flat_map(&:paths)
+        routes.reject { |r| r == route }.flat_map(&:paths).reject { |path| shared_track?(path) }
+      end
+
+      def shared_track?(_path)
+        false
       end
 
       def city_tokened_by?(city, entity)
@@ -1502,6 +1511,8 @@ module Engine
 
         routes.each do |route|
           route.paths.each do |path|
+            next if shared_track?(path)
+
             a = path.a
             b = path.b
 
@@ -1531,7 +1542,7 @@ module Engine
 
       def check_distance(route, visits, train = nil)
         train ||= route.train
-        distance = train.distance
+        distance = route_train_distance(route, train)
         if distance.is_a?(Numeric)
           route_distance = visits.sum(&:visit_cost)
           raise RouteTooLong, "#{route_distance} is too many stops for #{distance} train" if distance < route_distance
@@ -1573,20 +1584,21 @@ module Engine
       # Intended for game specific rules that only depend on one route
       def check_other(_route); end
 
-      # Intended for game specific rules that depend on multiple routes
-      def check_route_combination(_routes); end
+      def route_train_distance(_route, train)
+        train.distance
+      end
 
-      # Chains a route may take between two nodes besides the track Route#get_node_chains walks (18OE: sea
-      # crossings without track). Each chain is a hash like a walked one ({ nodes:, paths:, hexes:, id: });
-      # its id must start with the start node's hex id and end with the end node's, for replay.
-      def extra_node_chains(_route, _start_node, _end_node)
+      def route_links(_start_node, _end_node, _corporation)
         []
       end
+
+      # Intended for game specific rules that depend on multiple routes
+      def check_route_combination(_routes); end
 
       def compute_stops(route, train = nil)
         train ||= route.train
         visits = revenue_stops(route)
-        distance = train.distance
+        distance = route_train_distance(route, train)
         return visits if distance.is_a?(Numeric)
         return [] if visits.empty?
 
@@ -1641,7 +1653,7 @@ module Engine
       end
 
       def visited_stops(route)
-        route.connection_data.flat_map { |c| [c[:left], c[:right]] }.uniq.compact
+        route.connection_data.flat_map { |c| [c[:left], c[:right]] }.uniq.compact.flat_map(&:stops)
       end
 
       def revenue_stops(route)
@@ -2139,6 +2151,10 @@ module Engine
         nil
       end
 
+      def bundle_annotation(bundle)
+        bundle.shares.any? { |s| s.last_cert || s.double_cert } ? '[d]' : ''
+      end
+
       def corporation_show_loans?(_corporation)
         true
       end
@@ -2258,8 +2274,13 @@ module Engine
         train.owner = nil
       end
 
+      def extra_train?(train)
+        train.extra
+      end
+
       def num_corp_trains(entity)
-        self.class::OBSOLETE_TRAINS_COUNT_FOR_LIMIT ? entity.trains.size : entity.trains.count { |t| !t.obsolete }
+        trains = entity.trains.reject { |train| extra_train?(train) }
+        self.class::OBSOLETE_TRAINS_COUNT_FOR_LIMIT ? trains.size : trains.count { |t| !t.obsolete }
       end
 
       def crowded_corps
@@ -2824,9 +2845,10 @@ module Engine
 
               tile =
                 begin
-                  Tile.for(tile_string, preprinted: true, index: index)
+                  Tile.for(tile_string, preprinted: true, index: index, revisitable_nodes: self.class::REVISITABLE_NODES)
                 rescue Engine::GameError
-                  Tile.from_code(coord, color, tile_string, preprinted: true, index: index)
+                  Tile.from_code(coord, color, tile_string, preprinted: true, index: index,
+                                                            revisitable_nodes: self.class::REVISITABLE_NODES)
                 end
 
               # name the location (city/town)
@@ -2881,6 +2903,7 @@ module Engine
               name,
               index: i,
               reservation_blocks: self.class::TILE_RESERVATION_BLOCKS_OTHERS,
+              revisitable_nodes: self.class::REVISITABLE_NODES,
               unlimited: val == 'unlimited'
             )
           end
@@ -2896,6 +2919,7 @@ module Engine
               code,
               index: i,
               reservation_blocks: self.class::TILE_RESERVATION_BLOCKS_OTHERS,
+              revisitable_nodes: self.class::REVISITABLE_NODES,
               unlimited: val['count'] == 'unlimited',
               hidden: hidden
             )

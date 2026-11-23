@@ -8,7 +8,7 @@ RSpec.describe "18OE engine smoke" do
   # concessions. The 2-player game has no concessions, hence 2,600 (not 2,700).
   STARTING_CASH = { 2 => 2600, 3 => 1800, 4 => 1350, 5 => 1080, 6 => 900, 7 => 775 }.freeze
   # 10 concessions are removed in the 2-player game.
-  COMPANIES = { 2 => 22, 3 => 32, 4 => 32, 5 => 32, 6 => 32, 7 => 32 }.freeze
+  COMPANIES = { 2 => 23, 3 => 33, 4 => 33, 5 => 33, 6 => 33, 7 => 33 }.freeze # +1: Swift Metropolitan Line (§14.10, upstream #13163)
 
   def new_game(count)
     Engine::Game::G18OE::Game.new(("A".."Z").first(count), id: 1)

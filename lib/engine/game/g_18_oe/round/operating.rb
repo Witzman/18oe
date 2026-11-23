@@ -6,45 +6,35 @@ module Engine
   module Round
     module G18OE
       class Operating < Engine::Round::Operating
-        def abbreviated?
-          @game.abbreviated_or?(@round_num)
+        attr_reader :operating_position_entity, :operating_position
+
+        def choose_operating_position!(entity, position)
+          @operating_position_entity = entity
+          @operating_position = position
+          move_operating_position!
+          @current_operator = @entities[@entity_index]
         end
 
-        # Minor C's choice (§15.6) holds for one OR: reset it before the order is read.
-        def select_entities
-          @game.golden_bell_reset!
+        def recalculate_order
           super
+          move_operating_position!(@entity_index + 1)
         end
 
-        # The abbreviated OR (§13) has no Golden Bell step, so it keeps the normal order, and no mail contract
-        # (Minor K): it only repeats the previous payout (#508 5c).
-        def setup
-          @game.golden_bell_ask! unless abbreviated?
-          @game.pay_mail_contract! unless abbreviated?
-          super
-        end
+        private
 
-        # Nobody operates until Minor C's president has chosen a position.
-        def after_setup
-          super unless @game.golden_bell_pending?
-        end
+        def move_operating_position!(start_index = 0)
+          entity = @operating_position_entity
+          return unless entity
+          return unless %w[first last].include?(@operating_position)
 
-        def golden_bell_chosen!
-          @entities.replace(@game.operating_order)
-          @entity_index = 0
-          @golden_bell_started = true
-          start_operating
-        end
+          types = entity.type == :minor ? %i[minor regional] : %i[major national]
+          group = @entities.drop(start_index).select { |corporation| types.include?(corporation.type) }
+          return unless group.include?(entity)
 
-        def after_process(action)
-          return @golden_bell_started = false if @golden_bell_started
-
-          super
-        end
-
-        # §11.6.5: a minor/regional whose certificate sits in the Open Market does not operate.
-        def skip_entity?(entity)
-          super || (%i[minor regional].include?(entity.type) && entity.receivership?)
+          target = @operating_position == 'first' ? group.first : group.last
+          index = @entities.index(target)
+          @entities.delete(entity)
+          @entities.insert(index, entity)
         end
       end
     end

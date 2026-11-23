@@ -1,36 +1,20 @@
 # frozen_string_literal: true
 
 require 'engine'
+require 'engine/auto_router'
 
 module Oe
-  # Pure-Ruby copy of Engine::AutoRouter's path search (`path`, `real_revenue`
-  # and the bitfield helpers).
-  #
-  # Engine::AutoRouter cannot be loaded under MRI: its route *combiner* is a
-  # JavaScript class embedded in `%x{...}` for Opal, which MRI would run as a
-  # shell command when the file is required. Only the combiner is Opal-only;
-  # the path search is plain Ruby, kept here as in engine/auto_router.rb.
+  # Route candidates and a greedy combination on top of the core Engine::AutoRouter#path (its route combiner
+  # is a JavaScript class in `%x{...}`, Opal-only, and is never called under MRI).
   class RouteSearch
-    attr_accessor :running
-    # visits of the last #path (see walk_limit)
-    attr_reader :walks
-
     def initialize(game, flash = nil)
       @game = game
-      @train_autoroute_group = @game.class::TRAIN_AUTOROUTE_GROUPS
-      @next_hexside_bit = 0
       @flash = flash
     end
 
-    # Walk limits of the search as the RoutePicker runs it (see Oe::LegalActions::RoutePicker). Here so the
-    # game's Orient Express duty (§12.2, #512) searches exactly as the picker does.
-    WALK_LIMIT = 10_000
-    SEA_WALK_LIMIT = 5_000
-
     # Oe extension: the candidate routes per train of `corporation`, searched as the RoutePicker does.
     def train_routes(corporation)
-      path(@game.route_trains(corporation).sort_by(&:price), corporation,
-           walk_limit: WALK_LIMIT, sea_walk_limit: SEA_WALK_LIMIT).first
+      path(@game.route_trains(corporation).sort_by(&:price), corporation).first
     end
 
     # Oe extension (the RoutePicker's combination, moved here for #512): per train in the order of
@@ -55,7 +39,7 @@ module Oe
     # depot): the summed cities and towns, its town row unlimited. The search is the picker's.
     def orient_express_routes(corporation, trains)
       trial = combined_trial_train(corporation, trains)
-      routes, = path([trial], corporation, walk_limit: WALK_LIMIT, sea_walk_limit: SEA_WALK_LIMIT)
+      routes, = path([trial], corporation)
       routes[trial].select { |route| @game.orient_express_run?(route) }
     end
 
@@ -72,23 +56,6 @@ module Oe
     def combinations(candidates)
       sorted = candidates.sort_by { |t| [t.name, t.id] }
       (2..sorted.size).flat_map { |n| sorted.combination(n).to_a }.uniq { |trains| trains.map(&:name) }
-    end
-
-    # The best solution with `trains` combined (§12.1) running its best Orient Express route among `routes`,
-    # the other trains picking from `others` ([train, candidates] pairs), as {revenue:, routes: nil, combine:}.
-    # The combined train does not exist yet, so its route cannot be offered (routes: nil). A Pullman car runs on
-    # the combined train (Pullman#pullman_train), not on the train that carries it now.
-    def pick_combined(routes, others, trains)
-      picked = pick(others, [routes.first])
-      revenue = real_revenue(picked)
-      return if revenue.negative?
-
-      corporation = routes.first.train.owner
-      if @game.pullman?(corporation)
-        revenue += trains.map { |t| t.sym.to_i }.max * Engine::Game::G18OE::National::PULLMAN_PER_LEVEL
-        revenue -= (picked - [routes.first]).sum { |route| @game.pullman_revenue(route) }
-      end
-      { revenue: revenue, routes: nil, combine: trains }
     end
 
     # Each route validates itself against the other chosen routes, so the
@@ -121,307 +88,11 @@ module Oe
       -1
     end
 
+    # The candidate routes per train: the core AutoRouter's own path search (#563: no copy of it any more;
+    # Chris' graph walk hands the sea crossings as chains, so 18OE needs no extra pass). Returns
+    # [train_routes, timed_out] like AutoRouter#path. Only its combiner is Opal-only, hence `pick` above.
     def path(trains, corporation, **opts)
-      static = opts[:routes] || []
-      path_timeout = opts[:path_timeout] || 30
-      route_limit = opts[:route_limit] || 10_000
-      # Oe extension (not in AutoRouter): at most this many visits of the walk
-      # (calls of the walk_token block). Unlike path_timeout (wall clock, checked
-      # only between start nodes, so a single walk ran up to 93 s in green
-      # networks, #315/#319) it is deterministic, and it also cuts a running walk
-      # short: past the limit every visit is aborted.
-      walk_limit = opts[:walk_limit]
-      walks = @walks = 0
-      pass_walk_limit = walk_limit
-
-      connections = {}
-
-      graph = @game.graph_for_entity(corporation)
-      nodes = graph.connected_nodes(corporation).keys
-      # Oe (#360): a node the RR reaches only over the sea (G18OE::Graph, for track and tokens) starts no walk; the
-      # sea pass below reaches it from the land network, as before.
-      nodes = nodes.select { |node| graph.water_zones_to_node(corporation, node).zero? } if graph.respond_to?(:water_zones_to_node)
-      nodes = nodes.sort_by do |node|
-        revenue = trains
-          .map { |train| node.route_revenue(@game.phase, train) }
-          .max
-        [
-          node.tokened_by?(corporation) ? 0 : 1,
-          node.offboard? ? 0 : 1,
-          -revenue,
-        ]
-      end
-
-      path_walk_timed_out = false
-      now = Time.now
-
-      skip_paths = if @train_autoroute_group.nil?
-                     static.flat_map(&:paths).to_h { |path| [path, true] }
-                   elsif @train_autoroute_group == :each_train_separate
-                     # all trains have their own autoroute group so it's not possible to fill skip_paths
-                     {}
-                   else # rubocop:disable Lint/DuplicateBranch
-                     # NOTE: there is room for an optimization here. In the case of TRAIN_AUTOROUTE_GROUP being an array,
-                     # we need to compare the train types that are prefilled and the train types that will be searched and
-                     # if there is overlap and all the trains that are being searched can't visit the path it can be in skip_path
-                     {}
-                   end
-
-      # if only routing for subset of trains, omit the trains we won't assemble routes for
-      skip_trains = static.flat_map(&:train).to_a
-      trains -= skip_trains
-
-      # Oe extension (#359): a second pass whose walk also crosses the sea (G18OE::Graph#walk_token), up to the
-      # most sea units a train can carry; a crossing comes back as a G18OE::Sea::SeaJump among the visited paths.
-      # The land pass comes first and is the search as before; the sea pass has its own limit (sea_walk_limit,
-      # default walk_limit), so it never takes visits from land routes, and runs only when the network reaches a
-      # port the RR may use.
-      passes = [{}]
-      # (Minor H's reduction, §15.8, lets a crossing that is one or two units over the places still pass.)
-      sea_limit = trains.map { |t| @game.sea_places(t) }.max.to_i + @game.steamship_allowance(corporation, @game.phase) +
-                  @game.port_authority_allowance(corporation)
-      passes << { sea: sea_limit } if sea_pass?(graph, nodes, corporation, trains)
-
-      train_routes = Hash.new { |h, k| h[k] = [] }    # map of train to route list
-      hexside_bits = Hash.new { |h, k| h[k] = 0 }     # map of hexside_id to bit number
-      @next_hexside_bit = 0
-
-      passes.product(nodes).each_with_index do |(pass, node), index|
-        if (index % nodes.size).zero? # a pass begins
-          walks = 0
-          walk_limit = pass[:sea] ? opts.fetch(:sea_walk_limit, pass_walk_limit) : pass_walk_limit
-        end
-        if Time.now - now > path_timeout || (walk_limit && walks >= walk_limit)
-          ::LOGGER.debug('Path timeout reached')
-          path_walk_timed_out = true
-          next # Oe (#359): on to the next pass (AutoRouter: break)
-        else
-          ::LOGGER.debug { "Path search: #{nodes.index(node)} / #{nodes.size} - paths starting from #{node.hex.name}" }
-        end
-
-        walk_corporation = graph.no_blocking? ? nil : corporation
-        graph.walk_token(node, corporation: walk_corporation, skip_paths: skip_paths, **pass) do |_, vp|
-          walks += 1
-          @walks += 1
-          if walk_limit && walks > walk_limit
-            path_walk_timed_out = true
-            next :abort
-          end
-
-          paths = vp.keys
-          chains = []
-          chain = []
-          left = nil
-          right = nil
-          last_left = nil
-          last_right = nil
-
-          complete = lambda do
-            chains << { nodes: [left, right], paths: chain, hexes: chain.map(&:hex) }
-            last_left = left
-            last_right = right
-            left, right = nil
-            chain = []
-          end
-
-          assign = lambda do |a, b|
-            if a && b
-              if a == last_left || b == last_right
-                left = b
-                right = a
-              else
-                left = a
-                right = b
-              end
-              complete.call
-            elsif !left
-              left = a || b
-            elsif !right
-              right = a || b
-              complete.call
-            end
-          end
-
-          paths.each do |path|
-            if path.is_a?(Engine::Game::G18OE::Sea::SeaJump)
-              sea_chain!(chains, path.chain)
-              last_left, last_right = path.chain[:nodes]
-              next
-            end
-
-            chain << path
-            a, b = path.nodes
-
-            assign.call(a, b) if a || b
-          end
-
-          # a 1-city Local train will have no chains but will have a left; route.revenue will reject if not valid for game
-          if chains.empty?
-            next unless left
-
-            chains << { nodes: [left, nil], paths: [] }
-
-            # use the Local train's 1 city instead of any paths as their key;
-            # only 1 train can visit each city, but we want Locals to be able to
-            # visit multiple different cities if a corporation has more than one
-            # of them
-            id = [left]
-          else
-            id = chains.flat_map { |c| c[:paths] }.sort!
-            # Oe (#359): a crossing has no paths; its own id tells routes apart that differ only at sea
-            seas = chains.filter_map { |c| c[:sea] && c[:id] }
-            id = [id, seas] unless seas.empty?
-          end
-
-          next if connections[id]
-
-          connections[id] = chains.map do |c|
-            { left: c[:nodes][0], right: c[:nodes][1], chain: c }
-          end
-
-          connection = connections[id]
-
-          # each train has opportunity to vote to abort a branch of this node's path-walk tree
-          path_abort = trains.to_h { |train| [train, true] }
-
-          # build a test route for each train, use route.revenue to check for errors, keep the good ones
-          trains.each  do |train|
-            route = Engine::Route.new(
-              @game,
-              @game.phase,
-              train,
-              # we have to clone to prevent multiple routes having the same connection array.
-              # If we don't clone, then later route.touch_node calls will affect all routes with
-              # the same connection array
-              connection_data: connection.clone,
-              bitfield: bitfield_from_connection(connection, hexside_bits),
-            )
-            route.routes = [route]
-            # defer route combination checks until we have the full combination of routes to check
-            route.revenue(suppress_check_route_combination: true)
-            train_routes[train] << route
-          rescue Engine::RouteTooLong
-            # ignore for this train, and abort walking this path if ignored for all trains
-            path_abort.delete(train)
-          rescue Engine::ReusesCity
-            path_abort.clear
-          rescue Engine::NoToken, Engine::RouteTooShort, Engine::GameError # rubocop:disable Lint/SuppressedException
-          end
-
-          next :abort if path_abort.empty?
-        end
-      end
-
-      # Check that there are no duplicate hexside bits (algorithm error)
-      ::LOGGER.debug do
-        "Evaluated #{connections.size} paths, found #{@next_hexside_bit} unique hexsides, and found valid routes "\
-          "#{train_routes.map { |k, v| k.name + ':' + v.size.to_s }.join(', ')} in: #{Time.now - now}"
-      end
-
-      static.each do |route|
-        # recompute bitfields of passed-in routes since the bits may have changed across auto-router runs
-        route.bitfield = bitfield_from_connection(route.connection_data, hexside_bits)
-        train_routes[route.train] = [route] # force this train's route to be the passed-in one
-      end
-
-      train_routes.each do |train, routes|
-        train_routes[train] = routes.sort_by(&:revenue).reverse.take(route_limit)
-      end
-
-      [train_routes, path_walk_timed_out]
-    end
-
-    # Oe (#359): the sea pass is worth a walk only if a node the walk reaches by land has a usable port.
-    def sea_pass?(graph, nodes, corporation, trains)
-      return false if trains.empty? || !graph.respond_to?(:sea_jumps)
-
-      nodes.any? { |node| !graph.sea_jumps(node, corporation).empty? }
-    end
-
-    # Oe (#359): a crossing begins at the node where the walk arrived, the end of the chain before it; the
-    # chain-cutting above may hold that chain the other way round (a path's nodes are unordered).
-    def sea_chain!(chains, sea_chain)
-      from = sea_chain[:nodes][0]
-      last = chains.last
-      chains[-1] = last.merge(nodes: last[:nodes].reverse) if last && last[:nodes][1] != from && last[:nodes][0] == from
-      chains << sea_chain
-    end
-
-    # inputs:
-    #   connection is a route's connection_data
-    #   hexside_bits is a map of hexside_id to bit number
-    # returns:
-    #   the bitfield (array of ints) representing all hexsides in the connection path
-    # updates:
-    #   new hexsides are added to hexside_bits
-    def bitfield_from_connection(connection, hexside_bits)
-      bitfield = [0]
-      connection.each do |conn|
-        paths = conn[:chain][:paths]
-        if paths.size == 1 # special case for tiny intra-tile path like in 18NewEngland (issue #6890)
-          hexside_left = paths[0].nodes[0].id
-          check_edge_and_set(bitfield, hexside_left, hexside_bits)
-          if paths[0].nodes.size > 1 # local trains may not have a second node
-            hexside_right = paths[0].nodes[1].id
-            check_edge_and_set(bitfield, hexside_right, hexside_bits)
-          end
-        else
-          (paths.size - 1).times do |index|
-            # hand-optimized ruby gives faster opal code
-            node1 = paths[index]
-            node2 = paths[index + 1]
-            case node1.edges.size
-            when 1
-              # node1 has 1 edge, connect it to first edge of node2
-              hexside_left = node1.edges[0].id
-              hexside_right = node2.edges[0].id
-              check_and_set(bitfield, hexside_left, hexside_right, hexside_bits)
-            when 2
-              # node1 has 2 edges, connect them as well as 2nd edge to first node2 edge
-              hexside_left = node1.edges[0].id
-              hexside_right = node1.edges[1].id
-              check_and_set(bitfield, hexside_left, hexside_right, hexside_bits)
-              hexside_left = hexside_right
-              hexside_right  = node2.edges[0].id
-              check_and_set(bitfield, hexside_left, hexside_right, hexside_bits)
-            else
-              ::LOGGER.debug do
-                "  ERROR: auto-router found unexpected number of path node edges #{node1.edges.size}. "\
-                  'Route combos may be be incorrect'
-              end
-            end
-          end
-        end
-      end
-      bitfield
-    end
-
-    def check_and_set(bitfield, hexside_left, hexside_right, hexside_bits)
-      check_edge_and_set(bitfield, hexside_left, hexside_bits)
-      check_edge_and_set(bitfield, hexside_right, hexside_bits)
-    end
-
-    def check_edge_and_set(bitfield, hexside_edge, hexside_bits)
-      if hexside_bits.include?(hexside_edge)
-        set_bit(bitfield, hexside_bits[hexside_edge])
-      else
-        hexside_bits[hexside_edge] = @next_hexside_bit
-        set_bit(bitfield, @next_hexside_bit)
-        @next_hexside_bit += 1
-      end
-    end
-
-    # bitfield is an array of integers, can be expanded by this call if necessary
-    # bit is a bit number, 0 is lowest bit, 32 will jump to the next int in the array, and so on
-    def set_bit(bitfield, bit)
-      entry = (bit / 32).to_i
-      mask = 1 << (bit & 31)
-      add_count = entry + 1 - bitfield.size
-      while add_count.positive?
-        bitfield << 0
-        add_count -= 1
-      end
-      bitfield[entry] |= mask
+      Engine::AutoRouter.new(@game, @flash).path(trains, corporation, **opts.slice(:routes, :path_timeout, :route_limit))
     end
   end
 end

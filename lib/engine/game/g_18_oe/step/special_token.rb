@@ -1,141 +1,124 @@
 # frozen_string_literal: true
 
 require_relative '../../../step/special_token'
+require_relative 'skip_abbreviated_round'
+require_relative 'validated_token_cost'
+require_relative 'track_rights_tokener'
 
 module Engine
   module Game
     module G18OE
       module Step
         class SpecialToken < Engine::Step::SpecialToken
-          # §11.6.4 para. 2 (workshop #352): a paid special token obeys the same guard.
-          def pay_token_cost(entity, cost, city)
-            @game.check_first_round_spend!(entity, cost, what: 'a token')
-            super
+          include SkipAbbreviatedRound
+          include ValidatedTokenCost
+          include TrackRightsTokener
+
+          def available_hex(entity, hex)
+            return pass_through_available_hex(entity, hex) if pass_through_ability?(entity)
+            return super unless connected_ability?(entity)
+            return true if @game.loading
+
+            track_rights_available_hex(@game.token_owner(entity), hex)
+          end
+
+          def available_tokens(entity)
+            return [pass_through_token(entity)] if pass_through_ability?(entity)
+            return super unless connected_ability?(entity)
+
+            [@game.token_owner(entity).tokens.reject(&:used).max_by(&:price)].compact
           end
 
           def process_place_token(action)
-            company = action.entity
-            return process_pass_token(action) if @game.pass_token_company?(company)
-            return process_free_token(action) if company.id == 'WS'
+            return process_pass_through_token(action) if pass_through_ability?(action.entity)
 
             wien = ferry_payer(action)
-            without_price(action.token, wien) { super(action) }
-            @game.remove_wcf_placeholder! if company.id == 'WCF'
-            return unless wien
+            if wien
+              charter_price = action.token.price
+              action.token.price = 0
+            elsif connected_ability?(action.entity)
+              operator = @game.token_owner(action.entity)
+              action.token = available_tokens(action.entity).first
+              check_connected(operator, action.city, action.city.hex)
+              action.cost = recorded_fee(action, operator) unless @game.loading
+              if !@game.loading && operator.cash < action.cost
+                raise GameError, "#{operator.name} cannot afford the #{@game.format_currency(action.cost)} token cost"
+              end
 
-            @log << "#{wien.name} pays for the #{company.name} token"
-            close_after_use!(wien)
-          end
-
-          # §14.5/§14.6 (#79, #80): the pass-through token of the private goes into an extra position of the city:
-          # free, no connection, no token of the RR used, and the Place Token step stays open.
-          def available_tokens(entity)
-            return super unless @game.pass_token_company?(entity)
-
-            [Engine::Token.new(@game.token_owner(entity), type: :pass)]
-          end
-
-          # The hexes with a city the private's token may take (the enumerator, LegalActions#token_targets, then
-          # asks #pass_city_ok? for each city of them).
-          def available_hex(entity, hex)
-            return super unless site_checked?(entity)
-
-            hex.tile.cities.any? { |city| pass_city_ok?(entity, city) }
-          end
-
-          def pass_city_ok?(entity, city)
-            return true unless site_checked?(entity)
-
-            operator = @game.token_owner(entity)
-            return @game.pass_token_site_error(entity, city, operator).nil? if @game.pass_token_company?(entity)
-
-            free_token_error(operator, city).nil?
-          end
-
-          # §14.3 (#77): why the Wien Suedbahnhof token may not go on the city (nil if it may): the city is in the track
-          # rights zone and reachable as if the token were paid, and the RR can pay the fee for the ferries and sea
-          # zones (§11.2.1), which the private does not cover.
-          def free_token_error(operator, city)
-            hex = city.hex
-            return "#{hex.name} is outside #{operator.name}'s track rights zone" unless @game.city_in_track_rights?(operator, hex)
-            return nil if @game.loading
-            unless @game.token_graph_for_entity(operator).connected_nodes(operator)[city]
-              return "Cannot place token on #{hex.name} because it is not connected"
+              charter_price = action.token.price
+              action.token.price = action.cost
             end
 
-            fee = @game.cross_water_fee_of(@game.cross_water_token_cost(operator, city), :token).to_i
-            return nil if fee.zero? || (fee <= operator.cash && @game.first_round_spend_allowed?(operator, fee))
+            super
+            @game.remove_wcf_placeholder! if action.entity.id == 'WCF'
+            return unless wien
 
-            "#{operator.name} cannot pay #{@game.format_currency(fee)} for the ferries and sea zones to #{hex.name} (§11.2.1)"
+            @log << "#{wien.name} pays for the #{action.entity.name} token"
+            wien.close!
+          ensure
+            action.token.price = charter_price if charter_price
+          end
+
+          def adjust_token_price_ability!(entity, token, hex, city, special_ability: nil)
+            return super if !special_ability || !connected?(special_ability)
+
+            [token, special_ability]
           end
 
           private
 
-          def site_checked?(entity)
-            @game.pass_token_company?(entity) || entity.id == 'WS'
+          def pass_through_ability?(entity)
+            @game.pass_through_token_company?(entity) && !ability(entity).nil?
           end
 
-          # §14.3: one token of the RR for free, in the RR's Place Token step (which it takes, as a paid token would).
-          def process_free_token(action)
+          def pass_through_token(entity)
+            operator = @game.token_owner(entity)
+            Engine::Token.new(operator, price: 0, logo: @game.pass_through_token_logo(entity), type: :pass_through)
+          end
+
+          def pass_through_available_hex(entity, hex)
+            operator = @game.token_owner(entity)
+            return false unless @game.pass_through_hex?(entity, hex)
+
+            hex.tile.cities.none? { |city| city.tokened_by?(operator) || city.reserved_by?(operator) }
+          end
+
+          def process_pass_through_token(action)
             company = action.entity
-            operator = @game.token_owner(company)
-            token = action.token
-            raise GameError, "#{operator.name} has no token to place" if token.nil? || token.used
-
-            error = free_token_error(operator, action.city)
-            raise GameError, error if error
-
-            cost = @game.loading ? nil : @game.cross_water_token_cost(operator, action.city)
-            fee = @game.cross_water_fee_of(cost, :token).to_i
-            without_price(token, company) { place_token(operator, action.city, token, connected: false) }
-            if fee.positive?
-              operator.spend(fee, @game.bank)
-              @game.log_cross_water_fee(operator, cost, :token, 'the token (§11.2.1)')
+            city = action.city
+            hex = city.hex
+            unless pass_through_available_hex(company, hex)
+              raise GameError, "#{company.name} cannot place its token on #{hex.name}"
             end
-            close_after_use!(company)
+
+            @game.place_pass_through_token!(company, @game.token_owner(company), city)
+            ability(company).use!
           end
 
-          # §14.3: the Wien Suedbahnhof of the same owner may pay the ferry token; the action says so with cost 0.
+          def connected_ability?(entity)
+            ability = ability(entity)
+            !ability.nil? && connected?(ability)
+          end
+
+          def connected?(ability)
+            ability.type == :token && ability.connected
+          end
+
+          # RB 14.3: the Wien Sudbahnhof of the same owner may pay the White Cliffs Ferry token; the action says so with
+          # cost 0. Both privates close.
           def ferry_payer(action)
             return unless action.entity.id == 'WCF'
             return if action.cost.nil?
-            raise GameError, 'A White Cliffs Ferry token costs nothing only when Wien Suedbahnhof pays it' unless action.cost.zero?
+            raise GameError, 'A White Cliffs Ferry token costs nothing only when Wien Sudbahnhof pays it' unless action.cost.zero?
 
             wien = @game.company_by_id('WS')
             return wien if !wien.closed? && wien.owner == action.entity.owner
 
-            raise GameError, "Wien Suedbahnhof of #{action.entity.owner&.name} cannot pay the ferry token"
+            raise GameError, "Wien Sudbahnhof of #{action.entity.owner&.name} cannot pay the ferry token"
           end
 
-          # The token is placed without its price when a private pays; the price stays on the token.
-          def without_price(token, payer)
-            return yield unless payer && token
-
-            price = token.price
-            token.price = 0
-            yield
-          ensure
-            token.price = price if payer && token
-          end
-
-          def close_after_use!(company)
-            ability = ability(company)
-            ability&.use!
-            return if ability && !(ability.count&.zero? && ability.closed_when_used_up)
-
-            @game.company_closing_after_using_ability(company)
-            company.close!
-          end
-
-          def process_pass_token(action)
-            company = action.entity
-            operator = @game.token_owner(company)
-            error = @game.pass_token_site_error(company, action.city, operator)
-            raise GameError, error if error
-
-            @game.place_pass_token!(company, action.city, operator)
-            @log << "#{operator.name} places the #{company.name} token on #{action.city.hex.name}"
-            close_after_use!(company)
+          def recorded_fee(action, operator)
+            validated_token_cost(action, @game.cross_water_token_fee(operator, action.city))
           end
         end
       end

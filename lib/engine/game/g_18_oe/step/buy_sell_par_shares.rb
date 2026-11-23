@@ -48,30 +48,24 @@ module Engine
 
           def purchasable_companies(player)
             return [] unless can_trade?(player)
-            return [] unless @game.player_trade_enabled?
 
             @game.purchasable_companies(player).reject { |company| @game.face_down_private?(company) }
           end
 
-          # §10.4 is a stock action of every stock round (owner decision F1, 2026-11-18, workshop #67: the
-          # earlier limit to the opening stock round, "errata 10", has no source). Only a round that can ask
-          # the seller (Step::TradeOffer) trades: the stock round, not the consolidation (§10.6) or concession round.
-          # A player at the certificate limit may trade too (owner decision 2026-11-20, #524): what counts is the
-          # limit after the trade, checked for every offer in validate_trade_certs! (§4.1).
-          def can_trade?(_player)
-            @round.current_actions.empty? &&
-              @round.steps.any? { |step| step.is_a?(G18OE::Step::TradeOffer) }
+          def can_trade?(player)
+            @game.turn == 1 && @round.current_actions.empty? &&
+              @game.num_certs(player) < @game.cert_limit(player)
           end
 
           def can_buy_any_corporation?(player)
-            return false unless can_trade?(player) && @game.player_trade_enabled?
+            return false unless can_trade?(player)
 
             merged = @game.merged_minors.values.flatten
             @game.corporations.any? { |corporation| tradable_minor?(player, corporation, merged) }
           end
 
           def can_buy_corporation?(player, corporation)
-            can_trade?(player) && @game.player_trade_enabled? && tradable_minor?(player, corporation, @game.merged_minors.values.flatten)
+            can_trade?(player) && tradable_minor?(player, corporation, @game.merged_minors.values.flatten)
           end
 
           def price_range(player, _target)
@@ -100,104 +94,17 @@ module Engine
               return super
             end
 
-            raise GameError, "#{seller.name} has not agreed to sell #{company.name} (§10.4)" unless @game.player_trade_enabled?
             raise GameError, "Cannot buy #{company.name}" unless purchasable_companies(player).include?(company)
 
-            validate_trade_price!(action.price, price_range(player, company))
-            offer_trade!(action, company, seller)
-          end
-
-          # §10.4 (#202): a purchase from another player is an offer; Step::TradeOffer asks the seller.
-          def offer_trade!(action, target, seller)
-            validate_trade_objects!(action, target, seller)
-            @log << "#{action.entity.name} offers #{trade_terms(action)} to #{seller.name} for #{trade_wanted(action, target)}"
-            @round.trade_offer = action
-          end
-
-          # §10.4 (#517): "The players may only exchange personal cash, minors and face up privates." The
-          # buyer's `give` and the seller's `also` must be such objects of their owners, and neither side
-          # may end above its certificate limit (§4.1).
-          def validate_trade_objects!(action, target, seller)
-            buyer = action.entity
-            merged = @game.merged_minors.values.flatten
-            wanted = [target, *action.also]
-            offered = action.give
-            raise GameError, 'Cannot trade an object twice' if (wanted + offered).uniq.size != wanted.size + offered.size
-
-            offered.each do |object|
-              raise GameError, "Cannot trade #{object.name}: it is not yours (§10.4)" unless tradable_object?(buyer, object, merged)
-            end
-            action.also.each do |object|
-              raise GameError, "Cannot trade #{object.name}: it is not the seller's (§10.4)" unless tradable_object?(seller, object, merged)
-            end
-            validate_trade_certs!(buyer, wanted, offered)
-            validate_trade_certs!(seller, offered, wanted)
-          end
-
-          def validate_trade_certs!(player, received, given)
-            delta = received.sum { |object| trade_certs(object) } - given.sum { |object| trade_certs(object) }
-            return if delta <= 0 || @game.num_certs(player) + delta <= @game.cert_limit(player)
-
-            raise GameError, "#{player.name} would exceed the certificate limit by this trade (§4.1)"
-          end
-
-          # What `player` could give in a trade: own floated minors with their presidency, own face up privates.
-          def tradable_objects(player)
-            merged = @game.merged_minors.values.flatten
-            @game.corporations.select { |corporation| tradable_minor?(player, corporation, merged, other: false) } +
-              player.companies.select { |company| tradable_object?(player, company, merged) }
-          end
-
-          # An offer that would pass process_buy_company / process_buy_corporation's checks on the objects.
-          def valid_trade_objects?(action, target)
-            validate_trade_objects!(action, target, target.owner)
-            true
-          rescue GameError
-            false
-          end
-
-          def trade_certs(object)
-            return 1 if object.company?
-
-            object.presidents_share.counts_for_limit ? object.presidents_share.cert_size : 0
-          end
-
-          # A minor the owner holds with its presidency, or a face up private the owner holds.
-          def tradable_object?(owner, object, merged)
-            return tradable_minor?(owner, object, merged, other: false) if object.corporation?
-
-            object.company? && @game.private_company?(object) && object.owner == owner &&
-              !@game.face_down_private?(object) && !@game.abilities(object, :no_buy)
-          end
-
-          def trade_terms(action)
-            parts = action.give.map(&:name)
-            parts << @game.format_currency(action.price) if action.price.positive? || parts.empty?
-            parts.join(' and ')
-          end
-
-          def trade_wanted(action, target)
-            [target, *action.also].map(&:name).join(' and ')
-          end
-
-          # The seller accepted (Step::TradeOffer): the offer becomes the buyer's stock action.
-          def execute_trade(action)
-            return trade_corporation(action) if action.is_a?(Engine::Action::BuyCorporation)
-
-            trade_company(action)
-          end
-
-          def trade_company(action)
-            company = action.company
-            seller = company.owner
-            player = action.entity
             price = action.price
+            validate_trade_price!(price, price_range(player, company))
 
-            exchange_objects!(action, player, seller)
-            move_company(company, player)
+            company.owner = player
+            seller.companies.delete(company)
+            player.companies << company
             player.spend(price, seller) if price.positive?
             track_action(action, company)
-            @log << "#{player.name} buys #{trade_wanted(action, company)} from #{seller.name} for #{trade_terms(action)}"
+            @log << "#{player.name} buys #{company.name} from #{seller.name} for #{@game.format_currency(price)}"
             @game.after_buy_company(player, company, price)
             pass!
           end
@@ -205,21 +112,14 @@ module Engine
           def process_buy_corporation(action)
             player = action.entity
             corporation = action.corporation
-            raise GameError, "The seller has not agreed to the sale (§10.4)" unless @game.player_trade_enabled?
             raise GameError, "Cannot buy #{corporation&.name || 'that corporation'}" unless
               can_buy_corporation?(player, corporation)
 
-            validate_trade_price!(action.price, price_range(player, corporation))
-            offer_trade!(action, corporation, corporation.owner)
-          end
-
-          def trade_corporation(action)
-            player = action.entity
-            corporation = action.corporation
             price = action.price
+            validate_trade_price!(price, price_range(player, corporation))
+
             seller = corporation.owner
-            @log << "#{player.name} buys #{trade_wanted(action, corporation)} from #{seller.name} for #{trade_terms(action)}"
-            exchange_objects!(action, player, seller)
+            @log << "#{player.name} buys #{corporation.name} from #{seller.name} for #{@game.format_currency(price)}"
             @game.share_pool.transfer_shares(
               corporation.presidents_share.to_bundle, player,
               spender: player, receiver: seller, price: price
@@ -228,30 +128,7 @@ module Engine
             pass!
           end
 
-          # §10.4 (#517): the objects besides the target change hands: `give` to the seller, `also` to the buyer.
-          def exchange_objects!(action, buyer, seller)
-            action.give.each { |object| move_trade_object(object, seller) }
-            action.also.each { |object| move_trade_object(object, buyer) }
-          end
-
-          def move_trade_object(object, to)
-            if object.company?
-              move_company(object, to)
-              @game.after_buy_company(to, object, 0)
-            else
-              @game.share_pool.transfer_shares(object.presidents_share.to_bundle, to, price: 0)
-            end
-          end
-
-          def move_company(company, to)
-            company.owner.companies.delete(company)
-            company.owner = to
-            to.companies << company
-          end
-
-          # `other: true` asks whether `player` may buy it (held by another player); `other: false`, whether
-          # `player` holds it (#517).
-          def tradable_minor?(player, corporation, merged, other: true)
+          def tradable_minor?(player, corporation, merged)
             return false unless corporation&.corporation?
             return false if corporation.type != :minor || corporation.closed? || !corporation.floated?
             return false if merged.include?(corporation)
@@ -259,7 +136,7 @@ module Engine
             seller = corporation.owner
             return false unless seller&.player?
 
-            (other ? seller != player : seller == player) && corporation.presidents_share&.owner == seller
+            seller != player && corporation.presidents_share&.owner == seller
           end
 
           def must_sell_actions(entity)
@@ -278,23 +155,8 @@ module Engine
           def choose_available?(entity)
             return can_act_on_any_private?(entity) unless non_private_choices_allowed?(entity)
 
-            can_merge_any?(entity) || can_offer_any?(entity) || can_remove_any_corporation?(entity) ||
-              can_reserve_any?(entity) || can_act_on_any_private?(entity)
-          end
-
-          # §10.5 / §10.7 (#65): a minor may merge into another player's major when that player agrees; the
-          # owner asks the other presidents (Step::MergeOffer, as in the Consolidation Round, §10.6).
-          def can_offer_any?(player)
-            @game.corporations.any? { |corporation| can_offer?(player, corporation) }
-          end
-
-          def can_offer?(player, minor)
-            @round.current_actions.empty? && minor.type == :minor && minor.floated? && minor.owner == player &&
-              @game.phase.available?('3') && !offer_step.nil? && !@game.merge_offer_majors(minor).empty?
-          end
-
-          def offer_step
-            @round.steps.find { |step| step.is_a?(G18OE::Step::MergeOffer) }
+            can_merge_any?(entity) || can_offer_any?(entity) || can_remove_any_corporation?(entity) || can_reserve_any?(entity) ||
+              can_act_on_any_private?(entity)
           end
 
           def can_act_on_any_private?(player)
@@ -324,10 +186,15 @@ module Engine
           end
 
           def needs_skip_action?(player)
-            # Fully held majors can only merge a connected minor; skip avoids the graph check while loading.
             @round.current_actions.empty? &&
-              @game.corporations.any? { |c| c.type == :major && c.president?(player) && !@game.merge_share(c) } &&
+              @game.corporations.any? do |c|
+                %i[major national].include?(c.type) && c.president?(player) && !@game.merge_share(c)
+              end &&
               @game.corporations.any? { |c| c.type == :minor && c.owner == player }
+          end
+
+          def can_offer_any?(player)
+            owned_minors(player).any? { |minor| !offer_choices(player, minor).empty? }
           end
 
           def can_merge_any?(player)
@@ -386,10 +253,10 @@ module Engine
           def entity_choices(target)
             return private_choices(target) if target.company?
             return {} unless non_private_choices_allowed?(current_entity)
+            return offer_choices(current_entity, target) if owned_minor?(current_entity, target) && @round.current_actions.empty?
 
             corporation = target
             choices = {}
-            choices['offer_or_merge'] = 'Offer' if can_offer?(current_entity, corporation)
             choices['remove'] = 'Remove from game' if can_remove_corporation?(current_entity, corporation)
             choices['reserve'] = 'Reserve share' if can_reserve?(current_entity, corporation)
             choices
@@ -401,15 +268,15 @@ module Engine
 
             choices = { 'remove_private' => 'Remove from game' }
             choices['flip_private'] = 'Flip face down' unless @game.face_down_private?(company)
-            choices.merge(@game.bbbt_choices(company)) # §14.4 (#78)
+            choices.merge(@game.bbbt_choices(company)) # RB 14.4
           end
 
           def process_choose(action)
             return process_private_choice(action) if action.target&.company?
+            return process_offer(action) if offer_request?(action)
             raise GameError, "Cannot choose #{action.choice} while above the certificate limit" unless
               non_private_choices_allowed?(action.entity)
 
-            return offer_merge(action) if action.target && action.choice == 'offer_or_merge'
             return remove_regional(action) if action.target && action.choice == 'remove'
             return reserve_regional(action) if action.target && action.choice == 'reserve'
 
@@ -420,11 +287,40 @@ module Engine
             track_action(action, minor)
           end
 
-          def offer_merge(action)
-            minor = action.target
-            raise GameError, "Cannot offer #{minor.name}" unless @game.loading || can_offer?(action.entity, minor)
+          # RB 10.5: the minor's owner offers it to the presidents of other players' majors (MergeOffer).
+          def process_offer(action)
+            target = action.target
+            raise GameError, "Cannot offer #{target.name}" if target.owner != action.entity || @round.current_actions.any?
+            raise GameError, "Cannot #{action.choice} #{target.name}" unless offer_allowed?(target, action.choice)
 
-            offer_step.start!(minor, action)
+            offer_step.start!(target, action)
+          end
+
+          def offer_request?(action)
+            target = action.target
+            %w[offer_or_merge offer_or_abandon].include?(action.choice) && target&.corporation? && target.type == :minor
+          end
+
+          def offer_allowed?(target, choice)
+            @game.loading || entity_choices(target).key?(choice)
+          end
+
+          def offer_choices(player, minor)
+            return {} unless @game.phase.available?('3') && @round.current_actions.empty?
+
+            @game.merge_offer_majors(minor).empty? ? {} : { 'offer_or_merge' => 'Offer' }
+          end
+
+          def owned_minor?(player, corporation)
+            corporation.corporation? && corporation.type == :minor && corporation.owner == player
+          end
+
+          def owned_minors(player)
+            @game.corporations.select { |corporation| owned_minor?(player, corporation) }
+          end
+
+          def offer_step
+            @round.steps.find { |step| step.is_a?(G18OE::Step::MergeOffer) }
           end
 
           def process_private_choice(action)
@@ -432,7 +328,7 @@ module Engine
             company = action.target
             raise GameError, "Cannot #{action.choice} #{company.name}" unless private_choices(company).key?(action.choice)
 
-            if @converting && action.choice.start_with?(Engine::Game::G18OE::Bbbt::BBBT_REPAR)
+            if @converting && action.choice.start_with?(Bbbt::BBBT_REPAR)
               @repar_cell = @game.bbbt_repar!(company, @converting, action.choice)
             elsif @game.bbbt_choice?(action.choice)
               @game.bbbt_exercise!(company, action.choice)
@@ -482,10 +378,7 @@ module Engine
             unless reservation_prompt?(action)
               return if hold_buy_for_bbbt?(action)
 
-              super
-              # §8.2: buying a parred regional's president share floats it; the 18th float removes the rest (#348).
-              @game.close_unfloated_regionals_at_maximum!
-              return
+              return super
             end
 
             check_legal_buy(action.entity, action.bundle, swap: action.swap)
@@ -539,6 +432,32 @@ module Engine
             return bundle.corporation.share_price.price * 2 if president_pool_overcap_buy?(current_entity, bundle)
 
             super
+          end
+
+          # RB 11.6.5 step 4: the Open Market charter (minor) or president's certificate (regional) of an insolvent RR
+          # is bought as one stock action. can_buy? runs the usual checks (cash against modify_purchase_price,
+          # certificate limit, one purchase per turn).
+          def insolvent_buyback?(bundle)
+            !bundle.nil? && bundle.owner == @game.share_pool && !bundle.presidents_share.nil? &&
+              bundle.percent == bundle.corporation.presidents_percent && @game.insolvent?(bundle.corporation)
+          end
+
+          # The price goes to the bank, which financed the gap; the treasury keeps its cash and a regional its par value.
+          def process_insolvent_buyback(action)
+            player = action.entity
+            bundle = action.bundle
+            corporation = bundle.corporation
+            raise GameError, "Cannot buy #{corporation.name}" unless can_buy?(player, bundle)
+
+            price = @game.insolvent_buyback_price(corporation)
+            @round.players_bought[player][corporation] += bundle.percent
+            @game.share_pool.transfer_shares(bundle, player, spender: player, receiver: @game.bank, price: price,
+                                                             allow_president_change: false)
+            corporation.owner = player
+            @log << "#{player.name} buys the insolvent #{corporation.name} " \
+                    "#{corporation.type == :minor ? 'charter' : "president's certificate"} from the market " \
+                    "for #{@game.format_currency(price)}; #{corporation.name} operates again"
+            track_action(action, corporation)
           end
 
           def can_sell?(entity, bundle)
@@ -595,7 +514,7 @@ module Engine
             # Step 3: Locate the major par cell (right×2, up×1 from original par)
             # Using original_par_price ensures correct placement even if the regional
             # somehow moved before conversion.
-            # §14.4 (1) Re-Par (owner's reading, #78): the owner of the private picked the target instead.
+            # RB 14.4 (1): the owner of the private may pick the target instead.
             target_price = @repar_cell || @game.stock_market.find_relative_share_price(
               corporation.original_par_price, corporation, %i[right right up]
             )
@@ -648,7 +567,13 @@ module Engine
             share = corporation.ipo_shares.first
             @round.players_bought[entity][corporation] += share.percent
             buy_shares(entity, share.to_bundle, exchange: company, silent: true)
-            company.close!
+            if company == @game.minor_d_private
+              entity.companies.delete(company)
+              company.owner = corporation
+              corporation.companies << company
+            else
+              company.close!
+            end
             track_action(action, action.corporation)
           end
 
@@ -678,7 +603,7 @@ module Engine
             @sold = true
           end
 
-          # §14.4 (3) (#476): the sale waits for the owner of the private (Step::ProtectShare) before the marker moves.
+          # RB 14.4 (3): the sale waits for the owner of the private (Step::ProtectShare) before the marker moves.
           def hold_sale_for_bbbt?(action)
             # only in a stock round (the consolidation round has no Step::ProtectShare)
             return false if !@round.respond_to?(:pending_share_sale) || @round.pending_share_sale
@@ -691,7 +616,7 @@ module Engine
             true
           end
 
-          # §14.4 (2) (#514): a purchase of a share of the private owner's RR waits for the owner (Step::CustodyShare).
+          # RB 14.4 (2): a purchase of a share of the private owner's RR waits for the owner (Step::CustodyShare).
           # After a declined reservation (Step::ReserveShare) the window still follows; once answered it is not asked
           # again for the same purchase.
           def hold_buy_for_bbbt?(action)
@@ -727,7 +652,14 @@ module Engine
           end
 
           def close_unfloated_regionals_at_maximum!
-            pass! if @game.close_unfloated_regionals_at_maximum!
+            return unless @game.regionals_in_play >= @game.class::MAX_FLOATED_REGIONALS
+
+            leftovers = @game.corporations.reject { |corp| corp.ipoed || corp.type == :minor }
+            return if leftovers.empty?
+
+            leftovers.each { |corp| @game.close_corporation(corp) }
+
+            pass!
           end
 
           def get_par_prices(entity, corp)
@@ -779,8 +711,8 @@ module Engine
             actions
           end
 
-          # §14.4 (1) at the conversion of the owner's own regional (#78, kept as a special case by #513): the new
-          # major's par value, chosen before it floats. The general re-par is a private choice (Game#bbbt_choices).
+          # RB 14.4 (1) at the conversion of the owner's own regional: the new major's par value, chosen before it
+          # floats. The general re-par is a private choice (Game#bbbt_choices).
           def repar_available?(player)
             !repar_choices_for(player).empty?
           end
@@ -813,7 +745,7 @@ module Engine
 
           def reserved_for_another?(entity, bundle)
             return false unless bundle
-            return true if @game.bbbt_custody_blocks?(entity, bundle) # §14.4 (2)
+            return true if @game.bbbt_custody_blocks?(entity, bundle) # RB 14.4 (2)
 
             corporation = bundle.corporation
             bundle.shares.include?(@game.reserved_share(corporation)) && entity != corporation.owner
@@ -836,33 +768,6 @@ module Engine
             return false unless corp.president?(entity)
 
             entity.common_percent_of(corp) >= @game.major_max_ownership_percent
-          end
-
-          # §11.6.5 step 4 (#353): the Open-Market charter/president's certificate of an insolvent
-          # minor or regional, bought as one stock action. can_buy? runs the usual checks (cash
-          # against modify_purchase_price, certificate limit, one purchase per turn).
-          def insolvent_buyback?(bundle)
-            !bundle.nil? && bundle.owner == @game.share_pool && !bundle.presidents_share.nil? &&
-              bundle.percent == bundle.corporation.presidents_percent && @game.insolvent?(bundle.corporation)
-          end
-
-          # ASSUMPTION (#54 plan, assumption 2): the price goes to the bank, which financed the gap;
-          # the treasury keeps its cash and the regional its par value.
-          def process_insolvent_buyback(action)
-            player = action.entity
-            bundle = action.bundle
-            corporation = bundle.corporation
-            raise GameError, "Cannot buy #{corporation.name}" unless can_buy?(player, bundle)
-
-            price = @game.insolvent_buyback_price(corporation)
-            @round.players_bought[player][corporation] += bundle.percent
-            @game.share_pool.transfer_shares(bundle, player, spender: player, receiver: @game.bank, price: price,
-                                                             allow_president_change: false)
-            corporation.owner = player
-            @log << "#{player.name} buys the insolvent #{corporation.name} " \
-                    "#{corporation.type == :minor ? 'charter' : "president's certificate"} from the market " \
-                    "for #{@game.format_currency(price)}; #{corporation.name} operates again"
-            track_action(action, corporation)
           end
 
           def complete_conversion
