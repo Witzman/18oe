@@ -46,18 +46,20 @@ RSpec.describe Oe::LegalActions, "national formation" do
   it "names the step, its help and the pass in the prompt" do
     prompt = Oe::View.render(game, viewer: alice.id)[:prompt]
 
-    expect(prompt[:step]).to eq("ConvertToNational")
+    expect(prompt[:step]).to eq("FormNational")
     expect(prompt[:description]).to eq("Form Nationals")
-    expect(prompt[:help]).to include("Train Phase 4", "LNWR", "GWR")
-    expect(prompt[:pass_description]).to include("Done")
+    # Chris' Step::FormNational has no help text; the player text is the UI's (text.ts).
+    expect(prompt[:help]).to be_nil
+    expect(prompt[:pass_description]).to eq("Pass")
     expect(prompt[:unsupported]).to be_empty
-    expect(prompt[:acting_as].map { |a| a[:entity] }).to contain_exactly("a", "LNWR", "GWR")
+    expect(prompt[:acting_as].map { |a| a[:entity] }).to contain_exactly("a")
   end
 
   it "lets the bot decline until nationals operate (#64)" do
     action = Oe::Bot.new(game, rng: Random.new(1)).choose(player_id: alice.id)
 
-    expect(action).to be_a(Engine::Action::Pass)
+    expect(action).to be_a(Engine::Action::Choose)
+    expect(action.choice).to eq("done")
     expect(action.entity).to eq(alice)
   end
 end

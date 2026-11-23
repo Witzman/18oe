@@ -295,6 +295,10 @@ module Oe
       return entity_actions if entity_actions
 
       if (choose = by_class['Choose'])
+        # FormNational window (§9.4, #64): `choose done` declines to form a national until the bot rule of v0.3.
+        done = choose.find { |a| a.choice.to_s == 'done' }
+        return done if done
+
         merges = choose.select { |a| a.target.nil? || a.choice.to_s.start_with?('offer', 'merge') }
         return pick(merges.empty? ? choose : merges) unless by_class['Pass']
       end

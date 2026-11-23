@@ -82,6 +82,8 @@ RSpec.describe Oe::LegalActions, "train variants" do
 
   it "offers only the sides the treasury can pay" do
     buyer.spend(buyer.cash - 210, game.bank)
+    # Chris' Step::Train lets the president chip in for the cheapest depot train, so he is drained too (#356).
+    buyer.owner.spend(buyer.owner.cash, game.bank) if buyer.owner.cash.positive?
 
     expect(offers).to eq("3" => 200)
   end
