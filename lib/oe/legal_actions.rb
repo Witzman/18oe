@@ -597,6 +597,13 @@ module Oe
       end
     end
 
+    # §11.3.10 Brandt and Brandau: another RR removes the token for the hex's original terrain price and one tile
+    # point (patch 0017, Step::Track#bbe_removable_hexes); the step's own rules decide, the treasury must cover it.
+    def generate_remove_hex_token(step, entity)
+      hexes = step.bbe_removable_hexes(entity).select { |hex| step.bbe_removal_money(entity, hex) <= entity.cash }
+      sample(hexes).map { |hex| A::RemoveHexToken.new(entity, hex: hex) }
+    end
+
     # §15.4 Minor D / §14.8 Hochberg: the private places its token on a hex (the action's target), as the step's
     # own `available_hex` allows (Chris' Step::Assign; the train marker of Minor L is a `choose`, 4c).
     def generate_assign(step, entity)

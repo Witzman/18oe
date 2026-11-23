@@ -192,7 +192,6 @@ describe 'G18OE Brandt and Brandau, Engineers (RB 14.9, 11.3.10)' do
     end
 
     it 'offers the removal of the token to the RR of another player' do
-      pending('Oe::LegalActions does not offer RemoveHexToken yet (finding #563: wrapper, not engine)')
       place!('R39')
       other_op = start_major!(game, 'CHN', other)
       fund!(game, other_op, 500)
@@ -202,6 +201,8 @@ describe 'G18OE Brandt and Brandau, Engineers (RB 14.9, 11.3.10)' do
 
       removal = legal.call.find { |a| a.is_a?(Engine::Action::RemoveHexToken) }
       expect(removal&.hex&.id).to eq('R39')
+      expect { act!(game.round, removal) }.not_to raise_error
+      expect(game.bbe_token_hexes).to be_empty
     end
   end
 end
