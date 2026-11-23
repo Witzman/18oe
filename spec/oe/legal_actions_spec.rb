@@ -423,7 +423,7 @@ RSpec.describe Oe::LegalActions, "#lay_tile_options log" do
 end
 
 # #315/#319, #574: the path search runs on every prompt and bot move; it is Chris' Engine::AutoRouter#path (no
-# walk limit in the core: it is bounded by the wall clock path_timeout and the route_limit per train).
+# wall clock in the wrapper: the core's walk_limit (engine/patches/0019) bounds it, and the route_limit per train).
 RSpec.describe Oe::RouteSearch do
   include G18OESpecHelpers
 
@@ -451,9 +451,17 @@ RSpec.describe Oe::RouteSearch do
     expect(limited).to eq(full.transform_values { |revenues| revenues.first(2) })
   end
 
+  it "bounds the walk by steps, not seconds, unless told otherwise" do
+    allow_any_instance_of(Engine::AutoRouter).to receive(:path) do |_router, _trains, _corp, **opts|
+      expect(opts).to eq(walk_limit: described_class::WALK_LIMIT)
+      [{}, false]
+    end
+    described_class.new(new_game).path([], nil, path_timeout: 5)
+  end
+
   it "passes only the options the core router knows" do
     allow_any_instance_of(Engine::AutoRouter).to receive(:path) do |_router, _trains, _corp, **opts|
-      expect(opts.keys).to contain_exactly(:path_timeout)
+      expect(opts).to eq(walk_limit: 10)
       [{}, false]
     end
     described_class.new(new_game).path([], nil, path_timeout: 5, walk_limit: 10)

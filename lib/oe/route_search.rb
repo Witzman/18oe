@@ -7,6 +7,10 @@ module Oe
   # Route candidates and a greedy combination on top of the core Engine::AutoRouter#path (its route combiner
   # is a JavaScript class in `%x{...}`, Opal-only, and is never called under MRI).
   class RouteSearch
+    # The path walk is cut after this many callbacks, not after a number of seconds (#590): what it finds must not
+    # depend on how fast the machine is. About 80 microseconds per callback, so a cut search takes about 30 s at most; the walks measured so far need up to 120_000.
+    WALK_LIMIT = 400_000
+
     def initialize(game, flash = nil)
       @game = game
       @flash = flash
@@ -92,7 +96,8 @@ module Oe
     # Chris' graph walk hands the sea crossings as chains, so 18OE needs no extra pass). Returns
     # [train_routes, timed_out] like AutoRouter#path. Only its combiner is Opal-only, hence `pick` above.
     def path(trains, corporation, **opts)
-      Engine::AutoRouter.new(@game, @flash).path(trains, corporation, **opts.slice(:routes, :path_timeout, :route_limit))
+      opts = { walk_limit: WALK_LIMIT }.merge(opts.slice(:routes, :route_limit, :walk_limit))
+      Engine::AutoRouter.new(@game, @flash).path(trains, corporation, **opts)
     end
   end
 end
