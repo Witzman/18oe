@@ -44,7 +44,8 @@ module Oe
         pass = by_class["Pass"]&.first
         entity = tiles.first.entity
         candidates = all_lays(entity) || tiles
-        affordable = candidates.select { |a| cost(a) <= entity.cash - reserve(entity) }
+        # A private's lay (Brandt and Brandau, §14.9) is free and has no treasury: everything is affordable.
+        affordable = entity.respond_to?(:cash) ? candidates.select { |a| cost(a) <= entity.cash - reserve(entity) } : candidates
         if affordable.empty?
           return pass if pass
 

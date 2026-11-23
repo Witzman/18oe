@@ -62,8 +62,6 @@ games:
       - stock/BuySellParShares/choose:reserve
       - stock/BuySellParShares/buy_company:trade
       - stock/BuySellParShares/buy_corporation
-      - stock/TradeOffer/choose:accept_trade
-      - stock/TradeOffer/pass
       - stock/HomeToken/place_token
       - operating/Track/lay_tile
       - operating/Track/pass
