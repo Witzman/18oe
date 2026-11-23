@@ -463,7 +463,7 @@ RSpec.describe "games API authorizer (#36)" do
     rng = Random.new(1)
     strategist = Oe::StrategyPlayer.new(game, rng: rng)
     # the OR opens with Minor C's choice of operating position (#70), a player action
-    until Oe::View.round_type(game.round) == "operating" && !game.round.active_step.is_a?(Engine::Game::G18OE::Step::GoldenBellOrder)
+    until Oe::View.round_type(game.round) == "operating" && !game.round.active_step.is_a?(Engine::Game::G18OE::Step::ChooseOperatingPosition)
       actions = Oe::LegalActions.new(game, limit: 8, rng: rng).call
       game.process_action(strategist.choose(actions) || actions.sample(random: rng))
     end
