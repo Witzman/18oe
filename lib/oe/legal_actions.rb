@@ -238,12 +238,24 @@ module Oe
       return false if info.none? { |_, _, gain| gain }
 
       connected = connected_paths(entity)
-      sure = info.select { |_, op, _| op && connected[op] }.map(&:first)
+      sure = info.select { |np, op, _| (op && connected[op]) || meets_connected_path?(old_tile.hex, np, connected, entity) }.map(&:first)
       return nil if sure.empty?
 
       joints = sure.flat_map { |path| joints_of(path, entity, old_tile) }
       surely = info.select { |np, _, _| sure.include?(np) || joints_of(np, entity, old_tile).intersect?(joints) }
       surely.any? { |_, _, gain| gain } ? true : nil
+    end
+
+    # The path leaves the hex across an edge where the neighbour's path is connected now: the walk that reached that
+    # path goes on into this one (Part::Path#walk, the neighbour's exit). Only paths on a hex the graph skips (Brandt
+    # and Brandau, Game#graph_skip_paths) are not walked into, those are left to the trial lay.
+    def meets_connected_path?(hex, path, connected, entity)
+      return false if @game.graph_skip_paths(entity)&.any? { |skipped, _| skipped.hex == hex }
+
+      path.exits.any? do |edge|
+        neighbor = hex.neighbors[edge]
+        neighbor && (neighbor.paths[hex.invert(edge)] || []).any? { |other| connected[other] }
+      end
     end
 
     def joints_of(path, entity, old_tile)

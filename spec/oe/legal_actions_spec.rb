@@ -360,6 +360,15 @@ RSpec.describe Oe::LegalActions do
       expect(offered(track_build)).to match_array(accepted)
     end
 
+    # #587: a path that leaves the hex across an edge where the neighbour's path is connected is connected too, so
+    # every lay of this map is decided without a trial map (each trial clears the graph and rebuilds the sea network).
+    it "decides every lay of the start map without a trial lay" do
+      game = track_build
+      expect_any_instance_of(described_class).not_to receive(:with_tile_laid)
+
+      expect(offered(game)).not_to be_empty
+    end
+
     it "leaves out rotations the engine's check refuses" do
       game = track_build
       step = game.round.active_step
