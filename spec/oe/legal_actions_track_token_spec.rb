@@ -53,6 +53,7 @@ RSpec.describe Oe::LegalActions, "track and token formats" do
     let(:build) do
       lambda do
         game = new_game
+        game.minor_merged # Christiania lies outside LNWR's zone; majors leave it after the first merger (46330521f, #600)
         player = game.players.first
         buyer = start_major!(game, "LNWR", player)
         seller = start_major!(game, "GWR", player)
