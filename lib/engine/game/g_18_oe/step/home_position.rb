@@ -17,6 +17,18 @@ module Engine
             @game.home_position_cities(corporation, city.hex).include?(city)
           end
 
+          # The home token of a regional or major was paid at the float (RB 3.2 step 4; a major's is free), so a placement
+          # deferred to a later round costs nothing; the engine's Tokener would charge token.price again. A minor's is
+          # priced by G18OE::Step::HomeToken (RB 9.1).
+          def process_place_token(action)
+            home = token
+            price = home.price
+            home.price = 0 unless home.corporation.type == :minor
+            super
+          ensure
+            home.price = price if home
+          end
+
           def check_home_position!(action)
             return if pass_city_ok?(action.entity, action.city)
 

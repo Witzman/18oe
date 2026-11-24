@@ -170,13 +170,19 @@ module Oe
       tokener = step.is_a?(Engine::Step::HomeToken) || entity.company? ? tokens.first.corporation : entity
       extra_slot = company_extra_slot?(step, entity)
       token_cities(step, entity).select do |city|
-        city.tokenable?(tokener, free: false, tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
+        city.tokenable?(tokener, free: free_home_token?(step, tokener), tokens: tokens, extra_slot: extra_slot) && home_region_ok?(step, tokener, city) &&
           connected_for_token?(step, entity, tokener, city) && first_round_token_ok?(step, tokener, tokens, city) &&
           (!step.respond_to?(:pass_city_ok?) || step.pass_city_ok?(entity, city))
       end
     end
 
     private
+
+    # The home token of a regional or major was paid at the float, so one deferred to a later round is free
+    # (patch 0021, HomePosition#process_place_token). A minor's is priced by #home_region_ok?.
+    def free_home_token?(step, tokener)
+      step.is_a?(Engine::Step::HomeToken) && tokener.type != :minor
+    end
 
     # A private's token ability may use an extra position of the city (White
     # Cliffs Ferry in Lille); Tokener#place_token passes the same flag (#128).
