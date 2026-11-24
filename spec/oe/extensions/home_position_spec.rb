@@ -117,6 +117,31 @@ describe "G18OE metropolis home position (extension)" do
       expect(round.current_entity).to eq(lnwr)
     end
 
+    # Task 4b: the regional paid its home token at the float (Game#float_corporation, RB 3.2 step 4), so the deferred
+    # home token chosen after a metropolis tile costs nothing more. A treasury of 0 (#595, seed 1, 3p) left the
+    # enumerator with no position and the game in a dead end.
+    it 'places the deferred home token of a regional with an empty treasury at no further cost (#595)' do
+      hex = metropolis!('C74')
+      round = stock_round!(game)
+      msp = start_regional!(game, 'MSP', player)
+      msp.spend(msp.cash, game.bank)
+
+      expect(offered(round, msp, hex)).not_to be_empty
+      choose(round, msp, hex, 0)
+
+      expect(hex.tile.cities[0].tokened_by?(msp)).to be(true)
+      expect(msp.cash).to eq(0)
+    end
+
+    it 'does not charge the deferred home token a second time (#595)' do
+      hex = metropolis!('C74')
+      round = stock_round!(game)
+      msp = start_regional!(game, 'MSP', player)
+      thin_treasury!(msp)
+
+      expect { choose(round, msp, hex, 0) }.not_to(change { msp.cash })
+    end
+
     it 'leaves every position open when yellow track reaches a stop from each of them' do
       hex = metropolis!('R55')
       round = stock_round!(game)
