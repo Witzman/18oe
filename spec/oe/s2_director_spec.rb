@@ -62,6 +62,24 @@ RSpec.describe "S2 director steering (#481)" do
     end
   end
 
+  describe "sparing the bank for the consolidation round (#596)" do
+    let(:targets) { %w[consolidation/MergeOffer/pass] }
+    let(:regional) { start_regional!(game, "LNWR", game.players.first) }
+    let(:payout) { { "type" => "dividend", "entity" => regional.id, "kind" => "payout" } }
+    let(:withhold) { { "type" => "dividend", "entity" => regional.id, "kind" => "withhold" } }
+
+    it "withholds the dividend while a consolidation target is missing" do
+      expect(script.send(:director, "operating", "Dividend", prompt(payout, withhold))).to eq(withhold)
+    end
+
+    it "leaves the dividend to the bot for other targets and once the target is reached" do
+      script.instance_variable_set(:@targets, %w[stock/MergeMinor/merge])
+      expect(script.send(:director, "operating", "Dividend", prompt(payout, withhold))).to be_nil
+      script.instance_variable_set(:@targets, [])
+      expect(script.send(:director, "operating", "Dividend", prompt(payout, withhold))).to be_nil
+    end
+  end
+
   describe "filling a corporation with trains for the Phase 4 discard (#224)" do
     let(:targets) { %w[operating/DiscardTrain/discard_train] }
     let(:regional) { start_regional!(game, "LNWR", game.players.first) }

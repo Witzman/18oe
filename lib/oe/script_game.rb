@@ -261,6 +261,9 @@ module Oe
       crowd = crowd_trains(round, step, prompt, missing)
       return crowd if crowd
 
+      spare = spare_bank(round, step, prompt, missing)
+      return spare if spare
+
       range = prompt["ranges"].find { |r| missing.include?(key(round, step, r)) }
       return nil unless range
 
@@ -351,6 +354,18 @@ module Oe
       @held_regional ||= converts.first["entity"]
       other = converts.find { |a| a["entity"] != @held_regional }
       other || prompt["actions"].find { |a| a["type"] == "pass" }
+    end
+
+    # The Consolidation round follows the first Level-5 train (§11.8), but a rush game ends when the bank breaks
+    # (GAME_END_CHECK bank: :current_or). On the 18xx.games engine the 3-player game ended that way in Train
+    # Phase 3, turn 13 (CI run 45449578025, S2 game 2; #596; the end reason itself was not read). While a
+    # consolidation target is missing the director withholds every dividend: the money stays in the treasuries
+    # instead of leaving the bank. Legal and on offer; everything else is the bot's play.
+    def spare_bank(round, step, prompt, missing)
+      return nil unless @rush && round == "operating" && step == "Dividend"
+      return nil unless missing.any? { |k| k.start_with?("consolidation/") }
+
+      prompt["actions"].find { |a| a["type"] == "dividend" && a["kind"] == "withhold" }
     end
 
     # A corporation is over its train limit only when the limit falls (Phase 4: major 4 to 3, minor and regional 2 to 1)
