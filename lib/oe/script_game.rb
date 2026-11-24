@@ -410,7 +410,7 @@ module Oe
       end
 
       @ledger.executed[key(round, step, action)] += 1
-      @mirror.process_action(action.merge("user" => pid))
+      @mirror.process_action(action.merge("user" => pid), add_auto_actions: true)
       if @mirror.exception
         @ledger.problem(:mirror_diverged, "mirror rejected an action the server accepted: #{@mirror.exception.message}")
         return :mirror_diverged
