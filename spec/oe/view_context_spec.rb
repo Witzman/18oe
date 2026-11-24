@@ -212,9 +212,10 @@ RSpec.describe "Oe::View operating context in states built by code (#438)" do
   it "prices the hexes at the extra point of Minor E when no regular point is left (#426)" do
     game = new_game
     major = start_major!(game, "GWR", game.players[0])
+    game.minor_merged # a charter comes only with a merge, which lifts the zone limit of majors (upstream 46330521f, #600)
     game.add_minor_charter!(game.corporation_by_id("E"), major)
-    step = operating_round_for!(game, 1).active_step
-    step.instance_variable_set(:@points_used, game.tile_point_budget(major))
+    round = operating_round_for!(game, 1)
+    round.tile_points_used = game.tile_point_budget(major) # Chris' G18OE::Tracker keeps the points in the round (#600)
 
     view = check_view!(game)
 

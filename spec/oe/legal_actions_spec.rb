@@ -115,7 +115,8 @@ RSpec.describe Oe::LegalActions do
         game.players.each_with_index { |_player, index| start_major!(game, %w[LNWR PLM SFAI][index], game.players[index]) }
         game.corporations.select { |c| c.type == :major }.each { |major| fund!(game, major, 700) }
         game.phase.next!
-        enter_round!(game, game.operating_round(1))
+        # set up like a real OR (current_operator): Chris' IssueShares step refuses a sale of any other entity (#600)
+        operating_round_for!(game, 1, setup: true)
         game
       end
     end

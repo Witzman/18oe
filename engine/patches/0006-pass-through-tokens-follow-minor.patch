@@ -1,8 +1,8 @@
 diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
-index 1288f5e..84ff5ab 100644
+index eab22d9..0164318 100644
 --- a/lib/engine/game/g_18_oe/game.rb
 +++ b/lib/engine/game/g_18_oe/game.rb
-@@ -680,6 +680,20 @@ module Engine
+@@ -705,6 +705,20 @@ module Engine
            clear_graph_for_entity(corporation)
          end
  
@@ -23,7 +23,7 @@ index 1288f5e..84ff5ab 100644
          def pass_through_token_lines(corporation)
            @pass_through_tokens.filter_map do |company, token|
              next unless token.corporation == corporation
-@@ -1111,6 +1125,7 @@ module Engine
+@@ -1169,6 +1183,7 @@ module Engine
            @log << "#{minor.name} is abandoned"
            minor.trains.reject { |train| pullman?(train) }.each { |train| @depot.reclaim_train(train) }
            minor.placed_tokens.each(&:remove!)
@@ -32,10 +32,10 @@ index 1288f5e..84ff5ab 100644
            minor.spend(minor.cash, @bank) if minor.cash.positive?
            @share_pool.transfer_shares(minor.presidents_share.to_bundle, minor.ipo_owner, allow_president_change: false)
 diff --git a/lib/engine/game/g_18_oe/step/merge_minor.rb b/lib/engine/game/g_18_oe/step/merge_minor.rb
-index 2e46482..708b98a 100644
+index c03daeb..e25c829 100644
 --- a/lib/engine/game/g_18_oe/step/merge_minor.rb
 +++ b/lib/engine/game/g_18_oe/step/merge_minor.rb
-@@ -102,6 +102,7 @@ module Engine
+@@ -103,6 +103,7 @@ module Engine
                @game.abandon_minor!(minor)
              else
                @game.add_minor_charter!(minor, major)

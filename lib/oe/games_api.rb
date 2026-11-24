@@ -45,8 +45,10 @@ module Oe
         end
       end
 
+      # The game's own range for the options we start it with (none: Chris' Meta.player_range gives 2 to 7; 8 players
+      # need the Extended Full Game option, which the wrapper does not offer, #600).
       def player_range
-        Engine::Game::G18OE::Game::PLAYER_RANGE
+        Engine::Game::G18OE::Meta.player_range([])
       end
 
       # "p<n>" for the seat the logged-in account holds in this game, else nil.

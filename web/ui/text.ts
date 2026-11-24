@@ -67,7 +67,6 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "step.MergeToken": e("Merge token", "Merge token", "§10.5, §10.6"),
   "step.CustodyShare": e("Put a share into custodianship", "Custodianship", "§14.4"),
   "step.ProtectShare": e("Protect a share value from moving down", "Protect share value", "§14.4"),
-  "step.HomeHexConsent": e("Allow yellow track in your RR's home hex", "Home hex permission", "§11.1.9"),
   "step.HomePosition": e("Choose the home position", "Home position", "§11.1.9"),
   "step.MergeOffer": e("Merge offer", "Merge offer", "§10.5, §10.6"),
   "step.MergeDiscardTrain": e("Discard a train in the merger", "Discard train on merger", "§10.5, §10.6"),
@@ -806,8 +805,8 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "choice.flip_private_tip": e("The private is flipped face down and closed: it pays no more revenue, no longer counts against the certificate limit, can no longer be traded and does not count in the final standings.", "Close the private: flip its certificate face down", "§3.3, §6.1, §10.4"),
   "choice.accept_trade": e("Accept", "Accept", "§10.4"),
   "choice.accept_trade_tip": e("You sell at the offered price; the money goes to your cash. Passing declines: the buyer keeps their turn.", "Sell at the offered price; passing declines the offer", "§10.4"),
-  "choice.allow_home_lay": e("Allow", "Allow", "§11.1.9"),
-  "choice.allow_home_lay_tip": e("Another RR may lay yellow track in the home hex of your floated RR. Passing declines: the hex is then closed to it for this track lay.", "Allow yellow track in your RR's home hex; passing refuses it", "§11.1.9"),
+  "choice.first_round_insolvency": e("Declare first-round insolvency", "Declare first-round insolvency", "§11.6.5"),
+  "choice.first_round_insolvency_tip": e("The RR receives its reserved 2+2 with the unpaid part as a debt; the president's cash goes into the treasury, the charter or president's certificate goes to the Open Market and the president receives its face value. The RR does not operate until a player buys it back for face value plus the debt.", "Declare first-round insolvency: the reserved 2+2 with a debt, the certificate to the Open Market", "§11.6.5"),
   "choice.remove_private": e("Remove from game", "Remove from game", "§3.3, §6.1"),
   "choice.remove_private_tip": e("The private is removed from the game and is gone for good.", "Remove the private from the game", "§3.3, §6.1"),
 

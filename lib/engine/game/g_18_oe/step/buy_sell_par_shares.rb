@@ -373,16 +373,31 @@ module Engine
           end
 
           def process_buy_shares(action)
-            return process_insolvent_buyback(action) if insolvent_buyback?(action.bundle)
+            return buy_back_insolvent!(action) if insolvent_pool_bundle?(action.bundle)
 
-            unless reservation_prompt?(action)
+            if reservation_prompt?(action)
+              check_legal_buy(action.entity, action.bundle, swap: action.swap)
+              @round.pending_share_buy = action
+            else
               return if hold_buy_for_bbbt?(action)
 
-              return super
+              super
             end
+          end
 
-            check_legal_buy(action.entity, action.bundle, swap: action.swap)
-            @round.pending_share_buy = action
+          def buy_back_insolvent!(action)
+            player = action.entity
+            bundle = action.bundle
+            corporation = bundle.corporation
+            check_legal_buy(player, bundle)
+
+            @round.players_bought[player][corporation] += bundle.percent
+            @game.share_pool.transfer_shares(
+              bundle, player,
+              spender: player, receiver: @game.bank, price: @game.insolvent_purchase_price(corporation)
+            )
+            @game.restore_insolvent!(corporation)
+            track_action(action, corporation)
           end
 
           def corporation_actions(corporation)
@@ -400,6 +415,7 @@ module Engine
           end
 
           def can_buy?(entity, bundle)
+            return false if bundle && @game.insolvent?(bundle.corporation) && !insolvent_pool_bundle?(bundle)
             return false if treasury_share_off_sale?(bundle)
             return false if reserved_for_another?(entity, bundle)
 
@@ -428,36 +444,10 @@ module Engine
           end
 
           def modify_purchase_price(bundle)
-            return @game.insolvent_buyback_price(bundle.corporation) if insolvent_buyback?(bundle)
+            return @game.insolvent_purchase_price(bundle.corporation) if insolvent_pool_bundle?(bundle)
             return bundle.corporation.share_price.price * 2 if president_pool_overcap_buy?(current_entity, bundle)
 
             super
-          end
-
-          # RB 11.6.5 step 4: the Open Market charter (minor) or president's certificate (regional) of an insolvent RR
-          # is bought as one stock action. can_buy? runs the usual checks (cash against modify_purchase_price,
-          # certificate limit, one purchase per turn).
-          def insolvent_buyback?(bundle)
-            !bundle.nil? && bundle.owner == @game.share_pool && !bundle.presidents_share.nil? &&
-              bundle.percent == bundle.corporation.presidents_percent && @game.insolvent?(bundle.corporation)
-          end
-
-          # The price goes to the bank, which financed the gap; the treasury keeps its cash and a regional its par value.
-          def process_insolvent_buyback(action)
-            player = action.entity
-            bundle = action.bundle
-            corporation = bundle.corporation
-            raise GameError, "Cannot buy #{corporation.name}" unless can_buy?(player, bundle)
-
-            price = @game.insolvent_buyback_price(corporation)
-            @round.players_bought[player][corporation] += bundle.percent
-            @game.share_pool.transfer_shares(bundle, player, spender: player, receiver: @game.bank, price: price,
-                                                             allow_president_change: false)
-            corporation.owner = player
-            @log << "#{player.name} buys the insolvent #{corporation.name} " \
-                    "#{corporation.type == :minor ? 'charter' : "president's certificate"} from the market " \
-                    "for #{@game.format_currency(price)}; #{corporation.name} operates again"
-            track_action(action, corporation)
           end
 
           def can_sell?(entity, bundle)
@@ -548,14 +538,19 @@ module Engine
               return "#{current_entity.name} must purchase one share of #{@converted.name} to become president."
             end
 
-            return super unless can_float_minor?(current_entity)
+            can_float_minor = can_float_minor?(current_entity)
+            first_stock_round = @game.turn == 1 && @round.instance_of?(Engine::Round::Stock)
+            return super if !first_stock_round && !can_float_minor
 
-            "Available track rights zones: #{zones_display}. "\
-              'Home station placement determines which zone the minor receives.'
+            zones = "Available track rights zones: #{zones_display}."
+            zones += ' Home station placement determines which zone the minor receives.' if can_float_minor
+            return zones unless first_stock_round
+
+            regionals = @game.removed_regionals.map(&:full_name)
+            [zones, "Removed regionals: #{regionals.empty? ? 'None' : regionals.join(', ')}."]
           end
 
           def float_minor(action)
-            share_price = action.share_price
             corporation = action.corporation
             entity = action.entity
             company = find_minor_company(corporation)
@@ -563,7 +558,6 @@ module Engine
 
             @log << "#{entity.name} floats #{company.sym}"
 
-            @game.par_corporation(corporation, share_price)
             share = corporation.ipo_shares.first
             @round.players_bought[entity][corporation] += share.percent
             buy_shares(entity, share.to_bundle, exchange: company, silent: true)
@@ -652,12 +646,12 @@ module Engine
           end
 
           def close_unfloated_regionals_at_maximum!
-            return unless @game.regionals_in_play >= @game.class::MAX_FLOATED_REGIONALS
+            return unless @game.regionals_in_play >= @game.max_floated_regionals
 
             leftovers = @game.corporations.reject { |corp| corp.ipoed || corp.type == :minor }
             return if leftovers.empty?
 
-            leftovers.each { |corp| @game.close_corporation(corp) }
+            leftovers.each { |corp| @game.remove_regional!(corp, stock_action: false) }
 
             pass!
           end
@@ -736,6 +730,8 @@ module Engine
           end
 
           def zones_display
+            return 'None' if @game.minor_available_regions.empty?
+
             @game.minor_available_regions.map { |zone, count| "#{zone}(#{count})" }.join(', ')
           end
 
@@ -758,6 +754,13 @@ module Engine
             return false if bundle.owner != corporation.ipo_owner || !corporation.ipoed
 
             !(@game.parred_regional?(corporation) && bundle.presidents_share && bundle.percent == corporation.presidents_percent)
+          end
+
+          def insolvent_pool_bundle?(bundle)
+            return false unless bundle&.owner&.share_pool?
+            return false unless bundle.presidents_share
+
+            @game.insolvent?(bundle.corporation)
           end
 
           def president_pool_overcap_buy?(entity, bundle)

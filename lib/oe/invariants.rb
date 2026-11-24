@@ -220,7 +220,8 @@ module Oe
         price = corp.share_price
         next if corp.closed?
         unless price
-          out << "#{corp.name} is floated without a share price" if corp.floated?
+          # a minor floats without a par (§9.1; Chris' engine since upstream 49c770035, #600)
+          out << "#{corp.name} is floated without a share price" if corp.floated? && corp.type != :minor
           next
         end
         row, col = price.coordinates

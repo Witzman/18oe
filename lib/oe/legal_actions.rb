@@ -131,7 +131,10 @@ module Oe
       ability = step.abilities(entity)
       return [] unless ability
 
-      return @game.hexes unless ability.respond_to?(:hexes) # several abilities: the step decides per hex
+      # several abilities, or an ability without a hex list (Chris' Brandt & Brandau: the step's own brandt_hex?
+      # check comes first in available_hex): the step decides per hex
+      return @game.hexes if !ability.respond_to?(:hexes) || ability.hexes.empty?
+
       @game.hexes.select { |hex| ability.hexes.include?(hex.id) }
     end
 
@@ -151,7 +154,7 @@ module Oe
       rotations.select do |rotation|
         tile.rotate!(rotation)
         cost = terrain + @game.cross_water_tile_fee(entity, hex, tile).to_i
-        cost <= entity.cash && @game.first_round_spend_allowed?(entity, cost - @game.patronage_payout(hex))
+        cost <= entity.cash && reserve_allows?(entity, cost)
       end
     end
 
@@ -628,13 +631,6 @@ module Oe
       end
     end
 
-    # §11.3.10 Brandt and Brandau: another RR removes the token for the hex's original terrain price and one tile
-    # point (patch 0017, Step::Track#bbe_removable_hexes); the step's own rules decide, the treasury must cover it.
-    def generate_remove_hex_token(step, entity)
-      hexes = step.bbe_removable_hexes(entity).select { |hex| step.bbe_removal_money(entity, hex) <= entity.cash }
-      sample(hexes).map { |hex| A::RemoveHexToken.new(entity, hex: hex) }
-    end
-
     # §15.4 Minor D / §14.8 Hochberg: the private places its token on a hex (the action's target), as the step's
     # own `available_hex` allows (Chris' Step::Assign; the train marker of Minor L is a `choose`, 4c).
     def generate_assign(step, entity)
@@ -678,7 +674,7 @@ module Oe
       end
 
       step.selectable_token_choices(entity, city).filter_map do |choice|
-        next if choice[:cost] > entity.cash || !@game.first_round_spend_allowed?(entity, choice[:cost])
+        next if choice[:cost] > entity.cash || !reserve_allows?(entity, choice[:cost])
 
         A::PlaceToken.new(entity, city: city, token_index: choice[:index], cost: choice[:cost])
       end
@@ -688,7 +684,7 @@ module Oe
     def company_token_affordable?(tokener, city)
       # the private's token itself is free; the corporation pays the fee for ferries and sea zones (the step's check)
       fee = @game.cross_water_token_fee(tokener, city)
-      fee <= tokener.cash && (!@game.respond_to?(:first_round_spend_allowed?) || @game.first_round_spend_allowed?(tokener, fee))
+      fee <= tokener.cash && reserve_allows?(tokener, fee)
     end
 
     # §11.2.x Transfer Tokens: the buyer replaces a token of another RR (`slot` of the city) with one of its own
@@ -739,9 +735,18 @@ module Oe
 
     # RB 11.6.4 para. 2: a paid token may not leave the reserved 2+2 unpayable.
     def first_round_token_ok?(step, tokener, tokens, city)
-      return true if step.is_a?(Engine::Step::HomeToken) || !@game.respond_to?(:first_round_spend_allowed?)
+      return true if step.is_a?(Engine::Step::HomeToken)
 
-      @game.first_round_spend_allowed?(tokener, tokens.map(&:price).min.to_i + @game.cross_water_token_fee(tokener, city).to_i)
+      reserve_allows?(tokener, tokens.map(&:price).min.to_i + @game.cross_water_token_fee(tokener, city).to_i)
+    end
+
+    # §11.6.5: may the RR spend `cost` and still pay its reserved 2+2? Chris' Game#check_reserved_train_funds! decides
+    # (Step::Track/Token/SpecialToken call it with the full cost, fees included), asked here as a question.
+    def reserve_allows?(entity, cost)
+      @game.check_reserved_train_funds!(entity, cost)
+      true
+    rescue Engine::GameError
+      false
     end
 
     def token_cities(step, entity)

@@ -25,18 +25,6 @@ module Engine
             track_rights_available_hex(entity, hex)
           end
 
-          # RB 11.6.4 para. 2: a paid token obeys the same guard as a paid lay.
-          def pay_token_cost(entity, cost, city)
-            @game.check_first_round_spend!(entity, cost, what: 'a token')
-            super
-          end
-
-          # RB 11.6.4 para. 2: no token while its price would leave the reserved 2+2 unpayable; the step then has
-          # nothing to offer.
-          def can_place_token?(entity)
-            super && @game.first_round_spend_allowed?(entity, min_token_price(available_tokens(entity)))
-          end
-
           def process_place_token(action)
             entity = action.entity
             token = selected_token(action)
@@ -44,6 +32,8 @@ module Engine
 
             cost = token_cost(action, token)
             raise GameError, "#{entity.name} cannot afford the #{@game.format_currency(cost)} token cost" if cost > entity.cash
+
+            @game.check_reserved_train_funds!(entity, cost)
 
             charter_price = token.price
             action.token = token

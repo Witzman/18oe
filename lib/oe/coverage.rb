@@ -12,7 +12,7 @@ module Oe
       "S1" => {
         rounds: %w[Auction Concession Stock Operating],
         steps: %w[
-          WaterfallAuction Concession HomeToken HomeHexConsent BuySellParShares ReserveShare TradeOffer
+          WaterfallAuction Concession HomeToken BuySellParShares ReserveShare TradeOffer
           Track Token Route Dividend BuyTrain IssueShares Bankrupt GoldenBellOrder
         ],
         train_phases: %w[2],

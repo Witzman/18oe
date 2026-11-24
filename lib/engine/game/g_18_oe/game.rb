@@ -9,6 +9,7 @@ require_relative 'sea_routes'
 require_relative 'orient_express_duty'
 require_relative 'nationals'
 require_relative 'bbbt'
+require_relative 'first_round_insolvency'
 require_relative 'train'
 require_relative '../base'
 require_relative 'depot'
@@ -26,8 +27,6 @@ require_relative 'step/merge_offer'
 require_relative 'step/merge_token'
 require_relative 'step/concession'
 require_relative 'step/choose_operating_position'
-require_relative 'step/home_hex_consent'
-require_relative 'step/special_track'
 require_relative 'step/home_position'
 require_relative 'step/reserve_share'
 require_relative 'step/protect_share'
@@ -50,10 +49,11 @@ module Engine
         include G18OE::OrientExpressDuty
         include G18OE::Nationals
         include G18OE::Bbbt
+        include G18OE::FirstRoundInsolvency
         attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                       :consolidation_triggered, :consolidation_complete
         attr_reader :fast_start_minors, :concessions, :merged_minors, :wcf_placeholder, :minor_c_ability,
-                    :hochberg_token_hex, :swift_metropolitan_train, :bbe_token_hexes
+                    :hochberg_token_hex, :swift_metropolitan_train, :removed_regionals
 
         PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
                            { group: :white, count: 3 }, { group: :green, count: 8 }].freeze
@@ -77,12 +77,20 @@ module Engine
           'CCTC' => { logo: '/logos/18_oe/cctc.svg', port: false },
         }.freeze
 
+        RESERVED_TRAIN = '2+2'
         CERT_LIMIT = { 2 => 99, 3 => 48, 4 => 36, 5 => 29, 6 => 24, 7 => 20 }.freeze
         # Standard game: £5,400 total / num_players, rounded up to nearest £5.
         # 2-player variant uses without-concessions formula (£5,200 / 2 = £2,600).
         STARTING_CASH = { 2 => 2600, 3 => 1800, 4 => 1350, 5 => 1080, 6 => 900, 7 => 775 }.freeze
         STARTING_CASH_NO_CONCESSIONS = { 2 => 2600, 3 => 1735, 4 => 1300, 5 => 1040, 6 => 870, 7 => 745 }.freeze
         BANK_CASH = 54_000
+
+        EXTENDED_CERT_LIMIT = { 3 => 64, 4 => 48, 5 => 39, 6 => 32, 7 => 27, 8 => 24 }.freeze
+        EXTENDED_STARTING_CASH = { 3 => 2160, 4 => 1620, 5 => 1300, 6 => 1080, 7 => 930, 8 => 810 }.freeze
+        EXTENDED_STARTING_CASH_NO_CONCESSIONS = { 3 => 2095, 4 => 1570, 5 => 1260, 6 => 1050, 7 => 900, 8 => 785 }.freeze
+        EXTENDED_BANK_CASH = 64_800
+        EXTENDED_ADDITIONAL_PULLMANS = 4
+
         CURRENCY_FORMAT_STR = '£%s'
         CAPITALIZATION = :incremental
         SELL_BUY_ORDER = :sell_buy
@@ -90,6 +98,7 @@ module Engine
         EBUY_CAN_SELL_SHARES = false
         BANKRUPTCY_ALLOWED = false
         FORCED_NATIONAL_CHOICE = 'national'
+        FIRST_ROUND_INSOLVENCY_CHOICE = 'first_round_insolvency'
         MUST_SELL_IN_BLOCKS = false
         HOME_TOKEN_TIMING = :float
         # RB 11.1.9: when a tile laid on the metropolis gives SB or MSP its home position, its own president chooses it
@@ -486,8 +495,10 @@ module Engine
         HOCHBERG_TOKEN = 'HMLC'
         HOCHBERG_MIN_TERRAIN_COST = 45
         HOCHBERG_REVENUE = { '2' => 10, '3' => 20, '4' => 20, '5' => 40, '6' => 40, '7' => 60, '8' => 60 }.freeze
+        BRANDT_TOKEN = 'BBE'
         ASSIGNMENT_TOKENS = {
           HOCHBERG_TOKEN => '/logos/18_oe/hmlc.svg',
+          BRANDT_TOKEN => '/logos/18_oe/bbe.svg',
           MINOR_D_20_TOKEN => '/icons/18_oe/plus_twenty.svg',
           MINOR_D_40_TOKEN => '/icons/18_oe/plus_forty.svg',
         }.freeze
@@ -537,12 +548,15 @@ module Engine
 
         def setup
           super
+          setup_first_round_insolvency
           @minor_regional_order = []
           @minor_available_regions = self.class::MINOR_TRACK_RIGHTS_CHITS.transform_values(&:itself)
           @minor_asterisked_selected = 0
           @minor_floated_regions = {}
           @merged_minors = Hash.new { |hash, corporation| hash[corporation] = [] }
           @minor_charter_assets = {}
+          @removed_regionals = []
+          @majors_track_rights_restricted = true
           @removed_regional_zones = []
           @orient_express_markers = []
           @swift_metropolitan_train = nil
@@ -556,7 +570,6 @@ module Engine
           @hochberg_token_hex = nil
           @hochberg_printed_revenue = {}
           setup_nationals
-          setup_bbe_ability!
 
           corporations.each do |corp|
             corp.par_via_exchange = companies.find { |c| c.sym == corp.id } if corp.type == :minor
@@ -626,7 +639,9 @@ module Engine
         end
 
         def pass_through_cities(corporation)
-          @pass_through_tokens.values.filter_map { |token| token.city if token.corporation == corporation }
+          @pass_through_city_cache ||= {}
+          @pass_through_city_cache[corporation] ||=
+            @pass_through_tokens.values.filter_map { |token| token.city if token.corporation == corporation }
         end
 
         def pass_through_city?(city, corporation)
@@ -676,8 +691,14 @@ module Engine
           super(route, without_pass_through_cities(visits, route.corporation), train)
         end
 
-        def check_route_token(route, _token)
-          super(route, counted_stops(route).find { |stop| city_tokened_by?(stop, route.corporation) })
+        def check_route_token(route, token)
+          corporation = route.corporation
+          if token && pass_through_cities(corporation).empty? &&
+             !(hochberg_token_hex && hochberg_owner_route?(route) && token == hochberg_town)
+            return super(route, token)
+          end
+
+          super(route, counted_stops(route).find { |stop| city_tokened_by?(stop, corporation) })
         end
 
         def place_pass_through_token!(company, corporation, city)
@@ -689,6 +710,7 @@ module Engine
           )
           city.exchange_token(token, extra_slot: true)
           @pass_through_tokens[company] = token
+          @pass_through_city_cache = nil
           hex = city.hex
           @log << "#{corporation.name} (#{company.sym}) places the #{company.name} token on "\
                   "#{hex.name} (#{hex.location_name})"
@@ -784,13 +806,34 @@ module Engine
           payouts
         end
 
-        def fulfill_patronage!(entity, hex)
+        def fulfill_patronage!(entity, hex, lowest: false)
           payouts = remove_patronage!(hex)
           return unless payouts
 
-          amount = payouts[patronage_color]
+          amount = lowest ? payouts.values.min : payouts[patronage_color]
           @bank.spend(amount, entity)
           @log << "#{entity.name} fulfills the #{hex.location_name} patronage tile and receives #{format_currency(amount)}"
+        end
+
+        def self.min_players(optional_rules, num_players)
+          meta.min_players(optional_rules, num_players)
+        end
+
+        def self.max_players(optional_rules, num_players)
+          meta.max_players(optional_rules, num_players)
+        end
+
+        def extended_full_game?
+          @optional_rules.include?(:extended_full_game) &&
+            self.class::OPTIONAL_RULES.any? { |rule| rule[:sym] == :extended_full_game }
+        end
+
+        def bank_starting_cash
+          extended_full_game? ? self.class::EXTENDED_BANK_CASH : super
+        end
+
+        def game_cert_limit
+          extended_full_game? ? self.class::EXTENDED_CERT_LIMIT : super
         end
 
         def medium_start?
@@ -805,6 +848,10 @@ module Engine
           @optional_rules.include?(:long_endgame)
         end
 
+        def aggressive_game?
+          two_player? || @optional_rules.include?(:aggressive_game)
+        end
+
         def concessions?
           !medium_start? && !fast_start? && players.size > 2
         end
@@ -816,8 +863,17 @@ module Engine
         def init_starting_cash(players, bank)
           return if fast_start?
 
-          cash = medium_start? ? self.class::STARTING_CASH_NO_CONCESSIONS : self.class::STARTING_CASH
-          players.each { |player| bank.spend(cash[players.size], player) }
+          cash = starting_cash
+          players.each { |player| bank.spend(cash, player) }
+        end
+
+        def starting_cash
+          cash = if extended_full_game?
+                   medium_start? ? self.class::EXTENDED_STARTING_CASH_NO_CONCESSIONS : self.class::EXTENDED_STARTING_CASH
+                 else
+                   medium_start? ? self.class::STARTING_CASH_NO_CONCESSIONS : self.class::STARTING_CASH
+                 end
+          cash.fetch(players.size)
         end
 
         def init_round
@@ -876,10 +932,6 @@ module Engine
           'Treasury'
         end
 
-        # True once MAX_FLOATED_REGIONALS have been floated and the 6 remaining
-        # unfloated regionals have been closed. This is the correct trigger for
-        # "Major Railroad Phase" entry: conversions and secondary-share purchases
-        # become available from this point on.
         def major_phase?
           return false if @corporations.any? { |corporation| corporation.type == :regional && !corporation.floated? }
 
@@ -903,61 +955,14 @@ module Engine
           major_phase? && @first_or_complete
         end
 
-        # RB 11.6.4 para. 2: a player may not force a RR into first-round insolvency by spending money on track or tokens.
-        # The rule undoes such spending (tokens first, then paid track, each refunded); the engine instead refuses it up
-        # front: while the reserved 2+2 is still owed, a paid lay or token is legal only if the RR's and its president's
-        # cash still cover that 2+2 afterwards. In the first OR no money arrives between Track/Token and BuyTrain, and
-        # Track comes before Token, so a token is what the guard drops first, as the rule does. `cost` is the net spend
-        # (a patronage payout of the same lay already deducted).
-        def first_round_spend_allowed?(entity, cost)
-          reserve = first_round_train_reserve(entity)
-          return true if reserve.nil? || !cost.positive?
-
-          entity.cash + entity.owner.cash - cost >= reserve
-        end
-
-        def check_first_round_spend!(entity, cost, net_cost: cost, what: 'track')
-          return if first_round_spend_allowed?(entity, net_cost)
-
-          raise GameError, "#{entity.name} cannot spend #{format_currency(cost)} on #{what}: its cash and its " \
-                           "president's would no longer cover the reserved 2+2 (§11.6.4)"
-        end
-
-        # Price of the reserved 2+2 the RR still has to buy (RB 11.6.1), or nil when it owes none: obligation fulfilled or
-        # over, the RR already has a train, or no player owns it.
-        def first_round_train_reserve(entity)
-          return unless entity&.corporation? && entity.floated? && entity.trains.empty? && entity.owner&.player?
-          return if fulfilled_train_obligation?(entity)
-
-          depot.depot_trains.find { |train| train.name == '2+2' && train.from_depot? }&.price
-        end
-
-        # What fulfilling the patronage tile on this hex would pay now (RB 11.1.8), 0 without one.
-        def patronage_payout(hex)
-          payouts = hex.tile.patronage
-          payouts ? payouts[patronage_color].to_i : 0
-        end
-
-        def insolvent_corporations
-          @corporations.select { |corporation| insolvent?(corporation) }
-        end
-
-        # RB 11.6.5 step 4: face value (120 for a minor, twice the par value for a regional) plus the gap between the
-        # RR's treasury and the reserved 2+2.
-        def insolvent_buyback_price(corporation)
-          face_value = corporation.type == :minor ? G18OE::Step::BuyTrain::MINOR_CHARTER_VALUE : corporation.par_price.price * 2
-          reserved_price = self.class::TRAINS.find { |train| train[:name] == '2+2' }[:price]
-          face_value + [reserved_price - corporation.cash, 0].max
-        end
-
         # RB 11.1.9, last paragraph: "The president may not select a home token position that triggers the need to place a
         # green tile as outlined above if a token position is available that would not do so." Would the home station in
         # `city` leave the RR unable to connect to another stop (so the Right-of-Way green tile would apply)?
+        # The Track step is built only to ask it (no setup, the round is left untouched).
         def right_of_way_home_position_needed?(corporation, city)
           return false unless @players.size > 2 && !@phase.tiles.include?(:green)
 
           track = G18OE::Step::Track.new(self, @round)
-          track.instance_variable_set(:@points_used, 0)
           !track.home_connectable?(corporation, track.send(:get_tile_lay, corporation), {}, city, corporation.cash)
         end
 
@@ -969,38 +974,24 @@ module Engine
           fine.empty? ? open : fine
         end
 
-        # RB 11.1.9, part 2: "The home token hex of a floated RR may not have yellow track laid on it without the explicit
-        # permission of the RR's president. Un-floated RRs automatically provide this permission." Not in a two-player game.
-        def home_hex_of?(corporation, hex)
-          home = corporation.type == :minor ? corporation.tokens.first&.city&.hex&.id : corporation.coordinates
-          Array(home).include?(hex.id)
-        end
-
-        # Presidents (players) whose permission a yellow lay of `entity` on `hex` needs, in seat order.
-        def home_hex_consent_needed(entity, hex, tile)
-          return [] unless @players.size > 2 && hex.tile.color == :white && tile.color == :yellow
-
-          layer = entity.corporation? ? entity.owner : nil
-          @corporations.select do |corp|
-            corp.floated? && !corp.closed? && corp.owner&.player? && corp.owner != layer && home_hex_of?(corp, hex)
-          end.map(&:owner).uniq
-        end
-
         def operating_order
           floated_minors_and_regionals = @minor_regional_order.select { |c| c.floated? && !insolvent?(c) }
           floated_minors_and_regionals + @corporations.select { |c| %i[major national].include?(c.type) && c.floated? }.sort
         end
 
-        # RB 11.6.5: after a first-round insolvency the charter or president's certificate is in the Open Market and
-        # the RR does not operate until a player owns it again. RB 10 allows a president's certificate in the Open
-        # Market only after such an insolvency, so the place of the share is the insolvency state.
-        def insolvent?(corporation)
-          %i[minor regional].include?(corporation.type) && corporation.floated? &&
-            corporation.presidents_share&.owner == @share_pool
+        def majors_track_rights_restricted?
+          @majors_track_rights_restricted
+        end
+
+        def minor_merged
+          return unless @majors_track_rights_restricted
+
+          @majors_track_rights_restricted = false
+          @log << '-- Event: Majors are no longer restricted to their track rights zones --'
         end
 
         def hex_within_national_region?(entity, hex)
-          return true if entity.type == :major
+          return true if entity.type == :major && !majors_track_rights_restricted?
 
           region = self.class::CORPORATIONS_TRACK_RIGHTS[entity.id] || @minor_floated_regions[entity.id]
           hexes = self.class::NATIONAL_REGION_HEXES[region]
@@ -1008,7 +999,7 @@ module Engine
         end
 
         def city_in_track_rights?(entity, hex)
-          return true if entity.type == :major
+          return true if entity.type == :major && !majors_track_rights_restricted?
 
           region_for_hex(hex) == entity_track_rights_zone(entity)
         end
@@ -1140,7 +1131,7 @@ module Engine
         end
 
         def upgrade_cost(tile, hex, entity, spender)
-          return 0 if national?(entity)
+          return 0 if national?(entity) || hex.assigned?(self.class::BRANDT_TOKEN)
 
           base_cost = tile.upgrades.sum(&:cost)
           return super if base_cost.zero?
@@ -1227,7 +1218,7 @@ module Engine
         end
 
         def abandoned_minor?(corporation)
-          corporation.type == :minor && corporation.floated? && !corporation.owner
+          corporation.type == :minor && corporation.floated? && !corporation.owner && !insolvent?(corporation)
         end
 
         def corporation_show_shares?(corporation)
@@ -1295,6 +1286,19 @@ module Engine
           @log << "#{major.name} receives #{format_currency(amount)} from the bank for #{minor.name}"
         end
 
+        def num_trains(train)
+          return super unless extended_full_game?
+
+          case train[:name]
+          when reserved_train_name
+            @corporations.count { |corporation| %i[minor regional].include?(corporation.type) }
+          when self.class::PULLMAN
+            extended_pullman_count
+          else
+            super
+          end
+        end
+
         def rust(train)
           owner = train.owner
           if owner&.corporation? && national?(owner)
@@ -1337,6 +1341,14 @@ module Engine
 
         def pullman?(train)
           train.name == self.class::PULLMAN
+        end
+
+        def standard_pullman_count
+          game_trains.find { |train| train[:name] == self.class::PULLMAN }[:num]
+        end
+
+        def extended_pullman_count
+          standard_pullman_count + self.class::EXTENDED_ADDITIONAL_PULLMANS
         end
 
         def pullman(corporation)
@@ -1396,6 +1408,8 @@ module Engine
         end
 
         def event_pullmans_available!
+          remove_rusted_2_plus_2s! if extended_full_game?
+
           holder = minor_m_holder
           return unless holder
 
@@ -1404,6 +1418,14 @@ module Engine
 
           buy_train(holder, pullman_card, :free)
           @log << "#{holder.name} receives a free #{self.class::PULLMAN}"
+        end
+
+        def remove_rusted_2_plus_2s!
+          rusted_2_plus_2s = @depot.rusted_trains.select { |train| train.sym == reserved_train_name }
+          rusted_2_plus_2s.last(self.class::EXTENDED_ADDITIONAL_PULLMANS).each do |train|
+            remove_train(train)
+            train.owner = nil
+          end
         end
 
         def level8_train_available?
@@ -1436,6 +1458,7 @@ module Engine
         end
 
         def consolidation_round_finished!
+          close_unowned_insolvents!
           @consolidation_complete = true
         end
 
@@ -1530,16 +1553,23 @@ module Engine
           @corporations.count { |corporation| corporation.type == :regional && corporation.ipoed }
         end
 
+        def max_floated_regionals
+          return self.class::MAX_FLOATED_REGIONALS unless extended_full_game?
+
+          @max_floated_regionals ||= game_corporations.count { |corporation| corporation[:type] == 'regional' }
+        end
+
         def removable_regional?(corporation)
           return false if corporation.type != :regional || corporation.ipoed
-          return false unless @corporations.count { |c| c.type == :regional } > self.class::MAX_FLOATED_REGIONALS
+          return false unless @corporations.count { |c| c.type == :regional } > max_floated_regionals
 
           !@removed_regional_zones.include?(self.class::CORPORATIONS_TRACK_RIGHTS[corporation.id])
         end
 
-        def remove_regional!(corporation)
-          @removed_regional_zones << self.class::CORPORATIONS_TRACK_RIGHTS[corporation.id]
+        def remove_regional!(corporation, stock_action: true)
+          @removed_regional_zones << self.class::CORPORATIONS_TRACK_RIGHTS[corporation.id] if stock_action
           close_corporation(corporation)
+          @removed_regionals << corporation
         end
 
         def parred_regional?(corporation)
@@ -1547,7 +1577,7 @@ module Engine
         end
 
         def reserved_shares?
-          @players.size > 2
+          !aggressive_game?
         end
 
         def reserved_share(corporation)
@@ -1579,6 +1609,8 @@ module Engine
           lines << ['Orient Express marker'] if orient_express_marker?(corporation)
           port_authorities(corporation).each { |sea| lines << [port_authority_name(sea)] }
           lines.concat(pass_through_token_lines(corporation))
+          insolvent_line = insolvency_status_line(corporation)
+          lines << insolvent_line if insolvent_line
           lines unless lines.empty?
         end
 
@@ -1678,6 +1710,16 @@ module Engine
 
           seller_owner = sale.first.owner
           seller_owner if seller_owner != entity.owner
+        end
+
+        def consenter_for_lay_tile(entity, hex, _tile)
+          return unless hex.tile.color == :white
+          return unless (home_token = hex.tile.cities.flat_map(&:tokens).find { |t| t && t == t.corporation.tokens.first })
+
+          president = home_token.corporation.owner
+          return if !president || president == entity.player
+
+          president
         end
 
         def orient_express_marker?(corporation)
@@ -1867,6 +1909,11 @@ module Engine
           ])
         end
 
+        def new_operating_round(round_num = 1)
+          clear_graph unless brandt_hexes.empty?
+          super
+        end
+
         def operating_round(round_num)
           Round::G18OE::Operating.new(self, [
             G18OE::Step::SpecialChoose,
@@ -1877,7 +1924,6 @@ module Engine
             Engine::Step::DiscardTrain,
             G18OE::Step::Operating::HomeToken,
             G18OE::Step::Assign,
-            G18OE::Step::HomeHexConsent,
             G18OE::Step::SpecialTrack,
             G18OE::Step::Track,
             G18OE::Step::SpecialToken,
@@ -1914,6 +1960,7 @@ module Engine
 
         def check_other(route)
           super
+          check_brandt_exclusive!(route)
 
           if counted_stops(route).size < 2 && !route.connection_data.empty? && !route.train.local?
             raise RouteTooShort, 'Route must have at least 2 stops'
@@ -2017,6 +2064,96 @@ module Engine
           !abilities(company, :assign_hexes, time: 'any').nil?
         end
 
+        def brandt_private
+          company_by_id(self.class::BRANDT_TOKEN)
+        end
+
+        def brandt_token_placeable?(corporation)
+          company = brandt_private
+          return false if !corporation || !company || !company.owner&.player?
+          return false unless corporation.owner == company.owner
+
+          !abilities(company, :tile_lay, time: 'owning_player_track').nil?
+        end
+
+        def brandt_hex?(hex)
+          hex.tile.color == :white &&
+            hex.original_tile.terrain.intersect?(self.class::GREEN_TERRAIN) &&
+            !hex.assigned?(self.class::BRANDT_TOKEN)
+        end
+
+        def brandt_hexes
+          hexes.select { |hex| hex.assigned?(self.class::BRANDT_TOKEN) }
+        end
+
+        def brandt_blocked?(corporation, hex)
+          hex.assigned?(self.class::BRANDT_TOKEN) && corporation.owner != brandt_private.owner
+        end
+
+        def brandt_paths
+          brandt_hexes.each_with_object({}) { |hex, paths| hex.tile.paths.each { |path| paths[path] = true } }
+        end
+
+        def graph_skip_paths(corporation)
+          skip_paths = super || {}
+          brandt_hexes.each do |hex|
+            hex.tile.paths.each { |path| skip_paths[path] = true } if brandt_blocked?(corporation, hex)
+          end
+          skip_paths.empty? ? nil : skip_paths
+        end
+
+        def after_buy_company(player, company, price)
+          super
+          clear_graph if company == brandt_private
+        end
+
+        def check_brandt_exclusive!(route)
+          hex = route.paths.map(&:hex).find { |h| brandt_blocked?(route.corporation, h) }
+          return unless hex
+
+          owner = brandt_private.owner
+          raise GameError, "#{hex.name} is reserved for #{owner.name}'s railroads (Brandt & Brandau)"
+        end
+
+        def place_brandt_token!(hex)
+          company = brandt_private
+          hex.assign!(self.class::BRANDT_TOKEN)
+          copy_brandt_terrain!(hex.original_tile, hex.tile)
+          flip_private!(company) if company.abilities.empty? && !face_down_private?(company)
+          clear_graph
+          @log << "#{company.owner.name} places a Brandt & Brandau token in #{hex.name}"
+        end
+
+        def copy_brandt_terrain!(from_tile, to_tile)
+          to_tile.upgrades = from_tile.upgrades.map do |upgrade|
+            copy = Engine::Part::Upgrade.new(upgrade.cost, upgrade.terrains, upgrade.size, loc: upgrade.loc)
+            copy.tile = to_tile
+            copy
+          end
+        end
+
+        def brandt_removal_cost(corporation, hex)
+          return 0 if national?(corporation)
+
+          hex.original_tile.upgrades.sum(&:cost)
+        end
+
+        def brandt_removal_points(hex)
+          metropolis_hex?(hex) ? 2 : 1
+        end
+
+        def remove_brandt_token!(corporation, hex)
+          company = brandt_private
+          cost = brandt_removal_cost(corporation, hex)
+          corporation.spend(cost, bank) if cost.positive?
+          hex.remove_assignment!(self.class::BRANDT_TOKEN)
+          hex.tile.upgrades = []
+          @log << "#{corporation.name} removes the Brandt & Brandau token from #{hex.name}" \
+                  "#{cost.positive? ? " for #{format_currency(cost)}" : ''}"
+          remove_private!(company) if face_down_private?(company) && brandt_hexes.empty?
+          clear_graph
+        end
+
         def hochberg_town
           hochberg_token_hex&.tile&.towns&.first
         end
@@ -2060,6 +2197,10 @@ module Engine
 
         def update_tile_lists(tile, old_tile)
           super
+          if old_tile.hex&.assigned?(self.class::BRANDT_TOKEN)
+            copy_brandt_terrain!(old_tile, tile)
+            old_tile.upgrades = []
+          end
           return if !hochberg_token_hex || old_tile.hex != hochberg_token_hex
 
           printed = @hochberg_printed_revenue.delete(old_tile.id)
@@ -2178,6 +2319,16 @@ module Engine
           !train.nil? && add_on_train(type) == train
         end
 
+        def max_route_stops(train)
+          distance = train_distance(train)
+          return { city: nil, town: nil } if distance.is_a?(Numeric)
+
+          city_limit = distance.sum do |row|
+            row['nodes'].include?('city') || row['nodes'].include?('offboard') ? row['pay'] : 0
+          end
+          { city: city_limit, town: nil }
+        end
+
         def train_distance(train)
           distance = train.distance
           return distance if distance.is_a?(Numeric) || !add_on_train?(:one_plus_one_marker, train)
@@ -2228,70 +2379,14 @@ module Engine
           add_on_train?(:pullman, route.train) ? "#{str} + Pullman" : str
         end
 
-        # RB 14.9 Brandt & Brandau, Engineers: a token on a hex closes the track laid with it to every RR of another player
-        # (RB 11.3.10: for a national's revenue as well) until another RR removes the token.
-        BBE_TOKEN_LOGO = '/logos/18_oe/bbe.svg' # ASSUMPTION: no artwork yet, placeholder path
-
-        def bbe_company
-          company_by_id('BBE')
-        end
-
-        # The ability's hexes: unbuilt rough (hill, mountain) hexes without a city or metropolis, set once at setup.
-        def setup_bbe_ability!
-          @bbe_token_hexes = []
-          ability = bbe_company&.all_abilities&.find { |a| a.type == :tile_lay }
-          return unless ability
-
-          ability.hexes = hexes.select do |hex|
-            hex.tile.color == :white && hex.tile.cities.empty? && hex.tile.terrain.intersect?(self.class::GREEN_TERRAIN) &&
-              !metropolis_hex?(hex)
-          end.map(&:id)
-        end
-
-        def bbe_blocked_for?(corporation)
-          return false if @bbe_token_hexes.empty? || !corporation.respond_to?(:owner)
-
-          corporation.owner != bbe_company&.owner
-        end
-
-        def graph_skip_paths(corporation)
-          return super unless bbe_blocked_for?(corporation)
-
-          @bbe_token_hexes.flat_map { |hex| hex.tile.paths }.to_h { |path| [path, true] }
-        end
-
-        def bbe_place_token!(hex, company)
-          token = Engine::Token.new(company, logo: BBE_TOKEN_LOGO, simple_logo: BBE_TOKEN_LOGO, type: :bbe)
-          hex.place_token(token, logo: BBE_TOKEN_LOGO)
-          @bbe_token_hexes << hex
-          clear_graph
-          @log << "#{company.name} token placed on #{hex.id}"
-          flip_private!(company) if company.all_abilities.none? { |a| a.type == :tile_lay } && !face_down_private?(company)
-        end
-
-        def bbe_remove_token!(hex)
-          hex.tokens.find { |t| t.type == :bbe }.remove!
-          @bbe_token_hexes.delete(hex)
-          clear_graph
-          @log << "Brandt and Brandau token removed from #{hex.id}"
-          return unless @bbe_token_hexes.empty? && bbe_company.all_abilities.none? { |a| a.type == :tile_lay }
-
-          remove_private!(bbe_company)
-          @log << "#{bbe_company.name} is removed from the game"
-        end
-
         def check_connected(route, corporation)
-          if bbe_blocked_for?(corporation) && route.paths.any? { |path| @bbe_token_hexes.include?(path.hex) }
-            raise GameError, 'Route uses track marked by a Brandt and Brandau token'
-          end
-
           route.connection_data.each_cons(2) do |a, b|
             next if !a[:chain][:paths].empty? && !b[:chain][:paths].empty?
 
             raise GameError, 'Route is not connected' if a[:right].blocks?(corporation)
           end
 
-          connected = land_stretches(route).all? do |paths|
+          connected = land_stretches(route.connection_data).all? do |paths|
             paths.each_cons(2).all? do |a, b|
               (wcf_restricted?(corporation) && wcf_pass?(a, b)) || a.connects_to?(b, corporation)
             end

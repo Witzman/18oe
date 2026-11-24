@@ -13,7 +13,8 @@ require 'oe/route_search'
 describe 'G18OE track and tokens across open water (§11.1.3, §11.1.6, §11.2.1)' do
   include G18OESpecHelpers
 
-  let(:game) { new_game }
+  # majors build outside their track-rights zone only after the first merger (upstream 46330521f, #600)
+  let(:game) { new_game.tap(&:minor_merged) }
   let(:player) { game.players.first }
   let(:lnwr) { start_major!(game, 'LNWR', player) }
 

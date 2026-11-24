@@ -10,13 +10,9 @@ module Engine
         class BuyTrain < Engine::Step::BuyTrain
           include SkipAbbreviatedRound
 
-          MINOR_CHARTER_VALUE = 120
-
           def actions(entity)
-            return [] if first_round_insolvency?(current_entity)
-
             actions = super - ['sell_shares']
-            actions += ['choose'] if entity == current_entity && @game.forced_national_conversion?(entity)
+            actions += ['choose'] if entity == current_entity && (forced_national?(entity) || insolvency?(entity))
             actions
           end
 
@@ -24,77 +20,47 @@ module Engine
             false
           end
 
-          # RB 11.6.5: a minor or regional that must force buy its reserved 2+2 while treasury and president together
-          # cannot pay gets the train for free (the president's cash goes into the treasury) and its charter or
-          # president's certificate goes to the Open Market. Resolved by the step itself, no player decision.
-          def skip!
-            corporation = current_entity
-            return super unless first_round_insolvency?(corporation)
-
-            resolve_first_round_insolvency!(corporation)
-            pass!
-          end
-
-          def first_round_insolvency?(corporation)
-            return false unless corporation&.corporation? && %i[minor regional].include?(corporation.type)
-            return false unless corporation.floated? && @game.trainless?(corporation) && corporation.owner&.player?
-            return false if @game.fulfilled_train_obligation?(corporation)
-
-            train = reserved_train
-            !train.nil? && corporation.cash + corporation.owner.cash < train.price
-          end
-
-          def reserved_train
-            @game.depot.depot_trains.find { |train| train.name == '2+2' && train.from_depot? }
-          end
-
-          def resolve_first_round_insolvency!(corporation)
-            player = corporation.owner
-            train = reserved_train
-            @log << "#{corporation.name} cannot pay for its 2+2 and #{player.name} cannot make up the difference: " \
-                    'first-round insolvency'
-            player.spend(player.cash, corporation) if player.cash.positive?
-            @log << "#{player.name} puts all personal cash into #{corporation.name}'s treasury"
-
-            source = train.owner
-            @game.buy_train(corporation, train, :free)
-            @game.phase.buying_train!(corporation, train, source)
-            @game.fulfill_train_obligation!(corporation)
-            @log << "#{corporation.name} receives a #{train.name} train from the Locomotive Works"
-
-            move_certificate_to_market!(corporation, player)
-          end
-
-          def move_certificate_to_market!(corporation, player)
-            face_value = corporation.type == :minor ? MINOR_CHARTER_VALUE : corporation.par_price.price * 2
-            bundle = corporation.presidents_share.to_bundle
-            @game.share_pool.transfer_shares(bundle, @game.share_pool, spender: @game.bank, receiver: player,
-                                                                      price: face_value, allow_president_change: false)
-            corporation.owner = @game.share_pool
-            @log << "#{player.name} receives #{@game.format_currency(face_value)} for the #{corporation.name} " \
-                    "#{corporation.type == :minor ? 'charter' : "president's certificate"}, now in the Open Market; " \
-                    "#{corporation.name} will not operate until a player owns it"
-          end
-
           def show_president_contributions?(entity, shell = nil)
-            super && !@game.forced_national_conversion?(entity)
+            super && !forced_national?(entity) && !insolvency?(entity)
+          end
+
+          def forced_national?(entity)
+            @game.forced_national_conversion?(entity)
+          end
+
+          def insolvency?(entity)
+            @game.first_round_insolvency?(entity)
           end
 
           def choice_name
-            shortfall = @game.format_currency(@game.forced_train_price(current_entity) - current_entity.cash)
-            "#{current_entity.owner.name} cannot cover #{current_entity.name}'s #{shortfall} shortfall for the cheapest train"
+            entity = current_entity
+            if insolvency?(entity)
+              shortfall = @game.format_currency(@game.reserved_train_price - entity.cash - entity.owner.cash)
+              return "#{entity.owner.name} cannot cover #{entity.name}'s #{shortfall} shortfall for its reserved " \
+                     "#{@game.reserved_train_name}"
+            end
+
+            shortfall = @game.format_currency(@game.forced_train_price(entity) - entity.cash)
+            "#{entity.owner.name} cannot cover #{entity.name}'s #{shortfall} shortfall for the cheapest train"
           end
 
           def choices
+            return { @game.first_round_insolvency_choice => 'Declare first-round insolvency' } if insolvency?(current_entity)
+
             { @game.forced_national_choice => "Convert #{current_entity.name} to a national" }
           end
 
           def process_choose(action)
             entity = action.entity
-            raise GameError, "#{entity.name} cannot be converted to a national" unless @game.forced_national_conversion?(entity)
-            raise GameError, "Invalid choice: #{action.choice}" unless action.choice == @game.forced_national_choice
+            if action.choice == @game.first_round_insolvency_choice
+              @game.declare_first_round_insolvency!(entity)
+            elsif action.choice == @game.forced_national_choice
+              raise GameError, "#{entity.name} cannot be converted to a national" unless forced_national?(entity)
 
-            @game.force_national!(entity)
+              @game.force_national!(entity)
+            else
+              raise GameError, "Invalid choice: #{action.choice}"
+            end
             pass!
           end
 
@@ -130,9 +96,9 @@ module Engine
             if @game.fulfilled_train_obligation?(entity)
               return [] unless @game.non_starter_trains_available?
 
-              trains.reject { |t| t.name == '2+2' }
+              trains.reject { |t| t.name == @game.reserved_train_name }
             else
-              trains.select { |t| t.name == '2+2' && t.from_depot? }
+              trains.select { |t| t.name == @game.reserved_train_name && t.from_depot? }
             end
           end
 
@@ -191,7 +157,7 @@ module Engine
               raise GameError, "#{action.entity.name} has no room for another train"
             end
 
-            reserved = train.name == '2+2' && train.from_depot?
+            reserved = train.name == @game.reserved_train_name && train.from_depot?
             royalty = @game.pullman?(train) && train.from_depot? && !@depot.discarded.include?(train)
             super
             @game.pay_pullman_royalty! if royalty

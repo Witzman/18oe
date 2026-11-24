@@ -126,7 +126,7 @@ test("consequence hint: first train of a kind names the new phase and the trains
 test("insolvency (11.6.5): lines of the latest resolution from the log tail", () => {
   const g = load("buy-train-reserved");
   assert.deepEqual(insolvencyLines(g), []);
-  g.state.log.push({ action: 1400, text: "H cannot pay for its 2+2 and p1 cannot make up the difference: first-round insolvency" }, { action: 1400, text: "p1 puts all personal cash into H's treasury" }, { action: 1401, text: "other" });
+  g.state.log.push({ action: 1400, text: "p1 moves £20 into H's treasury" }, { action: 1400, text: "H is dormant until a player buys it (§11.6.5)" }, { action: 1401, text: "other" });
   assert.equal(insolvencyLines(g).length, 2);
   assert.match(textOf(TrainPanel(g, emptySelection(), noop)), /First-round insolvency/);
 });
