@@ -1,7 +1,8 @@
 diff --git a/lib/engine/game/g_18_oe/graph/sea_connectivity.rb b/lib/engine/game/g_18_oe/graph/sea_connectivity.rb
+index 3216db5..dc501b2 100644
 --- a/lib/engine/game/g_18_oe/graph/sea_connectivity.rb
 +++ b/lib/engine/game/g_18_oe/graph/sea_connectivity.rb
-@@ -6,6 +6,60 @@
+@@ -6,6 +6,60 @@ module Engine
        class SeaConnectivity
          SEA_ZONE_WATER_DISTANCE = 2
  
@@ -62,7 +63,7 @@ diff --git a/lib/engine/game/g_18_oe/graph/sea_connectivity.rb b/lib/engine/game
          attr_reader :anchors
  
          def initialize(game, corporation)
-@@ -160,20 +214,11 @@
+@@ -160,20 +214,11 @@ module Engine
            initial_allowances = Array.new(reduced_seas.size, reduction)
            best = { initial_allowances => starts.to_h { |node| [node, 0] } }
            settled = Hash.new { |hash, allowances| hash[allowances] = {} }
@@ -88,7 +89,7 @@ diff --git a/lib/engine/game/g_18_oe/graph/sea_connectivity.rb b/lib/engine/game
  
              settled[allowances][node] = true
              @edges[node].each do |other, weight, sea, ferry|
-@@ -195,7 +240,10 @@
+@@ -195,7 +240,10 @@ module Engine
                  candidate = lowest + step_weight
                  costs = (best[remaining] ||= {})
                  known = costs[other]

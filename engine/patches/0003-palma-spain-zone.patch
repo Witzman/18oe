@@ -1,8 +1,8 @@
 diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
-index ca6f65e..1288f5e 100644
+index 5648d0b..eab22d9 100644
 --- a/lib/engine/game/g_18_oe/game.rb
 +++ b/lib/engine/game/g_18_oe/game.rb
-@@ -421,7 +421,7 @@ module Engine
+@@ -432,7 +432,7 @@ module Engine
                       Y2 Y4 Y6 Y8 Y10 Y12 Y14 Y16 Y18 Y20 Y22 Y24 Y26 Y28
                       Z1 Z3 Z5 Z7 Z9 Z11 Z13 Z15 Z17 Z19 Z21 Z23 Z25 Z27
                       AA2 AA4 AA6 AA8 AA10 AA12 AA14 AA16 AA18 AA20 AA22

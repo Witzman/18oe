@@ -1,5 +1,5 @@
 diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
-index 526f734..cefcff6 100644
+index 2470c6a..4a82bc0 100644
 --- a/lib/engine/game/g_18_oe/game.rb
 +++ b/lib/engine/game/g_18_oe/game.rb
 @@ -6,6 +6,7 @@ require_relative 'map'
@@ -8,17 +8,17 @@ index 526f734..cefcff6 100644
  require_relative 'sea_routes'
 +require_relative 'orient_express_duty'
  require_relative 'nationals'
+ require_relative 'first_round_insolvency'
  require_relative 'train'
- require_relative '../base'
-@@ -40,6 +41,7 @@ module Engine
+@@ -41,6 +42,7 @@ module Engine
          include G18OE::Entities
          include G18OE::Map
          include G18OE::SeaRoutes
 +        include G18OE::OrientExpressDuty
          include G18OE::Nationals
+         include G18OE::FirstRoundInsolvency
          attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
-                       :consolidation_triggered, :consolidation_complete
-@@ -1909,7 +1911,8 @@ module Engine
+@@ -1978,7 +1980,8 @@ module Engine
            return false unless route.corporation&.type == :major
  
            visited = route.visited_stops.map(&:hex)

@@ -112,8 +112,12 @@ module Engine
           nodes.product(trains).map { |node, train| node.route_base_revenue(@game.phase, train) }.max || 0
         end
 
+        def brandt_paths
+          @brandt_paths ||= @game.brandt_paths
+        end
+
         def linked?(node)
-          node.walk(converging_path: false, skip_paths: @game.graph_skip_paths(@corporation)) do |path, _, _|
+          node.walk(converging_path: false, skip_paths: brandt_paths) do |path, _, _|
             return true if path.nodes.any? { |other| other.hex != node.hex } || offshore_ferry?(path)
           end
           false
@@ -148,8 +152,7 @@ module Engine
             visited_paths = {}
             zone_hexes.flat_map { |hex| hex.tile.cities }.reject { |city| city.paths.empty? }.each do |city|
               found << offshore_sea(city.hex)
-              city.walk(visited: visited, visited_paths: visited_paths, converging_path: false,
-                    skip_paths: @game.graph_skip_paths(@corporation)) do |path, _, _|
+              city.walk(visited: visited, visited_paths: visited_paths, converging_path: false) do |path, _, _|
                 found.concat(arrow_seas(path))
                 found.concat(path.nodes.select(&:city?).map { |node| offshore_sea(node.hex) })
               end

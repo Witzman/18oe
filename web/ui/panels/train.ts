@@ -114,11 +114,12 @@ export function trainRows(g: Game): TrainRow[] {
   return [...rows.filter((r) => r.reserved), ...rows.filter((r) => !r.reserved)];
 }
 
-/** Lines of the latest first-round insolvency (11.6.5) in the visible log tail; the engine resolves it itself. */
+/** Lines of the latest first-round insolvency (11.6.5) in the visible log tail. The president declares it (choice
+ *  first_round_insolvency in the train step, Chris' engine since 49c770035); its last log line says the RR is dormant. */
 export function insolvencyLines(g: Game): string[] {
   const log = g.state.log.slice(-20);
   let hit = -1;
-  log.forEach((l, i) => { if (/first-round insolvency/i.test(l.text)) hit = i; });
+  log.forEach((l, i) => { if (/is dormant until a player buys it/i.test(l.text)) hit = i; });
   if (hit < 0) return [];
   const action = log[hit]!.action;
   return log.filter((l) => l.action === action).map((l) => l.text);

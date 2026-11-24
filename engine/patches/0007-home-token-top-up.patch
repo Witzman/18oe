@@ -1,8 +1,8 @@
 diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
-index 84ff5ab..8d79f1c 100644
+index 0164318..2470c6a 100644
 --- a/lib/engine/game/g_18_oe/game.rb
 +++ b/lib/engine/game/g_18_oe/game.rb
-@@ -927,6 +927,21 @@ module Engine
+@@ -985,6 +985,21 @@ module Engine
            self.class::TRACK_RIGHTS_COST[region] || 0
          end
  
@@ -25,7 +25,7 @@ index 84ff5ab..8d79f1c 100644
            @minor_floated_regions[entity.id] = region
            @minor_available_regions[region] -= 1
 diff --git a/lib/engine/game/g_18_oe/step/home_token.rb b/lib/engine/game/g_18_oe/step/home_token.rb
-index 39fc42e..c851155 100644
+index f5bd3cc..1eba700 100644
 --- a/lib/engine/game/g_18_oe/step/home_token.rb
 +++ b/lib/engine/game/g_18_oe/step/home_token.rb
 @@ -15,7 +15,8 @@ module Engine
@@ -40,7 +40,7 @@ index 39fc42e..c851155 100644
  
 @@ -25,6 +26,18 @@ module Engine
  
-             @game.log << "The #{hex.location_name} patronage tile is removed"
+             @game.fulfill_patronage!(action.entity, hex, lowest: true)
            end
 +
 +          private

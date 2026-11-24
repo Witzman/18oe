@@ -1,5 +1,5 @@
 diff --git a/lib/engine/game/g_18_oe/step/special_token.rb b/lib/engine/game/g_18_oe/step/special_token.rb
-index 1e58ade..cc778f2 100644
+index 6cca655..c114009 100644
 --- a/lib/engine/game/g_18_oe/step/special_token.rb
 +++ b/lib/engine/game/g_18_oe/step/special_token.rb
 @@ -32,7 +32,11 @@ module Engine
@@ -15,7 +15,7 @@ index 1e58ade..cc778f2 100644
                operator = @game.token_owner(action.entity)
                action.token = available_tokens(action.entity).first
                check_connected(operator, action.city, action.city.hex)
-@@ -47,6 +51,10 @@ module Engine
+@@ -48,6 +52,10 @@ module Engine
  
              super
              @game.remove_wcf_placeholder! if action.entity.id == 'WCF'
@@ -26,7 +26,7 @@ index 1e58ade..cc778f2 100644
            ensure
              action.token.price = charter_price if charter_price
            end
-@@ -96,6 +104,19 @@ module Engine
+@@ -97,6 +105,19 @@ module Engine
              ability.type == :token && ability.connected
            end
  

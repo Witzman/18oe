@@ -1,8 +1,8 @@
 diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
-index cf6a6c6..6fbe0e5 100644
+index c09e5f7..ea84a8d 100644
 --- a/lib/engine/game/g_18_oe/game.rb
 +++ b/lib/engine/game/g_18_oe/game.rb
-@@ -1853,6 +1853,7 @@ module Engine
+@@ -1895,6 +1895,7 @@ module Engine
              G18OE::Step::MergeToken,
              G18OE::Step::MergeDiscardTrain,
              G18OE::Step::MergeMinor,
@@ -11,7 +11,7 @@ index cf6a6c6..6fbe0e5 100644
              G18OE::Step::ProtectShare,
              G18OE::Step::CustodyShare,
 diff --git a/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb b/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
-index 74a686f..98470c8 100644
+index 4b11ca3..34d49ea 100644
 --- a/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
 +++ b/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
 @@ -155,7 +155,7 @@ module Engine

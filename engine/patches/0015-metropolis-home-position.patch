@@ -1,17 +1,17 @@
 diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
-index f2ce8e8..1118b5d 100644
+index 18b245c..c91bfea 100644
 --- a/lib/engine/game/g_18_oe/game.rb
 +++ b/lib/engine/game/g_18_oe/game.rb
-@@ -26,6 +26,7 @@ require_relative 'step/merge_token'
+@@ -26,6 +26,7 @@ require_relative 'step/merge_offer'
+ require_relative 'step/merge_token'
  require_relative 'step/concession'
  require_relative 'step/choose_operating_position'
- require_relative 'step/home_hex_consent'
 +require_relative 'step/home_position'
  require_relative 'step/reserve_share'
  require_relative 'step/orient_express_bonus'
  require_relative 'step/transfer_tokens'
-@@ -86,6 +87,8 @@ module Engine
-         FORCED_NATIONAL_CHOICE = 'national'
+@@ -96,6 +97,8 @@ module Engine
+         FIRST_ROUND_INSOLVENCY_CHOICE = 'first_round_insolvency'
          MUST_SELL_IN_BLOCKS = false
          HOME_TOKEN_TIMING = :float
 +        # RB 11.1.9: when a tile laid on the metropolis gives SB or MSP its home position, its own president chooses it
@@ -19,18 +19,18 @@ index f2ce8e8..1118b5d 100644
          TILE_RESERVATION_BLOCKS_OTHERS = :always
          REVISITABLE_NODES = %w[town double_town].freeze
          # bank-break ends current OR; first level-8 purchase ends after one more full OR set
-@@ -941,6 +944,25 @@ module Engine
-           face_value + [reserved_price - corporation.cash, 0].max
+@@ -948,6 +951,25 @@ module Engine
+           major_phase? && @first_or_complete
          end
  
 +        # RB 11.1.9, last paragraph: "The president may not select a home token position that triggers the need to place a
 +        # green tile as outlined above if a token position is available that would not do so." Would the home station in
 +        # `city` leave the RR unable to connect to another stop (so the Right-of-Way green tile would apply)?
++        # The Track step is built only to ask it (no setup, the round is left untouched).
 +        def right_of_way_home_position_needed?(corporation, city)
 +          return false unless @players.size > 2 && !@phase.tiles.include?(:green)
 +
 +          track = G18OE::Step::Track.new(self, @round)
-+          track.instance_variable_set(:@points_used, 0)
 +          !track.home_connectable?(corporation, track.send(:get_tile_lay, corporation), {}, city, corporation.cash)
 +        end
 +
@@ -42,17 +42,17 @@ index f2ce8e8..1118b5d 100644
 +          fine.empty? ? open : fine
 +        end
 +
-         # RB 11.1.9, part 2: "The home token hex of a floated RR may not have yellow track laid on it without the explicit
-         # permission of the RR's president. Un-floated RRs automatically provide this permission." Not in a two-player game.
-         def home_hex_of?(corporation, hex)
-@@ -1841,7 +1863,7 @@ module Engine
+         def operating_order
+           floated_minors_and_regionals = @minor_regional_order.select { |c| c.floated? && !insolvent?(c) }
+           floated_minors_and_regionals + @corporations.select { |c| %i[major national].include?(c.type) && c.floated? }.sort
+@@ -1890,7 +1912,7 @@ module Engine
              Engine::Step::Exchange,
              G18OE::Step::FormNational,
              Engine::Step::DiscardTrain,
 -            Engine::Step::HomeToken,
 +            G18OE::Step::Operating::HomeToken,
              G18OE::Step::Assign,
-             G18OE::Step::HomeHexConsent,
+             G18OE::Step::SpecialTrack,
              G18OE::Step::Track,
 diff --git a/lib/engine/game/g_18_oe/step/home_position.rb b/lib/engine/game/g_18_oe/step/home_position.rb
 new file mode 100644
@@ -105,7 +105,7 @@ index 0000000..94bdc6d
 +  end
 +end
 diff --git a/lib/engine/game/g_18_oe/step/home_token.rb b/lib/engine/game/g_18_oe/step/home_token.rb
-index c851155..fb3f4c2 100644
+index 1eba700..d2b28bc 100644
 --- a/lib/engine/game/g_18_oe/step/home_token.rb
 +++ b/lib/engine/game/g_18_oe/step/home_token.rb
 @@ -1,13 +1,17 @@
@@ -126,59 +126,66 @@ index c851155..fb3f4c2 100644
              minor = action.entity.type == :minor
              hex = action.city.hex
              if minor
-diff --git a/lib/engine/game/g_18_oe/step/track.rb b/lib/engine/game/g_18_oe/step/track.rb
-index e64c2d8..4df6137 100644
---- a/lib/engine/game/g_18_oe/step/track.rb
-+++ b/lib/engine/game/g_18_oe/step/track.rb
-@@ -62,30 +62,43 @@ module Engine
-             home_connectable?(Array(entity_or_entities).first, 0, hex => tile)
-           end
+diff --git a/lib/engine/game/g_18_oe/step/tracker.rb b/lib/engine/game/g_18_oe/step/tracker.rb
+index 37498b3..65aad02 100644
+--- a/lib/engine/game/g_18_oe/step/tracker.rb
++++ b/lib/engine/game/g_18_oe/step/tracker.rb
+@@ -64,30 +64,50 @@ module Engine
+           home_connectable?(Array(entity_or_entities).first, 0, hex => tile)
+         end
  
--          def home_connectable?(entity, points, laid = {})
--            return false unless (home = entity.tokens.first&.city)
-+          # With `cash` the search also counts the terrain cost of the lays and rejects a route whose lays the RR cannot pay
-+          # or that would leave it unable to buy its reserved 2+2 (RB 11.1.9 "without causing a first turn bankruptcy").
-+          def home_connectable?(entity, points, laid = {}, home = nil, cash = nil)
-+            return false unless (home ||= entity.tokens.first&.city)
+-        def home_connectable?(entity, points, laid = {})
+-          return false unless (home = entity.tokens.first&.city)
++        # With `cash` the search also counts the terrain cost of the lays and rejects a route whose lays the RR cannot pay
++        # or that would leave it unable to buy its reserved 2+2 (RB 11.1.9 "without causing a first turn bankruptcy").
++        def home_connectable?(entity, points, laid = {}, home = nil, cash = nil)
++          return false unless (home ||= entity.tokens.first&.city)
  
-             cheapest = {}
--            queue = home.exits.map { |exit| [home.hex, exit, 0] } + yellow_lay_ends(entity, home.hex, home.tile, 0, points)
-+            queue = home.exits.map { |exit| [home.hex, exit, 0, 0] } +
-+                    affordable_lay_ends(entity, yellow_lay_ends(entity, home.hex, home.tile, 0, points), 0, cash)
-             until queue.empty?
--              hex, exit, cost = queue.shift
--              next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]] <= cost
-+              hex, exit, cost, money = queue.shift
-+              next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]].all? { |c, m| c <= cost && m <= money }
+           cheapest = {}
+-          queue = home.exits.map { |exit| [home.hex, exit, 0] } + yellow_lay_ends(entity, home.hex, home.tile, 0, points)
++          queue = home.exits.map { |exit| [home.hex, exit, 0, 0] } +
++                  affordable_lay_ends(entity, yellow_lay_ends(entity, home.hex, home.tile, 0, points), 0, cash)
+           until queue.empty?
+-            hex, exit, cost = queue.shift
+-            next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]] <= cost
++            hex, exit, cost, money = queue.shift
++            next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]].all? { |c, m| c <= cost && m <= money }
  
--              cheapest[[hex.id, exit]] = cost
-+              (cheapest[[hex.id, exit]] ||= []) << [cost, money]
-               crossings(hex, exit).each do |neighbor, edge|
-                 tile = laid[neighbor] || neighbor.tile
-                 paths = tile.paths.select { |path| path.exits.include?(edge) }.flat_map { |path| path.junction&.paths || [path] }
-                 return true if paths.any? { |path| path.nodes.any? { |node| node != home } }
+-            cheapest[[hex.id, exit]] = cost
++            (cheapest[[hex.id, exit]] ||= []) << [cost, money]
+             crossings(hex, exit).each do |neighbor, edge|
+               tile = laid[neighbor] || neighbor.tile
+               paths = tile.paths.select { |path| path.exits.include?(edge) }.flat_map { |path| path.junction&.paths || [path] }
+               return true if paths.any? { |path| path.nodes.any? { |node| node != home } }
  
--                lay_ends = yellow_lay_ends(entity, neighbor, tile, cost, points)
-+                lay_ends = affordable_lay_ends(entity, yellow_lay_ends(entity, neighbor, tile, cost, points), money, cash)
-                 return true if !lay_ends.empty? && !tile.city_towns.empty?
+-              lay_ends = yellow_lay_ends(entity, neighbor, tile, cost, points)
++              lay_ends = affordable_lay_ends(entity, yellow_lay_ends(entity, neighbor, tile, cost, points), money, cash)
+               return true if !lay_ends.empty? && !tile.city_towns.empty?
  
--                queue.concat(paths.flat_map(&:exits).map { |track_exit| [neighbor, track_exit, cost] }, lay_ends)
-+                queue.concat(paths.flat_map(&:exits).map { |track_exit| [neighbor, track_exit, cost, money] }, lay_ends)
-               end
+-              queue.concat(paths.flat_map(&:exits).map { |track_exit| [neighbor, track_exit, cost] }, lay_ends)
++              queue.concat(paths.flat_map(&:exits).map { |track_exit| [neighbor, track_exit, cost, money] }, lay_ends)
              end
-             false
            end
+           false
+         end
  
-+          # The lay ends of yellow_lay_ends with the money of the lay added; without `cash` no money is counted.
-+          def affordable_lay_ends(entity, lay_ends, money, cash)
-+            lay_ends.filter_map do |hex, exit, cost|
-+              total = money + (cash ? hex.tile.upgrades.sum(&:cost) : 0)
-+              next if cash && (total > cash || !@game.first_round_spend_allowed?(entity, total))
++        # The lay ends of yellow_lay_ends with the money of the lay added; without `cash` no money is counted.
++        def affordable_lay_ends(entity, lay_ends, money, cash)
++          lay_ends.filter_map do |hex, exit, cost|
++            total = money + (cash ? hex.tile.upgrades.sum(&:cost) : 0)
++            next if cash && (total > cash || !reserved_train_covered?(entity, total))
 +
-+              [hex, exit, cost, total]
-+            end
++            [hex, exit, cost, total]
 +          end
++        end
 +
-           def can_lay_tile?(entity)
-             return true if @game.track_token_placeable?(entity)
- 
++        # Game#check_reserved_train_funds! as a question: does spending `cost` leave the reserved 2+2 payable (§11.6.5)?
++        def reserved_train_covered?(entity, cost)
++          return true if !cost.positive? || !@game.reserved_train_due?(entity)
++
++          entity.cash + entity.owner.cash - cost >= @game.reserved_train_price.to_i
++        end
++
+         def get_tile_lay(entity)
+           @game.tile_point_budget(entity)
+         end

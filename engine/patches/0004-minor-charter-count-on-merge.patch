@@ -1,11 +1,11 @@
 diff --git a/lib/engine/game/g_18_oe/step/merge_minor.rb b/lib/engine/game/g_18_oe/step/merge_minor.rb
-index ae8d077..2e46482 100644
+index f32732b..c03daeb 100644
 --- a/lib/engine/game/g_18_oe/step/merge_minor.rb
 +++ b/lib/engine/game/g_18_oe/step/merge_minor.rb
-@@ -88,6 +88,9 @@ module Engine
-             else
+@@ -89,6 +89,9 @@ module Engine
                @log << "#{minor.name} merges into #{major.name} by track connection; #{minor.owner.name} receives no share"
              end
+             @game.minor_merged
 +            # RB 10.5 exchanges the minor charter: it stops counting towards the certificate limit (4.1) now, not
 +            # only when the minor closes after its tokens are resolved.
 +            minor.presidents_share.counts_for_limit = false

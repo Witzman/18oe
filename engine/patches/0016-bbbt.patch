@@ -241,7 +241,7 @@ index 0000000..2237c24
 +  end
 +end
 diff --git a/lib/engine/game/g_18_oe/entities.rb b/lib/engine/game/g_18_oe/entities.rb
-index a6760a3..7994fc8 100644
+index 9eedba0..c0cfcc3 100644
 --- a/lib/engine/game/g_18_oe/entities.rb
 +++ b/lib/engine/game/g_18_oe/entities.rb
 @@ -64,6 +64,14 @@ module Engine
@@ -260,7 +260,7 @@ index a6760a3..7994fc8 100644
            },
            # -----------------------------------------------------------------------
 diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
-index 1118b5d..7925e27 100644
+index c91bfea..c09e5f7 100644
 --- a/lib/engine/game/g_18_oe/game.rb
 +++ b/lib/engine/game/g_18_oe/game.rb
 @@ -8,6 +8,7 @@ require_relative 'graph'
@@ -268,11 +268,11 @@ index 1118b5d..7925e27 100644
  require_relative 'orient_express_duty'
  require_relative 'nationals'
 +require_relative 'bbbt'
+ require_relative 'first_round_insolvency'
  require_relative 'train'
  require_relative '../base'
- require_relative 'depot'
-@@ -28,6 +29,8 @@ require_relative 'step/choose_operating_position'
- require_relative 'step/home_hex_consent'
+@@ -28,6 +29,8 @@ require_relative 'step/concession'
+ require_relative 'step/choose_operating_position'
  require_relative 'step/home_position'
  require_relative 'step/reserve_share'
 +require_relative 'step/protect_share'
@@ -285,10 +285,10 @@ index 1118b5d..7925e27 100644
          include G18OE::OrientExpressDuty
          include G18OE::Nationals
 +        include G18OE::Bbbt
+         include G18OE::FirstRoundInsolvency
          attr_accessor :minor_regional_order, :minor_available_regions, :minor_floated_regions,
                        :consolidation_triggered, :consolidation_complete
-         attr_reader :fast_start_minors, :concessions, :merged_minors, :wcf_placeholder, :minor_c_ability,
-@@ -1205,8 +1209,10 @@ module Engine
+@@ -1198,8 +1202,10 @@ module Engine
            minor.placed_tokens.any? { |token| nodes.key?(token.city) }
          end
  
@@ -300,7 +300,7 @@ index 1118b5d..7925e27 100644
              @share_pool.shares_by_corporation[major].first
          end
  
-@@ -1462,6 +1468,7 @@ module Engine
+@@ -1487,6 +1493,7 @@ module Engine
                new_stock_round
              when Engine::Round::Stock
                @reserved_shares = []
@@ -308,7 +308,7 @@ index 1118b5d..7925e27 100644
                remove_major_par_markers!
                round = super
                @operating_rounds = final_operating_rounds if @turn == @final_turn
-@@ -1845,6 +1852,8 @@ module Engine
+@@ -1889,6 +1896,8 @@ module Engine
              G18OE::Step::MergeDiscardTrain,
              G18OE::Step::MergeMinor,
              G18OE::Step::ReserveShare,
@@ -318,7 +318,7 @@ index 1118b5d..7925e27 100644
            ])
          end
 diff --git a/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb b/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
-index 4df9518..74a686f 100644
+index 1b03e7e..4b11ca3 100644
 --- a/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
 +++ b/lib/engine/game/g_18_oe/step/buy_sell_par_shares.rb
 @@ -258,11 +258,12 @@ module Engine
@@ -357,21 +357,16 @@ index 4df9518..74a686f 100644
  
              bundle = action.bundle
              corporation = bundle.corporation
-@@ -327,7 +332,12 @@ module Engine
- 
-           def process_buy_shares(action)
-             return process_insolvent_buyback(action) if insolvent_buyback?(action.bundle)
--            return super unless reservation_prompt?(action)
-+
-+            unless reservation_prompt?(action)
+@@ -332,6 +337,8 @@ module Engine
+               check_legal_buy(action.entity, action.bundle, swap: action.swap)
+               @round.pending_share_buy = action
+             else
 +              return if hold_buy_for_bbbt?(action)
 +
-+              return super
-+            end
- 
-             check_legal_buy(action.entity, action.bundle, swap: action.swap)
-             @round.pending_share_buy = action
-@@ -462,9 +472,11 @@ module Engine
+               super
+             end
+           end
+@@ -455,9 +462,11 @@ module Engine
              # Step 3: Locate the major par cell (right×2, up×1 from original par)
              # Using original_par_price ensures correct placement even if the regional
              # somehow moved before conversion.
@@ -384,7 +379,7 @@ index 4df9518..74a686f 100644
  
              # Step 4: Move stock market token to major par cell and update par_price.
              # Directly calling move() avoids relying on three incremental moves from
-@@ -543,10 +555,42 @@ module Engine
+@@ -540,10 +549,42 @@ module Engine
            end
  
            def process_sell_shares(action)
@@ -427,7 +422,7 @@ index 4df9518..74a686f 100644
            def process_convert(action)
              @converting = action.entity
              track_action(action, action.entity)
-@@ -620,10 +664,24 @@ module Engine
+@@ -617,10 +658,24 @@ module Engine
              actions = []
              ipo_bundle = @converting.ipo_shares.first&.to_bundle
              actions << 'buy_shares' if ipo_bundle && can_buy?(entity, ipo_bundle)
@@ -452,7 +447,7 @@ index 4df9518..74a686f 100644
            def converted_actions(entity)
              actions = []
              actions << 'sell_shares' if can_sell_any?(entity)
-@@ -645,6 +703,7 @@ module Engine
+@@ -644,6 +699,7 @@ module Engine
  
            def reserved_for_another?(entity, bundle)
              return false unless bundle

@@ -1,8 +1,8 @@
 diff --git a/lib/engine/game/g_18_oe/game.rb b/lib/engine/game/g_18_oe/game.rb
-index cefcff6..5ac6c6f 100644
+index 4a82bc0..18b245c 100644
 --- a/lib/engine/game/g_18_oe/game.rb
 +++ b/lib/engine/game/g_18_oe/game.rb
-@@ -51,15 +51,18 @@ module Engine
+@@ -53,15 +53,18 @@ module Engine
          PATRONAGE_DRAWS = [{ group: :pink, count: 3 }, { group: :yellow, count: 3 },
                             { group: :white, count: 3 }, { group: :green, count: 8 }].freeze
  

@@ -1,61 +1,50 @@
 # frozen_string_literal: true
 
 require_relative '../../../step/special_track'
+require_relative 'tracker'
 
 module Engine
   module Game
     module G18OE
       module Step
-        # RB 14.9 Brandt & Brandau, Engineers: in the Track step of a RR of its owner the private places one of its tokens on
-        # a rough hex and lays a yellow tile there at no terrain cost. The lay spends the operating RR's tile points
-        # (Track#record_special_lay!); the tile_lay ability gives the count (4, two per OR), the hexes and the free lay.
         class SpecialTrack < Engine::Step::SpecialTrack
-          ACTIONS = %w[lay_tile].freeze
+          include Tracker
 
           def actions(entity)
-            return [] unless entity.company? && abilities(entity) && entity.owner == operator.owner
-            return [] if track_step.nil? || track_step.tile_points_left(operator) < 1
+            return [] unless entity == @game.brandt_private
+            return [] unless @game.brandt_token_placeable?(@round.current_operator)
 
-            ACTIONS
+            %w[lay_tile]
           end
 
-          def available_hex(entity, hex)
-            return unless (ability = abilities(entity))
-            return unless ability.hexes.include?(hex.id) && hex.tile.color == :white
-            return unless track_step.tile_points_left(operator) >= @game.tile_point_cost(operator, old_tile: hex.tile)
+          def available_hex(_entity, hex)
+            return unless @game.brandt_hex?(hex)
 
-            track_step.tracker_available_hex(operator, hex)
+            tracker_available_hex(@round.current_operator, hex)
           end
 
           def hex_neighbors(entity, hex)
-            return unless abilities(entity)
-
-            track_step.hex_neighbors(operator, hex)
+            @game.graph_for_entity(entity).connected_hexes(entity)[hex]
           end
 
           def process_lay_tile(action)
-            company = action.entity
-            ability = abilities(company)
-            raise GameError, "#{company.name} cannot lay a tile now" unless ability
-            raise GameError, "#{action.hex.id} cannot be built on now" unless available_hex(company, action.hex)
+            operator = @round.current_operator
+            hex = action.hex
+            tile = action.tile
+            old_tile = hex.tile
 
-            old_tile = action.hex.tile
-            points_cost = @game.tile_point_cost(operator, old_tile: old_tile)
-            lay_tile(action, spender: operator)
-            ability.use!
-            track_step.record_special_lay!(operator, action, old_tile, points_cost)
-            @game.bbe_place_token!(action.hex, company)
-            track_step.pass! unless track_step.can_lay_tile?(operator)
-          end
+            raise GameError, "#{action.entity.name} cannot be used by #{operator.name} now" unless
+              @game.brandt_token_placeable?(operator)
+            raise GameError, "#{hex.name} cannot hold a Brandt & Brandau token" unless @game.brandt_hex?(hex)
+            raise GameError, 'Brandt & Brandau lays a yellow tile' unless tile.color == :yellow
+            raise GameError, "#{old_tile.name} is not upgradeable to #{tile.name}" unless @game.upgrades_to?(old_tile, tile)
+            if !@game.loading && !tracker_available_hex(operator, hex)
+              raise GameError, "#{hex.name} is not connected to #{operator.name}"
+            end
 
-          private
-
-          def operator
-            @game.current_entity
-          end
-
-          def track_step
-            @round.steps.find { |step| step.is_a?(G18OE::Step::Track) }
+            lay_tile_action(action, spender: operator)
+            abilities(action.entity).use!
+            @game.place_brandt_token!(hex)
           end
         end
       end

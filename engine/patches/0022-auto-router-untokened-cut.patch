@@ -1,8 +1,8 @@
 diff --git a/lib/engine/auto_router.rb b/lib/engine/auto_router.rb
-index 4ac9cfd..eb2e4f3 100644
+index b9c84b9..a0fa19c 100644
 --- a/lib/engine/auto_router.rb
 +++ b/lib/engine/auto_router.rb
-@@ -204,7 +204,19 @@ module Engine
+@@ -218,7 +218,19 @@ module Engine
              path_abort.delete(train)
            rescue ReusesCity
              path_abort.clear
