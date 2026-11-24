@@ -1,0 +1,53 @@
+# Engine gate (#591): what 18xx.games checks for game features, and nothing else. Chris' own specs
+# (spec/engine/upstream, 1600+ examples), our patch specs (spec/oe/extensions, one per engine/patches entry) and
+# engine-check (lib/engine matches engine/MANIFEST). No bots, no wrapper, no whole games, no browser.
+# Every change to the engine or the rules passes this gate; bot, wrapper and web work additionally uses ci.yml and
+# full.yml (the bot/wrapper gate). `bin/deploy-check` (workshop) requires this gate for every deploy.
+# Triggers: pull request touching the engine paths, nightly, manual dispatch for any commit (input `sha`).
+name: engine
+
+on:
+  pull_request:
+    paths:
+      - "lib/engine/**"
+      - "engine/**"
+      - "spec/engine/upstream/**"
+      - "spec/oe/extensions/**"
+      - "spec/engine/engine_helper.rb"
+      - ".github/workflows/engine.yml"
+  schedule:
+    - cron: "47 1 * * *" # nightly, before full (02:17 UTC)
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "commit (SHA) to test; empty = the ref selected above"
+        type: string
+        default: ""
+
+concurrency:
+  group: engine-${{ inputs.sha || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  engine:
+    name: engine gate (Chris' specs, patch specs, engine-check)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: engine-check (lib/engine matches engine/MANIFEST)
+        run: ruby bin/engine-check
+      - name: Chris' specs and our patch specs
+        run: bundle exec rspec spec/engine/upstream spec/oe/extensions --format progress --format json --out "$RUNNER_TEMP/engine.json"
+      - name: failed examples
+        if: always()
+        run: ruby .github/scripts/rspec-failures.rb "$RUNNER_TEMP/engine.json"

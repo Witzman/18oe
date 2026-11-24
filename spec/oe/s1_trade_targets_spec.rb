@@ -13,11 +13,10 @@ RSpec.describe "S1 target list, player trade (§10.4, #223)" do
   let(:script) { Oe::ScriptGame.new(clients: {}, slice: "s1") }
   let(:combos) { Oe::ScriptGame.slice("s1").fetch("games").flat_map { |g| g["combos"] } }
 
-  it "lists the offer and both answers" do
-    expect(combos).to include("stock/BuySellParShares/buy_company:trade",
-                              "stock/BuySellParShares/buy_corporation",
-                              "stock/TradeOffer/choose:accept_trade",
-                              "stock/TradeOffer/pass")
+  # Chris' engine has no seller-consent step: the trade is the single buy_corporation (#563, Task 4a).
+  it "lists the offer without a TradeOffer answer step" do
+    expect(combos).to include("stock/BuySellParShares/buy_company:trade", "stock/BuySellParShares/buy_corporation")
+    expect(combos.grep(/TradeOffer/)).to be_empty
   end
 
   it "keys a range offer of a trade under buy_company:trade" do

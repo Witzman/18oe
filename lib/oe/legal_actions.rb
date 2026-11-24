@@ -332,11 +332,19 @@ module Oe
       players.flat_map do |player|
         player.companies.reject { |c| c.closed? || entities.include?(c) }.flat_map do |company|
           company_step = @game.round.active_step(company)
-          next [] unless company_step
+          next [] unless company_step && reachable_before_blocking?(company_step)
 
           company_step.actions(company).flat_map { |type| generate(type, company_step, company) }
         end
       end
+    end
+
+    # Round#process_action walks the steps in order and raises when an active blocking step does not take the action,
+    # so a private's action is only legal when its step comes no later than the first blocking one (HomeToken first).
+    def reachable_before_blocking?(company_step)
+      steps = @game.round.steps
+      blocking = steps.index { |s| s.active? && s.blocking? }
+      blocking.nil? || steps.index(company_step) <= blocking
     end
 
     def corporations_of(player)
@@ -587,6 +595,13 @@ module Oe
       sample(actions).map do |tile, hex, rotation|
         A::LayTile.new(entity, tile: tile, hex: hex, rotation: rotation)
       end
+    end
+
+    # §11.3.10 Brandt and Brandau: another RR removes the token for the hex's original terrain price and one tile
+    # point (patch 0017, Step::Track#bbe_removable_hexes); the step's own rules decide, the treasury must cover it.
+    def generate_remove_hex_token(step, entity)
+      hexes = step.bbe_removable_hexes(entity).select { |hex| step.bbe_removal_money(entity, hex) <= entity.cash }
+      sample(hexes).map { |hex| A::RemoveHexToken.new(entity, hex: hex) }
     end
 
     # §15.4 Minor D / §14.8 Hochberg: the private places its token on a hex (the action's target), as the step's
