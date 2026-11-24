@@ -13,6 +13,26 @@ module Engine
         def rusted_trains
           @discarded.select(&:rusted)
         end
+
+        # RB 8.3 and 11.6: after the first OR of the game, once the Major RR Phase has begun, level 3 trains may be
+        # bought "even if there are remaining level 2 trains reserved for purchase by newly floated minors and
+        # regionals". Engine::Depot offers only the first upcoming train, so a 2+2 left reserved for an RR that never
+        # buys it (it became a national first, RB 11.6.4) kept the game in Train Phase 2. Step::BuyTrain keeps the
+        # reserved 2+2 for the RRs that still owe it.
+        def depot_trains(clear: false)
+          open = @game.non_starter_trains_available?
+          clear ||= open != @level_3_open
+          @level_3_open = open
+          super(clear: clear)
+        end
+
+        def available_upcoming_trains
+          trains = super
+          return trains unless @level_3_open
+
+          level_3 = @upcoming.find { |train| train.name != '2+2' && !@game.extra_train?(train) }
+          (trains + [level_3]).compact.uniq(&:name)
+        end
       end
     end
   end
