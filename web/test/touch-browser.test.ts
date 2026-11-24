@@ -155,7 +155,7 @@ const CHECKS = (w: number, h: number) => String.raw`(async () => {
 })()`;
 
 for (const orientation of ["landscape", "portrait"] as const) {
-  test(`touch on the map under the iPad profile, ${orientation}: tap selects, list for ambiguous taps, pan, inertia, pinch, double tap`, { skip: browser ? false : "no headless browser installed", timeout: 330000 }, async () => {
+  test(`touch on the map under the iPad profile, ${orientation}: tap selects, list for ambiguous taps, pan, inertia, pinch, double tap`, { skip: browser ? false : "no headless browser installed", timeout: 130000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), "oe-touch-test-"));
     try {
       await build({ entryPoints: [join(web, "main.ts")], bundle: true, format: "esm", target: "es2022", outfile: join(dir, "main.js"), logLevel: "silent" });
@@ -166,9 +166,7 @@ for (const orientation of ["landscape", "portrait"] as const) {
       const [w, h] = orientation === "landscape" ? [ph, pw] : [pw, ph];
       const out = join(dir, "out.png");
       const r = spawnSync(process.execPath, [shot, `${join(dir, "index.html")}#/map?src=/map.json&pitch=0&yaw=0`, out,
-        "--device", "ipad", "--orientation", orientation, "--wait-for", ".map-dev[data-ready]", "--eval", CHECKS(w, h), "--delay", "0"], { encoding: "utf8", timeout: 300000 });
-      // 300 s (#598): since the sea gradient/foam strokes of #477 S1 (1c9567d) a software frame of the flat map costs ~14x (390 -> 5300 ms,
-      // measured locally under load; ~3.4x in CI: ipad-browser 19 -> 65 s, touch 45 s -> over 120 s), and this test needs ~100 frames.
+        "--device", "ipad", "--orientation", orientation, "--wait-for", ".map-dev[data-ready]", "--eval", CHECKS(w, h), "--delay", "0"], { encoding: "utf8", timeout: 120000 });
       // status null with r.error set: bin/shot was killed by the timeout (slow CI runner, #363), not a failed check.
       assert.equal(r.status, 0, (r.error ? `bin/shot did not finish: ${r.error.message}\n` : "") + r.stderr + r.stdout);
       assert.doesNotMatch(r.stderr, /page error/);

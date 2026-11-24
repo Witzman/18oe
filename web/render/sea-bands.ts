@@ -1,6 +1,7 @@
 // Base surfaces (#477): the sea gets lighter towards the coast and the coast a foam fringe. Both are
 // stacks of strokes along the smoothed land rings (coast.ts), computed once per map and theme, drawn into
-// the static sea and land layers, so they cost nothing per frame and show at every zoom stage. Pure numbers
+// the static sea and land layers and cached as textures (#599: as strokes they cost seconds per frame under software
+// rendering), so they cost little per frame and show at every zoom stage. Pure numbers
 // here (no PixiJS), the layer module turns them into strokes.
 
 /** Strokes in the sea gradient; more means smoother, each one is one more pass over the ring points. */
