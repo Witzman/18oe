@@ -38,23 +38,11 @@ module Oe
       chosen
     end
 
-    # Oe extension (#512, §12.1): the Orient Express routes a train made by combining `trains` could run.
-    # Read-only: the trial train is never added to the depot or the corporation. It is built as the engine's
-    # step builds the combined train (G18OE::Step::Route#combined_train!, private and adding the train to the
-    # depot): the summed cities and towns, its town row unlimited. The search is the picker's.
+    # Oe extension (#512, §12.1): the Orient Express routes a train made by combining `trains` could run. Read-only:
+    # the trial train is never added to the depot or the corporation. The game builds the trial train and keeps the
+    # search per state (#600): the duty check asks the same question.
     def orient_express_routes(corporation, trains)
-      trial = combined_trial_train(corporation, trains)
-      routes, = path([trial], corporation)
-      routes[trial].select { |route| @game.orient_express_run?(route) }
-    end
-
-    def combined_trial_train(corporation, trains)
-      cities, towns = trains.map { |t| @game.distance(t) }.transpose.map(&:sum)
-      distance = [
-        { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
-        { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
-      ]
-      Engine::Train.new(name: "#{cities}+#{towns}", distance: distance, price: 0).tap { |t| t.owner = corporation }
+      @game.orient_express_trial_routes(corporation, trains)
     end
 
     # Every set of two or more of `candidates`, one per multiset of train names, smallest first.
