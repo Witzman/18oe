@@ -264,12 +264,20 @@ module Engine
 
         def shortest_costs(starts)
           costs = starts.to_h { |node| [node, 0] }
+          queue = MinQueue.new
+          starts.each { |node| queue.push(0, node) }
           settled = {}
-          while (node = costs.keys.reject { |key| settled[key] }.min_by { |key| costs[key] })
+          while (entry = queue.pop)
+            cost, node = entry
+            next if settled[node]
+
             settled[node] = true
             @edges[node].each do |other, weight|
-              candidate = costs[node] + weight
-              costs[other] = candidate if !settled[other] && (!costs.key?(other) || candidate < costs[other])
+              candidate = cost + weight
+              next if settled[other] || (costs.key?(other) && candidate >= costs[other])
+
+              costs[other] = candidate
+              queue.push(candidate, other)
             end
           end
           costs
