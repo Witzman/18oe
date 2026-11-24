@@ -131,7 +131,10 @@ module Oe
       ability = step.abilities(entity)
       return [] unless ability
 
-      return @game.hexes unless ability.respond_to?(:hexes) # several abilities: the step decides per hex
+      # several abilities, or an ability without a hex list (Chris' Brandt & Brandau: the step's own brandt_hex?
+      # check comes first in available_hex): the step decides per hex
+      return @game.hexes if !ability.respond_to?(:hexes) || ability.hexes.empty?
+
       @game.hexes.select { |hex| ability.hexes.include?(hex.id) }
     end
 

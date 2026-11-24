@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-# EXTENSION (#563 Task 8/9): red on Chris' engine until the patch for home token top-up by the owning player (#367/#369) exists. Source of the old code: Step::HomeToken / pay_home_token_cost!.
+# EXTENSION (#563 Task 8/9): home token top-up by the owning player (#367/#369, engine/patches/0007). Since #600 the
+# insolvency itself is Chris' (upstream 49c770035: the president declares it with `choose`, Game#first_round_insolvency?).
 # Triage: notes/rueckport-differenz/spec-triage-B.md. Do not delete; Task 9 turns it green.
 
 require_relative '../engine_helper'
@@ -59,7 +60,7 @@ describe 'G18OE first-round insolvency after the home token (#471)' do
     expect(minor).to be_floated
     expect(minor.cash + player.cash).to be < 100
     step = buy_train_step
-    expect(step.first_round_insolvency?(minor)).to be(true)
+    expect(game.first_round_insolvency?(minor)).to be(true)
   end
 
   # Point 4: neither can pay the whole token (#367 fallback), they pay what they hold, so nothing is left for the
@@ -73,11 +74,13 @@ describe 'G18OE first-round insolvency after the home token (#471)' do
     expect(minor.owner).to eq(player)
 
     step = buy_train_step
-    step.skip!
+    face_value = game.insolvency_face_value(minor)
+    step.process_choose(Engine::Action::Choose.new(minor, choice: game.first_round_insolvency_choice))
 
     expect(minor.trains.map(&:name)).to eq(['2+2'])
-    expect(minor.owner).to eq(game.share_pool)
-    expect(player.cash).to eq(120)
+    expect(minor.owner).to be_nil
+    expect(minor.presidents_share.owner).to eq(game.share_pool)
+    expect(player.cash).to eq(face_value)
     expect(game.insolvent?(minor)).to be(true)
   end
 
@@ -89,8 +92,8 @@ describe 'G18OE first-round insolvency after the home token (#471)' do
 
     expect(regional.cash).to eq(80)
     step = buy_train_step
-    expect(step.first_round_insolvency?(regional)).to be(true)
-    step.skip!
-    expect(game.players.first.cash).to eq(120) # own cash into the RR, then 2 x par back
+    expect(game.first_round_insolvency?(regional)).to be(true)
+    step.process_choose(Engine::Action::Choose.new(regional, choice: game.first_round_insolvency_choice))
+    expect(game.players.first.cash).to eq(120) # own cash into the RR, then the president's certificate (2 x par) back
   end
 end

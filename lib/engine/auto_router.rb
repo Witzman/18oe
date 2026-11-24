@@ -218,19 +218,7 @@ module Engine
             path_abort.delete(train)
           rescue ReusesCity
             path_abort.clear
-          rescue NoToken
-            # the token is checked before the distance, so a route without a token never raises RouteTooLong or
-            # ReusesCity and its branch was never cut; check it again without the token: if it is too long or
-            # reuses a city, no extension of it can be a valid route either
-            begin
-              route.revenue(supress_route_token_check: true, suppress_check_route_combination: true)
-            rescue RouteTooLong
-              path_abort.delete(train)
-            rescue ReusesCity
-              path_abort.clear
-            rescue GameError # rubocop:disable Lint/SuppressedException
-            end
-          rescue RouteTooShort, GameError # rubocop:disable Lint/SuppressedException
+          rescue NoToken, RouteTooShort, GameError # rubocop:disable Lint/SuppressedException
           end
 
           next :abort if path_abort.empty?
