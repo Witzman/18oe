@@ -2,6 +2,7 @@
 
 require 'engine'
 require 'engine/auto_router'
+require 'engine/game/g_18_oe/orient_express_duty'
 
 module Oe
   # Route candidates and a greedy combination on top of the core Engine::AutoRouter#path (its route combiner
@@ -9,7 +10,7 @@ module Oe
   class RouteSearch
     # The path walk is cut after this many callbacks, not after a number of seconds (#590): what it finds must not
     # depend on how fast the machine is. About 80 microseconds per callback, so a cut search takes about 30 s at most; the walks measured so far need up to 120_000.
-    WALK_LIMIT = 400_000
+    WALK_LIMIT = Engine::Game::G18OE::OrientExpressDuty::WALK_LIMIT
 
     def initialize(game, flash = nil)
       @game = game
