@@ -1,0 +1,39 @@
+diff --git a/lib/engine/auto_router.rb b/lib/engine/auto_router.rb
+index 0880799..4ac9cfd 100644
+--- a/lib/engine/auto_router.rb
++++ b/lib/engine/auto_router.rb
+@@ -46,6 +46,10 @@ module Engine
+       static = opts[:routes] || []
+       path_timeout = opts[:path_timeout] || 30
+       route_limit = opts[:route_limit] || 10_000
++      # walk_limit: an upper bound on the number of path-walk callbacks (all start nodes together). It replaces the wall
++      # clock path_timeout, so what the walk finds does not depend on how fast the machine is.
++      walk_limit = opts[:walk_limit]
++      walks = 0
+ 
+       connections = {}
+ 
+@@ -85,7 +89,7 @@ module Engine
+       @next_hexside_bit = 0
+ 
+       nodes.each do |node|
+-        if Time.now - now > path_timeout
++        if walk_limit ? walks > walk_limit : Time.now - now > path_timeout
+           LOGGER.debug('Path timeout reached')
+           path_walk_timed_out = true
+           break
+@@ -96,6 +100,14 @@ module Engine
+         walk_corporation = graph.no_blocking? ? nil : corporation
+         graph.walk_token(node, corporation: walk_corporation, skip_paths: skip_paths, links: true,
+                                revisit: true) do |_, vp|
++          if walk_limit
++            walks += 1
++            if walks > walk_limit
++              path_walk_timed_out = true
++              next :abort
++            end
++          end
++
+           paths = vp.keys
+           chains = []
+           chain = []

@@ -103,7 +103,7 @@ module Oe
     def lay_tile_options_unlogged(step, entity)
       # a private's lay (§14.9) is the operating RR's: its graph, its tile points; no terrain price
       actor = entity.company? ? @game.current_entity : entity
-      candidates = @game.hexes.filter_map do |hex|
+      candidates = scan_hexes(step, entity).filter_map do |hex|
         next unless step.available_hex(entity, hex)
         next unless entity.company? || affordable_lay?(entity, hex)
 
@@ -120,6 +120,19 @@ module Oe
         end.reject { |_, rotations| rotations.empty? }
         [hex, tiles] unless tiles.empty?
       end
+    end
+
+    # The hexes `step.available_hex` is asked about. A private's special lay (Chris' G18OE::Step::SpecialTrack)
+    # only ever allows the hexes of its ability, and asking the step per hex looks the ability up every time
+    # (#590: ~800 hexes x every private owned, the bulk of a Track step's time); so the scan starts from them.
+    def scan_hexes(step, entity)
+      return @game.hexes unless entity.company? && step.is_a?(Engine::Game::G18OE::Step::SpecialTrack)
+
+      ability = step.abilities(entity)
+      return [] unless ability
+
+      return @game.hexes unless ability.respond_to?(:hexes) # several abilities: the step decides per hex
+      @game.hexes.select { |hex| ability.hexes.include?(hex.id) }
     end
 
     # The lay's terrain cost fits the cash (a private's lay pays no terrain, §14.9).
@@ -607,6 +620,8 @@ module Oe
     # §15.4 Minor D / §14.8 Hochberg: the private places its token on a hex (the action's target), as the step's
     # own `available_hex` allows (Chris' Step::Assign; the train marker of Minor L is a `choose`, 4c).
     def generate_assign(step, entity)
+      return [] unless @game.abilities(entity, :assign_hexes) # the step asks this per hex; it does not depend on it
+
       hexes = @game.hexes.select { |hex| step.available_hex(entity, hex) }
       sample(hexes).map { |hex| A::Assign.new(entity, target: hex) }
     end
