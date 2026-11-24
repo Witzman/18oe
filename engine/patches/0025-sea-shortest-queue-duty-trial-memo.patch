@@ -1,0 +1,101 @@
+diff --git a/lib/engine/game/g_18_oe/graph/sea_connectivity.rb b/lib/engine/game/g_18_oe/graph/sea_connectivity.rb
+index dc501b2..c187b1f 100644
+--- a/lib/engine/game/g_18_oe/graph/sea_connectivity.rb
++++ b/lib/engine/game/g_18_oe/graph/sea_connectivity.rb
+@@ -264,12 +264,20 @@ module Engine
+ 
+         def shortest_costs(starts)
+           costs = starts.to_h { |node| [node, 0] }
++          queue = MinQueue.new
++          starts.each { |node| queue.push(0, node) }
+           settled = {}
+-          while (node = costs.keys.reject { |key| settled[key] }.min_by { |key| costs[key] })
++          while (entry = queue.pop)
++            cost, node = entry
++            next if settled[node]
++
+             settled[node] = true
+             @edges[node].each do |other, weight|
+-              candidate = costs[node] + weight
+-              costs[other] = candidate if !settled[other] && (!costs.key?(other) || candidate < costs[other])
++              candidate = cost + weight
++              next if settled[other] || (costs.key?(other) && candidate >= costs[other])
++
++              costs[other] = candidate
++              queue.push(candidate, other)
+             end
+           end
+           costs
+diff --git a/lib/engine/game/g_18_oe/orient_express_duty.rb b/lib/engine/game/g_18_oe/orient_express_duty.rb
+index 606492e..9650f2a 100644
+--- a/lib/engine/game/g_18_oe/orient_express_duty.rb
++++ b/lib/engine/game/g_18_oe/orient_express_duty.rb
+@@ -41,6 +41,28 @@ module Engine
+             orient_express_reachable?(corporation)
+         end
+ 
++        # The Orient Express routes a train made by combining `trains` could run. Read-only: the trial train is never
++        # added to the depot or the corporation. The search walks the whole network (5-8 s on a late map) and is asked
++        # again and again in one state (the duty check, the combinations, the wrapper's reach for the same summed
++        # trains), so the routes are kept for the state: same RR, same summed reach, same round and last action.
++        def orient_express_trial_routes(corporation, trains)
++          key = orient_express_best_key(corporation)
++          @orient_express_trial = [key, {}] unless @orient_express_trial&.first == key
++          cities, towns = trains.map { |t| distance(t) }.transpose.map(&:sum)
++          @orient_express_trial[1][[cities, towns]] ||= begin
++            trial = Engine::Train.new(
++              name: "#{cities}+#{towns}",
++              price: 0,
++              distance: [
++                { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
++                { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
++              ],
++            ).tap { |t| t.owner = corporation }
++            found, = Engine::AutoRouter.new(self).path([trial], corporation, walk_limit: WALK_LIMIT)
++            found[trial].select { |route| orient_express_run?(route) }
++          end
++        end
++
+         # The step help names the duty only once the routes have been searched in this state, so showing the prompt
+         # never starts a search of its own.
+         def orient_express_required_known?(corporation)
+@@ -89,14 +111,14 @@ module Engine
+           candidates = double_head_candidates(corporation)
+           return [] if candidates.size < 2
+ 
+-          widest = duty_oe_routes(corporation, candidates)
++          widest = orient_express_trial_routes(corporation, candidates)
+           return [] if widest.empty?
+ 
+           need = widest.map { |route| route.visited_stops.count { |stop| !stop.town? } }.min
+           duty_combinations(candidates).filter_map do |trains|
+             next if trains.sum { |train| distance(train).first } < need
+ 
+-            routes = duty_oe_routes(corporation, trains)
++            routes = orient_express_trial_routes(corporation, trains)
+             next if routes.empty?
+ 
+             others = train_routes.reject { |train, _| trains.include?(train) }
+@@ -111,22 +133,6 @@ module Engine
+           Engine::AutoRouter.new(self).path(trains, corporation, walk_limit: WALK_LIMIT).first
+         end
+ 
+-        # The Orient Express routes a train made by combining `trains` could run. Read-only: the trial train is never
+-        # added to the depot or the corporation.
+-        def duty_oe_routes(corporation, trains)
+-          cities, towns = trains.map { |t| distance(t) }.transpose.map(&:sum)
+-          trial = Engine::Train.new(
+-            name: "#{cities}+#{towns}",
+-            price: 0,
+-            distance: [
+-              { 'nodes' => ['town'], 'pay' => towns, 'visit' => 99 },
+-              { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
+-            ],
+-          ).tap { |t| t.owner = corporation }
+-          found, = Engine::AutoRouter.new(self).path([trial], corporation, walk_limit: WALK_LIMIT)
+-          found[trial].select { |route| orient_express_run?(route) }
+-        end
+-
+         def duty_combinations(candidates)
+           sorted = candidates.sort_by { |t| [t.name, t.id] }
+           (2..sorted.size).flat_map { |n| sorted.combination(n).to_a }.uniq { |trains| trains.map(&:name) }

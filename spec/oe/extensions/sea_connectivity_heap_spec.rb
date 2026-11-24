@@ -109,3 +109,60 @@ describe 'SeaConnectivity#reduced_costs priority queue' do
     expect(seconds).to be < 1.0
   end
 end
+
+# engine/patches/0025 (#600): SeaConnectivity#shortest_costs (no port authority reductions) took the next node from a
+# priority queue too: it rebuilt and scanned the key list of every tentative cost per step, quadratic in the nodes.
+describe 'SeaConnectivity#shortest_costs priority queue' do
+  let(:klass) { Engine::Game::G18OE::SeaConnectivity }
+
+  def scan_shortest(edges, starts)
+    costs = starts.to_h { |node| [node, 0] }
+    settled = {}
+    while (node = costs.keys.reject { |key| settled[key] }.min_by { |key| costs[key] })
+      settled[node] = true
+      edges[node].each do |other, weight|
+        candidate = costs[node] + weight
+        costs[other] = candidate if !settled[other] && (!costs.key?(other) || candidate < costs[other])
+      end
+    end
+    costs
+  end
+
+  def connectivity(edges)
+    klass.allocate.tap { |sc| sc.instance_variable_set(:@edges, edges) }
+  end
+
+  it 'returns the costs of the linear scan on random graphs' do
+    5.times do |seed|
+      rng = Random.new(seed)
+      edges = Hash.new { |hash, key| hash[key] = [] }
+      120.times do
+        a = rng.rand(40)
+        b = rng.rand(40)
+        weight = rng.rand(0..4)
+        edges[a] << [b, weight, nil, nil]
+        edges[b] << [a, weight, nil, nil]
+      end
+
+      expect(connectivity(edges).send(:shortest_costs, [0, 7])).to eq(scan_shortest(edges, [0, 7])), "seed #{seed}"
+    end
+  end
+
+  it 'builds a 90x90 grid well under a second' do
+    edges = Hash.new { |hash, key| hash[key] = [] }
+    90.times do |x|
+      90.times do |y|
+        edges[[x, y]] << [[x + 1, y], 1, nil, nil] if x < 89
+        edges[[x + 1, y]] << [[x, y], 1, nil, nil] if x < 89
+        edges[[x, y]] << [[x, y + 1], 1, nil, nil] if y < 89
+        edges[[x, y + 1]] << [[x, y], 1, nil, nil] if y < 89
+      end
+    end
+
+    costs = nil
+    seconds = Benchmark.realtime { costs = connectivity(edges).send(:shortest_costs, [[0, 0]]) }
+
+    expect(costs[[89, 89]]).to eq(178)
+    expect(seconds).to be < 1.0
+  end
+end
