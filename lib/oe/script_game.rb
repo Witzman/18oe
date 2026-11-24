@@ -54,7 +54,7 @@ module Oe
     end
 
     Result = Struct.new(:slice, :status, :actions, :seed, :game_id, :ledger, :missing, :finished, :standings,
-                        :seconds, :detail, :targets, :phase, keyword_init: true) do
+                        :seconds, :detail, :targets, :phase, :end_reason, :bank_cash, keyword_init: true) do
       def ok?
         %i[finished covered].include?(status) && missing.empty? && ledger.problems.empty?
       end
@@ -443,7 +443,8 @@ module Oe
       Result.new(slice: "#{@slice_name} / #{@game_name}", status: status, actions: count, seed: @seed, game_id: @game_id, ledger: @ledger,
                  missing: missing, finished: finished, standings: view["meta"]["standings"],
                  seconds: (clock - started).round(1), detail: nil, targets: @targets,
-                 phase: "#{@mirror.phase.name} (turn #{@mirror.turn})")
+                 phase: "#{@mirror.phase.name} (turn #{@mirror.turn})",
+                 end_reason: @mirror.game_end_reason, bank_cash: @mirror.bank.cash)
     end
 
     def abort_result(status, detail, started)

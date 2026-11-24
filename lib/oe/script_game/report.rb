@@ -21,6 +21,7 @@ module Oe
                "#{result.finished ? 'finished' : "NOT finished (#{result.status})"}"
         out << "Standings: #{result.standings.map { |s| "#{s['player']}=#{s['value']}" }.join(' ')}" if result.standings && result.finished
         out << "Train phase at the end: #{result.phase}" if result.phase
+        out << "Game end: #{result.end_reason || 'none'}, bank cash #{result.bank_cash.inspect}" if result.respond_to?(:end_reason)
         out << ""
         out << "Executed (#{ledger.executed.size} combinations):"
         ledger.executed.sort.each { |key, n| out << format("  %-58s %5d%s", key, n, result.targets.include?(key) ? "" : "  (extra)") }
@@ -45,7 +46,18 @@ module Oe
         out << "Problems (#{ledger.problems.size}):"
         out.concat(ledger.problems.first(20).map { |p| "  #{p.kind}: #{p.detail}" })
         out << "  none" if ledger.problems.empty?
+        out << ""
+        out << verdict(result)
         out
+      end
+
+      # The one line that says why the process exits 1 (#596).
+      def verdict(result)
+        why = []
+        why << "status #{result.status}" unless %i[finished covered].include?(result.status)
+        why << "#{result.missing.size} target combination#{'s' unless result.missing.size == 1} missing" unless result.missing.empty?
+        why << "#{result.ledger.problems.size} problem#{'s' unless result.ledger.problems.size == 1}" unless result.ledger.problems.empty?
+        why.empty? ? "Verdict: OK" : "Verdict: FAILED (#{why.join(', ')})"
       end
 
       def mean(values)
