@@ -6,6 +6,60 @@ module Engine
       class SeaConnectivity
         SEA_ZONE_WATER_DISTANCE = 2
 
+        # Binary min-heap of [priority, value]; ties come out in insertion order.
+        class MinQueue
+          def initialize
+            @heap = []
+            @count = 0
+          end
+
+          def push(priority, value)
+            @heap << [priority, @count += 1, value]
+            sift_up(@heap.size - 1)
+          end
+
+          def pop
+            return if @heap.empty?
+
+            top = @heap.first
+            last = @heap.pop
+            unless @heap.empty?
+              @heap[0] = last
+              sift_down(0)
+            end
+            [top[0], top[2]]
+          end
+
+          private
+
+          def before?(first, second)
+            (first[0] <=> second[0]).nonzero? ? first[0] < second[0] : first[1] < second[1]
+          end
+
+          def sift_up(index)
+            while index.positive?
+              parent = (index - 1) / 2
+              break unless before?(@heap[index], @heap[parent])
+
+              @heap[parent], @heap[index] = @heap[index], @heap[parent]
+              index = parent
+            end
+          end
+
+          def sift_down(index)
+            loop do
+              child = (2 * index) + 1
+              break if child >= @heap.size
+
+              child += 1 if child + 1 < @heap.size && before?(@heap[child + 1], @heap[child])
+              break unless before?(@heap[child], @heap[index])
+
+              @heap[index], @heap[child] = @heap[child], @heap[index]
+              index = child
+            end
+          end
+        end
+
         attr_reader :anchors
 
         def initialize(game, corporation)
@@ -160,20 +214,11 @@ module Engine
           initial_allowances = Array.new(reduced_seas.size, reduction)
           best = { initial_allowances => starts.to_h { |node| [node, 0] } }
           settled = Hash.new { |hash, allowances| hash[allowances] = {} }
-          loop do
-            allowances = nil
-            node = nil
-            lowest = nil
-            best.each do |available, costs|
-              costs.each do |key, cost|
-                next if settled[available][key] || (lowest && cost >= lowest)
-
-                allowances = available
-                node = key
-                lowest = cost
-              end
-            end
-            break unless node
+          queue = MinQueue.new
+          best[initial_allowances].each { |node, cost| queue.push(cost, [initial_allowances, node]) }
+          while (popped = queue.pop)
+            lowest, (allowances, node) = popped
+            next if settled[allowances][node]
 
             settled[allowances][node] = true
             @edges[node].each do |other, weight, sea, ferry|
@@ -195,7 +240,10 @@ module Engine
                 candidate = lowest + step_weight
                 costs = (best[remaining] ||= {})
                 known = costs[other]
-                costs[other] = candidate if !settled[remaining][other] && (known.nil? || candidate < known)
+                next if settled[remaining][other] || (known && candidate >= known)
+
+                costs[other] = candidate
+                queue.push(candidate, [remaining, other])
               end
             end
           end
