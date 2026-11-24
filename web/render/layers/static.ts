@@ -239,8 +239,15 @@ export function drawCoast(scene: Scene, theme: RenderTheme): Coast {
     }
   }
   const seaNode = new Container();
-  seaNode.addChild(sea, gradient, gradientMed, marks);
+  // The gradient is soft and static: rendered once into a texture (#599; 14 wide strokes per sea cost seconds per frame under software
+  // rendering), then drawn as one sprite. About 2048 px along the longer side of the map, so it stays smooth up to the usual zoom.
+  const bandsNode = new Container();
+  bandsNode.addChild(gradient, gradientMed);
+  const longSide = Math.max(b.maxX - b.minX, b.maxY - b.minY, 1);
+  bandsNode.cacheAsTexture({ resolution: Math.max(1, 2048 / longSide), antialias: true });
+  seaNode.addChild(sea, bandsNode, marks);
   const landNode = new Container();
+  foam.cacheAsTexture({ resolution: Math.max(1, 2048 / longSide), antialias: true });
   landNode.addChild(foam, land, seaNames);
   if (theme.zoneNameAlpha > 0) for (const l of REGION_LABELS) addNames(landNode, l, theme.zoneNameSize, map.zoneName, theme.zoneNameAlpha, false, theme);
   return { sea: seaNode, land: landNode };
