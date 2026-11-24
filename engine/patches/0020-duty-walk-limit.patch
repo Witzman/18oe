@@ -1,0 +1,32 @@
+diff --git a/lib/engine/game/g_18_oe/orient_express_duty.rb b/lib/engine/game/g_18_oe/orient_express_duty.rb
+index 446c772..606492e 100644
+--- a/lib/engine/game/g_18_oe/orient_express_duty.rb
++++ b/lib/engine/game/g_18_oe/orient_express_duty.rb
+@@ -14,6 +14,9 @@ module Engine
+       module OrientExpressDuty
+         ORIENT_EXPRESS_REQUIRED = 'Orient Express is required: the best routes for all trains include an '\
+                                   'Orient Express run (RB 12.2).'
++        # Cap on the path-walk callbacks of every search of this check (AutoRouter#path walk_limit, patch 0019): the answer
++        # does not depend on the wall clock. One source for the engine and for Oe::RouteSearch.
++        WALK_LIMIT = 400_000
+ 
+         # The best solution found with an Orient Express run, {revenue:, routes:, combine:}, when `routes` (the submitted
+         # ones) leave out an Orient Express run and earn less, and the solution earns strictly more than the best found
+@@ -105,7 +108,7 @@ module Engine
+ 
+         def duty_train_routes(corporation)
+           trains = route_trains(corporation).sort_by(&:price)
+-          Engine::AutoRouter.new(self).path(trains, corporation).first
++          Engine::AutoRouter.new(self).path(trains, corporation, walk_limit: WALK_LIMIT).first
+         end
+ 
+         # The Orient Express routes a train made by combining `trains` could run. Read-only: the trial train is never
+@@ -120,7 +123,7 @@ module Engine
+               { 'nodes' => %w[city offboard town], 'pay' => cities, 'visit' => cities },
+             ],
+           ).tap { |t| t.owner = corporation }
+-          found, = Engine::AutoRouter.new(self).path([trial], corporation)
++          found, = Engine::AutoRouter.new(self).path([trial], corporation, walk_limit: WALK_LIMIT)
+           found[trial].select { |route| orient_express_run?(route) }
+         end
+ 
