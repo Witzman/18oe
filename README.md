@@ -119,14 +119,23 @@ salted scrypt hashes. Set `SESSION_SECRET` and `OE_INVITE_CODE` in Dokploy
 them). Until someone has registered with the code, nobody can log in. No
 confirmation mail and no password reset yet.
 
-## CI stages (#365)
+## CI stages (#365, #591)
+
+Two gates. The **engine gate** (`engine.yml`) is what 18xx.games checks for game features: Chris' specs
+(`spec/engine/upstream`), our patch specs (`spec/oe/extensions`, one per `engine/patches` entry) and `engine-check`.
+No bots, no wrapper, no whole games. Every engine or rules change passes it (pull request touching `lib/engine`,
+`engine/`, those spec folders; nightly 01:47 UTC; dispatch with `sha`). The **bot/wrapper gate** is `ci.yml` plus
+`full.yml` below: bots, wrapper (`lib/oe`), web, scripted games, `catalog live`, whole games; it is used when bot,
+wrapper or web work is done and for a deploy that changes them. `bin/deploy-check [SHA] [--since DEPLOYED_SHA]` in
+the workshop requires the engine gate always and the bot/wrapper gate only if such files changed since `--since`.
+Not part of the engine gate yet: RuboCop and the Opal compile that 18xx.games also runs (needs their toolchain).
 
 Two stages, one definition of "fast": the RSpec tag `:game_flow` (spec/support/tags.rb).
 
 | Stage | Workflow | When | What |
 |---|---|---|---|
 | fast | `ci.yml` | every pull request | rspec `--tag ~game_flow` (engine specs, contracts; = `bin/test fast`), typecheck, web unit tests, browser tests only if `web/**` changed (`touch-browser` excluded). Target: under 3 min |
-| milestone | `full.yml` | nightly (cron 02:17 UTC; GitHub starts scheduled runs late, measured 09:37 and 10:41 UTC), tag `v0.*`, manually for any commit | the complete rspec suite (`:game_flow` included), long whole games uncapped, all browser tests incl. `touch-browser`, scripted games (slice s1; slice s2 as its own job, one runner per game; #481), `catalog live` |
+| milestone (bot/wrapper gate) | `full.yml` | nightly (cron 02:17 UTC; GitHub starts scheduled runs late, measured 09:37 and 10:41 UTC), tag `v0.*`, manually for any commit | the complete rspec suite (`:game_flow` included), long whole games uncapped, all browser tests incl. `touch-browser`, scripted games (slice s1; slice s2 as its own job, one runner per game; #481), `catalog live` |
 
 `full.yml` does NOT run on every push to `main`, and nobody dispatches or waits for it after a merge (#439): a pull
 request is merged on a green fast stage. `full` runs nightly and before a deploy (`bin/deploy-check` in the workshop

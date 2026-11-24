@@ -1,4 +1,7 @@
 # Milestone stage (#269, #365): the complete suite, i.e. everything the pull-request stage (ci.yml) leaves out.
+# Since #591 this is the BOT/WRAPPER gate: bots, wrapper (lib/oe), web, scripted games, catalog live, whole games.
+# The engine/rules gate is engine.yml (Chris' specs + patch specs + engine-check, what 18xx.games checks); the
+# shards below leave spec/engine/upstream and spec/oe/extensions out, engine.yml runs them.
 # NOT run on every push to main any more (merge chains cancelled 25 runs). Triggers:
 #   - nightly (schedule, 02:17 UTC, default branch)
 #   - tag v0.* (a version milestone)
@@ -66,7 +69,7 @@ jobs:
           # Also excluded: fixture_catalog_spec, invariants_spec. The job `catalog live` runs both whole files against
           # fresh games of the current engine; here they would only replay the stored logs, and a stored log that is
           # merely stale is no defect and no gate (#439, refreshed nightly by catalog-refresh.yml).
-          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 'spec/oe/(view_spec|view_order_spec|bot_spec|fixture_catalog_spec|invariants_spec)\.rb$')
+          files=$(ruby .github/scripts/shard.rb ${{ matrix.shard }} 4 '^spec/engine/upstream/|^spec/oe/extensions/|spec/oe/(view_spec|view_order_spec|bot_spec|fixture_catalog_spec|invariants_spec)\.rb$')
           echo "$files"
           bundle exec rspec $files --format progress --format json --out "$RUNNER_TEMP/rspec.json"
       - name: per-file timings
