@@ -28,7 +28,7 @@ index 18b245c..c91bfea 100644
 +        # `city` leave the RR unable to connect to another stop (so the Right-of-Way green tile would apply)?
 +        # The Track step is built only to ask it (no setup, the round is left untouched).
 +        def right_of_way_home_position_needed?(corporation, city)
-+          return false unless @players.size > 2 && !@phase.tiles.include?(:green)
++          return false if @players.size <= 2 || @phase.tiles.include?(:green)
 +
 +          track = G18OE::Step::Track.new(self, @round)
 +          !track.home_connectable?(corporation, track.send(:get_tile_lay, corporation), {}, city, corporation.cash)
@@ -74,7 +74,7 @@ index 0000000..94bdc6d
 +        module HomePosition
 +          def pass_city_ok?(_entity, city)
 +            corporation = token.corporation
-+            return true unless @game.metropolis_hex?(city.hex) && corporation.corporation?
++            return true if !@game.metropolis_hex?(city.hex) || !corporation.corporation?
 +
 +            @game.home_position_cities(corporation, city.hex).include?(city)
 +          end
@@ -130,7 +130,7 @@ diff --git a/lib/engine/game/g_18_oe/step/tracker.rb b/lib/engine/game/g_18_oe/s
 index 37498b3..65aad02 100644
 --- a/lib/engine/game/g_18_oe/step/tracker.rb
 +++ b/lib/engine/game/g_18_oe/step/tracker.rb
-@@ -64,30 +64,50 @@ module Engine
+@@ -64,30 +64,51 @@ module Engine
            home_connectable?(Array(entity_or_entities).first, 0, hex => tile)
          end
  
@@ -139,7 +139,8 @@ index 37498b3..65aad02 100644
 +        # With `cash` the search also counts the terrain cost of the lays and rejects a route whose lays the RR cannot pay
 +        # or that would leave it unable to buy its reserved 2+2 (RB 11.1.9 "without causing a first turn bankruptcy").
 +        def home_connectable?(entity, points, laid = {}, home = nil, cash = nil)
-+          return false unless (home ||= entity.tokens.first&.city)
++          home ||= entity.tokens.first&.city
++          return false unless home
  
            cheapest = {}
 -          queue = home.exits.map { |exit| [home.hex, exit, 0] } + yellow_lay_ends(entity, home.hex, home.tile, 0, points)
@@ -149,7 +150,7 @@ index 37498b3..65aad02 100644
 -            hex, exit, cost = queue.shift
 -            next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]] <= cost
 +            hex, exit, cost, money = queue.shift
-+            next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]].all? { |c, m| c <= cost && m <= money }
++            next if cheapest[[hex.id, exit]]&.all? { |c, m| c <= cost && m <= money }
  
 -            cheapest[[hex.id, exit]] = cost
 +            (cheapest[[hex.id, exit]] ||= []) << [cost, money]
