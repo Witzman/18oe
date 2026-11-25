@@ -2,6 +2,7 @@
 
 require "json"
 require_relative "bot"
+require_relative "live"
 
 module Oe
   # Bot-vs-random simulation (#38): is the bot (#37) a better opponent than
@@ -85,7 +86,7 @@ module Oe
                  when :strategy then @strategist.choose(bot.legal_actions(pid))
                  else random_action(bot, pid, rng)
                  end
-        game.process_action(action)
+        Live.process(game, action) # as 18xx.games stores a live move (#604)
         if game.exception
           status = :rejected
           detail = "#{kinds[pid]} #{action.class.name.split('::').last}: #{game.exception.message[0, 120]}"

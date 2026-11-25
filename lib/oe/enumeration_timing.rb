@@ -2,6 +2,7 @@
 
 require_relative 'legal_actions'
 require_relative 'strategy_player'
+require_relative 'live'
 
 module Oe
   # Times Oe::LegalActions on every turn of a strategy game (#87): the full
@@ -30,7 +31,7 @@ module Oe
         samples << Sample.new(step: name, full: full_time, bot: bot_time, full_count: full.size, bot_count: bot.size)
         (status = :dead_end) && break if bot.empty?
 
-        game.process_action(strategist.choose(bot) || bot.sample(random: rng))
+        Live.process(game, strategist.choose(bot) || bot.sample(random: rng)) # #604
         count += 1
         (status = :error) && break if game.exception
       end
