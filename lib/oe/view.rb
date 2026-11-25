@@ -371,7 +371,7 @@ module Oe
         dividend: info.dividend_kind&.to_s,
         # Per train (#119): the run as driven. `segments` are the paths in order (hex id, exit edges, node
         # indexes); `stops` the places visited with their revenue for that train (Oe::RunDetail).
-        routes: RunDetail.of(game, corp) || [],
+        routes: RunDetail.of(game, corp, info) || [],
       }
     end
 
