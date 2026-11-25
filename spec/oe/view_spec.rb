@@ -2,11 +2,13 @@
 
 require_relative "../engine/engine_helper"
 require "oe/view"
-require "oe/strategy_player"
+require_relative "../support/check_game"
 require "json"
 
-# One full 4-player strategy game, played once; views are rendered at the first
-# state of every round type seen, every 500 actions, and at the end.
+# One game played once: the bots-only test game of spec/support/check_game.rb (#602: 3 bots, seed 1; the strategy
+# game seed 1 / 4 players before it no longer reaches its end). Views are rendered at the first state of every round
+# type and of every phase seen, every 500 actions, and at the end. Capped at GAME_CAP moves; to its end in the full
+# stage (OE_FULL_GAME=1).
 RSpec.describe Oe::View, :game_flow do
   PLAIN = [Hash, Array, String, Symbol, Integer, Float, TrueClass, FalseClass, NilClass].freeze
 
@@ -29,29 +31,27 @@ RSpec.describe Oe::View, :game_flow do
   end
 
   before(:all) do
-    @game = Engine::Game::G18OE::Game.new(%w[p0 p1 p2 p3], id: 1, seed: 1)
-    rng = Random.new(1)
-    strategist = Oe::StrategyPlayer.new(@game, rng: rng)
-    @samples = [] # [label, view, spectator_view]
+    @samples = [] # [label, view, spectator_view, injected]
     seen = {}
     count = 0
-    snapshot = lambda do |label|
-      viewer = @game.finished ? nil : @game.active_players.first&.id
+    snapshot = lambda do |game, label|
+      viewer = game.finished ? nil : game.active_players.first&.id
       # the phase-8 event adds REMAINDER_CASH to the bank (rule, game.rb event_remainder_cash_added!)
-      injected = @game.instance_variable_get(:@remainder_cash_added) ? @game.class::REMAINDER_CASH : 0
-      @samples << [label, Oe::View.render(@game, viewer: viewer), Oe::View.render(@game, viewer: nil), injected]
+      injected = game.instance_variable_get(:@remainder_cash_added) ? game.class::REMAINDER_CASH : 0
+      @samples << [label, Oe::View.render(game, viewer: viewer), Oe::View.render(game, viewer: nil), injected]
     end
-    until @game.finished || count > STRATEGY_CAP
-      type = Oe::View.round_type(@game.round)
-      snapshot.call("first #{type}") unless seen[type]
+    @game, = OeCheckGame.play(max: GAME_CAP) do |game|
+      type = Oe::View.round_type(game.round)
+      snapshot.call(game, "first #{type}") unless seen[type]
       seen[type] = true
-      snapshot.call("action #{count}") if (count % 500).zero?
-      actions = Oe::LegalActions.new(@game, limit: 8, rng: rng).call
-      @game.process_action(strategist.choose(actions) || actions.sample(random: rng))
+      phase = "phase #{game.phase.name}"
+      snapshot.call(game, "first #{phase}") unless seen[phase]
+      seen[phase] = true
+      snapshot.call(game, "action #{count}") if (count % 500).zero?
       count += 1
     end
-    snapshot.call("end")
-    @round_types = seen.keys
+    snapshot.call(@game, "end")
+    @round_types = seen.keys.reject { |k| k.start_with?("phase ") }
   end
 
   it "covers the main round types and the end of the game" do
@@ -59,11 +59,18 @@ RSpec.describe Oe::View, :game_flow do
     expect(@game.finished).to be(true) if FULL_GAME
   end
 
+  # #602: the end checks below need the late game; the test game must reach it (full stage).
+  it "reaches phase 8 with the remainder cash and nationals in the whole game", if: FULL_GAME do
+    expect(@samples.any? { |_, _, _, injected| injected.positive? }).to be(true), "no sample after the phase-8 remainder cash"
+    nationals = @samples.flat_map { |_, view, _| view[:corporations] }.select { |c| c[:type] == "national" && c[:ipoed] }
+    expect(nationals).not_to be_empty, "no ipoed national in any sample"
+  end
+
   it "has the documented top-level shape in every state" do
     @samples.each do |label, view, _|
       expect(view.keys).to eq(%i[meta players corporations market depot tiles bank auction concession companies zones map log prompt]), label
       expect(view[:meta].keys).to include(:seq, :finished, :round, :phase, :current, :active_players, :standings), label
-      expect(view[:players].size).to eq(4), label
+      expect(view[:players].size).to eq(OeCheckGame::PLAYERS), label
     end
   end
 
