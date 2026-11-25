@@ -12,7 +12,7 @@ module Engine
         module HomePosition
           def pass_city_ok?(_entity, city)
             corporation = token.corporation
-            return true unless @game.metropolis_hex?(city.hex) && corporation.corporation?
+            return true if !@game.metropolis_hex?(city.hex) || !corporation.corporation?
 
             @game.home_position_cities(corporation, city.hex).include?(city)
           end
