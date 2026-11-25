@@ -5,6 +5,7 @@ require 'json'
 require_relative 'invariants'
 require_relative 'legal_actions'
 require_relative 'strategy_player'
+require_relative 'live'
 
 module Oe
   # Plays one game with random legal actions (Oe::LegalActions) until it ends
@@ -81,7 +82,7 @@ module Oe
 
         action = strategist ? strategist.choose(actions) : actions.group_by(&:class).values.sample(random: rng).sample(random: rng)
         action ||= actions.sample(random: rng)
-        game.process_action(action)
+        Live.process(game, action) # as 18xx.games stores a live move (#604)
         count += 1
         if !game.exception && @invariants && (count % @invariants).zero? &&
            (found = Oe::Invariants.failures(Oe::Invariants.run(game))).any?

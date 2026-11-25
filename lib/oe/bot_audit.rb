@@ -2,6 +2,7 @@
 
 require "json"
 require_relative "bot"
+require_relative "live"
 
 module Oe
   # Bot game audit (#306): plays bots-only tables with a fixed seed and measures
@@ -116,7 +117,7 @@ module Oe
         key = step_key(game)
         legal = actions.map { |a| short(a) }.tally
         action = bot.choose(player_id: pid)
-        game.process_action(action)
+        Live.process(game, action) # as 18xx.games stores a live move (#604)
         dt = now - t0
         if game.exception
           status = :rejected
