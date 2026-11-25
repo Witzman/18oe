@@ -960,7 +960,7 @@ module Engine
         # `city` leave the RR unable to connect to another stop (so the Right-of-Way green tile would apply)?
         # The Track step is built only to ask it (no setup, the round is left untouched).
         def right_of_way_home_position_needed?(corporation, city)
-          return false unless @players.size > 2 && !@phase.tiles.include?(:green)
+          return false if @players.size <= 2 || @phase.tiles.include?(:green)
 
           track = G18OE::Step::Track.new(self, @round)
           !track.home_connectable?(corporation, track.send(:get_tile_lay, corporation), {}, city, corporation.cash)

@@ -67,14 +67,15 @@ module Engine
         # With `cash` the search also counts the terrain cost of the lays and rejects a route whose lays the RR cannot pay
         # or that would leave it unable to buy its reserved 2+2 (RB 11.1.9 "without causing a first turn bankruptcy").
         def home_connectable?(entity, points, laid = {}, home = nil, cash = nil)
-          return false unless (home ||= entity.tokens.first&.city)
+          home ||= entity.tokens.first&.city
+          return false unless home
 
           cheapest = {}
           queue = home.exits.map { |exit| [home.hex, exit, 0, 0] } +
                   affordable_lay_ends(entity, yellow_lay_ends(entity, home.hex, home.tile, 0, points), 0, cash)
           until queue.empty?
             hex, exit, cost, money = queue.shift
-            next if cheapest[[hex.id, exit]] && cheapest[[hex.id, exit]].all? { |c, m| c <= cost && m <= money }
+            next if cheapest[[hex.id, exit]]&.all? { |c, m| c <= cost && m <= money }
 
             (cheapest[[hex.id, exit]] ||= []) << [cost, money]
             crossings(hex, exit).each do |neighbor, edge|
