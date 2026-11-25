@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "engine"
+require "json"
 
 module Oe
   # The per-train detail of a corporation's last run for the view (#119). Chris' Engine::OperatingInfo keeps only
@@ -12,13 +13,29 @@ module Oe
     module_function
 
     # [{train:, name:, revenue:, hexes:, segments:, stops:, distance_str:, sea:, ferries:}, ...] or nil.
-    def of(game, corporation)
-      action = game.raw_actions.reverse_each.find { |a| a["type"] == "run_routes" && a["entity"] == corporation.id }
+    # The run is the one of `info` (the operating history entry shown, default the last): its trains and saved
+    # connection hexes pick the run_routes action (#602). The newest run_routes action alone is wrong between Run
+    # Routes and Dividend (not paid out yet, so not in the history) and after a turn without a run.
+    def of(game, corporation, info = corporation.operating_history.to_a.last&.last)
+      return unless info
+
+      wanted = run_key(info.routes.map { |train, connections| [train.id, connections] })
+      return [] if wanted.empty?
+
+      action = game.raw_actions.reverse_each.find do |a|
+        a["type"] == "run_routes" && a["entity"] == corporation.id &&
+          run_key((a["routes"] || []).map { |r| [r["train"], r["connections"]] }) == wanted
+      end
       return unless action
 
       routes = Engine::Action::RunRoutes.h_to_args(action, game)[:routes]
       routes.each { |route| route.routes = routes }
       routes.map { |route| detail(game, route) }
+    end
+
+    # Trains and connection hexes of a run, comparable between a live action and one loaded from JSON.
+    def run_key(pairs)
+      JSON.parse(JSON.generate(pairs.map { |train, connections| [train.to_s, connections] })).sort_by(&:first)
     end
 
     def detail(game, route)

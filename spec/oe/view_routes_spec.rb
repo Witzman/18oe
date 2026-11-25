@@ -78,4 +78,20 @@ RSpec.describe "Oe::View last_run routes in states built by code (#438)" do
     expect(run["routes"].first["hexes"]).to include("AB27", "AA20", "AF25") # Palma, Valencia, over the sea to Alger
     expect(run["routes"].first["segments"]).not_to be_empty
   end
+
+  # #602: last_run is the corporation's last operating history entry; its routes are the run of that entry. An
+  # entry without a run (withheld, no route) shows none, even when another run_routes action of the corporation
+  # exists (seed game: OR 1.1 without a run, OR 1.2 sampled between Run Routes and Dividend).
+  it "shows no routes for a paid out turn without a run after an earlier run (#602)" do
+    corp
+    lay_tile!(game, "AA20", "5", rotation: 4)
+    lay_tile!(game, "AB27", "5", rotation: 1)
+    place_token!(game, "AA20", corp)
+    run_and_read!
+    corp.operating_history[[1, 2]] = Engine::OperatingInfo.new([], Engine::Action::Dividend.new(corp, kind: "withhold"), 0, [])
+
+    run = JSON.parse(JSON.generate(Oe::View.render(game, log: nil, actions: false)))["corporations"].find { |c| c["id"] == corp.id }["last_run"]
+    expect(run["revenue"]).to eq(0)
+    expect(run["routes"]).to eq([])
+  end
 end
