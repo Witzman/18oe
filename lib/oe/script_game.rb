@@ -134,6 +134,7 @@ module Oe
       @bot = Bot.new(@mirror, rng: @rng)
       @account_of = game["seats"].to_h { |s| [GameSession.player_id(s), s["account_id"]] }
       state = game
+      last = state
       count = 0
       status = :limit
 
@@ -148,12 +149,18 @@ module Oe
         end
         pid = state["state"]["meta"]["active_players"].first
         state = view_for(pid, state)
+        if state.is_a?(Symbol)
+          status = state
+          state = last
+          break
+        end
+        last = state
         result = step_once(pid, state)
         if result.is_a?(Symbol)
           status = result
           break
         end
-        state = result
+        state = last = result
         count += 1
       end
 
@@ -174,7 +181,10 @@ module Oe
     def view_for(pid, state)
       return record_view(state) if state["viewer"] == pid && state["_fresh"]
 
-      status, body, took = client_for(pid).call(:get, "/games/#{@game_id}")
+      status, body, took = request(pid, :get, "/games/#{@game_id}", nil,
+                                   "#{state.dig('state', 'meta', 'round', 'type')}/#{state.dig('state', 'prompt', 'step')}")
+      return status if status.is_a?(Symbol)
+
       @ledger.get_seconds << took
       @ledger.get_details << { index: @ledger.get_seconds.size - 1, seconds: took, viewer: pid, round: state.dig("state", "meta", "round", "type"),
                                step: state.dig("state", "prompt", "step"), game: @game_id }
@@ -404,6 +414,18 @@ module Oe
       JSON.parse(JSON.generate(action.to_h.reject { |k, _| %w[id created_at user].include?(k) }))
     end
 
+    # A request that outlives the client's read timeout (Clients::Net, 120 s) or loses its connection stops the run
+    # as a problem, so the report (end reason, verdict) is still printed (#596: full run 45507429707 ended without it).
+    REQUEST_ERRORS = [Net::ReadTimeout, Net::OpenTimeout, EOFError, SystemCallError].freeze
+
+    def request(pid, verb, path, body, what)
+      started = clock
+      client_for(pid).call(verb, path, body)
+    rescue *REQUEST_ERRORS => e
+      @ledger.problem(:timeout, "#{verb.to_s.upcase} #{path} after #{(clock - started).round(1)} s at #{what}: #{e.class}: #{e.message}")
+      :timeout
+    end
+
     def offered_in?(action, prompt)
       return true if prompt["actions"].include?(action)
       return false unless %w[bid buy_company buy_corporation].include?(action["type"])
@@ -417,7 +439,10 @@ module Oe
     end
 
     def post(pid, state, action, round, step)
-      status, body, took = client_for(pid).call(:post, "/games/#{@game_id}/actions", { action: action, seq: state["seq"] })
+      status, body, took = request(pid, :post, "/games/#{@game_id}/actions", { action: action, seq: state["seq"] },
+                                   "#{round}/#{step} #{action.to_json[0, 200]}")
+      return status if status.is_a?(Symbol)
+
       @ledger.post_seconds << took
       unless status == 200
         @ledger.problem(:rejected, "#{round}/#{step} #{action.to_json[0, 200]}: #{status} #{body.inspect[0, 200]}")
