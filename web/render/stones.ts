@@ -114,7 +114,8 @@ export function townBars(nodes: readonly NodeGeom[], axes: readonly Axis[], leng
 /**
  * Arrow heads at the junction of a sea hex (#444): a port stub runs from a land side into the middle of the hex
  * and ends in an arrow. One triangle per stub, the tip at the junction, pointing along the stub, `length` long and
- * `width` wide across it. Nothing for a junction without a stub.
+ * `width` wide across it. Nothing for a junction without a stub: a track junction on land branches paths that are
+ * not terminal.
  */
 export function junctionArrows(nodes: readonly NodeGeom[], axes: readonly Axis[], length: number, width: number): number[][] {
   const out: number[][] = [];
@@ -122,7 +123,7 @@ export function junctionArrows(nodes: readonly NodeGeom[], axes: readonly Axis[]
     if (g.kind !== "junction") continue;
     for (const a of axes) {
       const atEnd = "node" in a.b && a.b.node === g.node, atStart = "node" in a.a && a.a.node === g.node;
-      if (!atEnd && !atStart) continue;
+      if (!a.terminal || (!atEnd && !atStart)) continue;
       const t = atEnd ? a.endTangent : { x: -a.startTangent.x, y: -a.startTangent.y }; // pointing into the junction
       const n = norm(t);
       if (!(n > 0)) continue;
