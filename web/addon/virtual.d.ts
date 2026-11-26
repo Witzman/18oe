@@ -1,8 +1,4 @@
 // Modules build-addon.mjs puts together.
-declare module "oe:geometry" {
-  const geometry: import("../render/mapdata.ts").MapGeometry;
-  export default geometry;
-}
 declare module "oe:market-css" {
   const css: string;
   export default css;

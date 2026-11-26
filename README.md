@@ -117,17 +117,19 @@ Our map and our price board in place of the page's in 18OE games on an 18xx serv
 switch back to the original (the map's is needed for laying track and placing tokens there).
 
 ```sh
-cd web && node build-addon.mjs --geometry map.json          # -> web/dist-addon/, local 18xx server only
-cd web && node build-addon.mjs --geometry map.json --site   # also https://18xx.games (owner's decision)
+cd web && node build-addon.mjs          # -> web/dist-addon/, local 18xx server only
+cd web && node build-addon.mjs --site   # also https://18xx.games (owner's decision)
 ```
 
-`geometry` is `Oe::MapData.build` of upstream's engine as a file. Install: Chrome/Edge `chrome://extensions`,
+The build holds no map data: on the first draw the add-on makes a game of its own with the page's engine and
+reads the fixed map from it (`web/addon/geometry.ts`, the fields of `Oe::MapData`), so the map always fits the
+engine the page runs. The themes' table of company colours is left out too. Install: Chrome/Edge `chrome://extensions`,
 developer mode, "Load unpacked", pick `dist-addon`; Firefox 140+ `about:debugging`, "This Firefox", "Load
 Temporary Add-on", pick its `manifest.json`. After a rebuild reload the extension and the page. Code:
-`web/addon/` (`page.ts` reads the game and marks the page's market grid, `place.ts` puts ours before the
+`web/addon/` (`geometry.ts` reads the fixed map, `page.ts` reads the game and marks the page's market grid, `place.ts` puts ours before the
 page's, `market.ts` draws the price board in a shadow tree with the web UI's grid, `content.ts` wires them); it runs
 in the page's own JavaScript world (`window.Opal`), sends nothing and asks for no permissions. The UK-France
-variant keeps the page's map (the build holds the full map).
+scenario keeps the page's map (not tried).
 
 Packages for passing it on or for a store (extension zip and source zip), the store texts and the steps before a
 first upload: `web/addon/store/PUBLISHING.md`. Nothing is published.

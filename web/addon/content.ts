@@ -1,15 +1,15 @@
 // The add-on's content script (#614): world MAIN, from document_start. Shows our map (#614) and price board
 // (#619) instead of the page's in 18OE games and follows the game. Read-only.
 import fonts from "oe:fonts";
-import geometry from "oe:geometry";
 import marketCss from "oe:market-css";
 import type { Board } from "../render/board.ts";
 import { mount, type StandaloneMap } from "../render/standalone.ts";
+import { readGeometry } from "./geometry.ts";
 import { boardStyles, mountMarket } from "./market.ts";
 import { installHook, installMarketTag, readBoard, type PageGame } from "./page.ts";
 import { attachMap, attachMarket, type Placed } from "./place.ts";
 
-/** Only the full game: the UK-France variant has another map than the one inside this build. */
+/** Only the full game: the UK-France scenario is not tried. */
 const TITLE = "18OE";
 
 /** The page's policy allows no font files of ours; fonts handed over as bytes are no request. */
@@ -25,6 +25,8 @@ function addFonts(): void {
 
 function run(Opal: any): void {
   let board: Board | null = null;
+  // the game the page shows: its engine class gives the fixed map, once, when the map is first drawn
+  let shownGame: PageGame = null;
   let drawn: Board | null = null;
   let map: StandaloneMap | null = null;
   let mounting = false;
@@ -47,7 +49,7 @@ function run(Opal: any): void {
         mounting = true;
         addFonts();
         const first = board!;
-        map = await mount(placed.stage, geometry, first);
+        map = await mount(placed.stage, readGeometry(Opal, shownGame), first);
         drawn = first;
         mounting = false;
         note(first);
@@ -103,6 +105,7 @@ function run(Opal: any): void {
     tagMarketView();
     if (String(game.$class().$title()) !== TITLE) return;
     board = readBoard(Opal, game);
+    shownGame = game;
     schedule();
   });
   new MutationObserver(() => { if (board) schedule(); }).observe(document.documentElement, { childList: true, subtree: true });

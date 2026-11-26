@@ -54,4 +54,6 @@ original or the restyled view, for the map and for the stock market. Removing th
 - To see it work, open an 18OE game on 18xx.games (a hotseat game is enough) and look at the Map and Market tabs.
 - `content.js` is bundled and minified by esbuild; the sources and the build command are in the source package
   (`BUILD.md`).
+- The package holds no map data. To read the fixed map, the script creates a second instance of the page's own
+  game object in memory (`web/addon/geometry.ts`); the shown game is not changed.
 - `THIRD_PARTY_LICENSES.txt` lists the bundled libraries and fonts.

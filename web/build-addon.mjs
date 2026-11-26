@@ -1,10 +1,10 @@
 // Builds the browser add-on (#614) as an unpacked Manifest V3 extension: Chrome, Edge ("Load unpacked") and
 // Firefox 140+ ("Load Temporary Add-on"). Packages for the stores: pack-addon.mjs.
 //
-//   node build-addon.mjs --geometry map.json [--site] [--release 1.2.3] [--out dist-addon]
+//   node build-addon.mjs [--site] [--release 1.2.3] [--out dist-addon]
 //
-// geometry = Oe::MapData.build of upstream's engine, as a file. Without --site it runs on a local 18xx server
-// only; --site adds https://18xx.games (the owner decides when, workshop #606).
+// Without --site it runs on a local 18xx server only; --site adds https://18xx.games (the owner decides when,
+// workshop #606). The build holds no map data: the add-on reads the map from the page (addon/geometry.ts, #626).
 import { build } from "esbuild";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -41,6 +41,16 @@ function virtual(modules) {
   };
 }
 
+/** A theme file without its table of 18OE company colours: the add-on takes the colours from the page. */
+export const withoutGameData = (theme) => JSON.stringify({ ...JSON.parse(theme), companies: {} }, null, 2) + "\n";
+
+const themes = {
+  name: "oe-themes",
+  setup(b) {
+    b.onLoad({ filter: /[\\/]themes[\\/][^\\/]+\.json$/ }, (args) => ({ contents: withoutGameData(readFileSync(args.path, "utf8")), loader: "json" }));
+  },
+};
+
 /** Name, version and license text of every library in the bundle, and the fonts' licenses. */
 function licenses(inputs) {
   const packages = new Map();
@@ -61,7 +71,7 @@ function licenses(inputs) {
 }
 
 /** The build with the list of files it read (relative to web/), also those it shook out of the bundle. */
-export async function buildWithInputs({ out, geometry, site = false, release }) {
+export async function buildWithInputs({ out, site = false, release }) {
   const version = readFileSync(join(root, "..", "VERSION"), "utf8").trim();
   const numbered = release ?? version.match(/^[\d.]*\d/)?.[0] ?? "";
   if (!STORE_VERSION.test(numbered) || /^[0.]+$/.test(numbered)) throw new Error(`not a store version: "${numbered}"`);
@@ -77,8 +87,7 @@ export async function buildWithInputs({ out, geometry, site = false, release }) 
     metafile: true,
     absWorkingDir: root,
     define: { __OE_VERSION__: JSON.stringify(version) },
-    plugins: [virtual({
-      "oe:geometry": JSON.parse(readFileSync(geometry, "utf8")),
+    plugins: [themes, virtual({
       "oe:fonts": fontFaces(),
       // the web UI's styles of the price board (#619), for its shadow tree
       "oe:market-css": ["theme.css", "ui/kit/kit.css", "ui/panels/stock.css"].map((f) => readFileSync(join(root, f), "utf8")).join("\n"),
@@ -110,12 +119,7 @@ export const buildAddon = async (options) => (await buildWithInputs(options)).ma
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const option = (name) => { const i = args.indexOf(`--${name}`); return i < 0 ? null : args[i + 1]; };
-  const geometry = option("geometry");
-  if (!geometry) {
-    console.error("usage: node build-addon.mjs --geometry map.json [--site] [--release 1.2.3] [--out dist-addon]");
-    process.exit(2);
-  }
   const out = option("out") ?? join(root, "dist-addon");
-  const manifest = await buildAddon({ out, geometry, site: args.includes("--site"), release: option("release") ?? undefined });
+  const manifest = await buildAddon({ out, site: args.includes("--site"), release: option("release") ?? undefined });
   console.log(`${out}: matches ${manifest.content_scripts[0].matches.join(", ")}`);
 }

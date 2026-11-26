@@ -14,7 +14,6 @@ import { buildAddon } from "../build-addon.mjs";
 import { packAddon } from "../pack-addon.mjs";
 
 const web = join(dirname(fileURLToPath(import.meta.url)), "..");
-const geometry = join(web, "test", "fixtures", "map-geometry.json");
 const temp = () => mkdtempSync(join(tmpdir(), "oe-pack-"));
 
 /** The entries of a zip file, read through its central directory. */
@@ -55,7 +54,7 @@ test("the icons are square PNGs with a transparent margin", () => {
 
 test("the manifest has what the stores ask for", async () => {
   const out = temp();
-  await buildAddon({ out, geometry });
+  await buildAddon({ out });
   const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8"));
   assert.equal(manifest.name, "18OE Visual Map");
   assert.ok(manifest.description.length <= 132, "Chrome's limit");
@@ -66,14 +65,14 @@ test("the manifest has what the stores ask for", async () => {
   assert.deepEqual(manifest.browser_specific_settings.gecko.data_collection_permissions, { required: ["none"] });
   assert.equal(manifest.browser_specific_settings.gecko.strict_min_version, "140.0");
 
-  await buildAddon({ out, geometry, release: "1.2.3" });
+  await buildAddon({ out, release: "1.2.3" });
   assert.equal(JSON.parse(readFileSync(join(out, "manifest.json"), "utf8")).version, "1.2.3");
-  await assert.rejects(buildAddon({ out, geometry, release: "1.2.3-dev" }), /version/);
+  await assert.rejects(buildAddon({ out, release: "1.2.3-dev" }), /version/);
 });
 
 test("the licenses of every bundled library and font travel with the extension", async () => {
   const out = temp();
-  await buildAddon({ out, geometry });
+  await buildAddon({ out });
   const text = readFileSync(join(out, "THIRD_PARTY_LICENSES.txt"), "utf8");
   for (const name of ["pixi.js", "eventemitter3", "colord", "earcut", "ismobilejs", "parse-svg-path", "tiny-lru"]) {
     assert.match(text, new RegExp(`^== ${name.replace(".", "\\.")} \\d`, "m"), name);
@@ -84,19 +83,25 @@ test("the licenses of every bundled library and font travel with the extension",
 
 test("packing writes the extension zip and the sources it is built from", async () => {
   const out = temp();
-  const made = await packAddon({ out, geometry, site: true, release: "0.2.0" });
+  const made = await packAddon({ out, site: true, release: "0.2.0" });
   const extension = unzip(readFileSync(made.extension));
   assert.match(made.extension, /18oe-visual-map-0\.2\.0\.zip$/);
   assert.deepEqual([...extension.keys()].sort(), ["THIRD_PARTY_LICENSES.txt", "content.js", "icons/128.png", "icons/16.png", "icons/32.png", "icons/48.png", "manifest.json"]);
   assert.ok(JSON.parse(String(extension.get("manifest.json"))).content_scripts[0].matches.includes("https://18xx.games/*"));
   const source = unzip(readFileSync(made.source));
-  for (const name of ["BUILD.md", "VERSION", "geometry.json", "web/package.json", "web/package-lock.json", "web/build-addon.mjs",
-    "web/addon/content.ts", "web/addon/icons.mjs", "web/render/map.ts", "web/theme.css", "web/fonts/fonts.css", "web/types.ts"]) {
+  for (const name of ["BUILD.md", "VERSION", "web/package.json", "web/package-lock.json", "web/build-addon.mjs",
+    "web/addon/content.ts", "web/addon/geometry.ts", "web/addon/icons.mjs", "web/render/map.ts", "web/theme.css", "web/fonts/fonts.css", "web/types.ts"]) {
     assert.ok(source.has(name), name);
   }
   assert.ok([...source.keys()].some((n) => n.endsWith(".woff2")), "font files");
   assert.ok(![...source.keys()].some((n) => n.includes("node_modules")), "libraries come from the registry");
-  assert.match(String(source.get("BUILD.md")), /node build-addon\.mjs --geometry \.\.\/geometry\.json --site --release 0\.2\.0/);
+  assert.match(String(source.get("BUILD.md")), /node build-addon\.mjs --site --release 0\.2\.0/);
+  // no map data and no table of companies travels, in the extension or in its sources (#626)
+  assert.ok(!source.has("geometry.json"));
+  for (const theme of ["web/themes/brett.json", "web/themes/atlas.json"]) assert.deepEqual(JSON.parse(String(source.get(theme))).companies, {}, theme);
+  for (const [name, data] of [...source, ...extension]) {
+    if (!/\.(woff2|png)$/.test(name)) assert.doesNotMatch(String(data), /Celtic Sea|companies:\{\w+:\{bg:/, name);
+  }
 
   // what a reviewer does: unpack, take the libraries from the registry (here: ours), run the command
   const copy = temp();
@@ -105,7 +110,7 @@ test("packing writes the extension zip and the sources it is built from", async 
     writeFileSync(join(copy, name), data);
   }
   symlinkSync(join(web, "node_modules"), join(copy, "web", "node_modules"), "dir");
-  execFileSync(process.execPath, ["build-addon.mjs", "--geometry", "../geometry.json", "--site", "--release", "0.2.0"], { cwd: join(copy, "web") });
+  execFileSync(process.execPath, ["build-addon.mjs", "--site", "--release", "0.2.0"], { cwd: join(copy, "web") });
   for (const file of ["content.js", "manifest.json", "THIRD_PARTY_LICENSES.txt", "icons/128.png"]) {
     assert.ok(readFileSync(join(copy, "web", "dist-addon", file)).equals(extension.get(file)!), `${file} from the sources`);
   }

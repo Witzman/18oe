@@ -289,7 +289,7 @@ test("the market has its own switch and memory, and sits before the page's grid"
 // ---- the unpacked extension -----------------------------------------------------------------------
 test("the build writes a Manifest V3 extension for the page world, by default for the local server only", async () => {
   const out = mkdtempSync(join(tmpdir(), "oe-addon-"));
-  await buildAddon({ out, geometry: join(web, "test", "fixtures", "map-geometry.json") });
+  await buildAddon({ out });
   const manifest = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8"));
   assert.equal(manifest.manifest_version, 3);
   assert.deepEqual(manifest.content_scripts, [{ matches: ["http://localhost/*", "http://127.0.0.1/*"], js: ["content.js"], run_at: "document_start", world: "MAIN" }]);
@@ -297,9 +297,11 @@ test("the build writes a Manifest V3 extension for the page world, by default fo
   assert.equal(manifest.host_permissions, undefined);
   assert.ok(manifest.browser_specific_settings.gecko.id);
   const content = readFileSync(join(out, "content.js"), "utf8");
-  assert.ok(content.includes("J79"), "the fixed map is inside");
+  // the fixed map is read from the page (#626): neither it nor the themes' company table is inside
+  assert.ok(content.includes("SEA_ZONES"), "the reader of the page's map is inside");
+  assert.doesNotMatch(content, /Celtic Sea|sea_zones:\[\{|companies:\{\w+:\{bg:/);
   assert.doesNotMatch(content, /\bfetch\(["']https?:/);
 
-  await buildAddon({ out, geometry: join(web, "test", "fixtures", "map-geometry.json"), site: true });
+  await buildAddon({ out, site: true });
   assert.ok(JSON.parse(readFileSync(join(out, "manifest.json"), "utf8")).content_scripts[0].matches.includes("https://18xx.games/*"));
 });
