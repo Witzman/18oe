@@ -96,6 +96,20 @@ text reaches its contrast. The "Look" menu (bottom right) switches theme and
 tile style; the pick is kept in `localStorage` (`oe.theme`, `oe.tileStyle`).
 The build imports TypeScript directly and needs Node 22.18 or newer.
 
+## The map as a bundle of its own
+
+For a browser add-on (workshop #606) the map also builds alone, apart from the web UI:
+
+```sh
+cd web && node build-standalone.mjs --geometry map.json --board board.json   # -> web/dist-standalone/
+```
+
+`oe-map.js` (global `OeMap`, entry `web/render/standalone.ts`) needs no server: `geometry` is `GET /map`
+(`Oe::MapData.build`) as a file, `board` the part of the game state the map reads (`web/render/board.ts`).
+It imports `pixi.js/unsafe-eval`, so it runs where a content security policy forbids eval. `map.html` is a
+self-contained test page (data and fonts inside, no eval, no network). The imports from outside
+`render/` and `themes/` are pinned by `web/test/standalone.test.ts`.
+
 ## Running with Docker
 
 ```sh
