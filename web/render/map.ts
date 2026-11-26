@@ -34,7 +34,8 @@ import { drawFerryLine } from "./layers/ferry.ts";
 import { drawPortMark } from "./layers/port.ts";
 import { nameLabels, nameVisible } from "./names.ts";
 import { portCornerSide, portMarks, type PortMark } from "./ports.ts";
-import { drawNodes, drawTargetCity, inkOn, makeToken, type Ring } from "./layers/nodes.ts";
+import { BADGE_FILL, drawNodes, drawTargetCity, inkOn, makeBadge, makeToken, type Ring } from "./layers/nodes.ts";
+import type { Badge } from "./board.ts";
 import { citySlots, companyIndex, labelAt, revenueAll, revenueNow, shieldAt, medallionExtent, slotsNear, type Slot } from "./stones.ts";
 import { hexesNear, hexIsFingerSized, inertiaStep, INERTIA_STOP, pushSample, releaseVelocity, type Sample } from "./touch.ts";
 import { h as el_ } from "../ui/dom.ts";
@@ -82,6 +83,8 @@ export interface MapOptions {
   cache?: boolean;
   /** Where the theme comes from (tests); default: the theme on the root element. */
   theme?: () => RenderTheme;
+  /** Company tokens as 18xx.games draws them (#618): a flat badge in these colours. Undefined: the theme's token. */
+  badge?: (corp: string) => Badge | undefined;
 }
 
 export interface MapStats {
@@ -173,7 +176,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   let tileNodes = new Map<string, Container>();
   let trackNodes = new Map<string, TrackNode>();
   /** Standing tokens and text marks (token symbols, revenue shields, tile labels) per hex. */
-  interface TokenObj { c: Container; at: Vec; z: number; sym: Text; symWidth: number }
+  interface TokenObj { c: Container; at: Vec; z: number; sym: Text; symWidth: number; symHeight: number; flat: boolean }
   interface Mark { text: Text; at: Vec; z: number }
   let tokenObjs = new Map<string, TokenObj[]>();
   let marks = new Map<string, Mark[]>();
@@ -363,7 +366,7 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
   // ---- game state seen by the nodes (tokens, home rings, revenue) ----------------------------
 
   /** Company colour: the theme's `companies` token (#99); unknown ids fall back to the placeholders company.c1..c6 by list position. */
-  const corpColor = (corp: string) => theme.companies[corp]?.bg ?? theme.company[`c${companyIndex(state?.corporations ?? [], corp, 6) + 1}` as keyof typeof theme.company];
+  const corpColor = (corp: string) => options.badge?.(corp)?.color ?? theme.companies[corp]?.bg ?? theme.company[`c${companyIndex(state?.corporations ?? [], corp, 6) + 1}` as keyof typeof theme.company];
   const homeHexes = (corp: string) => (geometry.homes ?? []).filter((h) => h.corporation === corp).map((h) => h.hex);
   const phaseColors = () => state?.meta.phase?.tiles ?? ["yellow"];
   /** Tokens per city of the hex: corporation ids per slot. */
@@ -499,13 +502,14 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
         t.corporations.forEach((corp, i) => {
           const s = corp && slots.find((x) => x.city === t.city && x.slot === i);
           if (!corp || !s) return;
-          const c = makeToken(theme, corpColor(corp));
+          const badge = options.badge?.(corp);
+          const c = badge ? makeBadge(theme, badge.color) : makeToken(theme, corpColor(corp));
           layers.objects.addChild(c);
-          const sym = new Text({ text: corp, resolution: dpr, style: { fontFamily: theme.font.body, fontSize: 11, fontWeight: "700", fill: inkOn(corpColor(corp), theme) } });
+          const sym = new Text({ text: corp, resolution: dpr, style: { fontFamily: badge ? "Arial" : theme.font.body, fontSize: 11, fontWeight: "700", fill: badge ? badge.ink : inkOn(corpColor(corp), theme) } });
           sym.anchor.set(0.5);
           sym.visible = false;
           layers.labels.addChild(sym);
-          objs.push({ c, sym, symWidth: sym.width, at: { x: g.x + s.pos.x, y: g.y + s.pos.y }, z: g.z });
+          objs.push({ c, sym, symWidth: sym.width, symHeight: sym.height, flat: !!badge, at: { x: g.x + s.pos.x, y: g.y + s.pos.y }, z: g.z });
         });
       }
       if (objs.length) tokenObjs.set(id, objs);
@@ -635,10 +639,13 @@ export async function mountMap(el: HTMLElement, geometry: MapGeometry, options: 
         t.c.position.set(p.x, p.y);
         t.c.scale.set(view.zoom);
         t.c.zIndex = p.y;
-        const top = p.y - theme.camera.heightToken * Math.sin((view.pitch * Math.PI) / 180) * view.zoom;
-        t.sym.visible = stage >= 2;
+        const top = t.flat ? p.y : p.y - theme.camera.heightToken * Math.sin((view.pitch * Math.PI) / 180) * view.zoom;
+        // A badge carries its abbreviation like a printed logo: it scales with the disc, from a readable size on.
+        const disc = 2 * BADGE_FILL * theme.slotRadius * view.zoom;
+        t.sym.visible = t.flat ? disc >= 9 : stage >= 2;
         // The symbol shrinks to fit the top of the token (never grows past its font size).
-        t.sym.scale.set(Math.min(1, (1.75 * theme.tokenRadius * view.zoom) / t.symWidth));
+        t.sym.scale.set(t.flat ? Math.min((0.86 * disc) / t.symWidth, (0.62 * disc) / t.symHeight)
+          : Math.min(1, (1.75 * theme.tokenRadius * view.zoom) / t.symWidth));
         t.sym.position.set(Math.round(p.x), Math.round(top));
       }
     }

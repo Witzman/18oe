@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { buildStandalone } from "../build-standalone.mjs";
-import { boardState, type Board } from "../render/board.ts";
+import { badgeOf, boardState, type Board } from "../render/board.ts";
 
 const web = join(dirname(fileURLToPath(import.meta.url)), "..");
 const fixture = (name: string) => join(web, "test", "fixtures", name);
@@ -62,4 +62,23 @@ test("the test page is one file: bundle, data and fonts inside, a policy without
   assert.ok(html.includes('"phase_tiles":["yellow","green"]'), "the board is embedded");
   // the bundle on its own, for an add-on to load
   assert.ok(readFileSync(join(out, "oe-map.js"), "utf8").includes("OeMap"));
+});
+
+// Tokens as 18xx.games draws them (#618): the company's own colours, read from the page's game.
+test("a company's badge takes its colours from the board: hex in any case, the engine's colour names", () => {
+  const companies = [
+    { id: "CHN", closed: false, tokens: [], color: "#A0522D", text_color: "#ffffff" },
+    { id: "B", closed: false, tokens: [], color: "#87cefa", text_color: "black" },
+    { id: "X", closed: false, tokens: [], color: "black" },
+  ];
+  assert.deepEqual(badgeOf(companies, "CHN"), { color: 0xa0522d, ink: 0xffffff });
+  assert.deepEqual(badgeOf(companies, "B"), { color: 0x87cefa, ink: 0x000000 });
+  assert.deepEqual(badgeOf(companies, "X"), { color: 0x000000, ink: 0xffffff });
+});
+
+test("no badge without a usable colour, so the theme's token is drawn", () => {
+  const companies = [{ id: "A", closed: false, tokens: [] }, { id: "Z", closed: false, tokens: [], color: "teal-ish" }];
+  assert.equal(badgeOf(companies, "A"), undefined);
+  assert.equal(badgeOf(companies, "Z"), undefined);
+  assert.equal(badgeOf(companies, "none"), undefined);
 });

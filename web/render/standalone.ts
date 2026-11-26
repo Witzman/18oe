@@ -5,7 +5,7 @@
 // security policy forbids eval (18xx.games).
 import "pixi.js/unsafe-eval";
 import { themeById } from "../themes/index.ts";
-import { boardState, type Board } from "./board.ts";
+import { badgeOf, boardState, type Board, type BoardCompany } from "./board.ts";
 import { mountMap, type MapView } from "./map.ts";
 import type { MapGeometry } from "./mapdata.ts";
 import { renderTheme, type RenderTheme } from "./theme.ts";
@@ -27,8 +27,14 @@ export async function mount(el: HTMLElement, geometry: MapGeometry, board?: Boar
   const found = themeById(themeId);
   const theme = renderTheme({ theme: found, tileStyle: found.shape.tileStyle });
   await loadFonts(theme);
-  const view = await mountMap(el, geometry, { theme: () => theme });
-  const setBoard = (next: Board) => view.setState(boardState(next));
+  // tokens as 18xx.games draws them, in the colours the board brings (#618)
+  let companies: BoardCompany[] = [];
+  const view = await mountMap(el, geometry, { theme: () => theme, badge: (corp) => badgeOf(companies, corp) });
+  const setBoard = (next: Board) => {
+    const state = boardState(next);
+    companies = next.corporations;
+    view.setState(state);
+  };
   if (board) setBoard(board);
   return { view, setBoard };
 }
