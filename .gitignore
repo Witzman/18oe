@@ -7,3 +7,4 @@ web/dist
 vendor
 # the standalone map bundle and test page (web/build-standalone.mjs)
 web/dist-standalone
+web/dist-addon

@@ -1,0 +1,75 @@
+// Reading the game from the page of 18xx.games (#614; findings workshop #612). Runs in the page's own JavaScript
+// world, read-only: no request, no write to the game. The objects are Opal's compiled Ruby: no types.
+import type { Board } from "../render/board.ts";
+
+/* The page's runtime and its engine objects. */
+export type Opal = any;
+export type PageGame = any;
+
+/**
+ * Reports the game the page shows. Every redraw goes through Snabberb::Component#update!, whose root store holds
+ * it. Reported when it is another object (history navigation, undo) or has another number of actions: a move is
+ * applied to the same object (`process_action` returns self).
+ */
+export function installHook(Opal: Opal, onGame: (game: PageGame) => void): void {
+  const proto = Opal.Snabberb.Component.$$prototype;
+  const original = proto["$update!"];
+  let last: PageGame = null;
+  let moves = -1;
+  proto["$update!"] = function (this: any, ...args: unknown[]) {
+    try {
+      return original.apply(this, args);
+    } finally {
+      try {
+        const game = this.root?.store?.["$[]"]("game");
+        if (game && game !== Opal.nil) {
+          const count: number = game.$raw_actions().length;
+          if (game !== last || count !== moves) {
+            last = game;
+            moves = count;
+            onGame(game);
+          }
+        }
+      } catch (error) {
+        console.warn("18OE map: could not read the game", error);
+      }
+    }
+  };
+}
+
+/** The part of the game the map draws (render/board.ts); `map` as lib/oe/view.rb builds it. */
+export function readBoard(Opal: Opal, game: PageGame): Board {
+  const nil = (v: unknown) => v === Opal.nil || v === undefined || v === null;
+  const hexes = [...game.$hexes()].sort((a, b) => (a.$id() < b.$id() ? -1 : a.$id() > b.$id() ? 1 : 0));
+  const map: Board["map"] = [];
+  for (const hex of hexes) {
+    const tile = hex.$tile();
+    const tokens: { city: number; corporations: string[] }[] = [];
+    [...tile.$cities()].forEach((city: any, index: number) => {
+      const corporations = [...city.$tokens()].filter((t: unknown) => !nil(t))
+        .map((t: any) => (nil(t.$corporation()) ? null : t.$corporation().$id()));
+      if (corporations.length) tokens.push({ city: index, corporations });
+    });
+    const patronage = tile.$patronage();
+    if (tile.$name() === hex.$original_tile().$name() && !tokens.length && nil(patronage)) continue;
+    map.push({
+      hex: hex.$id(),
+      tile: { name: String(tile.$name()), rotation: tile.$rotation(), color: String(tile.$color()) },
+      tokens,
+      ...(nil(patronage) ? {} : { patronage: JSON.parse(Opal.JSON.$generate(patronage)) }),
+    });
+  }
+  const corporations = [...game.$corporations()].map((corp: any) => ({
+    id: corp.$id(),
+    closed: corp["$closed?"]() === true,
+    color: String(corp.$color()),
+    text_color: String(corp.$text_color()),
+    tokens: [...corp.$tokens()].map((token: any) => {
+      const city = token.$city();
+      const hex = nil(city) || nil(city.$hex()) ? null : city.$hex().$id();
+      const used = token.$used();
+      return { used: !nil(used) && used !== false, hex };
+    }),
+  }));
+  return { map, corporations, phase_tiles: [...game.$phase().$tiles()].map(String) };
+}

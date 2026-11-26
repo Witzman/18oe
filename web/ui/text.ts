@@ -236,6 +236,10 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "map.pick.title": e("Selection", "Selection", "—"),
   "map.pick.hex": e("Hex {hex}", "Hex {hex}", "—"),
   "map.pick.slot": e("City {city}, slot {slot}", "City {city}, slot {slot}", "—"),
+  // Browser add-on (#614): the switch above the map on 18xx.games
+  "addon.map_original": e("Original map", "Original map", "—"),
+  "addon.map_ours": e("18OE map", "18OE map", "—"),
+  "addon.failed": e("18OE map failed: {reason}", "18OE map failed: {reason}", "—"),
   "version.label": e("Version", "Version", "—"),
   "version.line": e("Version {version} · Build {build} · Engine {engine}", "Version {version} · build {build} · engine {engine}", "—"),
   "version.title": e("Version information", "Version information", "—"),
