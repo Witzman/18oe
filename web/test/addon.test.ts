@@ -236,6 +236,11 @@ test("the board takes its own height in the page", () => {
   assert.ok(css.lastIndexOf(".stock-stage { position: relative; inset: auto; }") > css.indexOf("position: absolute"), "overrides the web UI's rule");
 });
 
+// The row of seals clips (overflow hidden): a seal's soft shadow showed as a grey square around it.
+test("the seals on the board are flat, like the markers on the map", () => {
+  assert.match(boardStyles(".kit-seal { box-shadow: var(--shape-shadow); }"), /\.stock-cell-corps \.kit-seal \{ box-shadow: none; \}/);
+});
+
 test("the page's market grid is tagged where it is drawn, nothing else", () => {
   const grid = { sel: "div", data: { style: { width: "100%", overflow: "auto" }, attrs: { id: "keep" } }, children: [] };
   const bank = { sel: "div", data: { style: { marginBottom: "1rem" } }, children: [] };

@@ -32,7 +32,9 @@ export function boardStyles(css: string): string {
   const own = css.replace(/^body:has[^{]*\{[^}]*\}/gm, "").replace(/^body\b/gm, ":host").replace(/:root/g, ":host");
   // the web UI's stage fills a positioned area; here the board sits in the page's flow and brings its height
   return `${own}\n:host { display: block; min-height: 0; color-scheme: ${theme.colorScheme}; ${variables} }\n` +
-    ".stock-stage { position: relative; inset: auto; }\n";
+    ".stock-stage { position: relative; inset: auto; }\n" +
+    // flat like the map's markers; the clipping row of seals cut their soft shadow into a grey square
+    ".stock-cell-corps .kit-seal { box-shadow: none; }\n";
 }
 
 export function mountMarket(stage: HTMLElement, styles: string): { setBoard(board: Board): void } {
