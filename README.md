@@ -113,8 +113,8 @@ company tokens look as on 18xx.games: a flat disc with the abbreviation, in the 
 
 ## Browser add-on (workshop #606)
 
-Our map in place of the page's map in 18OE games on an 18xx server, read-only, with a switch back to the
-original map (needed for laying track and placing tokens there).
+Our map and our price board in place of the page's in 18OE games on an 18xx server, read-only, each with a
+switch back to the original (the map's is needed for laying track and placing tokens there).
 
 ```sh
 cd web && node build-addon.mjs --geometry map.json          # -> web/dist-addon/, local 18xx server only
@@ -124,7 +124,8 @@ cd web && node build-addon.mjs --geometry map.json --site   # also https://18xx.
 `geometry` is `Oe::MapData.build` of upstream's engine as a file. Install: Chrome/Edge `chrome://extensions`,
 developer mode, "Load unpacked", pick `dist-addon`; Firefox 128+ `about:debugging`, "This Firefox", "Load
 Temporary Add-on", pick its `manifest.json`. After a rebuild reload the extension and the page. Code:
-`web/addon/` (`page.ts` reads the game, `place.ts` puts the map in the page, `content.ts` wires them); it runs
+`web/addon/` (`page.ts` reads the game and marks the page's market grid, `place.ts` puts ours before the
+page's, `market.ts` draws the price board in a shadow tree with the web UI's grid, `content.ts` wires them); it runs
 in the page's own JavaScript world (`window.Opal`), sends nothing and asks for no permissions. The UK-France
 variant keeps the page's map (the build holds the full map).
 

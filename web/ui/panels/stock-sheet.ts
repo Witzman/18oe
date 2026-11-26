@@ -43,13 +43,15 @@ export interface SheetInput {
   kind?: Kind | null;
   /** The kinds the viewer can pick now, in the fixed order (#527); empty when it is not the viewer's turn. */
   kinds?: { kind: Kind; count: number }[];
+  /** Seal colours from elsewhere than the theme (the browser add-on, #619: the engine's colours). */
+  colorOf?: (corp: string) => string | undefined;
 }
 
 const money = (n: number | null): string => (n === null ? txt("stock.unknown_value").text : formatGeld(n));
 const percent = (n: number): string => (n > 0 ? fillText("stock.pct", { n }) : txt("stock.none").text);
 
-const sealOf = (g: Game, theme: Theme, id: string, name?: string, size: "s" | "m" = "s") =>
-  Siegel({ sym: id, name, color: corpColor(theme, g, id) }, { theme, size });
+const sealOf = (g: Game, theme: Theme, id: string, name?: string, size: "s" | "m" = "s", color?: string) =>
+  Siegel({ sym: id, name, color: color ?? corpColor(theme, g, id) }, { theme, size });
 
 export function offerLabel(o: Offer, row: CorpRow): string {
   if (o.kind === "buy") return fillText("stock.offer_buy", { pct: o.percent, source: txt(`stock.source_${o.source === "market" ? "market" : "ipo"}`).text, price: money(o.price) });
@@ -158,7 +160,7 @@ const ARROW_GLYPH = { right: "→", down: "↓", up: "↑" } as const;
 
 function cellNode(c: MarketCellModel, i: SheetInput, h: SheetHandlers): VNode {
   const stack = sealStack(c.corps);
-  const seal = (id: string) => sealOf(i.g, i.theme, id, i.g.state.corporations.find((x) => x.id === id)?.name);
+  const seal = (id: string) => sealOf(i.g, i.theme, id, i.g.state.corporations.find((x) => x.id === id)?.name, "s", i.colorOf?.(id));
   const base = c.corps.length > 0 ? fillText("stock.cell_corps", { price: formatGeld(c.price), corps: c.corps.join(", ") }) : fillText("stock.cell", { price: formatGeld(c.price) });
   const marks = [
     c.major ? fillText("stock.cell_major", { letter: c.major }) : null,
@@ -199,7 +201,7 @@ function cellListDialog(i: SheetInput, h: SheetHandlers): VNode | null {
   return Dialog({
     id: "stock-cells", title: fillText("stock.cell_list_title", { price: formatGeld(c.price) }), onClose: h.onClose,
     body: [v("ul", { class: "stock-cell-list" }, ...c.corps.map((id) => v("li", { class: "stock-cell-list-item" },
-      sealOf(i.g, i.theme, id, i.g.state.corporations.find((x) => x.id === id)?.name),
+      sealOf(i.g, i.theme, id, i.g.state.corporations.find((x) => x.id === id)?.name, "s", i.colorOf?.(id)),
       v("strong", {}, id), v("span", { class: "muted" }, i.g.state.corporations.find((x) => x.id === id)?.name ?? ""),
       v("span", { class: "stock-price" }, formatGeld(c.price)))))],
     actions: [v("button", { type: "button", class: "kit-side-btn", onclick: () => h.onClose?.() }, txt("stock.close").text)],
@@ -209,7 +211,7 @@ function cellListDialog(i: SheetInput, h: SheetHandlers): VNode | null {
 const emptyCell = () => v("div", { class: "stock-cell stock-cell-empty", "aria-hidden": "true" });
 
 /** The rows are `display: contents` in one grid, so a short row is padded to the full width: otherwise the next row's cells fill the gap (#405). */
-function gridNode(i: SheetInput, h: SheetHandlers): VNode {
+function gridNode(i: SheetInput, h: SheetHandlers, choosing = true): VNode {
   const cols = Math.max(0, ...i.market.rows.map((l) => l.length));
   return v("section", { class: "stock-grid", "aria-label": txt("stock.tab_grid").text },
     v("div", { class: "stock-grid-scroll", style: `--cols:${cols}` }, ...i.market.rows.map((line, r) =>
@@ -220,8 +222,13 @@ function gridNode(i: SheetInput, h: SheetHandlers): VNode {
       v("li", { "data-type": "par" }, txt("stock.legend_par").text),
       v("li", { "data-type": "convert_range" }, txt("stock.legend_convert").text),
       v("li", { "data-mark": "arrow" }, txt("stock.legend_arrow").text),
-      v("li", { "data-mark": "valid" }, txt("stock.legend_target").text),
-      v("li", { "data-mark": "preview" }, txt("stock.legend_after").text)));
+      choosing ? v("li", { "data-mark": "valid" }, txt("stock.legend_target").text) : null,
+      choosing ? v("li", { "data-mark": "preview" }, txt("stock.legend_after").text) : null));
+}
+
+/** The Kurstafel alone, to look at: the grid and the company list of a cell (the browser add-on, #619). */
+export function marketGridNode(i: SheetInput, h: SheetHandlers): VNode {
+  return v("div", { class: "stock-stage" }, gridNode(i, h, false), cellListDialog(i, h));
 }
 
 /** Player order for the head: this round's in a stock round (seat order of the view), else the next stock round's (`meta.priority`, priority deal first; #406). */

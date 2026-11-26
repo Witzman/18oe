@@ -5,6 +5,8 @@ import type { GameState, HexChange } from "../types.ts";
 
 export interface BoardCompany {
   id: string;
+  /** Full name, for the price board's tooltips and lists (#619). */
+  name?: string;
   closed: boolean;
   tokens: { used: boolean; hex: string | null }[];
   /** The engine's colours of the company ("#rrggbb", "black" or "white"), for badges as on 18xx.games (#618). */
@@ -41,6 +43,8 @@ export interface Board {
   corporations: BoardCompany[];
   /** Tile colours of the current phase (the revenue shown on the tiles). */
   phase_tiles: string[];
+  /** The stock market, as GameState.market (the price board, #619). */
+  market?: GameState["market"];
 }
 
 export function boardState(board: Board): GameState {
