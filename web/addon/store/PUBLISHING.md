@@ -6,22 +6,22 @@ Nothing is published. This is what is ready and what only the owner can do.
 
 ```sh
 cd web
-node pack-addon.mjs --geometry map.json --site --release 1.0.0    # -> web/dist-addon-release/
+node pack-addon.mjs --site --release 1.0.0    # -> web/dist-addon-release/
 ```
 
 - `18oe-visual-map-1.0.0.zip` - the extension: for the stores, or to pass on (unpack, "Load unpacked").
 - `18oe-visual-map-1.0.0-source.zip` - sources and `BUILD.md`; Mozilla asks for them because the code is minified.
 
 Every upload to a store needs a higher `--release`. Without `--site` the package runs on a local server only.
-`geometry` is `Oe::MapData.build` of the engine version that the site runs.
 
 ## Before the first upload
 
 1. **Name and Firefox id.** `18OE Visual Map` is a proposal. The id `oe-map@18oe.local`
    (`build-addon.mjs`) cannot be changed after the first upload to Mozilla.
-2. **Rights.** The package holds map data (hexes, tiles, names) derived from the 18OE game files of 18xx.games.
-   The site's MIT license excludes the game titles; the rights holders' consent was given to the site, not to
-   this extension. Ask before giving it to others.
+2. **Rights.** The package holds no map data and no table of company colours: the add-on reads both from the
+   page. It does carry the game's name and the web UI's whole text catalogue (`web/ui/text.ts`, with hints that
+   cite rulebook sections). The site's MIT license excludes the game titles; the rights holders' consent was
+   given to the site, not to this extension. Ask before giving it to others.
 3. **Test on 18xx.games.** The `--site` build has never run there.
 4. **Screenshots.** At least one, 1280x800 or 640x400.
 5. **Accounts.** Mozilla add-on developer account (free), Chrome Web Store developer account (one-time fee),
