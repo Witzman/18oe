@@ -114,3 +114,16 @@ test("the stub ends in an arrow in the middle of the hex, pointing in from the l
   assert.ok(Math.abs(Math.hypot(ax! - bx!, ay! - by!) - 0.26) < 1e-9);
   assert.deepEqual(junctionArrows(geom.nodes, [], 0.3, 0.26), [], "no stub, no arrow");
 });
+
+// Tiles 80-83 and 544-546 branch at a junction too: their paths run through, nothing ends there.
+test("a track junction on land gets no arrow", async () => {
+  const { hexFrame, tileGeometry } = await import("../render/track-axes.ts");
+  const { junctionArrows } = await import("../render/stones.ts");
+  const here = dirname(fileURLToPath(import.meta.url));
+  const tiles = JSON.parse(readFileSync(join(here, "fixtures", "map-tiles.json"), "utf8"));
+  const frame = hexFrame(tiles.layout.edge_vectors);
+  const tile80 = { junction: 0, paths: [0, 1, 2].map((edge) => ({ a: { edge }, b: { node: 0 } })) };
+  const geom = tileGeometry(tile80, 0, frame);
+  assert.equal(geom.nodes.filter((n) => n.kind === "junction").length, 1);
+  assert.deepEqual(junctionArrows(geom.nodes, geom.axes, 0.3, 0.26), []);
+});
