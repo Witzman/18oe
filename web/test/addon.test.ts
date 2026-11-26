@@ -134,6 +134,17 @@ test("our map goes right before the page's map, which is hidden; calling again c
   assert.equal(p.scroller.style.display, "none");
 });
 
+// On the Game tab the page's map sits in a column of width max-content: the page's map brings its own width, the
+// canvas of ours (positioned absolutely) brings none, so the column shrank to the buttons below the map.
+test("our box asks for the whole width the page offers, and no more", () => {
+  const p = page();
+  const placed = attachMap(p.document as never, memory());
+  placed.sync();
+  const box = placed.box as unknown as Node;
+  assert.equal(box.style.width, "100vw", "its own width, so a shrink-to-content column grows");
+  assert.equal(box.style.maxWidth, "100%", "never wider than the place it is in");
+});
+
 test("the switch shows the page's own map for actions, and the choice is remembered", () => {
   const p = page(), store = memory();
   const placed = attachMap(p.document as never, store);

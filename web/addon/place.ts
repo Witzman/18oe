@@ -30,7 +30,8 @@ export function attachMap(document: Document, storage: Pick<Storage, "getItem" |
     Object.assign(el.style, style);
     return el;
   };
-  const box = make("div", {});
+  // A width of its own: where the page lets the map's column shrink to its content (Game tab), it takes the room.
+  const box = make("div", { width: "100vw", maxWidth: "100%" });
   const bar = make("div", { display: "flex", gap: "0.5rem", alignItems: "center", margin: "0.5rem 0 0 0" });
   const button = make("button", { padding: "0.35rem 0.8rem", cursor: "pointer" }) as HTMLButtonElement;
   const note = make("span", {});
