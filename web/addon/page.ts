@@ -61,6 +61,7 @@ export function readBoard(Opal: Opal, game: PageGame): Board {
   }
   const corporations = [...game.$corporations()].map((corp: any) => ({
     id: corp.$id(),
+    name: String(corp.$full_name()),
     closed: corp["$closed?"]() === true,
     color: String(corp.$color()),
     text_color: String(corp.$text_color()),
@@ -71,5 +72,48 @@ export function readBoard(Opal: Opal, game: PageGame): Board {
       return { used: !nil(used) && used !== false, hex };
     }),
   }));
-  return { map, corporations, phase_tiles: [...game.$phase().$tiles()].map(String) };
+  const rows = [...game.$stock_market().$market()].map((row: any) => [...row].map((cell: any) =>
+    nil(cell) ? null : {
+      price: cell.$price(),
+      type: nil(cell.$type()) ? null : String(cell.$type()),
+      corporations: [...cell.$corporations()].map((corp: any) => corp.$id()),
+    }));
+  return { map, corporations, phase_tiles: [...game.$phase().$tiles()].map(String), market: { rows } };
+}
+
+/**
+ * Marks the market grid in what View::Game::StockMarket draws (a snabbdom node), so that place.ts finds it: the
+ * page gives it no id; it is the one child that spans the width and scrolls.
+ */
+export function tagMarket(node: any): void {
+  for (const child of node?.children ?? []) {
+    const style = child?.data?.style;
+    if (style?.width === "100%" && style?.overflow === "auto") {
+      child.data.attrs = { ...child.data.attrs, "data-oe-market": "1" };
+    }
+  }
+}
+
+const tagged = new WeakSet<object>();
+
+/**
+ * Tags the grid wherever the page draws the market of an 18OE game (market tab, stock and auction views). False
+ * while the page's views are not loaded (they come with its second script): ask again.
+ */
+export function installMarketTag(Opal: Opal, title: string): boolean {
+  const proto = Opal.View?.Game?.StockMarket?.$$prototype;
+  if (!proto) return false;
+  if (tagged.has(proto)) return true;
+  tagged.add(proto);
+  const original = proto["$render"];
+  proto["$render"] = function (this: any, ...args: unknown[]) {
+    const node = original.apply(this, args);
+    try {
+      if (String(this.game.$class().$title()) === title) tagMarket(node);
+    } catch (error) {
+      console.warn("18OE market: could not mark the page's market", error);
+    }
+    return node;
+  };
+  return true;
 }

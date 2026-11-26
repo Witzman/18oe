@@ -50,14 +50,19 @@ export async function buildAddon({ out, geometry, site = false }) {
     outfile: join(out, "content.js"),
     absWorkingDir: root,
     define: { __OE_VERSION__: JSON.stringify(version) },
-    plugins: [virtual({ "oe:geometry": JSON.parse(readFileSync(geometry, "utf8")), "oe:fonts": fontFaces() })],
+    plugins: [virtual({
+      "oe:geometry": JSON.parse(readFileSync(geometry, "utf8")),
+      "oe:fonts": fontFaces(),
+      // the web UI's styles of the price board (#619), for its shadow tree
+      "oe:market-css": ["theme.css", "ui/kit/kit.css", "ui/panels/stock.css"].map((f) => readFileSync(join(root, f), "utf8")).join("\n"),
+    })],
     logLevel: "warning",
   });
   const manifest = {
     manifest_version: 3,
     name: "18OE map (private)",
     version: "0.1.0",
-    description: "Shows the 18OE map in its own style on 18xx games. Reads the page, sends nothing.",
+    description: "Shows the 18OE map and price board in their own style on 18xx games. Reads the page, sends nothing.",
     content_scripts: [{ matches: site ? [...LOCAL, SITE] : LOCAL, js: ["content.js"], run_at: "document_start", world: "MAIN" }],
     browser_specific_settings: { gecko: { id: "oe-map@18oe.local", strict_min_version: "128.0" } },
   };

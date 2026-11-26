@@ -240,6 +240,10 @@ export const TEXT: Readonly<Record<string, Entry>> = {
   "addon.map_original": e("Original map", "Original map", "—"),
   "addon.map_ours": e("18OE map", "18OE map", "—"),
   "addon.failed": e("18OE map failed: {reason}", "18OE map failed: {reason}", "—"),
+  // the same above the price board (#619)
+  "addon.market_original": e("Original market", "Original market", "—"),
+  "addon.market_ours": e("18OE market", "18OE market", "—"),
+  "addon.market_failed": e("18OE market failed: {reason}", "18OE market failed: {reason}", "—"),
   "version.label": e("Version", "Version", "—"),
   "version.line": e("Version {version} · Build {build} · Engine {engine}", "Version {version} · build {build} · engine {engine}", "—"),
   "version.title": e("Version information", "Version information", "—"),
