@@ -183,6 +183,21 @@ export function makeToken(theme: RenderTheme, color: number): Container {
   return out;
 }
 
+/**
+ * A company token as 18xx.games draws it (#618): a flat disc filling the station slot, in units of the side length,
+ * origin at its centre. The abbreviation is drawn on top by the map. Set `scale` and `position` as for makeToken.
+ */
+export function makeBadge(theme: RenderTheme, color: number): Container {
+  const r = theme.slotRadius * BADGE_FILL;
+  const ry = Math.max(r * Math.cos((theme.camera.pitch * Math.PI) / 180), 0.012);
+  const out = new Container({ label: "token" });
+  out.addChild(new Graphics().ellipse(0, 0, r, ry).fill({ color }).stroke({ width: 0.012, color: shade(color, 0.45) }));
+  return out;
+}
+
+/** Radius of a badge as a share of the station slot radius. */
+export const BADGE_FILL = 0.96;
+
 const hex = (n: number): string => `#${n.toString(16).padStart(6, "0")}`;
 
 /** Text colour on a company-coloured token top: the best-contrasting of the theme inks, black and white (computed, ui-spec 1.3). */

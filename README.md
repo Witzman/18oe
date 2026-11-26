@@ -107,7 +107,8 @@ cd web && node build-standalone.mjs --geometry map.json --board board.json   # -
 `oe-map.js` (global `OeMap`, entry `web/render/standalone.ts`) needs no server: `geometry` is `GET /map`
 (`Oe::MapData.build`) as a file, `board` the part of the game state the map reads (`web/render/board.ts`).
 It imports `pixi.js/unsafe-eval`, so it runs where a content security policy forbids eval. `map.html` is a
-self-contained test page (data and fonts inside, no eval, no network). The imports from outside
+self-contained test page (data and fonts inside, no eval, no network). In this bundle (not in the web UI)
+company tokens look as on 18xx.games: a flat disc with the abbreviation, in the colours the board brings. The imports from outside
 `render/` and `themes/` are pinned by `web/test/standalone.test.ts`.
 
 ## Running with Docker
