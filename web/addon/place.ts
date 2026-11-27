@@ -11,10 +11,14 @@ export interface Placed {
   stage: HTMLElement;
   /** Puts the box in place; false when the page shows no such element. */
   sync(): boolean;
-  /** Ours is on screen (false: the player switched to the page's, or ours failed). */
+  /** Ours is on screen (false: the player switched to the page's, or ours cannot be shown). */
   showing(): boolean;
-  /** Ours cannot be drawn: say why and leave the page's. */
+  /** Ours cannot be drawn: say why and leave the page's, for good. */
   fail(message: string): void;
+  /** The game cannot be read: say why and leave the page's, until called with null. */
+  lose(reason: string | null): void;
+  /** Takes ours away and leaves the page's. */
+  remove(): void;
 }
 
 // Assign only on a change: each write is a DOM mutation, and mutations trigger the next sync.
@@ -22,7 +26,7 @@ function set<T, K extends keyof T>(target: T, key: K, value: T[K]): void {
   if (target[key] !== value) target[key] = value;
 }
 
-type Store = Pick<Storage, "getItem" | "setItem">;
+export type Store = Pick<Storage, "getItem" | "setItem">;
 
 /** What is replaced and how it is called. */
 interface View {
@@ -68,13 +72,18 @@ function attach(view: View, document: Document, storage: Store, onShow?: () => v
   bar.append(button, note);
   box.append(bar, stage);
 
-  let failed = false;
+  let failed: string | null = null;
+  let lost: string | null = null;
   let page: HTMLElement | null = null;
   const read = () => { try { return storage.getItem(view.key) === "1"; } catch { return false; } };
   let original = read();
-  const showing = () => !failed && !original;
+  const broken = () => failed ?? lost;
+  const showing = () => broken() === null && !original;
 
   function apply() {
+    const reason = broken();
+    set(note, "textContent", reason === null ? "" : txt(view.texts.failed).text.replace("{reason}", reason));
+    set(button.style, "display", reason === null ? "" : "none");
     if (page) set(page.style, "display", showing() ? "none" : "");
     set(stage.style, "display", showing() ? "" : "none");
     set(button, "textContent", txt(showing() ? view.texts.original : view.texts.ours).text);
@@ -102,9 +111,17 @@ function attach(view: View, document: Document, storage: Store, onShow?: () => v
       return true;
     },
     fail(message) {
-      failed = true;
-      note.textContent = txt(view.texts.failed).text.replace("{reason}", message);
+      failed = message;
       apply();
+    },
+    lose(reason) {
+      lost = reason;
+      apply();
+    },
+    remove() {
+      if (page) set(page.style, "display", "");
+      page = null;
+      if (box.parentNode) box.remove();
     },
   };
 }

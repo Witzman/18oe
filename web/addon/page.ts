@@ -9,9 +9,9 @@ export type PageGame = any;
 /**
  * Reports the game the page shows. Every redraw goes through Snabberb::Component#update!, whose root store holds
  * it. Reported when it is another object (history navigation, undo) or has another number of actions: a move is
- * applied to the same object (`process_action` returns self).
+ * applied to the same object (`process_action` returns self). An error on the way never reaches the page.
  */
-export function installHook(Opal: Opal, onGame: (game: PageGame) => void): void {
+export function installHook(Opal: Opal, onGame: (game: PageGame) => void, onError?: (game: PageGame, error: unknown) => void): void {
   const proto = Opal.Snabberb.Component.$$prototype;
   const original = proto["$update!"];
   let last: PageGame = null;
@@ -20,8 +20,9 @@ export function installHook(Opal: Opal, onGame: (game: PageGame) => void): void 
     try {
       return original.apply(this, args);
     } finally {
+      let game: PageGame;
       try {
-        const game = this.root?.store?.["$[]"]("game");
+        game = this.root?.store?.["$[]"]("game");
         if (game && game !== Opal.nil) {
           const count: number = game.$raw_actions().length;
           if (game !== last || count !== moves) {
@@ -32,9 +33,33 @@ export function installHook(Opal: Opal, onGame: (game: PageGame) => void): void 
         }
       } catch (error) {
         console.warn("18OE map: could not read the game", error);
+        onError?.(game, error);
       }
     }
   };
+}
+
+/** What follows the page's game: our views (views.ts). */
+export interface Views {
+  /** The page shows this game of ours, read just now. */
+  show(board: Board, game: PageGame): void;
+  /** The page shows a game that is not ours. */
+  leave(): void;
+  /** The page's game of ours cannot be read: what we drew last must not stand in for it. */
+  lose(reason: string): void;
+}
+
+export function followGame(Opal: Opal, title: string, views: Views): void {
+  const isOurs = (game: PageGame) => String(game.$class().$title()) === title;
+  installHook(Opal, (game) => {
+    if (isOurs(game)) views.show(readBoard(Opal, game), game);
+    else views.leave();
+  }, (game, error) => {
+    let ours = false;
+    try { ours = isOurs(game); } catch { /* unknown: say nothing on what may be another title's page */ }
+    if (ours) views.lose(String((error as Error)?.message ?? error));
+    else views.leave();
+  });
 }
 
 /** The part of the game the map draws (render/board.ts); `map` as lib/oe/view.rb builds it. */
