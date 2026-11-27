@@ -8,8 +8,9 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { buildAddon } from "../build-addon.mjs";
 import { boardNode, boardStyles } from "../addon/market.ts";
-import { installHook, installMarketTag, readBoard, tagMarket } from "../addon/page.ts";
+import { followGame, installHook, installMarketTag, readBoard, tagMarket } from "../addon/page.ts";
 import { attachMap, attachMarket } from "../addon/place.ts";
+import { createViews } from "../addon/views.ts";
 import { find, textOf } from "../ui/kit/vnode.ts";
 
 const web = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -100,6 +101,7 @@ class Node {
   parentNode: Node | null = null;
   style: Record<string, string> = {};
   attributes: Record<string, string> = {};
+  dataset: Record<string, string> = {};
   textContent = "";
   onclick: (() => void) | null = null;
   tag: string;
@@ -189,6 +191,129 @@ test("a map that cannot be drawn leaves the page's map visible and says why", ()
   placed.fail("no webgl");
   assert.equal(p.scroller.style.display, "");
   assert.match((placed.box as unknown as Node).children[0]!.children[1]!.textContent, /no webgl/);
+});
+
+// ---- when the game cannot be read (#627) -------------------------------------------------------------
+const noteOf = (box: unknown) => (box as Node).children[0]!.children[1]!.textContent;
+
+test("a game that cannot be read: the page's own, a reason and no switch; ours again once it can", () => {
+  const p = page();
+  const placed = attachMap(p.document as never, memory());
+  placed.sync();
+  const button = (placed.box as unknown as Node).children[0]!.children[0]!;
+  placed.lose("no such method");
+  assert.equal(p.scroller.style.display, "");
+  assert.equal((placed.stage as unknown as Node).style.display, "none");
+  assert.match(noteOf(placed.box), /no such method/);
+  assert.equal(button.style.display, "none", "nothing to switch to");
+  placed.sync();
+  assert.equal(p.scroller.style.display, "", "a redraw does not bring the old map back");
+  placed.lose(null);
+  assert.equal(p.scroller.style.display, "none");
+  assert.equal(noteOf(placed.box), "");
+  assert.equal(button.style.display, "");
+});
+
+test("reading again does not bring back a view that could not be drawn", () => {
+  const p = page();
+  const placed = attachMap(p.document as never, memory());
+  placed.sync();
+  placed.fail("no webgl");
+  placed.lose("no such method");
+  placed.lose(null);
+  assert.equal(p.scroller.style.display, "");
+  assert.match(noteOf(placed.box), /no webgl/);
+});
+
+/** The add-on on a stand-in page showing map and market; `settle` runs what it scheduled. */
+function addon(draw: { map?: () => Promise<void> } = {}) {
+  const p = page();
+  const grid = new Node("div");
+  p.view.append(grid);
+  p.document.querySelector = (selector: string) => (selector === "[data-oe-market]" ? grid : null);
+  const frames: (() => void)[] = [];
+  const drawn: string[] = [];
+  const views = createViews({
+    document: p.document as never,
+    storage: memory(),
+    frame: (run) => { frames.push(run); },
+    map: async () => { await draw.map?.(); drawn.push("map"); return { setBoard: () => { drawn.push("map"); } }; },
+    market: () => ({ setBoard: () => { drawn.push("market"); } }),
+  });
+  const { Opal, proto } = opal();
+  followGame(Opal, "18OE", views);
+  const settle = async () => {
+    while (frames.length) { frames.shift()!(); await new Promise((r) => setImmediate(r)); }
+  };
+  const boxes = () => p.view.children.filter((c) => c.children[0]?.children[0]?.tag === "button");
+  const ours = () => [p.scroller.style.display === "none", grid.style.display === "none"];
+  return { p, grid, views, drawn, boxes, ours, settle, show: async (game: unknown) => { redraw(proto, game); await settle(); } };
+}
+
+const quiet = (t: { mock: { method: (o: object, m: string, f: () => void) => unknown } }) => t.mock.method(console, "warn", () => {});
+
+test("a board that can no longer be read: map and market of the page come back at once", async (t) => {
+  quiet(t);
+  const a = addon();
+  await a.show(pageGame());
+  assert.deepEqual(a.ours(), [true, true]);
+  await a.show({ ...pageGame([{}]), $hexes: () => { throw new TypeError("$hexes is not a function"); } });
+  assert.deepEqual(a.ours(), [false, false]);
+  for (const box of a.boxes()) assert.match(noteOf(box), /\$hexes is not a function/);
+  a.views.refresh();
+  await a.settle();
+  assert.deepEqual(a.ours(), [false, false], "a redraw of the page changes nothing");
+  await a.show(pageGame([{}, {}]));
+  assert.deepEqual(a.ours(), [true, true]);
+});
+
+test("a count of moves that cannot be read counts as a game that cannot be read", async (t) => {
+  quiet(t);
+  const a = addon();
+  await a.show(pageGame());
+  assert.deepEqual(a.ours(), [true, true]);
+  await a.show({ ...pageGame(), $raw_actions: () => { throw new Error("gone"); } });
+  assert.deepEqual(a.ours(), [false, false]);
+});
+
+test("a first read that fails says so next to the page's map", async (t) => {
+  quiet(t);
+  const a = addon();
+  await a.show({ ...pageGame(), $phase: () => { throw new Error("gone"); } });
+  assert.deepEqual(a.ours(), [false, false]);
+  assert.equal(a.boxes().length, 2);
+  assert.deepEqual(a.drawn, []);
+});
+
+test("another title takes our views away, and a redraw does not bring them back", async () => {
+  const a = addon();
+  await a.show(pageGame());
+  await a.show({ ...pageGame(), $class: () => ({ $title: () => "1889" }) });
+  assert.deepEqual(a.ours(), [false, false]);
+  assert.equal(a.boxes().length, 0);
+  a.views.refresh();
+  await a.settle();
+  assert.equal(a.boxes().length, 0);
+  await a.show(pageGame([{}]));
+  assert.deepEqual(a.ours(), [true, true], "back with the next 18OE game");
+});
+
+test("an unreadable game that is not known to be 18OE gets no note of ours", async (t) => {
+  quiet(t);
+  const a = addon();
+  await a.show({ $class: () => { throw new Error("gone"); }, $raw_actions: () => [] });
+  assert.equal(a.boxes().length, 0);
+});
+
+test("a read that fails while the map is still being set up leaves the page's map", async (t) => {
+  quiet(t);
+  let done = () => {};
+  const a = addon({ map: () => new Promise<void>((r) => { done = r; }) });
+  await a.show(pageGame());
+  await a.show({ ...pageGame([{}]), $hexes: () => { throw new Error("gone"); } });
+  done();
+  await a.settle();
+  assert.equal(a.p.scroller.style.display, "");
 });
 
 // ---- the stock market (#619) ------------------------------------------------------------------------

@@ -115,6 +115,9 @@ company tokens look as on 18xx.games: a flat disc with the abbreviation, in the 
 
 Our map and our price board in place of the page's in 18OE games on an 18xx server, read-only, each with a
 switch back to the original (the map's is needed for laying track and placing tokens there).
+When the add-on cannot read the game (an error while reading, e.g. after the server's code changed), the originals
+come back with the reason and return to ours with the next read that works; on another title's game neither of ours
+shows. A wrong value read without an error is not noticed.
 
 ```sh
 cd web && node build-addon.mjs          # -> web/dist-addon/, local 18xx server only
