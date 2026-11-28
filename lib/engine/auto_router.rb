@@ -7,6 +7,8 @@ require_relative 'route'
 
 module Engine
   class AutoRouter
+    TIMEOUT_CHECK_INTERVAL = 256
+
     attr_accessor :running
 
     def initialize(game, flash = nil)
@@ -49,7 +51,6 @@ module Engine
       # walk_limit: an upper bound on the number of path-walk callbacks (all start nodes together). It replaces the wall
       # clock path_timeout, so what the walk finds does not depend on how fast the machine is.
       walk_limit = opts[:walk_limit]
-      walks = 0
 
       connections = {}
 
@@ -68,7 +69,8 @@ module Engine
       end
 
       path_walk_timed_out = false
-      now = Time.now
+      walk_count = 0
+      start = Time.now
 
       skip_paths = if @train_autoroute_group.nil?
                      static.flat_map(&:paths).reject { |path| shared_track?(path) }.to_h { |path| [path, true] }
@@ -91,7 +93,7 @@ module Engine
       @next_hexside_bit = 0
 
       nodes.each do |node|
-        if walk_limit ? walks > walk_limit : Time.now - now > path_timeout
+        if walk_limit ? walk_count > walk_limit : Time.now - start > path_timeout
           LOGGER.debug('Path timeout reached')
           path_walk_timed_out = true
           break
@@ -102,12 +104,18 @@ module Engine
         walk_corporation = graph.no_blocking? ? nil : corporation
         graph.walk_token(node, corporation: walk_corporation, skip_paths: skip_paths, links: true,
                                revisit: true) do |_, vp|
-          if walk_limit
-            walks += 1
-            if walks > walk_limit
-              path_walk_timed_out = true
-              next :abort
-            end
+          next :abort if path_walk_timed_out
+
+          walk_count += 1
+          over = if walk_limit
+                   walk_count > walk_limit
+                 else
+                   (walk_count % TIMEOUT_CHECK_INTERVAL).zero? && Time.now - start > path_timeout
+                 end
+          if over
+            LOGGER.debug('Path timeout reached during a node walk')
+            path_walk_timed_out = true
+            next :abort
           end
 
           paths = vp.keys
@@ -228,7 +236,7 @@ module Engine
       # Check that there are no duplicate hexside bits (algorithm error)
       LOGGER.debug do
         "Evaluated #{connections.size} paths, found #{@next_hexside_bit} unique hexsides, and found valid routes "\
-          "#{train_routes.map { |k, v| k.name + ':' + v.size.to_s }.join(', ')} in: #{Time.now - now}"
+          "#{train_routes.map { |k, v| k.name + ':' + v.size.to_s }.join(', ')} in: #{Time.now - start}"
       end
 
       static.each do |route|
