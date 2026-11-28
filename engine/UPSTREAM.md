@@ -31,9 +31,9 @@ engine.
 
 ## Removed
 
-- All other game titles: every `lib/engine/game/g_*` directory and its
-  `g_*.rb` stub except `g_18_oe/`, `g_18_oe.rb`, `g_18_oe_uk_fr/` and
-  `g_18_oe_uk_fr.rb` (the UK-France scenario variant, kept unmodified because
+- All other game titles: every `lib/engine/game/g_*` directory (and its
+  `g_*.rb` stub, where upstream still has one) except `g_18_oe/` and
+  `g_18_oe_uk_fr/` (the UK-France scenario variant, kept unmodified because
   the upstream 18OE specs exercise it). Nothing in `g_18_oe/` or the kept core
   files references another title.
 - Kept unchanged: the whole core (`round/`, `step/`, `ability/`, `part/`,
@@ -93,8 +93,6 @@ SOFTWARE.
 
 ## Known deviations of upstream specs (spec/engine/upstream)
 
-- `right_of_way_spec.rb` 'finds Barcelona a yellow route to the town next to it': expects side 1 connectable (true) instead of
-  false because patch 0003 puts Palma (AB27) in the Spain zone (owner, who built the map, 2026-11-22: "Palma ist Spanien").
 - `stock_round_spec.rb` (six market-move examples), `setup_spec.rb` ('runs the market ...'): the market grid is that of the
   printed board (nine rows, £30 to £550; engine/patches/0013, owner 2026-11-22: "Brett übernehmen"), so the expectations use
   its coordinates.
